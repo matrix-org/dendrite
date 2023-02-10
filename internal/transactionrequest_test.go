@@ -198,8 +198,8 @@ func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
 func createTransactionWithEDU(ctx *process.ProcessContext, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.JetStream.InMemory = true
 	natsInstance := &jetstream.NATSInstance{}

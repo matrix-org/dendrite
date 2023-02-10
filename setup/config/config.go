@@ -79,8 +79,6 @@ type Dendrite struct {
 
 	// Any information derived from the configuration options for later use.
 	Derived Derived `yaml:"-"`
-
-	IsMonolith bool `yaml:"-"`
 }
 
 // TODO: Kill Derived
@@ -191,7 +189,7 @@ type ConfigErrors []string
 
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
-func Load(configPath string, monolith bool) (*Dendrite, error) {
+func Load(configPath string) (*Dendrite, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -202,28 +200,26 @@ func Load(configPath string, monolith bool) (*Dendrite, error) {
 	}
 	// Pass the current working directory and os.ReadFile so that they can
 	// be mocked in the tests
-	return loadConfig(basePath, configData, os.ReadFile, monolith)
+	return loadConfig(basePath, configData, os.ReadFile)
 }
 
 func loadConfig(
 	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
-	monolithic bool,
 ) (*Dendrite, error) {
 	var c Dendrite
 	c.Defaults(DefaultOpts{
-		Generate:   false,
-		Monolithic: monolithic,
+		Generate:       false,
+		SingleDatabase: true,
 	})
-	c.IsMonolith = monolithic
 
 	var err error
 	if err = yaml.Unmarshal(configData, &c); err != nil {
 		return nil, err
 	}
 
-	if err = c.check(monolithic); err != nil {
+	if err = c.check(); err != nil {
 		return nil, err
 	}
 
@@ -333,8 +329,8 @@ func (config *Dendrite) Derive() error {
 }
 
 type DefaultOpts struct {
-	Generate   bool
-	Monolithic bool
+	Generate       bool
+	SingleDatabase bool
 }
 
 // SetDefaults sets default config values if they are not explicitly set.
@@ -355,9 +351,9 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Wiring()
 }
 
-func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *Dendrite) Verify(configErrs *ConfigErrors) {
 	type verifiable interface {
-		Verify(configErrs *ConfigErrors, isMonolith bool)
+		Verify(configErrs *ConfigErrors)
 	}
 	for _, c := range []verifiable{
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
@@ -365,7 +361,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
 	} {
-		c.Verify(configErrs, isMonolith)
+		c.Verify(configErrs)
 	}
 }
 
@@ -461,7 +457,7 @@ func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
 
 // check returns an error type containing all errors found within the config
 // file.
-func (config *Dendrite) check(_ bool) error { // monolithic
+func (config *Dendrite) check() error { // monolithic
 	var configErrs ConfigErrors
 
 	if config.Version != Version {
@@ -526,51 +522,6 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 			return gomatrixserverlib.KeyID(keyID), privKey, nil
 		}
 	}
-}
-
-// AppServiceURL returns a HTTP URL for where the appservice component is listening.
-func (config *Dendrite) AppServiceURL() string {
-	// Hard code the appservice server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.AppServiceAPI.InternalAPI.Connect)
-}
-
-// FederationAPIURL returns an HTTP URL for where the federation API is listening.
-func (config *Dendrite) FederationAPIURL() string {
-	// Hard code the federationapi to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.FederationAPI.InternalAPI.Connect)
-}
-
-// RoomServerURL returns an HTTP URL for where the roomserver is listening.
-func (config *Dendrite) RoomServerURL() string {
-	// Hard code the roomserver to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.RoomServer.InternalAPI.Connect)
-}
-
-// UserAPIURL returns an HTTP URL for where the userapi is listening.
-func (config *Dendrite) UserAPIURL() string {
-	// Hard code the userapi to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.UserAPI.InternalAPI.Connect)
-}
-
-// KeyServerURL returns an HTTP URL for where the key server is listening.
-func (config *Dendrite) KeyServerURL() string {
-	// Hard code the key server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.KeyServer.InternalAPI.Connect)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

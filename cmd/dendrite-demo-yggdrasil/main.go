@@ -117,8 +117,8 @@ func main() {
 		cfg = setup.ParseFlags(true)
 	} else {
 		cfg.Defaults(config.DefaultOpts{
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.Global.PrivateKey = sk
 		cfg.Global.JetStream.StoragePath = config.Path(filepath.Join(*instanceDir, *instanceName))

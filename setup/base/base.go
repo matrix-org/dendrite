@@ -17,7 +17,6 @@ package base
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -38,8 +37,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -53,19 +50,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	federationIntHTTP "github.com/matrix-org/dendrite/federationapi/inthttp"
-	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
-	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 )
 
 //go:embed static/*.gotmpl
@@ -78,7 +65,6 @@ var staticContent embed.FS
 // Must be closed when shutting down.
 type BaseDendrite struct {
 	*process.ProcessContext
-	componentName          string
 	tracerCloser           io.Closer
 	PublicClientAPIMux     *mux.Router
 	PublicFederationAPIMux *mux.Router
@@ -90,8 +76,6 @@ type BaseDendrite struct {
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
 	NATS                   *jetstream.NATSInstance
-	UseHTTPAPIs            bool
-	apiHttpClient          *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
 	DNSCache               *gomatrixserverlib.DNSCache
@@ -111,8 +95,6 @@ type BaseDendriteOptions int
 
 const (
 	DisableMetrics BaseDendriteOptions = iota
-	UseHTTPAPIs
-	PolylithMode
 )
 
 // NewBaseDendrite creates a new instance to be used by a component.
@@ -120,23 +102,16 @@ const (
 // of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
 	platformSanityChecks()
-	useHTTPAPIs := false
 	enableMetrics := true
-	isMonolith := true
 	for _, opt := range options {
 		switch opt {
 		case DisableMetrics:
 			enableMetrics = false
-		case UseHTTPAPIs:
-			useHTTPAPIs = true
-		case PolylithMode:
-			isMonolith = false
-			useHTTPAPIs = true
 		}
 	}
 
 	configErrors := &config.ConfigErrors{}
-	cfg.Verify(configErrors, isMonolith)
+	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
 			logrus.Errorf("Configuration error: %s", err)
@@ -145,7 +120,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	}
 
 	internal.SetupStdLogging()
-	internal.SetupHookLogging(cfg.Logging, componentName)
+	internal.SetupHookLogging(cfg.Logging)
 	internal.SetupPprof()
 
 	logrus.Infof("Dendrite version %s", internal.VersionString())
@@ -160,8 +135,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	}
 
 	var fts *fulltext.Search
-	isSyncOrMonolith := componentName == "syncapi" || isMonolith
-	if cfg.SyncAPI.Fulltext.Enabled && isSyncOrMonolith {
+	if cfg.SyncAPI.Fulltext.Enabled {
 		fts, err = fulltext.New(cfg.SyncAPI.Fulltext)
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to create full text")
@@ -196,32 +170,12 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		)
 	}
 
-	apiClient := http.Client{
-		Timeout: time.Minute * 10,
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
-				// Ordinarily HTTP/2 would expect TLS, but the remote listener is
-				// H2C-enabled (HTTP/2 without encryption). Overriding the DialTLS
-				// function with a plain Dial allows us to trick the HTTP client
-				// into establishing a HTTP/2 connection without TLS.
-				// TODO: Eventually we will want to look at authenticating and
-				// encrypting these internal HTTP APIs, at which point we will have
-				// to reconsider H2C and change all this anyway.
-				return net.Dial(network, addr)
-			},
-		},
-	}
-
 	// If we're in monolith mode, we'll set up a global pool of database
 	// connections. A component is welcome to use this pool if they don't
 	// have a separate database config of their own.
 	var db *sql.DB
 	var writer sqlutil.Writer
 	if cfg.Global.DatabaseOptions.ConnectionString != "" {
-		if !isMonolith {
-			logrus.Panic("Using a global database connection pool is not supported in polylith deployments")
-		}
 		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
 			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
 		}
@@ -246,8 +200,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 
 	return &BaseDendrite{
 		ProcessContext:         process.NewProcessContext(),
-		componentName:          componentName,
-		UseHTTPAPIs:            useHTTPAPIs,
 		tracerCloser:           closer,
 		Cfg:                    cfg,
 		Caches:                 caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics),
@@ -262,7 +214,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
 		NATS:                   &jetstream.NATSInstance{},
-		apiHttpClient:          &apiClient,
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
 		EnableMetrics:          enableMetrics,
@@ -298,52 +249,6 @@ func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, 
 		return b.Database, b.DatabaseWriter, nil
 	}
 	return nil, nil, fmt.Errorf("no database connections configured")
-}
-
-// AppserviceHTTPClient returns the AppServiceInternalAPI for hitting the appservice component over HTTP.
-func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceInternalAPI {
-	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
-	}
-	return a
-}
-
-// RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
-func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
-	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.apiHttpClient, b.Caches)
-	if err != nil {
-		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.apiHttpClient)
-	}
-	return rsAPI
-}
-
-// UserAPIClient returns UserInternalAPI for hitting the userapi over HTTP.
-func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
-	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.apiHttpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("UserAPIClient failed", b.apiHttpClient)
-	}
-	return userAPI
-}
-
-// FederationAPIHTTPClient returns FederationInternalAPI for hitting
-// the federation API server over HTTP
-func (b *BaseDendrite) FederationAPIHTTPClient() federationAPI.FederationInternalAPI {
-	f, err := federationIntHTTP.NewFederationAPIClient(b.Cfg.FederationAPIURL(), b.apiHttpClient, b.Caches)
-	if err != nil {
-		logrus.WithError(err).Panic("FederationAPIHTTPClient failed", b.apiHttpClient)
-	}
-	return f
-}
-
-// KeyServerHTTPClient returns KeyInternalAPI for hitting the key server over HTTP
-func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
-	f, err := keyinthttp.NewKeyServerClient(b.Cfg.KeyServerURL(), b.apiHttpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.apiHttpClient)
-	}
-	return f
 }
 
 // PushGatewayHTTPClient returns a new client for interacting with (external) Push Gateways.
@@ -445,17 +350,15 @@ func (b *BaseDendrite) ConfigureAdminEndpoints() {
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
-	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
+	externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,
 ) {
 	// Manually unlocked right before actually serving requests,
 	// as we don't return from this method (defer doesn't work).
 	b.startupLock.Lock()
-	internalAddr, _ := internalHTTPAddr.Address()
 	externalAddr, _ := externalHTTPAddr.Address()
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	internalRouter := externalRouter
 
 	externalServ := &http.Server{
 		Addr:         string(externalAddr),
@@ -465,25 +368,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			return b.ProcessContext.Context()
 		},
 	}
-	internalServ := externalServ
-
-	if internalAddr != NoListener && externalAddr != internalAddr {
-		// H2C allows us to accept HTTP/2 connections without TLS
-		// encryption. Since we don't currently require any form of
-		// authentication or encryption on these internal HTTP APIs,
-		// H2C gives us all of the advantages of HTTP/2 (such as
-		// stream multiplexing and avoiding head-of-line blocking)
-		// without enabling TLS.
-		internalH2S := &http2.Server{}
-		internalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
-		internalServ = &http.Server{
-			Addr:    string(internalAddr),
-			Handler: h2c.NewHandler(internalRouter, internalH2S),
-			BaseContext: func(_ net.Listener) context.Context {
-				return b.ProcessContext.Context()
-			},
-		}
-	}
 
 	b.configureHTTPErrors()
 
@@ -492,9 +376,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
 
-	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
+	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {
-		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
+		externalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
 	b.ConfigureAdminEndpoints()
@@ -528,7 +412,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		})
 		federationHandler = sentryHandler.Handle(b.PublicFederationAPIMux)
 	}
-	internalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.DendriteAdminMux)
+	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.DendriteAdminMux)
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !b.Cfg.Global.DisableFederation {
 		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
@@ -540,38 +424,11 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.PublicStaticMux)
 
 	b.startupLock.Unlock()
-	if internalAddr != NoListener && internalAddr != externalAddr {
-		go func() {
-			var internalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
-			logrus.Infof("Starting internal %s listener on %s", b.componentName, internalServ.Addr)
-			b.ProcessContext.ComponentStarted()
-			internalServ.RegisterOnShutdown(func() {
-				if internalShutdown.CompareAndSwap(false, true) {
-					b.ProcessContext.ComponentFinished()
-					logrus.Infof("Stopped internal HTTP listener")
-				}
-			})
-			if certFile != nil && keyFile != nil {
-				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-					if err != http.ErrServerClosed {
-						logrus.WithError(err).Fatal("failed to serve HTTPS")
-					}
-				}
-			} else {
-				if err := internalServ.ListenAndServe(); err != nil {
-					if err != http.ErrServerClosed {
-						logrus.WithError(err).Fatal("failed to serve HTTP")
-					}
-				}
-			}
-			logrus.Infof("Stopped internal %s listener on %s", b.componentName, internalServ.Addr)
-		}()
-	}
 
 	if externalAddr != NoListener {
 		go func() {
 			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
-			logrus.Infof("Starting external %s listener on %s", b.componentName, externalServ.Addr)
+			logrus.Infof("Starting external listener on %s", externalServ.Addr)
 			b.ProcessContext.ComponentStarted()
 			externalServ.RegisterOnShutdown(func() {
 				if externalShutdown.CompareAndSwap(false, true) {
@@ -592,7 +449,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					}
 				}
 			}
-			logrus.Infof("Stopped external %s listener on %s", b.componentName, externalServ.Addr)
+			logrus.Infof("Stopped external listener on %s", externalServ.Addr)
 		}()
 	}
 
@@ -600,7 +457,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	<-b.ProcessContext.WaitForShutdown()
 
 	logrus.Infof("Stopping HTTP listeners")
-	_ = internalServ.Shutdown(context.Background())
 	_ = externalServ.Shutdown(context.Background())
 	logrus.Infof("Stopped HTTP listeners")
 }

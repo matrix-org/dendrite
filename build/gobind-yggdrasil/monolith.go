@@ -127,8 +127,8 @@ func (m *DendriteMonolith) Start() {
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk

@@ -34,38 +34,18 @@ import (
 )
 
 var (
-	httpBindAddr   = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	apiBindAddr    = flag.String("api-bind-address", "localhost:18008", "The HTTP listening port for the internal HTTP APIs (if -api is enabled)")
-	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
-	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
-	traceInternal  = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
+	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
+	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	traceInternal = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
 )
 
 func main() {
 	cfg := setup.ParseFlags(true)
 	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
 	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
-	httpAPIAddr := httpAddr
 	options := []basepkg.BaseDendriteOptions{}
-	if *enableHTTPAPIs {
-		logrus.Warnf("DANGER! The -api option is enabled, exposing internal APIs on %q!", *apiBindAddr)
-		httpAPIAddr = config.HTTPAddress("http://" + *apiBindAddr)
-		// If the HTTP APIs are enabled then we need to update the Listen
-		// statements in the configuration so that we know where to find
-		// the API endpoints. They'll listen on the same port as the monolith
-		// itself.
-		cfg.AppServiceAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.ClientAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.FederationAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.KeyServer.InternalAPI.Connect = httpAPIAddr
-		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
-		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.UserAPI.InternalAPI.Connect = httpAPIAddr
-		options = append(options, basepkg.UseHTTPAPIs)
-	}
 
 	base := basepkg.NewBaseDendrite(cfg, "Monolith", options...)
 	defer base.Close() // nolint: errcheck
@@ -75,10 +55,6 @@ func main() {
 	rsImpl := roomserver.NewInternalAPI(base)
 	// call functions directly on the impl unless running in HTTP mode
 	rsAPI := rsImpl
-	if base.UseHTTPAPIs {
-		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl, base.EnableMetrics)
-		rsAPI = base.RoomserverHTTPClient()
-	}
 	if traceInternal {
 		rsAPI = &api.RoomserverInternalAPITrace{
 			Impl: rsAPI,
@@ -88,41 +64,22 @@ func main() {
 	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, base.Caches, nil, false,
 	)
-	fsImplAPI := fsAPI
-	if base.UseHTTPAPIs {
-		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI, base.EnableMetrics)
-		fsAPI = base.FederationAPIHTTPClient()
-	}
+
 	keyRing := fsAPI.KeyRing()
 
 	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
 	keyAPI := keyImpl
-	if base.UseHTTPAPIs {
-		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI, base.EnableMetrics)
-		keyAPI = base.KeyServerHTTPClient()
-	}
 
 	pgClient := base.PushGatewayHTTPClient()
-	userImpl := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
-	userAPI := userImpl
-	if base.UseHTTPAPIs {
-		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI, base.EnableMetrics)
-		userAPI = base.UserAPIClient()
-	}
+	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
+
 	if traceInternal {
 		userAPI = &uapi.UserInternalAPITrace{
 			Impl: userAPI,
 		}
 	}
 
-	// TODO: This should use userAPI, not userImpl, but the appservice setup races with
-	// the listeners and panics at startup if it tries to create appservice accounts
-	// before the listeners are up.
-	asAPI := appservice.NewInternalAPI(base, userImpl, rsAPI)
-	if base.UseHTTPAPIs {
-		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI, base.EnableMetrics)
-		asAPI = base.AppserviceHTTPClient()
-	}
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
@@ -141,7 +98,7 @@ func main() {
 		AppserviceAPI: asAPI,
 		// always use the concrete impl here even in -http mode because adding public routes
 		// must be done on the concrete impl not an HTTP client else fedapi will call itself
-		FederationAPI: fsImplAPI,
+		FederationAPI: fsAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
 		KeyAPI:        keyAPI,
@@ -156,20 +113,12 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		base.SetupAndServeHTTP(
-			httpAPIAddr, // internal API
-			httpAddr,    // external API
-			nil, nil,    // TLS settings
-		)
+		base.SetupAndServeHTTP(httpAddr, nil, nil)
 	}()
 	// Handle HTTPS if certificate and key are provided
 	if *certFile != "" && *keyFile != "" {
 		go func() {
-			base.SetupAndServeHTTP(
-				basepkg.NoListener, // internal API
-				httpsAddr,          // external API
-				certFile, keyFile,  // TLS settings
-			)
+			base.SetupAndServeHTTP(httpsAddr, certFile, keyFile)
 		}()
 	}
 

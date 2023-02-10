@@ -548,8 +548,8 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	t.Helper()
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"

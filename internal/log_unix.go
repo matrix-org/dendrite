@@ -31,7 +31,7 @@ import (
 // SetupHookLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
+func SetupHookLogging(hooks []config.LogrusHook) {
 	levelLogAddedMu.Lock()
 	defer levelLogAddedMu.Unlock()
 	for _, hook := range hooks {
@@ -50,10 +50,10 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		switch hook.Type {
 		case "file":
 			checkFileHookParams(hook.Params)
-			setupFileHook(hook, level, componentName)
+			setupFileHook(hook, level)
 		case "syslog":
 			checkSyslogHookParams(hook.Params)
-			setupSyslogHook(hook, level, componentName)
+			setupSyslogHook(hook, level)
 		case "std":
 			setupStdLogHook(level)
 		default:
@@ -94,8 +94,8 @@ func setupStdLogHook(level logrus.Level) {
 	stdLevelLogAdded[level] = true
 }
 
-func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {
-	syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, componentName)
+func setupSyslogHook(hook config.LogrusHook, level logrus.Level) {
+	syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, "dendrite")
 	if err == nil {
 		logrus.AddHook(&logLevelHook{level, syslogHook})
 	}

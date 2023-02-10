@@ -17,14 +17,12 @@ package federationapi
 import (
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/internal"
-	"github.com/matrix-org/dendrite/federationapi/inthttp"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
@@ -40,12 +38,6 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
 )
-
-// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
-// on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI, enableMetrics bool) {
-	inthttp.AddRoutes(intAPI, router, enableMetrics)
-}
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(

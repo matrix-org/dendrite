@@ -31,8 +31,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	internalHTTPUtil "github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -859,16 +857,6 @@ func completeRegistration(
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
-			}
-		}
-		switch e := err.(type) {
-		case internalHTTPUtil.InternalAPIError:
-			conflictErr := &userapi.ErrorConflict{Message: sqlutil.ErrUserExists.Error()}
-			if e.Message == conflictErr.Error() {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.UserInUse("Desired user ID is already taken."),
-				}
 			}
 		}
 		return util.JSONResponse{

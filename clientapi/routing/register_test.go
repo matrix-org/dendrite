@@ -201,8 +201,8 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	// Set up a config
 	fakeConfig := &config.Dendrite{}
 	fakeConfig.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	fakeConfig.Global.ServerName = "localhost"
 	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}

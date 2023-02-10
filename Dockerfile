@@ -35,19 +35,6 @@ LABEL org.opencontainers.image.documentation="https://matrix-org.github.io/dendr
 LABEL org.opencontainers.image.vendor="The Matrix.org Foundation C.I.C."
 
 #
-# Builds the polylith image and only contains the polylith binary
-#
-FROM dendrite-base AS polylith
-LABEL org.opencontainers.image.title="Dendrite (Polylith)"
-
-COPY --from=build /out/dendrite-polylith-multi /usr/bin/
-
-VOLUME /etc/dendrite
-WORKDIR /etc/dendrite
-
-ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
-
-#
 # Builds the monolith image and contains all required binaries
 #
 FROM dendrite-base AS monolith
