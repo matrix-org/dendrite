@@ -236,7 +236,6 @@ func (p *P2PMonolith) Addr() string {
 
 func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider, enableWebsockets bool) {
 	p.httpMux = mux.NewRouter().SkipClean(true).UseEncodedPath()
-	p.httpMux.PathPrefix(httputil.InternalPathPrefix).Handler(p.BaseDendrite.InternalAPIMux)
 	p.httpMux.PathPrefix(httputil.PublicClientPathPrefix).Handler(p.BaseDendrite.PublicClientAPIMux)
 	p.httpMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.PublicMediaAPIMux)
 	p.httpMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(p.BaseDendrite.DendriteAdminMux)

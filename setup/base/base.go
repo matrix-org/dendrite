@@ -72,7 +72,6 @@ type BaseDendrite struct {
 	PublicMediaAPIMux      *mux.Router
 	PublicWellKnownAPIMux  *mux.Router
 	PublicStaticMux        *mux.Router
-	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
 	NATS                   *jetstream.NATSInstance
@@ -89,7 +88,6 @@ type BaseDendrite struct {
 const NoListener = ""
 
 const HTTPServerTimeout = time.Minute * 5
-const HTTPClientTimeout = time.Second * 30
 
 type BaseDendriteOptions int
 
@@ -208,7 +206,6 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
 		PublicStaticMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicStaticPath).Subrouter().UseEncodedPath(),
-		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
 		NATS:                   &jetstream.NATSInstance{},
@@ -345,8 +342,8 @@ func (b *BaseDendrite) ConfigureAdminEndpoints() {
 	})
 }
 
-// SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
-// ApiMux under /api/ and adds a prometheus handler under /metrics.
+// SetupAndServeHTTP sets up the HTTP server to serve client & federation APIs
+// and adds a prometheus handler under /_dendrite/metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
 	externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,
@@ -374,9 +371,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
 
-	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.InternalAPIMux)
-	if b.Cfg.Global.Metrics.Enabled {
-		externalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
+	if b.Cfg.Global.Metrics.Enabled && b.DendriteAdminMux != nil {
+		b.DendriteAdminMux.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
 	b.ConfigureAdminEndpoints()
