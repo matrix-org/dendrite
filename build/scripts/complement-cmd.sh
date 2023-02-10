@@ -16,5 +16,5 @@ else
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \
-    --config dendrite.yaml \
+    --config dendrite.yaml
 fi
