@@ -6,6 +6,7 @@
 
 ### Features
 
+* Dendrite can now be compiled against Go 1.20
 * Initial store and forward support has been added
 * A landing page showing that Dendrite is running has been added (contributed by [LukasLJL](https://github.com/LukasLJL))
 
