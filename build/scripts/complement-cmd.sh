@@ -12,7 +12,7 @@ if [[ "${COVER}" -eq 1 ]]; then
     --test.coverprofile=complementcover.log
 else
   echo "Not running with coverage"
-  exec /dendrite/dendrite-monolith-server \
+  exec /dendrite/dendrite \
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \
