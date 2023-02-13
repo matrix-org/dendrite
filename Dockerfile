@@ -3,7 +3,7 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.19-alpine AS base
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.20-alpine AS base
 RUN apk --update --no-cache add bash build-base curl
 
 #
@@ -28,6 +28,7 @@ RUN --mount=target=. \
 # Builds the Dendrite image containing all required binaries
 #
 FROM alpine:latest
+RUN apk --update --no-cache add curl
 LABEL org.opencontainers.image.title="Dendrite"
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
@@ -38,11 +39,11 @@ LABEL org.opencontainers.image.vendor="The Matrix.org Foundation C.I.C."
 COPY --from=build /out/create-account /usr/bin/create-account
 COPY --from=build /out/generate-config /usr/bin/generate-config
 COPY --from=build /out/generate-keys /usr/bin/generate-keys
-COPY --from=build /out/dendrite-monolith-server /usr/bin/dendrite-monolith-server
+COPY --from=build /out/dendrite /usr/bin/dendrite
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
 
-ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
+ENTRYPOINT ["/usr/bin/dendrite"]
 EXPOSE 8008 8448
 

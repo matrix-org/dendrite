@@ -371,8 +371,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
 
-	if b.Cfg.Global.Metrics.Enabled && b.DendriteAdminMux != nil {
-		b.DendriteAdminMux.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
+	if b.Cfg.Global.Metrics.Enabled {
+		externalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
 	b.ConfigureAdminEndpoints()
