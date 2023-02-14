@@ -283,7 +283,7 @@ func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Ve
 	return semVers, nil
 }
 
-func calculateVersions(cli *http.Client, from, to string, direct bool) ([]*semver.Version, bool) {
+func calculateVersions(cli *http.Client, from, to string, direct bool) []*semver.Version {
 	semvers, err := getAndSortVersionsFromGithub(cli)
 	if err != nil {
 		log.Fatalf("failed to collect semvers from github: %s", err)
@@ -338,10 +338,10 @@ func calculateVersions(cli *http.Client, from, to string, direct bool) ([]*semve
 	if direct {
 		semvers = []*semver.Version{semvers[0], semvers[len(semvers)-1]}
 	}
-	return semvers, to == HEAD
+	return semvers
 }
 
-func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, baseTempDir string, concurrency int, versions []*semver.Version, wantLatest bool) map[string]string {
+func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, baseTempDir string, concurrency int, versions []*semver.Version) map[string]string {
 	// concurrently build all versions, this can be done in any order. The mutex protects the map
 	branchToImageID := make(map[string]string)
 	var mu sync.Mutex
@@ -576,10 +576,10 @@ func main() {
 		os.Exit(1)
 	}
 	cleanup(dockerClient)
-	versions, wantLatest := calculateVersions(httpClient, *flagFrom, *flagTo, *flagDirect)
+	versions := calculateVersions(httpClient, *flagFrom, *flagTo, *flagDirect)
 	log.Printf("Testing dendrite versions: %v\n", versions)
 
-	branchToImageID := buildDendriteImages(httpClient, dockerClient, *flagTempDir, *flagBuildConcurrency, versions, wantLatest)
+	branchToImageID := buildDendriteImages(httpClient, dockerClient, *flagTempDir, *flagBuildConcurrency, versions)
 
 	// make a shared postgres volume
 	volume, err := dockerClient.VolumeCreate(context.Background(), volume.VolumeCreateBody{
