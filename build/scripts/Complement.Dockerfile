@@ -16,7 +16,7 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/dendrite && \
+    CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/dendrite && \
     CGO_ENABLED=${CGO} go test -c -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 

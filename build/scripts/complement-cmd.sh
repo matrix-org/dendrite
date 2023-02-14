@@ -4,7 +4,7 @@
 
 if [[ "${COVER}" -eq 1 ]]; then
   echo "Running with coverage"
-  exec /dendrite/dendrite-monolith-server-cover \
+  exec /dendrite/dendrite-cover \
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \

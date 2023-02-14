@@ -19,7 +19,7 @@ WORKDIR /runtime
 # This script compiles Dendrite for us.
 RUN echo '\
     #!/bin/bash -eux \n\
-    if test -f "/runtime/dendrite-monolith-server" && test -f "/runtime/dendrite-monolith-server-cover"; then \n\
+    if test -f "/runtime/dendrite" && test -f "/runtime/dendrite-cover"; then \n\
     echo "Skipping compilation; binaries exist" \n\
     exit 0 \n\
     fi \n\
