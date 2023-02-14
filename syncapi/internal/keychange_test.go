@@ -64,7 +64,7 @@ func (k *mockKeyAPI) QuerySignatures(ctx context.Context, req *keyapi.QuerySigna
 }
 
 type mockRoomserverAPI struct {
-	api.RoomserverInternalAPITrace
+	api.RoomserverInternalAPI
 	roomIDToJoinedMembers map[string][]string
 }
 

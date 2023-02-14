@@ -80,8 +80,8 @@ type P2PMonolith struct {
 func GenerateDefaultConfig(sk ed25519.PrivateKey, storageDir string, cacheDir string, dbPrefix string) *config.Dendrite {
 	cfg := config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.PrivateKey = sk
 	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", filepath.Join(cacheDir, dbPrefix)))
@@ -121,9 +121,9 @@ func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 
 func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
 	if enableMetrics {
-		p.BaseDendrite = base.NewBaseDendrite(cfg, "Monolith")
+		p.BaseDendrite = base.NewBaseDendrite(cfg)
 	} else {
-		p.BaseDendrite = base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+		p.BaseDendrite = base.NewBaseDendrite(cfg, base.DisableMetrics)
 	}
 	p.port = port
 	p.BaseDendrite.ConfigureAdminEndpoints()
@@ -236,7 +236,6 @@ func (p *P2PMonolith) Addr() string {
 
 func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider, enableWebsockets bool) {
 	p.httpMux = mux.NewRouter().SkipClean(true).UseEncodedPath()
-	p.httpMux.PathPrefix(httputil.InternalPathPrefix).Handler(p.BaseDendrite.InternalAPIMux)
 	p.httpMux.PathPrefix(httputil.PublicClientPathPrefix).Handler(p.BaseDendrite.PublicClientAPIMux)
 	p.httpMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.PublicMediaAPIMux)
 	p.httpMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(p.BaseDendrite.DendriteAdminMux)

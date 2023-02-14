@@ -2,13 +2,10 @@ package roomserver_test
 
 import (
 	"context"
-	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi"
 
@@ -22,7 +19,6 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -207,24 +203,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 			}
 		}
 
-		t.Run("HTTP API", func(t *testing.T) {
-			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-			roomserver.AddInternalRoutes(router, rsAPI, false)
-			apiURL, cancel := test.ListenAndServe(t, router, false)
-			defer cancel()
-			httpAPI, err := inthttp.NewRoomserverClient(apiURL, &http.Client{Timeout: time.Second * 5}, nil)
-			if err != nil {
-				t.Fatalf("failed to create HTTP client")
-			}
-			testCase(httpAPI)
-		})
-		t.Run("Monolith", func(t *testing.T) {
-			testCase(rsAPI)
-			// also test tracing
-			traceAPI := &api.RoomserverInternalAPITrace{Impl: rsAPI}
-			testCase(traceAPI)
-		})
-
+		testCase(rsAPI)
 	})
 }
 

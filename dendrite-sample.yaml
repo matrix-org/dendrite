@@ -38,7 +38,7 @@ global:
 
   # Global database connection pool, for PostgreSQL monolith deployments only. If
   # this section is populated then you can omit the "database" blocks in all other
-  # sections. For polylith deployments, or monolith deployments using SQLite databases,
+  # sections. For monolith deployments using SQLite databases,
   # you must configure the "database" block for each component instead.
   database:
     connection_string: postgresql://username:password@hostname/dendrite?sslmode=disable
@@ -113,8 +113,7 @@ global:
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an
     # internal NATS server will be started automatically when running Dendrite in
-    # monolith mode. For polylith deployments, it is required to specify the address
-    # of at least one NATS Server node.
+    # monolith mode.
     addresses:
     # - localhost:4222
 

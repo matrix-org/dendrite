@@ -7,9 +7,6 @@ import (
 type MediaAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
-
 	// The MediaAPI database stores information about files uploaded and downloaded
 	// by local users. It is only accessed by the MediaAPI.
 	Database DatabaseOptions `yaml:"database,omitempty"`
@@ -39,12 +36,6 @@ type MediaAPI struct {
 var DefaultMaxFileSizeBytes = FileSizeBytes(10485760)
 
 func (c *MediaAPI) Defaults(opts DefaultOpts) {
-	if !opts.Monolithic {
-		c.InternalAPI.Listen = "http://localhost:7774"
-		c.InternalAPI.Connect = "http://localhost:7774"
-		c.ExternalAPI.Listen = "http://[::]:8074"
-		c.Database.Defaults(5)
-	}
 	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
 	if opts.Generate {
@@ -65,14 +56,14 @@ func (c *MediaAPI) Defaults(opts DefaultOpts) {
 				ResizeMethod: "scale",
 			},
 		}
-		if !opts.Monolithic {
+		if !opts.SingleDatabase {
 			c.Database.ConnectionString = "file:mediaapi.db"
 		}
 		c.BasePath = "./media_store"
 	}
 }
 
-func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *MediaAPI) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
@@ -81,13 +72,8 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].width", i), int64(size.Width))
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].height", i), int64(size.Height))
 	}
-	if isMonolith { // polylith required configs below
-		return
-	}
+
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 	}
-	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))
-	checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
 }

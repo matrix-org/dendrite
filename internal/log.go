@@ -129,9 +129,9 @@ func checkFileHookParams(params map[string]interface{}) {
 }
 
 // Add a new FSHook to the logger. Each component will log in its own file
-func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName string) {
+func setupFileHook(hook config.LogrusHook, level logrus.Level) {
 	dirPath := (hook.Params["path"]).(string)
-	fullPath := filepath.Join(dirPath, componentName+".log")
+	fullPath := filepath.Join(dirPath, "dendrite.log")
 
 	if err := os.MkdirAll(path.Dir(fullPath), os.ModePerm); err != nil {
 		logrus.Fatalf("Couldn't create directory %s: %q", path.Dir(fullPath), err)
