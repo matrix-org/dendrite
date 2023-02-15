@@ -181,6 +181,7 @@ func (s *devicesStatements) DeleteDevices(
 	if err != nil {
 		return err
 	}
+	defer internal.CloseAndLogIfError(ctx, prep, "DeleteDevices.StmtClose() failed")
 	stmt := sqlutil.TxStmt(txn, prep)
 	params := make([]interface{}, len(devices)+2)
 	params[0] = localpart

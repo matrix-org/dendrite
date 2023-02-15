@@ -104,6 +104,34 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
 	}
 
+	if err != nil {
+		return nil, err
+	}
+	otk, err := NewPostgresOneTimeKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	dk, err := NewPostgresDeviceKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	kc, err := NewPostgresKeyChangesTable(db)
+	if err != nil {
+		return nil, err
+	}
+	sdl, err := NewPostgresStaleDeviceListsTable(db)
+	if err != nil {
+		return nil, err
+	}
+	csk, err := NewPostgresCrossSigningKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	css, err := NewPostgresCrossSigningSigsTable(db)
+	if err != nil {
+		return nil, err
+	}
+
 	m = sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "userapi: server names populate",
@@ -128,6 +156,12 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		Pushers:               pusherTable,
 		Notifications:         notificationsTable,
 		Stats:                 statsTable,
+		OneTimeKeysTable:      otk,
+		DeviceKeysTable:       dk,
+		KeyChangesTable:       kc,
+		StaleDeviceListsTable: sdl,
+		CrossSigningKeysTable: csk,
+		CrossSigningSigsTable: css,
 		ServerName:            serverName,
 		DB:                    db,
 		Writer:                writer,

@@ -22,7 +22,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
 	if err != nil {

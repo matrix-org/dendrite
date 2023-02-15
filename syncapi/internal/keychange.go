@@ -18,22 +18,22 @@ import (
 	"context"
 	"strings"
 
+	keytypes "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
-	keytypes "github.com/matrix-org/dendrite/keyserver/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/userapi/api"
 )
 
 // DeviceOTKCounts adds one-time key counts to the /sync response
-func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
-	var queryRes keyapi.QueryOneTimeKeysResponse
-	_ = keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
+func DeviceOTKCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
+	var queryRes api.QueryOneTimeKeysResponse
+	_ = keyAPI.QueryOneTimeKeys(ctx, &api.QueryOneTimeKeysRequest{
 		UserID:   userID,
 		DeviceID: deviceID,
 	}, &queryRes)
@@ -48,7 +48,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, devi
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
 func DeviceListCatchup(
-	ctx context.Context, db storage.SharedUsers, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
+	ctx context.Context, db storage.SharedUsers, userAPI api.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
 	userID string, res *types.Response, from, to types.StreamPosition,
 ) (newPos types.StreamPosition, hasNew bool, err error) {
 
@@ -74,8 +74,8 @@ func DeviceListCatchup(
 	if from > 0 {
 		offset = int64(from)
 	}
-	var queryRes keyapi.QueryKeyChangesResponse
-	_ = keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
+	var queryRes api.QueryKeyChangesResponse
+	_ = userAPI.QueryKeyChanges(ctx, &api.QueryKeyChangesRequest{
 		Offset:   offset,
 		ToOffset: toOffset,
 	}, &queryRes)

@@ -28,9 +28,9 @@ import (
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 )
 
 const (
@@ -59,7 +59,7 @@ func Send(
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
-	keyAPI keyapi.FederationKeyAPI,
+	keyAPI userAPI.FederationUserAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation federationAPI.FederationClient,
 	mu *internal.MutexByRoom,

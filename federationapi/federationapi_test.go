@@ -17,13 +17,13 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/internal"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type fedRoomserverAPI struct {
@@ -230,9 +230,9 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	// Inject a keyserver key change event and ensure we try to send it out. If we don't, then the
 	// federationapi is incorrectly waiting for an output room event to arrive to update the joined
 	// hosts table.
-	key := keyapi.DeviceMessage{
-		Type: keyapi.TypeDeviceKeyUpdate,
-		DeviceKeys: &keyapi.DeviceKeys{
+	key := userapi.DeviceMessage{
+		Type: userapi.TypeDeviceKeyUpdate,
+		DeviceKeys: &userapi.DeviceKeys{
 			UserID:      joiningUser.ID,
 			DeviceID:    "MY_DEVICE",
 			DisplayName: "BLARGLE",
@@ -277,7 +277,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(b, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, nil)
+	federationapi.AddPublicRoutes(b, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil)
 	baseURL, cancel := test.ListenAndServe(t, b.PublicFederationAPIMux, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
