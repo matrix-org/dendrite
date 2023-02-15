@@ -33,8 +33,7 @@ func init() {
 }
 
 // calculateHistoryVisibilityDuration stores the time it takes to
-// calculate the history visibility. In polylith mode the roundtrip
-// to the roomserver is included in this time.
+// calculate the history visibility.
 var calculateHistoryVisibilityDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "dendrite",

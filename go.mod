@@ -26,7 +26,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20230131183213-122f1e0e3fa1
-	github.com/matrix-org/pinecone v0.11.1-0.20230111184901-61850f0e63cb
+	github.com/matrix-org/pinecone v0.11.1-0.20230210171230-8c3b24f2649a
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/nats-io/nats-server/v2 v2.9.8
@@ -50,7 +50,6 @@ require (
 	golang.org/x/crypto v0.5.0
 	golang.org/x/image v0.1.0
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
-	golang.org/x/net v0.5.0
 	golang.org/x/term v0.4.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
@@ -106,9 +105,6 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
-	github.com/lucas-clemente/quic-go v0.30.0 // indirect
-	github.com/marten-seemann/qtls-go1-18 v0.1.3 // indirect
-	github.com/marten-seemann/qtls-go1-19 v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
@@ -128,6 +124,10 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/quic-go/qtls-go1-18 v0.2.0 // indirect
+	github.com/quic-go/qtls-go1-19 v0.2.0 // indirect
+	github.com/quic-go/qtls-go1-20 v0.1.0 // indirect
+	github.com/quic-go/quic-go v0.32.0 // indirect
 	github.com/relvacode/iso8601 v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20220927061507-ef77025ab5aa // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
@@ -137,8 +137,9 @@ require (
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
-	golang.org/x/exp v0.0.0-20221031165847-c99f073a8326 // indirect
+	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db // indirect
 	golang.org/x/mod v0.6.0 // indirect
+	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/time v0.1.0 // indirect

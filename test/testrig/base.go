@@ -28,24 +28,24 @@ import (
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   false,
-		Monolithic: true,
+		Generate:       false,
+		SingleDatabase: true,
 	})
 	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{ // use in memory fts
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
@@ -58,7 +58,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		base := base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics)
+		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
 		return base, func() {
 			base.ShutdownDendrite()
 			base.WaitForShutdown()
@@ -66,8 +66,8 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		}
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: false,
 		})
 		cfg.Global.ServerName = "test"
 
@@ -86,7 +86,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
 		cfg.RelayAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "relayapi.db"))
 
-		base := base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics)
+		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
 		return base, func() {
 			base.ShutdownDendrite()
 			base.WaitForShutdown()
@@ -102,14 +102,14 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 	if cfg == nil {
 		cfg = &config.Dendrite{}
 		cfg.Defaults(config.DefaultOpts{
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: false,
 		})
 	}
 	cfg.Global.JetStream.InMemory = true
 	cfg.SyncAPI.Fulltext.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	base := base.NewBaseDendrite(cfg, "Tests", base.DisableMetrics)
+	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
 }

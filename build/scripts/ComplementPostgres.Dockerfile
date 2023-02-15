@@ -34,8 +34,8 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-config && \
     CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/dendrite-monolith-server && \
-    CGO_ENABLED=${CGO} go test --race -c -cover -covermode=atomic -o /dendrite/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server && \
+    CGO_ENABLED=${CGO} go build --race -o /dendrite/dendrite ./cmd/dendrite && \
+    CGO_ENABLED=${CGO} go test --race -c -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /dendrite
@@ -54,6 +54,5 @@ CMD /build/run_postgres.sh && ./generate-keys --keysize 1024 --server $SERVER_NA
     # Bump max_open_conns up here in the global database config
     sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' dendrite.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
-    <<<<<<< HEAD
-exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+    exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
 exec /complement-cmd.sh

@@ -36,6 +36,16 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
+  # Global database connection pool, for PostgreSQL monolith deployments only. If
+  # this section is populated then you can omit the "database" blocks in all other
+  # sections. For monolith deployments using SQLite databases,
+  # you must configure the "database" block for each component instead.
+  database:
+    connection_string: postgresql://username:password@hostname/dendrite?sslmode=disable
+    max_open_conns: 90
+    max_idle_conns: 5
+    conn_max_lifetime: -1
+
   # Configuration for in-memory caches. Caches can often improve performance by
   # keeping frequently accessed items (like events, identifiers etc.) in memory
   # rather than having to read them from the database.
@@ -103,15 +113,18 @@ global:
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an
     # internal NATS server will be started automatically when running Dendrite in
-    # monolith mode. For polylith deployments, it is required to specify the address
-    # of at least one NATS Server node.
+    # monolith mode.
     addresses:
-      - hostname:4222
+    # - localhost:4222
 
     # Disable the validation of TLS certificates of NATS. This is
     # not recommended in production since it may allow NATS traffic
     # to be sent to an insecure endpoint.
     disable_tls_validation: false
+
+    # Persistent directory to store JetStream streams in. This directory should be
+    # preserved across Dendrite restarts.
+    storage_path: ./
 
     # The prefix to use for stream names for this homeserver - really only useful
     # if you are running more than one Dendrite server on the same NATS deployment.
@@ -133,10 +146,6 @@ global:
 
 # Configuration for the Appservice API.
 app_service_api:
-  internal_api:
-    listen: http://[::]:7777 # The listen address for incoming API requests
-    connect: http://app_service_api:7777 # The connect address for other components to use
-
   # Disable the validation of TLS certificates of appservices. This is
   # not recommended in production since it may allow appservice traffic
   # to be sent to an insecure endpoint.
@@ -148,12 +157,6 @@ app_service_api:
 
 # Configuration for the Client API.
 client_api:
-  internal_api:
-    listen: http://[::]:7771 # The listen address for incoming API requests
-    connect: http://client_api:7771 # The connect address for other components to use
-  external_api:
-    listen: http://[::]:8071
-
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
   registration_disabled: true
@@ -186,7 +189,7 @@ client_api:
   recaptcha_public_key: ""
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
-
+  
   # To use hcaptcha.com instead of ReCAPTCHA, set the following parameters, otherwise just keep them empty.
   # recaptcha_siteverify_api: "https://hcaptcha.com/siteverify"
   # recaptcha_api_js_url: "https://js.hcaptcha.com/1/api.js"
@@ -220,17 +223,6 @@ client_api:
 
 # Configuration for the Federation API.
 federation_api:
-  internal_api:
-    listen: http://[::]:7772 # The listen address for incoming API requests
-    connect: http://federation_api:7772 # The connect address for other components to use
-  external_api:
-    listen: http://[::]:8072
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_federationapi?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # How many times we will try to resend a failed transaction to a specific server. The
   # backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc. Once
   # the max retries are exceeded, Dendrite will no longer try to send transactions to
@@ -264,30 +256,8 @@ federation_api:
   # last resort.
   prefer_direct_fetch: false
 
-# Configuration for the Key Server (for end-to-end encryption).
-key_server:
-  internal_api:
-    listen: http://[::]:7779 # The listen address for incoming API requests
-    connect: http://key_server:7779 # The connect address for other components to use
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_keyserver?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
 # Configuration for the Media API.
 media_api:
-  internal_api:
-    listen: http://[::]:7774 # The listen address for incoming API requests
-    connect: http://media_api:7774 # The connect address for other components to use
-  external_api:
-    listen: http://[::]:8074
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_mediaapi?sslmode=disable
-    max_open_conns: 5
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # Storage path for uploaded media. May be relative or absolute.
   base_path: ./media_store
 
@@ -319,35 +289,13 @@ mscs:
   mscs:
   #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
   #  - msc2946  # (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_mscs?sslmode=disable
-    max_open_conns: 5
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
-# Configuration for the Room Server.
-room_server:
-  internal_api:
-    listen: http://[::]:7770 # The listen address for incoming API requests
-    connect: http://room_server:7770 # The connect address for other components to use
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_roomserver?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 
 # Configuration for the Sync API.
 sync_api:
-  internal_api:
-    listen: http://[::]:7773 # The listen address for incoming API requests
-    connect: http://sync_api:7773 # The connect address for other components to use
-  external_api:
-    listen: http://[::]:8073
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_syncapi?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
+  # This option controls which HTTP header to inspect to find the real remote IP
+  # address of the client. This is likely required if Dendrite is running behind
+  # a reverse proxy server.
+  # real_ip_header: X-Real-IP
 
   # Configuration for the full-text search engine.
   search:
@@ -362,22 +310,8 @@ sync_api:
     # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
     language: "en"
 
-  # This option controls which HTTP header to inspect to find the real remote IP
-  # address of the client. This is likely required if Dendrite is running behind
-  # a reverse proxy server.
-  # real_ip_header: X-Real-IP
-
 # Configuration for the User API.
 user_api:
-  internal_api:
-    listen: http://[::]:7781 # The listen address for incoming API requests
-    connect: http://user_api:7781 # The connect address for other components to use
-  account_database:
-    connection_string: postgresql://username:password@hostname/dendrite_userapi?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # The cost when hashing passwords on registration/login. Default: 10. Min: 4, Max: 31
   # See https://pkg.go.dev/golang.org/x/crypto/bcrypt for more information.
   # Setting this lower makes registration/login consume less CPU resources at the cost

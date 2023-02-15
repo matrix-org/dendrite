@@ -24,19 +24,8 @@ jobs:
           - label: SQLite Cgo
             cgo: 1
 
-          - label: SQLite native, full HTTP APIs
-            api: full-http
-
-          - label: SQLite Cgo, full HTTP APIs
-            api: full-http
-            cgo: 1
-
           - label: PostgreSQL
             postgres: postgres
-
-          - label: PostgreSQL, full HTTP APIs
-            postgres: postgres
-            api: full-http
     container:
       image: matrixdotorg/sytest-dendrite:latest
       volumes:
@@ -45,7 +34,6 @@ jobs:
         - /root/.cache/go-mod:/gopath/pkg/mod
       env:
         POSTGRES: ${{ matrix.postgres && 1}}
-        API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
         RACE_DETECTION: 1
         COVER: 1
@@ -93,7 +81,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: '>=1.19.0'
+          go-version: 'stable'
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
@@ -125,21 +113,8 @@ jobs:
           - label: SQLite Cgo
             cgo: 1
 
-          - label: SQLite native, full HTTP APIs
-            api: full-http
-            cgo: 0
-
-          - label: SQLite Cgo, full HTTP APIs
-            api: full-http
-            cgo: 1
-
           - label: PostgreSQL
             postgres: Postgres
-            cgo: 0
-
-          - label: PostgreSQL, full HTTP APIs
-            postgres: Postgres
-            api: full-http
             cgo: 0
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
@@ -182,7 +157,7 @@ jobs:
             (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
       # Build initial Dendrite image
-      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
         env:
           DOCKER_BUILDKIT: 1
@@ -203,8 +178,7 @@ jobs:
         shell: bash
         name: Run Complement Tests
         env:
-          COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }}
-          COMPLEMENT_DENDRITE_API: ${{ matrix.api && 1 }}
+          COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.cgo }}
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_DENDRITE_
           COMPLEMENT_DENDRITE_COVER: 1
           COMPLEMENT_POST_TEST_SCRIPT: /tmp/posttest.sh
@@ -229,7 +203,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: '>=1.19.0'
+          go-version: 'stable'
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3

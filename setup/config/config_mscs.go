@@ -14,11 +14,8 @@ type MSCs struct {
 }
 
 func (c *MSCs) Defaults(opts DefaultOpts) {
-	if !opts.Monolithic {
-		c.Database.Defaults(5)
-	}
 	if opts.Generate {
-		if !opts.Monolithic {
+		if !opts.SingleDatabase {
 			c.Database.ConnectionString = "file:mscs.db"
 		}
 	}
@@ -34,10 +31,7 @@ func (c *MSCs) Enabled(msc string) bool {
 	return false
 }
 
-func (c *MSCs) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if isMonolith { // polylith required configs below
-		return
-	}
+func (c *MSCs) Verify(configErrs *ConfigErrors) {
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
 	}

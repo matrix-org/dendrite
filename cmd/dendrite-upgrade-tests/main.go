@@ -44,6 +44,10 @@ var (
 
 const HEAD = "HEAD"
 
+// The binary was renamed after v0.11.1, so everything after that should use the new name
+var binaryChangeVersion, _ = semver.NewVersion("v0.11.1")
+var latest, _ = semver.NewVersion("v6.6.6") // Dummy version, used as "HEAD"
+
 // Embed the Dockerfile to use when building dendrite versions.
 // We cannot use the dockerfile associated with the repo with each version sadly due to changes in
 // Docker versions. Specifically, earlier Dendrite versions are incompatible with newer Docker clients
@@ -55,15 +59,17 @@ const DockerfilePostgreSQL = `FROM golang:1.19-buster as build
 
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
+ARG BINARY
 
 # Copy the build context to the repo as this is the right dendrite code. This is different to the
 # Complement Dockerfile which wgets a branch.
 COPY . .
 
-RUN go build --race ./cmd/dendrite-monolith-server
+RUN go build --race ./cmd/${BINARY}
 RUN go build --race ./cmd/generate-keys
 RUN go build --race ./cmd/generate-config
 RUN go build --race ./cmd/create-account
+
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
@@ -89,22 +95,24 @@ done \n\
  \n\
 sed -i "s/server_name: localhost/server_name: ${SERVER_NAME}/g" dendrite.yaml \n\
 PARAMS="--tls-cert server.crt --tls-key server.key --config dendrite.yaml" \n\
-./dendrite-monolith-server --really-enable-open-registration ${PARAMS} || ./dendrite-monolith-server ${PARAMS} \n\
+./${BINARY} --really-enable-open-registration ${PARAMS} || ./${BINARY} ${PARAMS} \n\
 ' > run_dendrite.sh && chmod +x run_dendrite.sh
 
 ENV SERVER_NAME=localhost
+ENV BINARY=dendrite
 EXPOSE 8008 8448
-CMD /build/run_dendrite.sh `
+CMD /build/run_dendrite.sh`
 
 const DockerfileSQLite = `FROM golang:1.19-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
+ARG BINARY
 
 # Copy the build context to the repo as this is the right dendrite code. This is different to the
 # Complement Dockerfile which wgets a branch.
 COPY . .
 
-RUN go build --race  ./cmd/dendrite-monolith-server
+RUN go build --race  ./cmd/${BINARY}
 RUN go build --race  ./cmd/generate-keys
 RUN go build --race  ./cmd/generate-config
 RUN go build --race  ./cmd/create-account
@@ -119,10 +127,11 @@ RUN sed -i "s%connection_string:.file:%connection_string: file:\/var\/lib\/postg
 RUN echo '\
 sed -i "s/server_name: localhost/server_name: ${SERVER_NAME}/g" dendrite.yaml \n\
 PARAMS="--tls-cert server.crt --tls-key server.key --config dendrite.yaml" \n\
-./dendrite-monolith-server --really-enable-open-registration ${PARAMS} || ./dendrite-monolith-server ${PARAMS} \n\
+./${BINARY} --really-enable-open-registration ${PARAMS} || ./${BINARY} ${PARAMS} \n\
 ' > run_dendrite.sh && chmod +x run_dendrite.sh
 
 ENV SERVER_NAME=localhost
+ENV BINARY=dendrite
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh `
 
@@ -183,7 +192,7 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 }
 
 // buildDendrite builds Dendrite on the branchOrTagName given. Returns the image ID or an error
-func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir, branchOrTagName string) (string, error) {
+func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir string, branchOrTagName, binary string) (string, error) {
 	var tarball *bytes.Buffer
 	var err error
 	// If a custom HEAD location is given, use that, else pull from github. Mostly useful for CI
@@ -217,6 +226,9 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 	log.Printf("%s: Building version %s\n", branchOrTagName, branchOrTagName)
 	res, err := dockerClient.ImageBuild(context.Background(), tarball, types.ImageBuildOptions{
 		Tags: []string{"dendrite-upgrade"},
+		BuildArgs: map[string]*string{
+			"BINARY": &binary,
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to start building image: %s", err)
@@ -273,7 +285,7 @@ func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Ve
 	return semVers, nil
 }
 
-func calculateVersions(cli *http.Client, from, to string, direct bool) []string {
+func calculateVersions(cli *http.Client, from, to string, direct bool) []*semver.Version {
 	semvers, err := getAndSortVersionsFromGithub(cli)
 	if err != nil {
 		log.Fatalf("failed to collect semvers from github: %s", err)
@@ -321,28 +333,25 @@ func calculateVersions(cli *http.Client, from, to string, direct bool) []string 
 		}
 		semvers = semvers[:i+1]
 	}
-	var versions []string
-	for _, sv := range semvers {
-		versions = append(versions, sv.Original())
-	}
+
 	if to == HEAD {
-		versions = append(versions, HEAD)
+		semvers = append(semvers, latest)
 	}
 	if direct {
-		versions = []string{versions[0], versions[len(versions)-1]}
+		semvers = []*semver.Version{semvers[0], semvers[len(semvers)-1]}
 	}
-	return versions
+	return semvers
 }
 
-func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, baseTempDir string, concurrency int, branchOrTagNames []string) map[string]string {
+func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, baseTempDir string, concurrency int, versions []*semver.Version) map[string]string {
 	// concurrently build all versions, this can be done in any order. The mutex protects the map
 	branchToImageID := make(map[string]string)
 	var mu sync.Mutex
 
 	var wg sync.WaitGroup
 	wg.Add(concurrency)
-	ch := make(chan string, len(branchOrTagNames))
-	for _, branchName := range branchOrTagNames {
+	ch := make(chan *semver.Version, len(versions))
+	for _, branchName := range versions {
 		ch <- branchName
 	}
 	close(ch)
@@ -350,11 +359,13 @@ func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, b
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			for branchName := range ch {
+			for version := range ch {
+				branchName, binary := versionToBranchAndBinary(version)
+				log.Printf("Building version %s with binary %s", branchName, binary)
 				tmpDir := baseTempDir + alphaNumerics.ReplaceAllString(branchName, "")
-				imgID, err := buildDendrite(httpClient, dockerClient, tmpDir, branchName)
+				imgID, err := buildDendrite(httpClient, dockerClient, tmpDir, branchName, binary)
 				if err != nil {
-					log.Fatalf("%s: failed to build dendrite image: %s", branchName, err)
+					log.Fatalf("%s: failed to build dendrite image: %s", version, err)
 				}
 				mu.Lock()
 				branchToImageID[branchName] = imgID
@@ -366,13 +377,14 @@ func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, b
 	return branchToImageID
 }
 
-func runImage(dockerClient *client.Client, volumeName, version, imageID string) (csAPIURL, containerID string, err error) {
-	log.Printf("%s: running image %s\n", version, imageID)
+func runImage(dockerClient *client.Client, volumeName string, branchNameToImageID map[string]string, version *semver.Version) (csAPIURL, containerID string, err error) {
+	branchName, binary := versionToBranchAndBinary(version)
+	imageID := branchNameToImageID[branchName]
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	body, err := dockerClient.ContainerCreate(ctx, &container.Config{
 		Image: imageID,
-		Env:   []string{"SERVER_NAME=hs1"},
+		Env:   []string{"SERVER_NAME=hs1", fmt.Sprintf("BINARY=%s", binary)},
 		Labels: map[string]string{
 			dendriteUpgradeTestLabel: "yes",
 		},
@@ -385,7 +397,7 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 				Target: "/var/lib/postgresql/11/main",
 			},
 		},
-	}, nil, nil, "dendrite_upgrade_test_"+version)
+	}, nil, nil, "dendrite_upgrade_test_"+branchName)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to ContainerCreate: %s", err)
 	}
@@ -452,8 +464,8 @@ func destroyContainer(dockerClient *client.Client, containerID string) {
 	}
 }
 
-func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchToImageID map[string]string) error {
-	csAPIURL, containerID, err := runImage(dockerClient, volumeName, v, branchToImageID[v])
+func loadAndRunTests(dockerClient *client.Client, volumeName string, v *semver.Version, branchToImageID map[string]string) error {
+	csAPIURL, containerID, err := runImage(dockerClient, volumeName, branchToImageID, v)
 	if err != nil {
 		return fmt.Errorf("failed to run container for branch %v: %v", v, err)
 	}
@@ -473,9 +485,10 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 }
 
 // test that create-account is working
-func testCreateAccount(dockerClient *client.Client, v string, containerID string) error {
-	createUser := strings.ToLower("createaccountuser-" + v)
-	log.Printf("%s: Creating account %s with create-account\n", v, createUser)
+func testCreateAccount(dockerClient *client.Client, version *semver.Version, containerID string) error {
+	branchName, _ := versionToBranchAndBinary(version)
+	createUser := strings.ToLower("createaccountuser-" + branchName)
+	log.Printf("%s: Creating account %s with create-account\n", branchName, createUser)
 
 	respID, err := dockerClient.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
 		AttachStderr: true,
@@ -507,9 +520,21 @@ func testCreateAccount(dockerClient *client.Client, v string, containerID string
 	return nil
 }
 
-func verifyTests(dockerClient *client.Client, volumeName string, versions []string, branchToImageID map[string]string) error {
+func versionToBranchAndBinary(version *semver.Version) (branchName, binary string) {
+	binary = "dendrite-monolith-server"
+	branchName = version.Original()
+	if version.GreaterThan(binaryChangeVersion) {
+		binary = "dendrite"
+		if version.Equal(latest) {
+			branchName = HEAD
+		}
+	}
+	return
+}
+
+func verifyTests(dockerClient *client.Client, volumeName string, versions []*semver.Version, branchToImageID map[string]string) error {
 	lastVer := versions[len(versions)-1]
-	csAPIURL, containerID, err := runImage(dockerClient, volumeName, lastVer, branchToImageID[lastVer])
+	csAPIURL, containerID, err := runImage(dockerClient, volumeName, branchToImageID, lastVer)
 	if err != nil {
 		return fmt.Errorf("failed to run container for branch %v: %v", lastVer, err)
 	}

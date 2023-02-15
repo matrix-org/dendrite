@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -23,7 +24,8 @@ type user struct {
 // - register alice and bob with branch name muxed into the localpart
 // - create a DM room for the 2 users and exchange messages
 // - create/join a public #global room and exchange messages
-func runTests(baseURL, branchName string) error {
+func runTests(baseURL string, v *semver.Version) error {
+	branchName, _ := versionToBranchAndBinary(v)
 	// register 2 users
 	users := []user{
 		{
@@ -165,15 +167,16 @@ func runTests(baseURL, branchName string) error {
 }
 
 // verifyTestsRan checks that the HS has the right rooms/messages
-func verifyTestsRan(baseURL string, branchNames []string) error {
+func verifyTestsRan(baseURL string, versions []*semver.Version) error {
 	log.Println("Verifying tests....")
 	// check we can login as all users
 	var resp *gomatrix.RespLogin
-	for _, branchName := range branchNames {
+	for _, version := range versions {
 		client, err := gomatrix.NewClient(baseURL, "", "")
 		if err != nil {
 			return err
 		}
+		branchName, _ := versionToBranchAndBinary(version)
 		userLocalparts := []string{
 			"alice" + branchName,
 			"bob" + branchName,
@@ -229,7 +232,7 @@ func verifyTestsRan(baseURL string, branchNames []string) error {
 			msgArray = append(msgArray, ev)
 		}
 	}
-	wantMsgCount := len(branchNames) * 4
+	wantMsgCount := len(versions) * 4
 	if msgCount != wantMsgCount {
 		msgArrayJSON, _ := json.Marshal(msgArray)
 		return fmt.Errorf("got %d messages in global room, want %d msgArray %v", msgCount, wantMsgCount, string(msgArrayJSON))

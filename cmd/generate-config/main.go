@@ -18,7 +18,6 @@ func main() {
 	dbURI := flag.String("db", "", "The DB URI to use for all components (PostgreSQL only)")
 	dirPath := flag.String("dir", "./", "The folder to use for paths (like SQLite databases, media storage)")
 	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
-	polylith := flag.Bool("polylith", false, "Generate a config that makes sense for polylith deployments")
 	flag.Parse()
 
 	var cfg *config.Dendrite
@@ -27,14 +26,14 @@ func main() {
 			Version: config.Version,
 		}
 		cfg.Defaults(config.DefaultOpts{
-			Generate:   true,
-			Monolithic: !*polylith,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		if *serverName != "" {
 			cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 		}
 		uri := config.DataSource(*dbURI)
-		if *polylith || uri.IsSQLite() || uri == "" {
+		if uri.IsSQLite() || uri == "" {
 			for name, db := range map[string]*config.DatabaseOptions{
 				"federationapi": &cfg.FederationAPI.Database,
 				"keyserver":     &cfg.KeyServer.Database,
@@ -43,6 +42,7 @@ func main() {
 				"roomserver":    &cfg.RoomServer.Database,
 				"syncapi":       &cfg.SyncAPI.Database,
 				"userapi":       &cfg.UserAPI.AccountDatabase,
+				"relayapi":      &cfg.RelayAPI.Database,
 			} {
 				if uri == "" {
 					path := filepath.Join(*dirPath, fmt.Sprintf("dendrite_%s.db", name))
@@ -96,7 +96,7 @@ func main() {
 		}
 	} else {
 		var err error
-		if cfg, err = config.Load(*normalise, !*polylith); err != nil {
+		if cfg, err = config.Load(*normalise); err != nil {
 			panic(err)
 		}
 	}
