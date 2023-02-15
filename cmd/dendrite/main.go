@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"io/fs"
 
 	"github.com/sirupsen/logrus"
 
@@ -30,16 +31,33 @@ import (
 )
 
 var (
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	unixSocket           = flag.String("unix-socket", "", "The HTTP listening unix socket for the server")
+	unixSocketPermission = flag.Int("unix-socket-permission", 0755, "The HTTP listening unix socket permission for the server")
+	httpBindAddr         = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
+	httpsBindAddr        = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	certFile             = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile              = flag.String("tls-key", "", "The PEM private key to use for TLS")
 )
 
 func main() {
 	cfg := setup.ParseFlags(true)
-	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
-	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
+	httpAddr := config.ServerAddress{}
+	httpsAddr := config.ServerAddress{}
+	if *unixSocket == "" {
+		http, err := config.HttpAddress("http://" + *httpBindAddr)
+		if err != nil {
+			logrus.WithError(err).Fatalf("Failed to parse http address")
+		}
+		httpAddr = http
+		https, err := config.HttpAddress("https://" + *httpsBindAddr)
+		if err != nil {
+			logrus.WithError(err).Fatalf("Failed to parse https address")
+		}
+		httpsAddr = https
+	} else {
+		httpAddr = config.UnixSocketAddress(*unixSocket, fs.FileMode(*unixSocketPermission))
+	}
+
 	options := []basepkg.BaseDendriteOptions{}
 
 	base := basepkg.NewBaseDendrite(cfg, options...)
@@ -92,7 +110,7 @@ func main() {
 		base.SetupAndServeHTTP(httpAddr, nil, nil)
 	}()
 	// Handle HTTPS if certificate and key are provided
-	if *certFile != "" && *keyFile != "" {
+	if *unixSocket == "" && *certFile != "" && *keyFile != "" {
 		go func() {
 			base.SetupAndServeHTTP(httpsAddr, certFile, keyFile)
 		}()

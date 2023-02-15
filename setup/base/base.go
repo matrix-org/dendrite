@@ -85,8 +85,6 @@ type BaseDendrite struct {
 	startupLock            sync.Mutex
 }
 
-const NoListener = ""
-
 const HTTPServerTimeout = time.Minute * 5
 
 type BaseDendriteOptions int
@@ -345,18 +343,17 @@ func (b *BaseDendrite) ConfigureAdminEndpoints() {
 // SetupAndServeHTTP sets up the HTTP server to serve client & federation APIs
 // and adds a prometheus handler under /_dendrite/metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
-	externalHTTPAddr config.HTTPAddress,
+	externalHTTPAddr config.ServerAddress,
 	certFile, keyFile *string,
 ) {
 	// Manually unlocked right before actually serving requests,
 	// as we don't return from this method (defer doesn't work).
 	b.startupLock.Lock()
-	externalAddr, _ := externalHTTPAddr.Address()
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
 	externalServ := &http.Server{
-		Addr:         string(externalAddr),
+		Addr:         externalHTTPAddr.Address,
 		WriteTimeout: HTTPServerTimeout,
 		Handler:      externalRouter,
 		BaseContext: func(_ net.Listener) context.Context {
@@ -419,7 +416,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	b.startupLock.Unlock()
 
-	if externalAddr != NoListener {
+	if externalHTTPAddr.Enabled() {
 		go func() {
 			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
 			logrus.Infof("Starting external listener on %s", externalServ.Addr)
@@ -437,9 +434,27 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					}
 				}
 			} else {
-				if err := externalServ.ListenAndServe(); err != nil {
-					if err != http.ErrServerClosed {
-						logrus.WithError(err).Fatal("failed to serve HTTP")
+				if externalHTTPAddr.IsUnixSocket() {
+					_ = os.Remove(externalHTTPAddr.Address)
+					listener, err := net.Listen(externalHTTPAddr.Network(), externalHTTPAddr.Address)
+					if err != nil {
+						logrus.WithError(err).Fatal("failed to serve unix socket HTTP")
+					}
+					err = os.Chmod(externalHTTPAddr.Address, externalHTTPAddr.UnixSocketPermission)
+					if err != nil {
+						logrus.WithError(err).Fatal("failed to set unix socket permissions")
+					}
+					if err := externalServ.Serve(listener); err != nil {
+						if err != http.ErrServerClosed {
+							logrus.WithError(err).Fatal("failed to serve HTTP")
+						}
+					}
+
+				} else {
+					if err := externalServ.ListenAndServe(); err != nil {
+						if err != http.ErrServerClosed {
+							logrus.WithError(err).Fatal("failed to serve HTTP")
+						}
 					}
 				}
 			}

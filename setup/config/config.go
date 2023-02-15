@@ -19,7 +19,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -130,20 +129,6 @@ func (d DataSource) IsPostgres() bool {
 
 // A Topic in kafka.
 type Topic string
-
-// An Address to listen on.
-type Address string
-
-// An HTTPAddress to listen on, starting with either http:// or https://.
-type HTTPAddress string
-
-func (h HTTPAddress) Address() (Address, error) {
-	url, err := url.Parse(string(h))
-	if err != nil {
-		return "", err
-	}
-	return Address(url.Host), nil
-}
 
 // FileSizeBytes is a file size in bytes
 type FileSizeBytes int64
