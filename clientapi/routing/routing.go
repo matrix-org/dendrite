@@ -646,6 +646,23 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
+			ev := roomserverAPI.GetEvent(req.Context(), rsAPI, vars["eventID"])
+			// user is always allowed to redact their own events.
+			isAllowed := ev.Sender() == device.UserID
+			if !isAllowed {
+				// if event is not from the sender, then check with the authz module.
+				isAllowed, _ = authorization.IsAllowed(authz.AuthorizationArgs{
+					RoomId:     vars["roomID"],
+					UserId:     device.UserID,
+					Permission: authz.PermissionRedact,
+				})
+			}
+			if !isAllowed {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Unauthorised"),
+				}
+			}
 			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, nil, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -654,6 +671,23 @@ func Setup(
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
+			}
+			ev := roomserverAPI.GetEvent(req.Context(), rsAPI, vars["eventID"])
+			// user is always allowed to redact their own events.
+			isAllowed := ev.Sender() == device.UserID
+			if !isAllowed {
+				// if event is not from the sender, then check with the authz module.
+				isAllowed, _ = authorization.IsAllowed(authz.AuthorizationArgs{
+					RoomId:     vars["roomID"],
+					UserId:     device.UserID,
+					Permission: authz.PermissionRedact,
+				})
+			}
+			if !isAllowed {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Unauthorised"),
+				}
 			}
 			txnID := vars["txnId"]
 			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, &txnID, transactionsCache)
