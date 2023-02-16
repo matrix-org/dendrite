@@ -29,7 +29,7 @@ import (
 type KeyChange struct {
 	Topic     string
 	JetStream nats.JetStreamContext
-	DB        storage.KeyserverDatabase
+	DB        storage.KeyChangeDatabase
 }
 
 // ProduceKeyChanges creates new change events for each key

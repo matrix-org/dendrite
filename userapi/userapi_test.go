@@ -21,7 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/setup/config"
@@ -38,6 +40,13 @@ const (
 
 type apiTestOpts struct {
 	loginTokenLifetime time.Duration
+	serverName         string
+}
+
+type dummyProducer struct{}
+
+func (d *dummyProducer) PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error) {
+	return &nats.PubAck{}, nil
 }
 
 func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (api.UserInternalAPI, storage.Database, func()) {
@@ -46,9 +55,13 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	}
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	sName := serverName
+	if opts.serverName != "" {
+		sName = gomatrixserverlib.ServerName(opts.serverName)
+	}
 	accountDB, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	}, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
@@ -56,14 +69,17 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	cfg := &config.UserAPI{
 		Matrix: &config.Global{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: serverName,
+				ServerName: sName,
 			},
 		},
 	}
 
+	syncProducer := producers.NewSyncAPI(accountDB, &dummyProducer{}, "", "")
+
 	return &internal.UserInternalAPI{
-			DB:     accountDB,
-			Config: cfg,
+			DB:           accountDB,
+			Config:       cfg,
+			SyncProducer: syncProducer,
 		}, accountDB, func() {
 			close()
 			baseclose()
@@ -330,5 +346,89 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 		}
 
 		testCases(t, intAPI)
+	})
+}
+
+func TestAccountData(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
+
+	testCases := []struct {
+		name      string
+		inputData *api.InputAccountDataRequest
+		wantErr   bool
+	}{
+		{
+			name:      "not a local user",
+			inputData: &api.InputAccountDataRequest{UserID: "@notlocal:example.com"},
+			wantErr:   true,
+		},
+		{
+			name:      "local user missing datatype",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID},
+			wantErr:   true,
+		},
+		{
+			name:      "missing json",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.push_rules", AccountData: nil},
+			wantErr:   true,
+		},
+		{
+			name:      "with json",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.push_rules", AccountData: []byte("{}")},
+		},
+		{
+			name:      "room data",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.push_rules", AccountData: []byte("{}"), RoomID: "!dummy:test"},
+		},
+		{
+			name:      "ignored users",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.ignored_user_list", AccountData: []byte("{}")},
+		},
+		{
+			name:      "m.fully_read",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.fully_read", AccountData: []byte("{}")},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType)
+		defer close()
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				res := api.InputAccountDataResponse{}
+				err := intAPI.InputAccountData(ctx, tc.inputData, &res)
+				if tc.wantErr && err == nil {
+					t.Fatalf("expected an error, but got none")
+				}
+				if !tc.wantErr && err != nil {
+					t.Fatalf("expected no error, but got: %s", err)
+				}
+
+				// query the data again and compare
+				queryRes := api.QueryAccountDataResponse{}
+				queryReq := api.QueryAccountDataRequest{
+					UserID:   tc.inputData.UserID,
+					DataType: tc.inputData.DataType,
+					RoomID:   tc.inputData.RoomID,
+				}
+				err = intAPI.QueryAccountData(ctx, &queryReq, &queryRes)
+				if err != nil && !tc.wantErr {
+					t.Fatal(err)
+				}
+				// verify global data
+				if tc.inputData.RoomID == "" {
+					if !reflect.DeepEqual(tc.inputData.AccountData, queryRes.GlobalAccountData[tc.inputData.DataType]) {
+						t.Fatalf("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.GlobalAccountData[tc.inputData.DataType]))
+					}
+				} else {
+					// verify room data
+					if !reflect.DeepEqual(tc.inputData.AccountData, queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]) {
+						t.Fatalf("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]))
+					}
+				}
+			})
+		}
 	})
 }

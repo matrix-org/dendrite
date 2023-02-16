@@ -78,7 +78,13 @@ func (s *accountDataStatements) InsertAccountData(
 	roomID, dataType string, content json.RawMessage,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertAccountDataStmt)
-	_, err = stmt.ExecContext(ctx, localpart, serverName, roomID, dataType, content)
+	// Empty/nil json.RawMessage is not interpreted as "nil", so use *json.RawMessage
+	// when passing the data to trigger "NOT NULL" constraint
+	var data *json.RawMessage
+	if len(content) > 0 {
+		data = &content
+	}
+	_, err = stmt.ExecContext(ctx, localpart, serverName, roomID, dataType, data)
 	return
 }
 

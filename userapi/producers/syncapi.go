@@ -19,7 +19,7 @@ type JetStreamPublisher interface {
 
 // SyncAPI produces messages for the Sync API server to consume.
 type SyncAPI struct {
-	db                    storage.Database
+	db                    storage.Notification
 	producer              JetStreamPublisher
 	clientDataTopic       string
 	notificationDataTopic string
