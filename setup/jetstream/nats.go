@@ -53,7 +53,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 		if err != nil {
 			panic(err)
 		}
-		s.ConfigureLogger()
+		s.SetLogger(NewLogAdapter(), false, false)
 		go func() {
 			process.ComponentStarted()
 			s.Start()
