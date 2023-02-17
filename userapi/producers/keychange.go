@@ -28,7 +28,7 @@ import (
 // KeyChange produces key change events for the sync API and federation sender to consume
 type KeyChange struct {
 	Topic     string
-	JetStream nats.JetStreamContext
+	JetStream JetStreamPublisher
 	DB        storage.KeyChangeDatabase
 }
 
