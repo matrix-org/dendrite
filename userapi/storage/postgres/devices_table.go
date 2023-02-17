@@ -160,7 +160,7 @@ func (s *devicesStatements) InsertDevice(
 	if err := stmt.QueryRowContext(ctx, id, localpart, serverName, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
 		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
 	}
-	return &api.Device{
+	dev := &api.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
@@ -168,7 +168,11 @@ func (s *devicesStatements) InsertDevice(
 		LastSeenTS:  createdTimeMS,
 		LastSeenIP:  ipAddr,
 		UserAgent:   userAgent,
-	}, nil
+	}
+	if displayName != nil {
+		dev.DisplayName = *displayName
+	}
+	return dev, nil
 }
 
 func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id,

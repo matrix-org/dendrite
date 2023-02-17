@@ -437,10 +437,10 @@ func TestAccountData(t *testing.T) {
 
 func TestDevices(t *testing.T) {
 	ctx := context.Background()
-	alice := test.NewUser(t)
-	_ = alice
 
 	dupeAccessToken := util.RandomString(8)
+
+	displayName := "testing"
 
 	creationTests := []struct {
 		name         string
@@ -455,7 +455,7 @@ func TestDevices(t *testing.T) {
 		},
 		{
 			name:      "implicit local user",
-			inputData: &api.PerformDeviceCreationRequest{Localpart: "test1", AccessToken: util.RandomString(8), NoDeviceListUpdate: true},
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test1", AccessToken: util.RandomString(8), NoDeviceListUpdate: true, DeviceDisplayName: &displayName},
 		},
 		{
 			name:      "explicit local user",
@@ -546,6 +546,38 @@ func TestDevices(t *testing.T) {
 				// At this point, there should only be one device
 				if !reflect.DeepEqual(*res.Device, queryDevicesRes.Devices[0]) {
 					t.Fatalf("expected device to be\n%#v, got \n%#v", *res.Device, queryDevicesRes.Devices[0])
+				}
+
+				newDisplayName := "new name"
+				if tc.inputData.DeviceDisplayName == nil {
+					updateRes := api.PerformDeviceUpdateResponse{}
+					updateReq := api.PerformDeviceUpdateRequest{
+						RequestingUserID: fmt.Sprintf("@%s:%s", tc.inputData.Localpart, "test"),
+						DeviceID:         deviceID,
+						DisplayName:      &newDisplayName,
+					}
+
+					if err = intAPI.PerformDeviceUpdate(ctx, &updateReq, &updateRes); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				queryDeviceInfosRes := api.QueryDeviceInfosResponse{}
+				queryDeviceInfosReq := api.QueryDeviceInfosRequest{DeviceIDs: []string{*tc.inputData.DeviceID}}
+				if err = intAPI.QueryDeviceInfos(ctx, &queryDeviceInfosReq, &queryDeviceInfosRes); err != nil {
+					t.Fatal(err)
+				}
+				gotDisplayName := queryDeviceInfosRes.DeviceInfo[*tc.inputData.DeviceID].DisplayName
+				if tc.inputData.DeviceDisplayName != nil {
+					wantDisplayName := *tc.inputData.DeviceDisplayName
+					if wantDisplayName != gotDisplayName {
+						t.Fatalf("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
+					}
+				} else {
+					wantDisplayName := newDisplayName
+					if wantDisplayName != gotDisplayName {
+						t.Fatalf("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
+					}
 				}
 			})
 		}
