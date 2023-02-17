@@ -644,7 +644,7 @@ func (d *Database) CreateDevice(
 			}
 		}
 	}
-	return
+	return dev, returnErr
 }
 
 // generateDeviceID creates a new device id. Returns an error if failed to generate
