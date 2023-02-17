@@ -81,7 +81,7 @@ const selectDeviceByIDSQL = "" +
 	"SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = $3"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3 ORDER BY last_seen_ts DESC"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent, session_id FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3 ORDER BY last_seen_ts DESC"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND server_name = $3 AND device_id = $4"
@@ -96,7 +96,7 @@ const deleteDevicesSQL = "" +
 	"DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = ANY($3)"
 
 const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, server_name, display_name, last_seen_ts FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
+	"SELECT device_id, localpart, server_name, display_name, last_seen_ts, session_id FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
 
 const updateDeviceLastSeen = "" +
 	"UPDATE userapi_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND server_name = $5 AND device_id = $6"
@@ -169,6 +169,14 @@ func (s *devicesStatements) InsertDevice(
 		LastSeenIP:  ipAddr,
 		UserAgent:   userAgent,
 	}, nil
+}
+
+func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	accessToken string, displayName *string, ipAddr, userAgent string,
+	sessionID int64,
+) (*api.Device, error) {
+	return s.InsertDevice(ctx, txn, id, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
 }
 
 // deleteDevice removes a single device by id and user localpart.
@@ -271,7 +279,7 @@ func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []s
 	var lastseents sql.NullInt64
 	var displayName sql.NullString
 	for rows.Next() {
-		if err := rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &lastseents); err != nil {
+		if err := rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &lastseents, &dev.SessionID); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {
@@ -303,7 +311,7 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	var lastseents sql.NullInt64
 	var id, displayname, ip, useragent sql.NullString
 	for rows.Next() {
-		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent)
+		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent, &dev.SessionID)
 		if err != nil {
 			return devices, err
 		}

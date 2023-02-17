@@ -594,16 +594,42 @@ func (d *Database) CreateDevice(
 	deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
-		returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-			var err error
-			// Revoke existing tokens for this device
-			if err = d.Devices.DeleteDevice(ctx, txn, *deviceID, localpart, serverName); err != nil {
-				return err
-			}
+		_, ok := d.Writer.(*sqlutil.ExclusiveWriter)
+		if ok { // we're using most likely using SQLite, so do things a little different
+			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+				var err error
 
-			dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
-			return err
-		})
+				devices, err := d.Devices.SelectDevicesByLocalpart(ctx, txn, localpart, serverName, "")
+				if err != nil && !errors.Is(err, sql.ErrNoRows) {
+					return err
+				}
+				// No devices yet, only create a new one
+				if len(devices) == 0 {
+					dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
+					return err
+				}
+				sessionID := devices[0].SessionID + 1
+
+				// Revoke existing tokens for this device
+				if err = d.Devices.DeleteDevice(ctx, txn, *deviceID, localpart, serverName); err != nil {
+					return err
+				}
+				// Create a new device with the session ID incremented
+				dev, err = d.Devices.InsertDeviceWithSessionID(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent, sessionID)
+				return err
+			})
+		} else {
+			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+				var err error
+				// Revoke existing tokens for this device
+				if err = d.Devices.DeleteDevice(ctx, txn, *deviceID, localpart, serverName); err != nil {
+					return err
+				}
+
+				dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
+				return err
+			})
+		}
 	} else {
 		// We generate device IDs in a loop in case its already taken.
 		// We cap this at going round 5 times to ensure we don't spin forever
