@@ -32,7 +32,7 @@ type crossSigningRequest struct {
 }
 
 func UploadCrossSigningDeviceKeys(
-	req *http.Request, userInteractiveAuth *auth.UserInteractive,
+	req *http.Request,
 	keyserverAPI api.ClientKeyAPI, device *api.Device,
 	accountAPI api.ClientUserAPI, cfg *config.ClientAPI,
 ) util.JSONResponse {
@@ -62,8 +62,8 @@ func UploadCrossSigningDeviceKeys(
 		}
 	}
 	typePassword := auth.LoginTypePassword{
-		GetAccountByPassword: accountAPI.QueryAccountByPassword,
-		Config:               cfg,
+		UserAPI: accountAPI,
+		Config:  cfg,
 	}
 	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {
 		return *authErr

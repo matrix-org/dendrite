@@ -113,8 +113,8 @@ type UserInteractive struct {
 
 func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
-		GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
-		Config:               cfg,
+		UserAPI: userAccountAPI,
+		Config:  cfg,
 	}
 	return &UserInteractive{
 		Flows: []userInteractiveFlow{
@@ -140,7 +140,7 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 	return false
 }
 
-func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
+func (u *UserInteractive) AddCompletedStage(sessionID, _ string) {
 	u.Lock()
 	// TODO: Handle multi-stage flows
 	delete(u.Sessions, sessionID)
@@ -214,7 +214,7 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
 // Returns the login that was verified for additional checks if required.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, _ *api.Device) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"

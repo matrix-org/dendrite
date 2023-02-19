@@ -12,6 +12,7 @@ require (
 	github.com/docker/docker v20.10.19+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.14.0
+	github.com/go-ldap/ldap/v3 v3.4.4
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -55,6 +56,7 @@ require (
 )
 
 require (
+	github.com/Azure/go-ntlmssp v0.0.0-20220621081337-cb9428e4ac1e // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/RoaringBitmap/roaring v1.2.3 // indirect
@@ -80,6 +82,7 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.4 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect

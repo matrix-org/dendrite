@@ -73,8 +73,8 @@ func Password(
 
 	// Check if the existing password is correct.
 	typePassword := auth.LoginTypePassword{
-		GetAccountByPassword: userAPI.QueryAccountByPassword,
-		Config:               cfg,
+		UserAPI: userAPI,
+		Config:  cfg,
 	}
 	if _, authErr := typePassword.Login(req.Context(), &r.Auth.PasswordRequest); authErr != nil {
 		return *authErr

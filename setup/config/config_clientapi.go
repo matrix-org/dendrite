@@ -52,9 +52,26 @@ type ClientAPI struct {
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
 	MSCs *MSCs `yaml:"-"`
+
+	Ldap Ldap `yaml:"ldap"`
 }
 
-func (c *ClientAPI) Defaults(opts DefaultOpts) {
+type Ldap struct {
+	Enabled             bool   `yaml:"enabled"`
+	Uri                 string `yaml:"uri"`
+	BaseDn              string `yaml:"base_dn"`
+	SearchFilter        string `yaml:"search_filter"`
+	SearchAttribute     string `yaml:"search_attribute"`
+	AdminBindEnabled    bool   `yaml:"admin_bind_enabled"`
+	AdminBindDn         string `yaml:"admin_bind_dn"`
+	AdminBindPassword   string `yaml:"admin_bind_password"`
+	UserBindDn          string `yaml:"user_bind_dn"`
+	AdminGroupDn        string `yaml:"admin_group_dn"`
+	AdminGroupFilter    string `yaml:"admin_group_filter"`
+	AdminGroupAttribute string `yaml:"admin_group_attribute"`
+}
+
+func (c *ClientAPI) Defaults(_ DefaultOpts) {
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""
