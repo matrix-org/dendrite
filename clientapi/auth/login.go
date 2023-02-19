@@ -57,8 +57,8 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 	switch header.Type {
 	case authtypes.LoginTypePassword:
 		typ = &LoginTypePassword{
-			GetAccountByPassword: useraccountAPI.QueryAccountByPassword,
-			Config:               cfg,
+			UserAPI: useraccountAPI,
+			Config:  cfg,
 		}
 	case authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{
