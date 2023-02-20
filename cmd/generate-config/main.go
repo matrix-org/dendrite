@@ -36,6 +36,7 @@ func main() {
 		if uri.IsSQLite() || uri == "" {
 			for name, db := range map[string]*config.DatabaseOptions{
 				"federationapi": &cfg.FederationAPI.Database,
+				"keyserver":     &cfg.KeyServer.Database,
 				"mscs":          &cfg.MSCs.Database,
 				"mediaapi":      &cfg.MediaAPI.Database,
 				"roomserver":    &cfg.RoomServer.Database,

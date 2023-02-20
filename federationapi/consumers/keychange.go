@@ -48,7 +48,7 @@ type KeyChangeConsumer struct {
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
 func NewKeyChangeConsumer(
 	process *process.ProcessContext,
-	cfg *config.UserAPI,
+	cfg *config.KeyServer,
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
