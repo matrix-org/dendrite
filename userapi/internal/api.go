@@ -252,6 +252,17 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	if !a.Config.Matrix.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %s is not local", serverName)
 	}
+	// If a device ID was specified, check if it already exists and
+	// avoid sending an empty device list update which would remove
+	// existing device keys.
+	isExisting := false
+	if req.DeviceID != nil && *req.DeviceID != "" {
+		existingDev, err := a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		isExisting = existingDev != nil
+	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
 		"device_id":    req.DeviceID,
@@ -263,7 +274,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	}
 	res.DeviceCreated = true
 	res.Device = dev
-	if req.NoDeviceListUpdate {
+	if req.NoDeviceListUpdate || isExisting {
 		return nil
 	}
 	// create empty device keys and upload them to trigger device list changes
