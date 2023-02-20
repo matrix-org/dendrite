@@ -263,7 +263,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		isExisting = existingDev != nil
+		isExisting = existingDev.ID == *req.DeviceID
 	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
