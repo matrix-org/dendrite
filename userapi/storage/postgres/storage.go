@@ -139,6 +139,9 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 
 func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
 	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+	if err != nil {
+		return nil, err
+	}
 	otk, err := NewPostgresOneTimeKeysTable(db)
 	if err != nil {
 		return nil, err
