@@ -8,7 +8,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -40,11 +39,9 @@ func TestAdminResetPassword(t *testing.T) {
 
 		rsAPI := roomserver.NewInternalAPI(base)
 		// Needed for changing the password/login
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
-		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
-		keyAPI.SetUserAPI(userAPI)
+		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil)
+		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
@@ -155,14 +152,12 @@ func TestPurgeRoom(t *testing.T) {
 
 		fedClient := base.CreateFederationClient()
 		rsAPI := roomserver.NewInternalAPI(base)
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fedClient, rsAPI)
-		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI)
 		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
-		keyAPI.SetUserAPI(userAPI)
 
 		// Create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -170,7 +165,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil)
+		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{

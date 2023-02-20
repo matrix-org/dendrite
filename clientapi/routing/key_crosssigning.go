@@ -21,9 +21,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
@@ -34,8 +33,8 @@ type crossSigningRequest struct {
 
 func UploadCrossSigningDeviceKeys(
 	req *http.Request, userInteractiveAuth *auth.UserInteractive,
-	keyserverAPI api.ClientKeyAPI, device *userapi.Device,
-	accountAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	keyserverAPI api.ClientKeyAPI, device *api.Device,
+	accountAPI api.ClientUserAPI, cfg *config.ClientAPI,
 ) util.JSONResponse {
 	uploadReq := &crossSigningRequest{}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
@@ -107,7 +106,7 @@ func UploadCrossSigningDeviceKeys(
 	}
 }
 
-func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
+func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.ClientKeyAPI, device *api.Device) util.JSONResponse {
 	uploadReq := &api.PerformUploadDeviceSignaturesRequest{}
 	uploadRes := &api.PerformUploadDeviceSignaturesResponse{}
 

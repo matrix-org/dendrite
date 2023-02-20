@@ -79,7 +79,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		defer close()
 		base, _, _ := testrig.Base(nil)
 		defer base.Close()
-		db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
+		db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
 		}, "test", bcrypt.MinCost, 0, 0, "")
 		if err != nil {

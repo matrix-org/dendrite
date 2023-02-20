@@ -151,7 +151,7 @@ func (s *devicesStatements) InsertDevice(
 	if _, err := insertStmt.ExecContext(ctx, id, localpart, serverName, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
 		return nil, err
 	}
-	return &api.Device{
+	dev := &api.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
@@ -159,7 +159,11 @@ func (s *devicesStatements) InsertDevice(
 		LastSeenTS:  createdTimeMS,
 		LastSeenIP:  ipAddr,
 		UserAgent:   userAgent,
-	}, nil
+	}
+	if displayName != nil {
+		dev.DisplayName = *displayName
+	}
+	return dev, nil
 }
 
 func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id,
@@ -172,7 +176,7 @@ func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *
 	if _, err := insertStmt.ExecContext(ctx, id, localpart, serverName, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
 		return nil, err
 	}
-	return &api.Device{
+	dev := &api.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
@@ -180,7 +184,11 @@ func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *
 		LastSeenTS:  createdTimeMS,
 		LastSeenIP:  ipAddr,
 		UserAgent:   userAgent,
-	}, nil
+	}
+	if displayName != nil {
+		dev.DisplayName = *displayName
+	}
+	return dev, nil
 }
 
 func (s *devicesStatements) DeleteDevice(
@@ -202,6 +210,7 @@ func (s *devicesStatements) DeleteDevices(
 	if err != nil {
 		return err
 	}
+	defer internal.CloseAndLogIfError(ctx, prep, "DeleteDevices.StmtClose() failed")
 	stmt := sqlutil.TxStmt(txn, prep)
 	params := make([]interface{}, len(devices)+2)
 	params[0] = localpart

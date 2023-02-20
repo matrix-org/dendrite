@@ -38,7 +38,7 @@ import (
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
 	client := &http.Client{

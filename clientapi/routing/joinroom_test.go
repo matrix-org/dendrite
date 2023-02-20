@@ -10,7 +10,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -29,8 +28,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		defer baseClose()
 
 		rsAPI := roomserver.NewInternalAPI(base)
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
-		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
 

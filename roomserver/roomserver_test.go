@@ -12,7 +12,6 @@ import (
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -47,7 +46,7 @@ func TestUsers(t *testing.T) {
 		})
 
 		t.Run("kick users", func(t *testing.T) {
-			usrAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, nil, rsAPI, nil)
+			usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 			rsAPI.SetUserAPI(usrAPI)
 			testKickUsers(t, rsAPI, usrAPI)
 		})
@@ -228,11 +227,10 @@ func TestPurgeRoom(t *testing.T) {
 
 		fedClient := base.CreateFederationClient()
 		rsAPI := roomserver.NewInternalAPI(base)
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fedClient, rsAPI)
-		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI)
 		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 

@@ -19,7 +19,7 @@ type PusherDevice struct {
 }
 
 // GetPushDevices pushes to the configured devices of a local user.
-func GetPushDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, tweaks map[string]interface{}, db storage.Database) ([]*PusherDevice, error) {
+func GetPushDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, tweaks map[string]interface{}, db storage.UserDatabase) ([]*PusherDevice, error) {
 	pushers, err := db.GetPushers(ctx, localpart, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("db.GetPushers: %w", err)

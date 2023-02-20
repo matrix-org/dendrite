@@ -38,7 +38,7 @@ type OutputRoomEventConsumer struct {
 	rsAPI        rsapi.UserRoomserverAPI
 	jetstream    nats.JetStreamContext
 	durable      string
-	db           storage.Database
+	db           storage.UserDatabase
 	topic        string
 	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
@@ -53,7 +53,7 @@ func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
-	store storage.Database,
+	store storage.UserDatabase,
 	pgClient pushgateway.Client,
 	rsAPI rsapi.UserRoomserverAPI,
 	syncProducer *producers.SyncAPI,

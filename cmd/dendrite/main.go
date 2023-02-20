@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	basepkg "github.com/matrix-org/dendrite/setup/base"
@@ -56,10 +55,7 @@ func main() {
 
 	keyRing := fsAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
-
-	pgClient := base.PushGatewayHTTPClient()
-	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
+	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
@@ -69,7 +65,6 @@ func main() {
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 	rsAPI.SetAppserviceAPI(asAPI)
 	rsAPI.SetUserAPI(userAPI)
-	keyAPI.SetUserAPI(userAPI)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -83,7 +78,6 @@ func main() {
 		FederationAPI: fsAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
-		KeyAPI:        keyAPI,
 	}
 	monolith.AddAllPublicRoutes(base)
 

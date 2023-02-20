@@ -52,7 +52,7 @@ const updateBackupKeySQL = "" +
 const countKeysSQL = "" +
 	"SELECT COUNT(*) FROM userapi_key_backups WHERE user_id = $1 AND version = $2"
 
-const selectKeysSQL = "" +
+const selectBackupKeysSQL = "" +
 	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
 	"WHERE user_id = $1 AND version = $2"
 
@@ -83,7 +83,7 @@ func NewPostgresKeyBackupTable(db *sql.DB) (tables.KeyBackupTable, error) {
 		{&s.insertBackupKeyStmt, insertBackupKeySQL},
 		{&s.updateBackupKeyStmt, updateBackupKeySQL},
 		{&s.countKeysStmt, countKeysSQL},
-		{&s.selectKeysStmt, selectKeysSQL},
+		{&s.selectKeysStmt, selectBackupKeysSQL},
 		{&s.selectKeysByRoomIDStmt, selectKeysByRoomIDSQL},
 		{&s.selectKeysByRoomIDAndSessionIDStmt, selectKeysByRoomIDAndSessionIDSQL},
 	}.Prepare(db)

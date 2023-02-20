@@ -125,7 +125,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(base)
-		usrAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, nil, rsAPI, nil)
+		usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(base, usrAPI, rsAPI)
 
 		runCases(t, asAPI)

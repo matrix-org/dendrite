@@ -16,7 +16,6 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -83,18 +82,15 @@ func (s *syncUserAPI) QueryAccessToken(ctx context.Context, req *userapi.QueryAc
 	return nil
 }
 
+func (s *syncUserAPI) QueryKeyChanges(ctx context.Context, req *userapi.QueryKeyChangesRequest, res *userapi.QueryKeyChangesResponse) error {
+	return nil
+}
+
+func (s *syncUserAPI) QueryOneTimeKeys(ctx context.Context, req *userapi.QueryOneTimeKeysRequest, res *userapi.QueryOneTimeKeysResponse) error {
+	return nil
+}
+
 func (s *syncUserAPI) PerformLastSeenUpdate(ctx context.Context, req *userapi.PerformLastSeenUpdateRequest, res *userapi.PerformLastSeenUpdateResponse) error {
-	return nil
-}
-
-type syncKeyAPI struct {
-	keyapi.SyncKeyAPI
-}
-
-func (s *syncKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) error {
-	return nil
-}
-func (s *syncKeyAPI) QueryOneTimeKeys(ctx context.Context, req *keyapi.QueryOneTimeKeysRequest, res *keyapi.QueryOneTimeKeysResponse) error {
 	return nil
 }
 
@@ -121,7 +117,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	msgs := toNATSMsgs(t, base, room.Events()...)
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}})
 	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
@@ -220,7 +216,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	// m.room.history_visibility
 	msgs := toNATSMsgs(t, base, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}})
 	for i, msg := range msgs {
 		testrig.MustPublishMsgs(t, jsctx, msg)
 		time.Sleep(100 * time.Millisecond)
@@ -304,7 +300,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, &syncKeyAPI{})
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{})
 	w := httptest.NewRecorder()
 	base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 		"access_token": alice.AccessToken,
@@ -422,7 +418,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		rsAPI := roomserver.NewInternalAPI(base)
 		rsAPI.SetFederationAPI(nil, nil)
 
-		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, &syncKeyAPI{})
+		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI)
 
 		for _, tc := range testCases {
 			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
@@ -722,7 +718,7 @@ func TestGetMembership(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(base)
 		rsAPI.SetFederationAPI(nil, nil)
 
-		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, &syncKeyAPI{})
+		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -789,7 +785,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, &syncKeyAPI{})
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{})
 
 	producer := producers.SyncAPIProducer{
 		TopicSendToDeviceEvent: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
@@ -1008,7 +1004,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 	rsAPI := roomserver.NewInternalAPI(base)
 	rsAPI.SetFederationAPI(nil, nil)
 
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, &syncKeyAPI{})
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI)
 
 	room := test.NewRoom(t, user)
 
