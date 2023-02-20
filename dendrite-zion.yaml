@@ -81,9 +81,9 @@ global:
   # Configures the handling of presence events.
   presence:
     # Whether inbound presence events are allowed, e.g. receiving presence events from other servers
-    enable_inbound: false
+    enable_inbound: true
     # Whether outbound presence events are allowed, e.g. sending presence events to other servers
-    enable_outbound: false
+    enable_outbound: true
 
   # Server notices allows server admins to send messages to all users.
   server_notices:
