@@ -32,7 +32,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
@@ -48,7 +47,6 @@ type RequestPool struct {
 	db       storage.Database
 	cfg      *config.SyncAPI
 	userAPI  userapi.SyncUserAPI
-	keyAPI   keyapi.SyncKeyAPI
 	rsAPI    roomserverAPI.SyncRoomserverAPI
 	lastseen *sync.Map
 	presence *sync.Map
@@ -69,7 +67,7 @@ type PresenceConsumer interface {
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
 	db storage.Database, cfg *config.SyncAPI,
-	userAPI userapi.SyncUserAPI, keyAPI keyapi.SyncKeyAPI,
+	userAPI userapi.SyncUserAPI,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	streams *streams.Streams, notifier *notifier.Notifier,
 	producer PresencePublisher, consumer PresenceConsumer, enableMetrics bool,
@@ -83,7 +81,6 @@ func NewRequestPool(
 		db:       db,
 		cfg:      cfg,
 		userAPI:  userAPI,
-		keyAPI:   keyAPI,
 		rsAPI:    rsAPI,
 		lastseen: &sync.Map{},
 		presence: &sync.Map{},
@@ -280,7 +277,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
 				// Only try to get OTKs if the context isn't already done.
 				if syncReq.Context.Err() == nil {
-					err = internal.DeviceOTKCounts(syncReq.Context, rp.keyAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
+					err = internal.DeviceOTKCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
 					if err != nil && err != context.Canceled {
 						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
@@ -551,7 +548,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), snapshot, syncReq, fromToken.PDUPosition, toToken.PDUPosition)
 	_, _, err = internal.DeviceListCatchup(
-		req.Context(), snapshot, rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
+		req.Context(), snapshot, rp.userAPI, rp.rsAPI, syncReq.Device.UserID,
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {

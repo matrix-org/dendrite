@@ -37,7 +37,7 @@ type OutputReceiptEventConsumer struct {
 	jetstream    nats.JetStreamContext
 	durable      string
 	topic        string
-	db           storage.Database
+	db           storage.UserDatabase
 	serverName   gomatrixserverlib.ServerName
 	syncProducer *producers.SyncAPI
 	pgClient     pushgateway.Client
@@ -49,7 +49,7 @@ func NewOutputReceiptEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
-	store storage.Database,
+	store storage.UserDatabase,
 	syncProducer *producers.SyncAPI,
 	pgClient pushgateway.Client,
 ) *OutputReceiptEventConsumer {

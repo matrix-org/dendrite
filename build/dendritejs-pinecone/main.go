@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -183,13 +182,11 @@ func startup() {
 	rsAPI := roomserver.NewInternalAPI(base)
 
 	federation := conn.CreateFederationClient(base, pSessions)
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation, rsAPI)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
-	keyAPI.SetUserAPI(userAPI)
+	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
 
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
@@ -208,7 +205,6 @@ func startup() {
 		FederationAPI: fedSenderAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
-		KeyAPI:        keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}

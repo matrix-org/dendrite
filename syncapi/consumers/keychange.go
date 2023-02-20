@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -28,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )

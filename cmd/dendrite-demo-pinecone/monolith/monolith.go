@@ -38,7 +38,6 @@ import (
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/relayapi"
 	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -139,9 +138,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		p.BaseDendrite, federation, rsAPI, p.BaseDendrite.Caches, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(p.BaseDendrite, &p.BaseDendrite.Cfg.KeyServer, fsAPI, rsComponent)
-	userAPI := userapi.NewInternalAPI(p.BaseDendrite, &cfg.UserAPI, nil, keyAPI, rsAPI, p.BaseDendrite.PushGatewayHTTPClient())
-	keyAPI.SetUserAPI(userAPI)
+	userAPI := userapi.NewInternalAPI(p.BaseDendrite, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(p.BaseDendrite, userAPI, rsAPI)
 
@@ -175,7 +172,6 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		FederationAPI:            fsAPI,
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  userAPI,
-		KeyAPI:                   keyAPI,
 		RelayAPI:                 relayAPI,
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,

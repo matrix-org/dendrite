@@ -256,6 +256,7 @@ func (s *statsStatements) allUsers(ctx context.Context, txn *sql.Tx) (result int
 	if err != nil {
 		return 0, err
 	}
+	defer internal.CloseAndLogIfError(ctx, queryStmt, "allUsers.StmtClose() failed")
 	stmt := sqlutil.TxStmt(txn, queryStmt)
 	err = stmt.QueryRowContext(ctx,
 		1, 2, 3, 4,
@@ -269,6 +270,7 @@ func (s *statsStatements) nonBridgedUsers(ctx context.Context, txn *sql.Tx) (res
 	if err != nil {
 		return 0, err
 	}
+	defer internal.CloseAndLogIfError(ctx, queryStmt, "nonBridgedUsers.StmtClose() failed")
 	stmt := sqlutil.TxStmt(txn, queryStmt)
 	err = stmt.QueryRowContext(ctx,
 		1, 2, 3,
@@ -286,6 +288,7 @@ func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx)
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, queryStmt, "registeredUserByType.StmtClose() failed")
 	stmt := sqlutil.TxStmt(txn, queryStmt)
 	registeredAfter := time.Now().AddDate(0, 0, -30)
 
