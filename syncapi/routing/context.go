@@ -67,6 +67,8 @@ func Context(
 			errMsg = "unable to parse filter"
 		case *strconv.NumError:
 			errMsg = "unable to parse limit"
+		default:
+			errMsg = err.Error()
 		}
 		return util.JSONResponse{
 			Code:    http.StatusBadRequest,
@@ -167,7 +169,18 @@ func Context(
 
 	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBeforeFiltered, gomatrixserverlib.FormatAll)
 	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfterFiltered, gomatrixserverlib.FormatAll)
-	newState := applyLazyLoadMembers(device, filter, eventsAfterClient, eventsBeforeClient, state, lazyLoadCache)
+
+	newState := state
+	if filter.LazyLoadMembers {
+		allEvents := append(eventsBeforeFiltered, eventsAfterFiltered...)
+		allEvents = append(allEvents, &requestedEvent)
+		evs := gomatrixserverlib.HeaderedToClientEvents(allEvents, gomatrixserverlib.FormatAll)
+		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
+		if err != nil {
+			logrus.WithError(err).Error("unable to load membership events")
+			return jsonerror.InternalServerError()
+		}
+	}
 
 	ev := gomatrixserverlib.HeaderedToClientEvent(&requestedEvent, gomatrixserverlib.FormatAll)
 	response := ContextRespsonse{
@@ -244,41 +257,43 @@ func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, star
 }
 
 func applyLazyLoadMembers(
+	ctx context.Context,
 	device *userapi.Device,
-	filter *gomatrixserverlib.RoomEventFilter,
-	eventsAfter, eventsBefore []gomatrixserverlib.ClientEvent,
-	state []*gomatrixserverlib.HeaderedEvent,
+	snapshot storage.DatabaseTransaction,
+	roomID string,
+	events []gomatrixserverlib.ClientEvent,
 	lazyLoadCache caching.LazyLoadCache,
-) []*gomatrixserverlib.HeaderedEvent {
-	if filter == nil || !filter.LazyLoadMembers {
-		return state
-	}
-	allEvents := append(eventsBefore, eventsAfter...)
-	x := make(map[string]struct{})
+) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	eventSenders := make(map[string]struct{})
 	// get members who actually send an event
-	for _, e := range allEvents {
+	for _, e := range events {
 		// Don't add membership events the client should already know about
 		if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, e.RoomID, e.Sender); cached {
 			continue
 		}
-		x[e.Sender] = struct{}{}
+		eventSenders[e.Sender] = struct{}{}
 	}
 
-	newState := []*gomatrixserverlib.HeaderedEvent{}
-	membershipEvents := []*gomatrixserverlib.HeaderedEvent{}
-	for _, event := range state {
-		if event.Type() != gomatrixserverlib.MRoomMember {
-			newState = append(newState, event)
-		} else {
-			// did the user send an event?
-			if _, ok := x[event.Sender()]; ok {
-				membershipEvents = append(membershipEvents, event)
-				lazyLoadCache.StoreLazyLoadedUser(device, event.RoomID(), event.Sender(), event.EventID())
-			}
-		}
+	wantUsers := make([]string, 0, len(eventSenders))
+	for userID := range eventSenders {
+		wantUsers = append(wantUsers, userID)
 	}
-	// Add the membershipEvents to the end of the list, to make Sytest happy
-	return append(newState, membershipEvents...)
+
+	// Query missing membership events
+	filter := gomatrixserverlib.DefaultStateFilter()
+	filter.Senders = &wantUsers
+	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
+	memberships, err := snapshot.GetStateEventsForRoom(ctx, roomID, &filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// cache the membership events
+	for _, membership := range memberships {
+		lazyLoadCache.StoreLazyLoadedUser(device, roomID, *membership.StateKey(), membership.EventID())
+	}
+
+	return memberships, nil
 }
 
 func parseRoomEventFilter(req *http.Request) (*gomatrixserverlib.RoomEventFilter, error) {

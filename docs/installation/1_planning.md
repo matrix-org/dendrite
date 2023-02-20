@@ -7,6 +7,22 @@ permalink: /installation/planning
 
 # Planning your installation
 
+## Modes
+
+Dendrite consists of several components, each responsible for a different aspect of the Matrix protocol.
+Users can run Dendrite in one of two modes which dictate how these components are executed and communicate.
+
+* **Monolith mode** runs all components in a single process. Components communicate through an internal NATS
+  server with generally low overhead. This mode dramatically simplifies deployment complexity and offers the
+  best balance between performance and resource usage for low-to-mid volume deployments.
+
+* **Polylith mode** runs all components in isolated processes. Components communicate through an external NATS
+  server and HTTP APIs, which incur considerable overhead. While this mode allows for more granular control of
+  resources dedicated toward individual processes, given the additional communications overhead, it is only
+  necessary for very large deployments.
+
+Given our current state of development, **we recommend monolith mode** for all deployments.
+
 ## Databases
 
 Dendrite can run with either a PostgreSQL or a SQLite backend. There are considerable tradeoffs
@@ -67,11 +83,17 @@ you should check (by running `go version`) that you are using a suitable version
 
 If using the PostgreSQL database engine, you should install PostgreSQL 12 or later.
 
+### NATS Server
+
+Dendrite comes with a built-in [NATS Server](https://github.com/nats-io/nats-server) and
+therefore does not need this to be manually installed. If you are planning a monolith installation, you
+do not need to do anything.
+
+
 ### Reverse proxy
 
 A reverse proxy such as [Caddy](https://caddyserver.com), [NGINX](https://www.nginx.com) or
-[HAProxy](http://www.haproxy.org) is recommended for monolith deployments.
-Configuring those not covered in this documentation, although sample configurations
+[HAProxy](http://www.haproxy.org) is useful for deployments. Configuring those is not covered in this documentation, although sample configurations
 for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy) and
 [NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx) are provided.
 

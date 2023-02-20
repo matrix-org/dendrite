@@ -22,14 +22,12 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 type AppServiceAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
-
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
 
 	// DisableTLSValidation disables the validation of X.509 TLS certs
 	// on appservice endpoints. This is not recommended in production!
@@ -39,18 +37,9 @@ type AppServiceAPI struct {
 }
 
 func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
-	if !opts.Monolithic {
-		c.InternalAPI.Listen = "http://localhost:7777"
-		c.InternalAPI.Connect = "http://localhost:7777"
-	}
 }
 
-func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if isMonolith { // polylith required configs below
-		return
-	}
-	checkURL(configErrs, "app_service_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "app_service_api.internal_api.connect", string(c.InternalAPI.Connect))
+func (c *AppServiceAPI) Verify(configErrs *ConfigErrors) {
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application

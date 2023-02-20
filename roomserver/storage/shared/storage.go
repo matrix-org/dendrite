@@ -51,6 +51,12 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 	return true
 }
 
+func (d *Database) GetMembershipForHistoryVisibility(
+	ctx context.Context, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
+) (map[string]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.StateSnapshotTable.BulkSelectMembershipForHistoryVisibility(ctx, nil, userNID, roomInfo, eventIDs...)
+}
+
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {

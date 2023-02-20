@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentRoomState, *sql.DB, func()) {
@@ -79,10 +80,49 @@ func TestCurrentRoomStateTable(t *testing.T) {
 					return fmt.Errorf("SelectEventsWithEventIDs\nexpected id %q not returned", id)
 				}
 			}
+
+			testCurrentState(t, ctx, txn, tab, room)
+
 			return nil
 		})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	})
+}
+
+func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables.CurrentRoomState, room *test.Room) {
+	t.Run("test currentState", func(t *testing.T) {
+		// returns the complete state of the room with a default filter
+		filter := gomatrixserverlib.DefaultStateFilter()
+		evs, err := tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectCount := 5
+		if gotCount := len(evs); gotCount != expectCount {
+			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
+		}
+		// When lazy loading, we expect no membership event, so only 4 events
+		filter.LazyLoadMembers = true
+		expectCount = 4
+		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotCount := len(evs); gotCount != expectCount {
+			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
+		}
+		// same as above, but with existing NotTypes defined
+		notTypes := []string{gomatrixserverlib.MRoomMember}
+		filter.NotTypes = &notTypes
+		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotCount := len(evs); gotCount != expectCount {
+			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
+		}
+	})
+
 }

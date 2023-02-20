@@ -151,8 +151,8 @@ func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID
 	return summary, nil
 }
 
-func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
-	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
+func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomIDs []string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
+	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, roomIDs, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
 func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
@@ -370,19 +370,25 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	}
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeededFiltered, eventMapFiltered, err := d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil, nil
+	stateFiltered := state
+	// avoid hitting the database if the result would be the same as above
+	if !isStatefilterEmpty(stateFilter) {
+		var stateNeededFiltered map[string]map[string]bool
+		var eventMapFiltered map[string]types.StreamEvent
+		stateNeededFiltered, eventMapFiltered, err = d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil, nil, nil
+			}
+			return nil, nil, err
 		}
-		return nil, nil, err
-	}
-	stateFiltered, err := d.fetchStateEvents(ctx, d.txn, stateNeededFiltered, eventMapFiltered)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil, nil
+		stateFiltered, err = d.fetchStateEvents(ctx, d.txn, stateNeededFiltered, eventMapFiltered)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil, nil, nil
+			}
+			return nil, nil, err
 		}
-		return nil, nil, err
 	}
 
 	// find out which rooms this user is peeking, if any.
@@ -699,6 +705,28 @@ func (d *Database) PurgeRoomState(
 func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Relations.SelectMaxRelationID(ctx, d.txn)
 	return types.StreamPosition(id), err
+}
+
+func isStatefilterEmpty(filter *gomatrixserverlib.StateFilter) bool {
+	if filter == nil {
+		return true
+	}
+	switch {
+	case filter.NotTypes != nil && len(*filter.NotTypes) > 0:
+		return false
+	case filter.Types != nil && len(*filter.Types) > 0:
+		return false
+	case filter.Senders != nil && len(*filter.Senders) > 0:
+		return false
+	case filter.NotSenders != nil && len(*filter.NotSenders) > 0:
+		return false
+	case filter.NotRooms != nil && len(*filter.NotRooms) > 0:
+		return false
+	case filter.ContainsURL != nil:
+		return false
+	default:
+		return true
+	}
 }
 
 func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (

@@ -58,7 +58,7 @@ func TestHandleSend(t *testing.T) {
 		if !ok {
 			panic("This is a programming error.")
 		}
-		routing.Setup(base, nil, r, keyRing, nil, nil, nil, &base.Cfg.MSCs, nil, nil)
+		routing.Setup(base, nil, r, keyRing, nil, nil, &base.Cfg.MSCs, nil, nil)
 
 		handler := fedMux.Get(routing.SendRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)

@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -62,7 +61,6 @@ func Setup(
 	keys gomatrixserverlib.JSONVerifier,
 	federation federationAPI.FederationClient,
 	userAPI userapi.FederationUserAPI,
-	keyAPI keyserverAPI.FederationKeyAPI,
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
@@ -141,7 +139,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
+				cfg, rsAPI, userAPI, keys, federation, mu, servers, producer,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRouteName)
@@ -269,7 +267,7 @@ func Setup(
 		"federation_user_devices", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return GetUserDevices(
-				httpReq, keyAPI, vars["userID"],
+				httpReq, userAPI, vars["userID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -494,14 +492,14 @@ func Setup(
 	v1fedmux.Handle("/user/keys/claim", MakeFedAPI(
 		"federation_keys_claim", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
-			return ClaimOneTimeKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
+			return ClaimOneTimeKeys(httpReq, request, userAPI, cfg.Matrix.ServerName)
 		},
 	)).Methods(http.MethodPost)
 
 	v1fedmux.Handle("/user/keys/query", MakeFedAPI(
 		"federation_keys_query", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
-			return QueryDeviceKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
+			return QueryDeviceKeys(httpReq, request, userAPI, cfg.Matrix.ServerName)
 		},
 	)).Methods(http.MethodPost)
 

@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -177,19 +176,17 @@ func startup() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := base.NewBaseDendrite(cfg, "Monolith")
+	base := base.NewBaseDendrite(cfg)
 	defer base.Close() // nolint: errcheck
 
 	rsAPI := roomserver.NewInternalAPI(base)
 
 	federation := conn.CreateFederationClient(base, pSessions)
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation, rsAPI)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
-	keyAPI.SetUserAPI(userAPI)
+	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
 
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
@@ -208,14 +205,12 @@ func startup() {
 		FederationAPI: fedSenderAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
-		KeyAPI:        keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}
 	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 

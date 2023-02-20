@@ -368,9 +368,9 @@ func (s *outputRoomEventsStatements) InsertEvent(
 
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
+	roomIDs []string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 	chronologicalOrder bool, onlySyncEvents bool,
-) ([]types.StreamEvent, bool, error) {
+) (map[string]types.RecentEvents, error) {
 	var query string
 	if onlySyncEvents {
 		query = selectRecentEventsForSyncSQL
@@ -378,49 +378,55 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		query = selectRecentEventsSQL
 	}
 
-	stmt, params, err := prepareWithFilters(
-		s.db, txn, query,
-		[]interface{}{
-			roomID, r.Low(), r.High(),
-		},
-		eventFilter.Senders, eventFilter.NotSenders,
-		eventFilter.Types, eventFilter.NotTypes,
-		nil, eventFilter.ContainsURL, eventFilter.Limit+1, FilterOrderDesc,
-	)
-	if err != nil {
-		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
-	}
-	defer internal.CloseAndLogIfError(ctx, stmt, "selectRecentEvents: stmt.close() failed")
-
-	rows, err := stmt.QueryContext(ctx, params...)
-	if err != nil {
-		return nil, false, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
-	if err != nil {
-		return nil, false, err
-	}
-	if chronologicalOrder {
-		// The events need to be returned from oldest to latest, which isn't
-		// necessary the way the SQL query returns them, so a sort is necessary to
-		// ensure the events are in the right order in the slice.
-		sort.SliceStable(events, func(i int, j int) bool {
-			return events[i].StreamPosition < events[j].StreamPosition
-		})
-	}
-	// we queried for 1 more than the limit, so if we returned one more mark limited=true
-	limited := false
-	if len(events) > eventFilter.Limit {
-		limited = true
-		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
-		if chronologicalOrder {
-			events = events[1:]
-		} else {
-			events = events[:len(events)-1]
+	result := make(map[string]types.RecentEvents, len(roomIDs))
+	for _, roomID := range roomIDs {
+		stmt, params, err := prepareWithFilters(
+			s.db, txn, query,
+			[]interface{}{
+				roomID, r.Low(), r.High(),
+			},
+			eventFilter.Senders, eventFilter.NotSenders,
+			eventFilter.Types, eventFilter.NotTypes,
+			nil, eventFilter.ContainsURL, eventFilter.Limit+1, FilterOrderDesc,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 		}
+		defer internal.CloseAndLogIfError(ctx, stmt, "selectRecentEvents: stmt.close() failed")
+
+		rows, err := stmt.QueryContext(ctx, params...)
+		if err != nil {
+			return nil, err
+		}
+		defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
+		events, err := rowsToStreamEvents(rows)
+		if err != nil {
+			return nil, err
+		}
+		if chronologicalOrder {
+			// The events need to be returned from oldest to latest, which isn't
+			// necessary the way the SQL query returns them, so a sort is necessary to
+			// ensure the events are in the right order in the slice.
+			sort.SliceStable(events, func(i int, j int) bool {
+				return events[i].StreamPosition < events[j].StreamPosition
+			})
+		}
+		res := types.RecentEvents{}
+		// we queried for 1 more than the limit, so if we returned one more mark limited=true
+		if len(events) > eventFilter.Limit {
+			res.Limited = true
+			// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
+			if chronologicalOrder {
+				events = events[1:]
+			} else {
+				events = events[:len(events)-1]
+			}
+		}
+		res.Events = events
+		result[roomID] = res
 	}
-	return events, limited, nil
+
+	return result, nil
 }
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(

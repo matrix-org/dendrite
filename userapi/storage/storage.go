@@ -29,14 +29,35 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 )
 
-// NewUserAPIDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
+// NewUserDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
-func NewUserAPIDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (Database, error) {
+func NewUserDatabase(
+	base *base.BaseDendrite,
+	dbProperties *config.DatabaseOptions,
+	serverName gomatrixserverlib.ServerName,
+	bcryptCost int,
+	openIDTokenLifetimeMS int64,
+	loginTokenLifetime time.Duration,
+	serverNoticesLocalpart string,
+) (UserDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+		return sqlite3.NewUserDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+	default:
+		return nil, fmt.Errorf("unexpected database type")
+	}
+}
+
+// NewKeyDatabase opens a new Postgres or Sqlite database (base on dataSourceName) scheme)
+// and sets postgres connection parameters.
+func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.NewKeyDatabase(base, dbProperties)
+	case dbProperties.ConnectionString.IsPostgres():
+		return postgres.NewKeyDatabase(base, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

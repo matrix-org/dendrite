@@ -17,23 +17,22 @@ package userapi_test
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
-	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage"
 )
 
@@ -43,32 +42,71 @@ const (
 
 type apiTestOpts struct {
 	loginTokenLifetime time.Duration
+	serverName         string
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (api.UserInternalAPI, storage.Database, func()) {
+type dummyProducer struct {
+	callCount sync.Map
+	t         *testing.T
+}
+
+func (d *dummyProducer) PublishMsg(msg *nats.Msg, opts ...nats.PubOpt) (*nats.PubAck, error) {
+	count, loaded := d.callCount.LoadOrStore(msg.Subject, 1)
+	if loaded {
+		c, ok := count.(int)
+		if !ok {
+			d.t.Fatalf("unexpected type: %T with value %q", c, c)
+		}
+		d.callCount.Store(msg.Subject, c+1)
+		d.t.Logf("Incrementing call counter for %s", msg.Subject)
+	}
+	return &nats.PubAck{}, nil
+}
+
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, publisher producers.JetStreamPublisher) (api.UserInternalAPI, storage.UserDatabase, func()) {
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	accountDB, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
+	sName := serverName
+	if opts.serverName != "" {
+		sName = gomatrixserverlib.ServerName(opts.serverName)
+	}
+	accountDB, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	}, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
+	}
+
+	keyDB, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{
+		ConnectionString: config.DataSource(connStr),
+	})
+	if err != nil {
+		t.Fatalf("failed to create key DB: %s", err)
 	}
 
 	cfg := &config.UserAPI{
 		Matrix: &config.Global{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: serverName,
+				ServerName: sName,
 			},
 		},
 	}
 
+	if publisher == nil {
+		publisher = &dummyProducer{t: t}
+	}
+
+	syncProducer := producers.NewSyncAPI(accountDB, publisher, "client_data", "notification_data")
+	keyChangeProducer := &producers.KeyChange{DB: keyDB, JetStream: publisher, Topic: "keychange"}
 	return &internal.UserInternalAPI{
-			DB:     accountDB,
-			Config: cfg,
+			DB:                accountDB,
+			KeyDatabase:       keyDB,
+			Config:            cfg,
+			SyncProducer:      syncProducer,
+			KeyChangeProducer: keyChangeProducer,
 		}, accountDB, func() {
 			close()
 			baseclose()
@@ -129,7 +167,7 @@ func TestQueryProfile(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
 		defer close()
 		_, err := accountDB.CreateAccount(context.TODO(), "alice", serverName, "foobar", "", api.AccountTypeUser)
 		if err != nil {
@@ -142,20 +180,7 @@ func TestQueryProfile(t *testing.T) {
 			t.Fatalf("failed to set display name: %s", err)
 		}
 
-		t.Run("HTTP API", func(t *testing.T) {
-			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-			userapi.AddInternalRoutes(router, userAPI, false)
-			apiURL, cancel := test.ListenAndServe(t, router, false)
-			defer cancel()
-			httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
-			if err != nil {
-				t.Fatalf("failed to create HTTP client")
-			}
-			runCases(httpAPI, true)
-		})
-		t.Run("Monolith", func(t *testing.T) {
-			runCases(userAPI, false)
-		})
+		runCases(userAPI, false)
 	})
 }
 
@@ -165,7 +190,7 @@ func TestQueryProfile(t *testing.T) {
 func TestPasswordlessLoginFails(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
 		defer close()
 		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
@@ -191,7 +216,7 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
 			defer close()
 			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {
@@ -241,7 +266,7 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("expiredTokenIsNotReturned", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, dbType)
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, dbType, nil)
 			defer close()
 
 			creq := api.PerformLoginTokenCreationRequest{
@@ -266,7 +291,7 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("deleteWorks", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
 			defer close()
 
 			creq := api.PerformLoginTokenCreationRequest{
@@ -297,7 +322,7 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("deleteUnknownIsNoOp", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
 			defer close()
 			dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
 			var dresp api.PerformLoginTokenDeletionResponse
@@ -315,7 +340,7 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
 		defer close()
 
 		createdAcc, err := db.CreateAccount(ctx, localpart, userServername, "", "", alice.AccountType)
@@ -347,24 +372,306 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 			}
 		}
 
-		t.Run("Monolith", func(t *testing.T) {
-			testCases(t, intAPI)
-			// also test tracing
-			testCases(t, &api.UserInternalAPITrace{Impl: intAPI})
-		})
+		testCases(t, intAPI)
+	})
+}
 
-		t.Run("HTTP API", func(t *testing.T) {
-			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-			userapi.AddInternalRoutes(router, intAPI, false)
-			apiURL, cancel := test.ListenAndServe(t, router, false)
-			defer cancel()
+func TestAccountData(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
 
-			userHTTPApi, err := inthttp.NewUserAPIClient(apiURL, &http.Client{Timeout: time.Second * 5})
-			if err != nil {
-				t.Fatalf("failed to create HTTP client: %s", err)
+	testCases := []struct {
+		name      string
+		inputData *api.InputAccountDataRequest
+		wantErr   bool
+	}{
+		{
+			name:      "not a local user",
+			inputData: &api.InputAccountDataRequest{UserID: "@notlocal:example.com"},
+			wantErr:   true,
+		},
+		{
+			name:      "local user missing datatype",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID},
+			wantErr:   true,
+		},
+		{
+			name:      "missing json",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.push_rules", AccountData: nil},
+			wantErr:   true,
+		},
+		{
+			name:      "with json",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.push_rules", AccountData: []byte("{}")},
+		},
+		{
+			name:      "room data",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.push_rules", AccountData: []byte("{}"), RoomID: "!dummy:test"},
+		},
+		{
+			name:      "ignored users",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.ignored_user_list", AccountData: []byte("{}")},
+		},
+		{
+			name:      "m.fully_read",
+			inputData: &api.InputAccountDataRequest{UserID: alice.ID, DataType: "m.fully_read", AccountData: []byte("{}")},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType, nil)
+		defer close()
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				res := api.InputAccountDataResponse{}
+				err := intAPI.InputAccountData(ctx, tc.inputData, &res)
+				if tc.wantErr && err == nil {
+					t.Fatalf("expected an error, but got none")
+				}
+				if !tc.wantErr && err != nil {
+					t.Fatalf("expected no error, but got: %s", err)
+				}
+
+				// query the data again and compare
+				queryRes := api.QueryAccountDataResponse{}
+				queryReq := api.QueryAccountDataRequest{
+					UserID:   tc.inputData.UserID,
+					DataType: tc.inputData.DataType,
+					RoomID:   tc.inputData.RoomID,
+				}
+				err = intAPI.QueryAccountData(ctx, &queryReq, &queryRes)
+				if err != nil && !tc.wantErr {
+					t.Fatal(err)
+				}
+				// verify global data
+				if tc.inputData.RoomID == "" {
+					if !reflect.DeepEqual(tc.inputData.AccountData, queryRes.GlobalAccountData[tc.inputData.DataType]) {
+						t.Fatalf("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.GlobalAccountData[tc.inputData.DataType]))
+					}
+				} else {
+					// verify room data
+					if !reflect.DeepEqual(tc.inputData.AccountData, queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]) {
+						t.Fatalf("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]))
+					}
+				}
+			})
+		}
+	})
+}
+
+func TestDevices(t *testing.T) {
+	ctx := context.Background()
+
+	dupeAccessToken := util.RandomString(8)
+
+	displayName := "testing"
+
+	creationTests := []struct {
+		name         string
+		inputData    *api.PerformDeviceCreationRequest
+		wantErr      bool
+		wantNewDevID bool
+	}{
+		{
+			name:      "not a local user",
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test1", ServerName: "notlocal"},
+			wantErr:   true,
+		},
+		{
+			name:      "implicit local user",
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test1", AccessToken: util.RandomString(8), NoDeviceListUpdate: true, DeviceDisplayName: &displayName},
+		},
+		{
+			name:      "explicit local user",
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test2", ServerName: "test", AccessToken: util.RandomString(8), NoDeviceListUpdate: true},
+		},
+		{
+			name:      "dupe token - ok",
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test3", ServerName: "test", AccessToken: dupeAccessToken, NoDeviceListUpdate: true},
+		},
+		{
+			name:      "dupe token - not ok",
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test3", ServerName: "test", AccessToken: dupeAccessToken, NoDeviceListUpdate: true},
+			wantErr:   true,
+		},
+		{
+			name:      "test3 second device", // used to test deletion later
+			inputData: &api.PerformDeviceCreationRequest{Localpart: "test3", ServerName: "test", AccessToken: util.RandomString(8), NoDeviceListUpdate: true},
+		},
+		{
+			name:         "test3 third device", // used to test deletion later
+			wantNewDevID: true,
+			inputData:    &api.PerformDeviceCreationRequest{Localpart: "test3", ServerName: "test", AccessToken: util.RandomString(8), NoDeviceListUpdate: true},
+		},
+	}
+
+	deletionTests := []struct {
+		name        string
+		inputData   *api.PerformDeviceDeletionRequest
+		wantErr     bool
+		wantDevices int
+	}{
+		{
+			name:      "deletion - not a local user",
+			inputData: &api.PerformDeviceDeletionRequest{UserID: "@test:notlocalhost"},
+			wantErr:   true,
+		},
+		{
+			name:        "deleting not existing devices should not error",
+			inputData:   &api.PerformDeviceDeletionRequest{UserID: "@test1:test", DeviceIDs: []string{"iDontExist"}},
+			wantDevices: 1,
+		},
+		{
+			name:        "delete all devices",
+			inputData:   &api.PerformDeviceDeletionRequest{UserID: "@test1:test"},
+			wantDevices: 0,
+		},
+		{
+			name:        "delete all devices",
+			inputData:   &api.PerformDeviceDeletionRequest{UserID: "@test3:test"},
+			wantDevices: 0,
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType, nil)
+		defer close()
+
+		for _, tc := range creationTests {
+			t.Run(tc.name, func(t *testing.T) {
+				res := api.PerformDeviceCreationResponse{}
+				deviceID := util.RandomString(8)
+				tc.inputData.DeviceID = &deviceID
+				if tc.wantNewDevID {
+					tc.inputData.DeviceID = nil
+				}
+				err := intAPI.PerformDeviceCreation(ctx, tc.inputData, &res)
+				if tc.wantErr && err == nil {
+					t.Fatalf("expected an error, but got none")
+				}
+				if !tc.wantErr && err != nil {
+					t.Fatalf("expected no error, but got: %s", err)
+				}
+				if !res.DeviceCreated {
+					return
+				}
+
+				queryDevicesRes := api.QueryDevicesResponse{}
+				queryDevicesReq := api.QueryDevicesRequest{UserID: res.Device.UserID}
+				if err = intAPI.QueryDevices(ctx, &queryDevicesReq, &queryDevicesRes); err != nil {
+					t.Fatal(err)
+				}
+				// We only want to verify one device
+				if len(queryDevicesRes.Devices) > 1 {
+					return
+				}
+				res.Device.AccessToken = ""
+
+				// At this point, there should only be one device
+				if !reflect.DeepEqual(*res.Device, queryDevicesRes.Devices[0]) {
+					t.Fatalf("expected device to be\n%#v, got \n%#v", *res.Device, queryDevicesRes.Devices[0])
+				}
+
+				newDisplayName := "new name"
+				if tc.inputData.DeviceDisplayName == nil {
+					updateRes := api.PerformDeviceUpdateResponse{}
+					updateReq := api.PerformDeviceUpdateRequest{
+						RequestingUserID: fmt.Sprintf("@%s:%s", tc.inputData.Localpart, "test"),
+						DeviceID:         deviceID,
+						DisplayName:      &newDisplayName,
+					}
+
+					if err = intAPI.PerformDeviceUpdate(ctx, &updateReq, &updateRes); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				queryDeviceInfosRes := api.QueryDeviceInfosResponse{}
+				queryDeviceInfosReq := api.QueryDeviceInfosRequest{DeviceIDs: []string{*tc.inputData.DeviceID}}
+				if err = intAPI.QueryDeviceInfos(ctx, &queryDeviceInfosReq, &queryDeviceInfosRes); err != nil {
+					t.Fatal(err)
+				}
+				gotDisplayName := queryDeviceInfosRes.DeviceInfo[*tc.inputData.DeviceID].DisplayName
+				if tc.inputData.DeviceDisplayName != nil {
+					wantDisplayName := *tc.inputData.DeviceDisplayName
+					if wantDisplayName != gotDisplayName {
+						t.Fatalf("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
+					}
+				} else {
+					wantDisplayName := newDisplayName
+					if wantDisplayName != gotDisplayName {
+						t.Fatalf("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
+					}
+				}
+			})
+		}
+
+		for _, tc := range deletionTests {
+			t.Run(tc.name, func(t *testing.T) {
+				delRes := api.PerformDeviceDeletionResponse{}
+				err := intAPI.PerformDeviceDeletion(ctx, tc.inputData, &delRes)
+				if tc.wantErr && err == nil {
+					t.Fatalf("expected an error, but got none")
+				}
+				if !tc.wantErr && err != nil {
+					t.Fatalf("expected no error, but got: %s", err)
+				}
+				if tc.wantErr {
+					return
+				}
+
+				queryDevicesRes := api.QueryDevicesResponse{}
+				queryDevicesReq := api.QueryDevicesRequest{UserID: tc.inputData.UserID}
+				if err = intAPI.QueryDevices(ctx, &queryDevicesReq, &queryDevicesRes); err != nil {
+					t.Fatal(err)
+				}
+
+				if len(queryDevicesRes.Devices) != tc.wantDevices {
+					t.Fatalf("expected %d devices, got %d", tc.wantDevices, len(queryDevicesRes.Devices))
+				}
+
+			})
+		}
+	})
+}
+
+// Tests that the session ID of a device is not reused when reusing the same device ID.
+func TestDeviceIDReuse(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		publisher := &dummyProducer{t: t}
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType, publisher)
+		defer close()
+
+		res := api.PerformDeviceCreationResponse{}
+		// create a first device
+		deviceID := util.RandomString(8)
+		req := api.PerformDeviceCreationRequest{Localpart: "alice", ServerName: "test", DeviceID: &deviceID, NoDeviceListUpdate: true}
+		err := intAPI.PerformDeviceCreation(ctx, &req, &res)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Do the same request again, we expect a different sessionID
+		res2 := api.PerformDeviceCreationResponse{}
+		// Set NoDeviceListUpdate to false, to verify we don't send device list updates when
+		// reusing the same device ID
+		req.NoDeviceListUpdate = false
+		err = intAPI.PerformDeviceCreation(ctx, &req, &res2)
+		if err != nil {
+			t.Fatalf("expected no error, but got: %v", err)
+		}
+
+		if res2.Device.SessionID == res.Device.SessionID {
+			t.Fatalf("expected a different session ID, but they are the same")
+		}
+
+		publisher.callCount.Range(func(key, value any) bool {
+			if value != nil {
+				t.Fatalf("expected publisher to not get called, but got value %d for subject %s", value, key)
 			}
-			testCases(t, userHTTPApi)
-
+			return true
 		})
 	})
 }

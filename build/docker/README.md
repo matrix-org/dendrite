@@ -5,25 +5,21 @@ These are Docker images for Dendrite!
 They can be found on Docker Hub:
 
 - [matrixdotorg/dendrite-monolith](https://hub.docker.com/r/matrixdotorg/dendrite-monolith) for monolith deployments
-- [matrixdotorg/dendrite-polylith](https://hub.docker.com/r/matrixdotorg/dendrite-polylith) for polylith deployments
 
 ## Dockerfiles
 
-The `Dockerfile` is a multistage file which can build all four Dendrite
-images depending on the supplied `--target`. From the root of the Dendrite
+The `Dockerfile` is a multistage file which can build Dendrite. From the root of the Dendrite
 repository, run:
 
 ```
 docker build . --target monolith -t matrixdotorg/dendrite-monolith
-docker build . --target polylith -t matrixdotorg/dendrite-monolith
 ```
 
 ## Compose files
 
-There are two sample `docker-compose` files:
+There is one sample `docker-compose` files:
 
 - `docker-compose.monolith.yml` which runs a monolith Dendrite deployment
-- `docker-compose.polylith.yml` which runs a polylith Dendrite deployment
 
 ## Configuration
 
@@ -49,7 +45,7 @@ docker run --rm --entrypoint="" \
 
 The key files will now exist in your current working directory, and can be mounted into place.
 
-## Starting Dendrite as a monolith deployment
+## Starting Dendrite
 
 Create your config based on the [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml) sample configuration file.
 
@@ -57,16 +53,6 @@ Then start the deployment:
 
 ```
 docker-compose -f docker-compose.monolith.yml up
-```
-
-## Starting Dendrite as a polylith deployment
-
-Create your config based on the [`dendrite-sample.polylith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml) sample configuration file.
-
-Then start the deployment:
-
-```
-docker-compose -f docker-compose.polylith.yml up
 ```
 
 ## Building the images

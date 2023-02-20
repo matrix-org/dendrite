@@ -8,11 +8,10 @@ permalink: /installation/manual/configuration
 
 # Configuring Dendrite
 
-A YAML configuration file is used to configure Dendrite. Sample configuration files are
+A YAML configuration file is used to configure Dendrite. A sample configuration file is
 present in the top level of the Dendrite repository:
 
 * [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml)
-* [`dendrite-sample.polylith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
 
 You will need to duplicate the sample, calling it `dendrite.yaml` for example, and then
 tailor it to your installation. At a minimum, you will need to populate the following
@@ -44,16 +43,41 @@ global:
   private_key: /path/to/matrix_key.pem
 ```
 
+## JetStream configuration
+
+Dendrite deployments can use the built-in NATS Server rather than running a standalone
+server. If you want to use a standalone NATS Server anyway, you can also configure that too.
+
 ### Built-in NATS Server
 
-In the `global` section, under the `jetstream` key, set a `storage_path` to a persistent folder on the filesystem:
+In the `global` section, under the `jetstream` key, ensure that no server addresses are
+configured and set a `storage_path` to a persistent folder on the filesystem:
 
 ```yaml
 global:
   # ...
   jetstream:
     storage_path: /path/to/storage/folder
+    topic_prefix: Dendrite
 ```
+
+### Standalone NATS Server
+
+To use a standalone NATS Server instance, you will need to configure `addresses` field
+to point to the port that your NATS Server is listening on:
+
+```yaml
+global:
+  # ...
+  jetstream:
+    addresses:
+      - localhost:4222
+    topic_prefix: Dendrite
+```
+
+You do not need to configure the `storage_path` when using a standalone NATS Server instance.
+In the case that you are connecting to a multi-node NATS cluster, you can configure more than
+one address in the `addresses` field.
 
 ## Database connections
 

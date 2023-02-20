@@ -22,7 +22,7 @@ func Test_AuthFallback(t *testing.T) {
 			for _, wantErr := range []bool{false, true} {
 				t.Run(fmt.Sprintf("useHCaptcha(%v) - recaptchaEnabled(%v) - wantErr(%v)", useHCaptcha, recaptchaEnabled, wantErr), func(t *testing.T) {
 					// Set the defaults for each test
-					base.Cfg.ClientAPI.Defaults(config.DefaultOpts{Generate: true, Monolithic: true})
+					base.Cfg.ClientAPI.Defaults(config.DefaultOpts{Generate: true, SingleDatabase: true})
 					base.Cfg.ClientAPI.RecaptchaEnabled = recaptchaEnabled
 					base.Cfg.ClientAPI.RecaptchaPublicKey = "pub"
 					base.Cfg.ClientAPI.RecaptchaPrivateKey = "priv"
@@ -33,7 +33,7 @@ func Test_AuthFallback(t *testing.T) {
 						base.Cfg.ClientAPI.RecaptchaSitekeyClass = "h-captcha"
 					}
 					cfgErrs := &config.ConfigErrors{}
-					base.Cfg.ClientAPI.Verify(cfgErrs, true)
+					base.Cfg.ClientAPI.Verify(cfgErrs)
 					if len(*cfgErrs) > 0 {
 						t.Fatalf("(hCaptcha=%v) unexpected config errors: %s", useHCaptcha, cfgErrs.Error())
 					}

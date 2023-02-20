@@ -42,7 +42,7 @@ total:															(statements)					53.7%
 ```
 
 The total coverage for this run is the last line at the bottom. However, this value is misleading because Dendrite can run in many different configurations,
-which will never be tested in a single test run (e.g sqlite or postgres, monolith or polylith). To get a more accurate value, additional processing is required
+which will never be tested in a single test run (e.g sqlite or postgres). To get a more accurate value, additional processing is required
 to remove packages which will never be tested and extension MSCs:
 
 (The following commands use [gocovmerge](https://github.com/wadey/gocovmerge), to merge two or more coverage logs, so make sure you have that installed)
@@ -50,17 +50,11 @@ to remove packages which will never be tested and extension MSCs:
 ```bash
 # These commands are all similar but change which package paths are _removed_ from the output.
 
-# For Postgres (monolith)
-find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|inthttp|sqlite|setup/mscs|api_trace' > final.cov && go tool cover -func=final.cov
+# For Postgres
+find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|sqlite|setup/mscs' > final.cov && go tool cover -func=final.cov
 
-# For Postgres (polylith)
-find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|sqlite|setup/mscs|api_trace' > final.cov && go tool cover -func=final.cov
-
-# For SQLite (monolith)
-find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|inthttp|postgres|setup/mscs|api_trace' > final.cov && go tool cover -func=final.cov
-
-# For SQLite (polylith)
-find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|postgres|setup/mscs|api_trace' > final.cov && go tool cover -func=final.cov
+# For SQLite
+find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|postgres|setup/mscs' > final.cov && go tool cover -func=final.cov
 ```
 
 ## Running unit tests with coverage enabled

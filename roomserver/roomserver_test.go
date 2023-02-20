@@ -2,27 +2,22 @@ package roomserver_test
 
 import (
 	"context"
-	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -51,7 +46,7 @@ func TestUsers(t *testing.T) {
 		})
 
 		t.Run("kick users", func(t *testing.T) {
-			usrAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, nil, rsAPI, nil)
+			usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 			rsAPI.SetUserAPI(usrAPI)
 			testKickUsers(t, rsAPI, usrAPI)
 		})
@@ -207,24 +202,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 			}
 		}
 
-		t.Run("HTTP API", func(t *testing.T) {
-			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-			roomserver.AddInternalRoutes(router, rsAPI, false)
-			apiURL, cancel := test.ListenAndServe(t, router, false)
-			defer cancel()
-			httpAPI, err := inthttp.NewRoomserverClient(apiURL, &http.Client{Timeout: time.Second * 5}, nil)
-			if err != nil {
-				t.Fatalf("failed to create HTTP client")
-			}
-			testCase(httpAPI)
-		})
-		t.Run("Monolith", func(t *testing.T) {
-			testCase(rsAPI)
-			// also test tracing
-			traceAPI := &api.RoomserverInternalAPITrace{Impl: rsAPI}
-			testCase(traceAPI)
-		})
-
+		testCase(rsAPI)
 	})
 }
 
@@ -249,11 +227,10 @@ func TestPurgeRoom(t *testing.T) {
 
 		fedClient := base.CreateFederationClient()
 		rsAPI := roomserver.NewInternalAPI(base)
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fedClient, rsAPI)
-		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI)
 		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 

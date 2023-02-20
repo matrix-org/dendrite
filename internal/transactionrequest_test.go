@@ -23,13 +23,13 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/producers"
-	keyAPI "github.com/matrix-org/dendrite/keyserver/api"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	keyAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
@@ -198,8 +198,8 @@ func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
 func createTransactionWithEDU(ctx *process.ProcessContext, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.JetStream.InMemory = true
 	natsInstance := &jetstream.NATSInstance{}
@@ -647,7 +647,7 @@ func init() {
 }
 
 type testRoomserverAPI struct {
-	rsAPI.RoomserverInternalAPITrace
+	rsAPI.RoomserverInternalAPI
 	inputRoomEvents           []rsAPI.InputRoomEvent
 	queryStateAfterEvents     func(*rsAPI.QueryStateAfterEventsRequest) rsAPI.QueryStateAfterEventsResponse
 	queryEventsByID           func(req *rsAPI.QueryEventsByIDRequest) rsAPI.QueryEventsByIDResponse

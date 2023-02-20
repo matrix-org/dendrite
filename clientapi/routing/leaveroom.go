@@ -18,7 +18,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
@@ -43,15 +42,6 @@ func LeaveRoomByID(
 			return util.JSONResponse{
 				Code: leaveRes.Code,
 				JSON: jsonerror.LeaveServerNoticeError(),
-			}
-		}
-		switch e := err.(type) {
-		case httputil.InternalAPIError:
-			if e.Message == jsonerror.LeaveServerNoticeError().Error() {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.LeaveServerNoticeError(),
-				}
 			}
 		}
 		return util.JSONResponse{

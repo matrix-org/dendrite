@@ -24,7 +24,6 @@ This does not mean:
 - Dendrite is ready for massive homeserver deployments. There is no sharding of microservices (although it is possible to run them on separate machines) and there is no high-availability/clustering support.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
-In the future, we will be able to scale up to gigantic servers (equivalent to `matrix.org`) via polylith mode.
 
 If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
 
@@ -88,7 +87,7 @@ Then point your favourite Matrix client at `http://localhost:8008` or `https://l
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of August 2022 we're at around 90% CS API coverage and 95% Federation coverage, though check
+updates with CI. As of January 2023, we have 100% server-server parity with Synapse, and the client-server parity is at 93% , though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well, although there are still some missing features (like SSO and Third-party ID APIs).
 

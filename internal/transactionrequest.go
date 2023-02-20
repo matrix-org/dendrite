@@ -24,9 +24,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -56,7 +56,7 @@ var (
 type TxnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI                  api.FederationRoomserverAPI
-	keyAPI                 keyapi.FederationKeyAPI
+	userAPI                userAPI.FederationUserAPI
 	ourServerName          gomatrixserverlib.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
 	roomsMu                *MutexByRoom
@@ -66,7 +66,7 @@ type TxnReq struct {
 
 func NewTxnReq(
 	rsAPI api.FederationRoomserverAPI,
-	keyAPI keyapi.FederationKeyAPI,
+	userAPI userAPI.FederationUserAPI,
 	ourServerName gomatrixserverlib.ServerName,
 	keys gomatrixserverlib.JSONVerifier,
 	roomsMu *MutexByRoom,
@@ -80,7 +80,7 @@ func NewTxnReq(
 ) TxnReq {
 	t := TxnReq{
 		rsAPI:                  rsAPI,
-		keyAPI:                 keyAPI,
+		userAPI:                userAPI,
 		ourServerName:          ourServerName,
 		keys:                   keys,
 		roomsMu:                roomsMu,
