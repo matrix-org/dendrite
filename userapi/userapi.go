@@ -57,6 +57,11 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
+	keyDB, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to key db")
+	}
+
 	syncProducer := producers.NewSyncAPI(
 		db, js,
 		// TODO: user API should handle syncs for account data. Right now,
@@ -69,11 +74,12 @@ func NewInternalAPI(
 	keyChangeProducer := &producers.KeyChange{
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		JetStream: js,
-		DB:        db,
+		DB:        keyDB,
 	}
 
 	userAPI := &internal.UserInternalAPI{
 		DB:                   db,
+		KeyDatabase:          keyDB,
 		SyncProducer:         syncProducer,
 		KeyChangeProducer:    keyChangeProducer,
 		Config:               cfg,
@@ -84,7 +90,7 @@ func NewInternalAPI(
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, userAPI, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, keyDB, userAPI, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err := updater.CleanUp(); err != nil {

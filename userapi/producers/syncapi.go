@@ -25,7 +25,7 @@ type SyncAPI struct {
 	notificationDataTopic string
 }
 
-func NewSyncAPI(db storage.Database, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
+func NewSyncAPI(db storage.UserDatabase, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
 	return &SyncAPI{
 		db:                    db,
 		producer:              js,

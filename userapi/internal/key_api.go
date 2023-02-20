@@ -33,7 +33,7 @@ import (
 )
 
 func (a *UserInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) error {
-	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Offset, req.ToOffset)
+	userIDs, latest, err := a.KeyDatabase.KeyChanges(ctx, req.Offset, req.ToOffset)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: err.Error(),
@@ -53,7 +53,7 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
-	otks, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	otks, err := a.KeyDatabase.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.Perform
 			continue
 		}
 		// claim local keys
-		keys, err := a.DB.ClaimKeys(ctx, local)
+		keys, err := a.KeyDatabase.ClaimKeys(ctx, local)
 		if err != nil {
 			res.Error = &api.KeyError{
 				Err: fmt.Sprintf("failed to ClaimKeys locally: %s", err),
@@ -160,7 +160,7 @@ func (a *UserInternalAPI) claimRemoteKeys(
 }
 
 func (a *UserInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) error {
-	if err := a.DB.DeleteDeviceKeys(ctx, req.UserID, req.KeyIDs); err != nil {
+	if err := a.KeyDatabase.DeleteDeviceKeys(ctx, req.UserID, req.KeyIDs); err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("Failed to delete device keys: %s", err),
 		}
@@ -169,7 +169,7 @@ func (a *UserInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.Perfor
 }
 
 func (a *UserInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) error {
-	count, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	count, err := a.KeyDatabase.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("Failed to query OTK counts: %s", err),
@@ -181,7 +181,7 @@ func (a *UserInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOn
 }
 
 func (a *UserInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.QueryDeviceMessagesRequest, res *api.QueryDeviceMessagesResponse) error {
-	msgs, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil, false)
+	msgs, err := a.KeyDatabase.DeviceKeysForUser(ctx, req.UserID, nil, false)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to query DB for device keys: %s", err),
@@ -208,7 +208,7 @@ func (a *UserInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Quer
 // PerformMarkAsStaleIfNeeded marks the users device list as stale, if the given deviceID is not present
 // in our database.
 func (a *UserInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *api.PerformMarkAsStaleRequest, res *struct{}) error {
-	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{}, true)
+	knownDevices, err := a.KeyDatabase.DeviceKeysForUser(ctx, req.UserID, []string{}, true)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 		domain := string(serverName)
 		// query local devices
 		if a.Config.Matrix.IsLocalServerName(serverName) {
-			deviceKeys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs, false)
+			deviceKeys, err := a.KeyDatabase.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 			if err != nil {
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("failed to query local device keys: %s", err),
@@ -323,14 +323,14 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 			masterKey.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
 		}
 		for targetKeyID := range masterKey.Keys {
-			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
+			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
 			if err != nil {
 				// Stop executing the function if the context was canceled/the deadline was exceeded,
 				// as we can't continue without a valid context.
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return nil
 				}
-				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
+				logrus.WithError(err).Errorf("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
 			}
 			if len(sigMap) == 0 {
@@ -349,14 +349,14 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 
 	for targetUserID, forUserID := range res.DeviceKeys {
 		for targetKeyID, key := range forUserID {
-			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, gomatrixserverlib.KeyID(targetKeyID))
+			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, gomatrixserverlib.KeyID(targetKeyID))
 			if err != nil {
 				// Stop executing the function if the context was canceled/the deadline was exceeded,
 				// as we can't continue without a valid context.
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return nil
 				}
-				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
+				logrus.WithError(err).Errorf("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
 			}
 			if len(sigMap) == 0 {
@@ -571,7 +571,7 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 func (a *UserInternalAPI) populateResponseWithDeviceKeysFromDatabase(
 	ctx context.Context, res *api.QueryKeysResponse, respMu *sync.Mutex, userID string, deviceIDs []string,
 ) error {
-	keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs, false)
+	keys, err := a.KeyDatabase.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 	// if we can't query the db or there are fewer keys than requested, fetch from remote.
 	if err != nil {
 		return fmt.Errorf("DeviceKeysForUser %s %v failed: %w", userID, deviceIDs, err)
@@ -625,7 +625,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 	}
 
 	// Get all of the user existing device keys so we can check for changes.
-	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil, true)
+	existingKeys, err := a.KeyDatabase.DeviceKeysForUser(ctx, req.UserID, nil, true)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to query existing device keys: %s", err.Error()),
@@ -644,7 +644,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 	}
 
 	if len(toClean) > 0 {
-		if err = a.DB.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
+		if err = a.KeyDatabase.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
 			logrus.WithField("user_id", req.UserID).WithError(err).Errorf("Failed to clean up %d stale keyserver device key entries", len(toClean))
 		} else {
 			logrus.WithField("user_id", req.UserID).Debugf("Cleaned up %d stale keyserver device key entries", len(toClean))
@@ -704,7 +704,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 	}
 
 	// store the device keys and emit changes
-	err = a.DB.StoreLocalDeviceKeys(ctx, keysToStore)
+	err = a.KeyDatabase.StoreLocalDeviceKeys(ctx, keysToStore)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to store device keys: %s", err.Error()),
@@ -724,10 +724,10 @@ func (a *UserInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perfor
 		}
 	}
 	if req.DeviceID != "" && len(req.OneTimeKeys) == 0 {
-		counts, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+		counts, err := a.KeyDatabase.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 		if err != nil {
 			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("a.DB.OneTimeKeysCount: %s", err),
+				Err: fmt.Sprintf("a.KeyDatabase.OneTimeKeysCount: %s", err),
 			}
 		}
 		if counts != nil {
@@ -743,7 +743,7 @@ func (a *UserInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perfor
 			keyIDsWithAlgorithms[i] = keyIDWithAlgo
 			i++
 		}
-		existingKeys, err := a.DB.ExistingOneTimeKeys(ctx, req.UserID, req.DeviceID, keyIDsWithAlgorithms)
+		existingKeys, err := a.KeyDatabase.ExistingOneTimeKeys(ctx, req.UserID, req.DeviceID, keyIDsWithAlgorithms)
 		if err != nil {
 			res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
 				Err: "failed to query existing one-time keys: " + err.Error(),
@@ -760,7 +760,7 @@ func (a *UserInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perfor
 			}
 		}
 		// store one-time keys
-		counts, err := a.DB.StoreOneTimeKeys(ctx, key)
+		counts, err := a.KeyDatabase.StoreOneTimeKeys(ctx, key)
 		if err != nil {
 			res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
 				Err: fmt.Sprintf("%s device %s : failed to store one-time keys: %s", req.UserID, req.DeviceID, err.Error()),

@@ -50,7 +50,7 @@ func (d *dummyProducer) PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, err
 	return &nats.PubAck{}, nil
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (api.UserInternalAPI, storage.Database, func()) {
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (api.UserInternalAPI, storage.UserDatabase, func()) {
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
@@ -67,6 +67,13 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 		t.Fatalf("failed to create account DB: %s", err)
 	}
 
+	keyDB, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{
+		ConnectionString: config.DataSource(connStr),
+	})
+	if err != nil {
+		t.Fatalf("failed to create key DB: %s", err)
+	}
+
 	cfg := &config.UserAPI{
 		Matrix: &config.Global{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{
@@ -76,9 +83,10 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	}
 
 	syncProducer := producers.NewSyncAPI(accountDB, &dummyProducer{}, "", "")
-	keyChangeProducer := &producers.KeyChange{DB: accountDB, JetStream: &dummyProducer{}}
+	keyChangeProducer := &producers.KeyChange{DB: keyDB, JetStream: &dummyProducer{}}
 	return &internal.UserInternalAPI{
 			DB:                accountDB,
+			KeyDatabase:       keyDB,
 			Config:            cfg,
 			SyncProducer:      syncProducer,
 			KeyChangeProducer: keyChangeProducer,

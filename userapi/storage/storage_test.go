@@ -32,7 +32,7 @@ var (
 	ctx              = context.Background()
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
@@ -50,7 +50,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		alice := test.NewUser(t)
 		localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -81,7 +81,7 @@ func Test_AccountData(t *testing.T) {
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		alice := test.NewUser(t)
 		aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -161,7 +161,7 @@ func Test_Devices(t *testing.T) {
 	accessToken := util.RandomString(16)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
@@ -241,7 +241,7 @@ func Test_KeyBackup(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		wantAuthData := json.RawMessage("my auth data")
@@ -318,7 +318,7 @@ func Test_KeyBackup(t *testing.T) {
 func Test_LoginToken(t *testing.T) {
 	alice := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		// create a new token
@@ -350,7 +350,7 @@ func Test_OpenID(t *testing.T) {
 	token := util.RandomString(24)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
@@ -371,7 +371,7 @@ func Test_Profile(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		// create account, which also creates a profile
@@ -420,7 +420,7 @@ func Test_Pusher(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		appID := util.RandomString(8)
@@ -471,7 +471,7 @@ func Test_ThreePID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
@@ -510,7 +510,7 @@ func Test_Notification(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		// generate some dummy notifications
 		for i := 0; i < 10; i++ {
@@ -575,9 +575,9 @@ func Test_Notification(t *testing.T) {
 	})
 }
 
-func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewUserDatabase(base, &base.Cfg.KeyServer.Database, "localhost", bcrypt.MinCost, 2000, time.Second, "")
+	db, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}
@@ -594,7 +594,7 @@ func MustNotError(t *testing.T, err error) {
 
 func TestKeyChanges(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := MustCreateDatabase(t, dbType)
+		db, clean := mustCreateKeyDatabase(t, dbType)
 		defer clean()
 		_, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
@@ -617,7 +617,7 @@ func TestKeyChanges(t *testing.T) {
 
 func TestKeyChangesNoDupes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := MustCreateDatabase(t, dbType)
+		db, clean := mustCreateKeyDatabase(t, dbType)
 		defer clean()
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
@@ -643,7 +643,7 @@ func TestKeyChangesNoDupes(t *testing.T) {
 
 func TestKeyChangesUpperLimit(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := MustCreateDatabase(t, dbType)
+		db, clean := mustCreateKeyDatabase(t, dbType)
 		defer clean()
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
@@ -672,7 +672,7 @@ var deviceArray = []string{"AAA", "another_device"}
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	var err error
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := MustCreateDatabase(t, dbType)
+		db, clean := mustCreateKeyDatabase(t, dbType)
 		defer clean()
 		alice := "@alice:TestDeviceKeysStreamIDGeneration"
 		bob := "@bob:TestDeviceKeysStreamIDGeneration"

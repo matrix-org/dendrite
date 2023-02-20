@@ -44,7 +44,8 @@ import (
 )
 
 type UserInternalAPI struct {
-	DB                storage.Database
+	DB                storage.UserDatabase
+	KeyDatabase       storage.KeyDatabase
 	SyncProducer      *producers.SyncAPI
 	KeyChangeProducer *producers.KeyChange
 	Config            *config.UserAPI

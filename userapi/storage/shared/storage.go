@@ -53,16 +53,21 @@ type Database struct {
 	Notifications         tables.NotificationTable
 	Pushers               tables.PusherTable
 	Stats                 tables.StatsTable
+	LoginTokenLifetime    time.Duration
+	ServerName            gomatrixserverlib.ServerName
+	BcryptCost            int
+	OpenIDTokenLifetimeMS int64
+}
+
+type KeyDatabase struct {
 	OneTimeKeysTable      tables.OneTimeKeys
 	DeviceKeysTable       tables.DeviceKeys
 	KeyChangesTable       tables.KeyChanges
 	StaleDeviceListsTable tables.StaleDeviceLists
 	CrossSigningKeysTable tables.CrossSigningKeys
 	CrossSigningSigsTable tables.CrossSigningSigs
-	LoginTokenLifetime    time.Duration
-	ServerName            gomatrixserverlib.ServerName
-	BcryptCost            int
-	OpenIDTokenLifetimeMS int64
+	DB                    *sql.DB
+	Writer                sqlutil.Writer
 }
 
 const (
@@ -884,11 +889,11 @@ func (d *Database) DailyRoomsMessages(
 
 //
 
-func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
+func (d *KeyDatabase) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
 	return d.OneTimeKeysTable.SelectOneTimeKeys(ctx, userID, deviceID, keyIDsWithAlgorithms)
 }
 
-func (d *Database) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (counts *api.OneTimeKeysCount, err error) {
+func (d *KeyDatabase) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (counts *api.OneTimeKeysCount, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		counts, err = d.OneTimeKeysTable.InsertOneTimeKeys(ctx, txn, keys)
 		return err
@@ -896,15 +901,15 @@ func (d *Database) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (
 	return
 }
 
-func (d *Database) OneTimeKeysCount(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error) {
+func (d *KeyDatabase) OneTimeKeysCount(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error) {
 	return d.OneTimeKeysTable.CountOneTimeKeys(ctx, userID, deviceID)
 }
 
-func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
+func (d *KeyDatabase) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
 	return d.DeviceKeysTable.SelectDeviceKeysJSON(ctx, keys)
 }
 
-func (d *Database) PrevIDsExists(ctx context.Context, userID string, prevIDs []int64) (bool, error) {
+func (d *KeyDatabase) PrevIDsExists(ctx context.Context, userID string, prevIDs []int64) (bool, error) {
 	count, err := d.DeviceKeysTable.CountStreamIDsForUser(ctx, userID, prevIDs)
 	if err != nil {
 		return false, err
@@ -912,7 +917,7 @@ func (d *Database) PrevIDsExists(ctx context.Context, userID string, prevIDs []i
 	return count == len(prevIDs), nil
 }
 
-func (d *Database) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error {
+func (d *KeyDatabase) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, userID := range clearUserIDs {
 			err := d.DeviceKeysTable.DeleteAllDeviceKeys(ctx, txn, userID)
@@ -924,7 +929,7 @@ func (d *Database) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceM
 	})
 }
 
-func (d *Database) StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+func (d *KeyDatabase) StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
 	// work out the latest stream IDs for each user
 	userIDToStreamID := make(map[string]int64)
 	for _, k := range keys {
@@ -949,11 +954,11 @@ func (d *Database) StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMe
 	})
 }
 
-func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error) {
+func (d *KeyDatabase) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error) {
 	return d.DeviceKeysTable.SelectBatchDeviceKeys(ctx, userID, deviceIDs, includeEmpty)
 }
 
-func (d *Database) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error) {
+func (d *KeyDatabase) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error) {
 	var result []api.OneTimeKeys
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for userID, deviceToAlgo := range userToDeviceToAlgorithm {
@@ -976,7 +981,7 @@ func (d *Database) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[st
 	return result, err
 }
 
-func (d *Database) StoreKeyChange(ctx context.Context, userID string) (id int64, err error) {
+func (d *KeyDatabase) StoreKeyChange(ctx context.Context, userID string) (id int64, err error) {
 	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
 		id, err = d.KeyChangesTable.InsertKeyChange(ctx, userID)
 		return err
@@ -984,18 +989,18 @@ func (d *Database) StoreKeyChange(ctx context.Context, userID string) (id int64,
 	return
 }
 
-func (d *Database) KeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
+func (d *KeyDatabase) KeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
 	return d.KeyChangesTable.SelectKeyChanges(ctx, fromOffset, toOffset)
 }
 
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 // If no domains are given, all user IDs with stale device lists are returned.
-func (d *Database) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+func (d *KeyDatabase) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
 	return d.StaleDeviceListsTable.SelectUserIDsWithStaleDeviceLists(ctx, domains)
 }
 
 // MarkDeviceListStale sets the stale bit for this user to isStale.
-func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
+func (d *KeyDatabase) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
 	return d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
 		return d.StaleDeviceListsTable.InsertStaleDeviceList(ctx, userID, isStale)
 	})
@@ -1003,7 +1008,7 @@ func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isSta
 
 // DeleteDeviceKeys removes the device keys for a given user/device, and any accompanying
 // cross-signing signatures relating to that device.
-func (d *Database) DeleteDeviceKeys(ctx context.Context, userID string, deviceIDs []gomatrixserverlib.KeyID) error {
+func (d *KeyDatabase) DeleteDeviceKeys(ctx context.Context, userID string, deviceIDs []gomatrixserverlib.KeyID) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, deviceID := range deviceIDs {
 			if err := d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget(ctx, txn, userID, deviceID); err != nil && err != sql.ErrNoRows {
@@ -1021,7 +1026,7 @@ func (d *Database) DeleteDeviceKeys(ctx context.Context, userID string, deviceID
 }
 
 // CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
-func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey, error) {
+func (d *KeyDatabase) CrossSigningKeysForUser(ctx context.Context, userID string) (map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey, error) {
 	keyMap, err := d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
 	if err != nil {
 		return nil, fmt.Errorf("d.CrossSigningKeysTable.SelectCrossSigningKeysForUser: %w", err)
@@ -1060,17 +1065,17 @@ func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (
 }
 
 // CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
-func (d *Database) CrossSigningKeysDataForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error) {
+func (d *KeyDatabase) CrossSigningKeysDataForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error) {
 	return d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
 }
 
 // CrossSigningSigsForTarget returns the signatures for a given user's key ID, if any.
-func (d *Database) CrossSigningSigsForTarget(ctx context.Context, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (types.CrossSigningSigMap, error) {
+func (d *KeyDatabase) CrossSigningSigsForTarget(ctx context.Context, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (types.CrossSigningSigMap, error) {
 	return d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, originUserID, targetUserID, targetKeyID)
 }
 
 // StoreCrossSigningKeysForUser stores the latest known cross-signing keys for a user.
-func (d *Database) StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap types.CrossSigningKeyMap) error {
+func (d *KeyDatabase) StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap types.CrossSigningKeyMap) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for keyType, keyData := range keyMap {
 			if err := d.CrossSigningKeysTable.UpsertCrossSigningKeysForUser(ctx, txn, userID, keyType, keyData); err != nil {
@@ -1082,7 +1087,7 @@ func (d *Database) StoreCrossSigningKeysForUser(ctx context.Context, userID stri
 }
 
 // StoreCrossSigningSigsForTarget stores a signature for a target user ID and key/dvice.
-func (d *Database) StoreCrossSigningSigsForTarget(
+func (d *KeyDatabase) StoreCrossSigningSigsForTarget(
 	ctx context.Context,
 	originUserID string, originKeyID gomatrixserverlib.KeyID,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
@@ -1097,7 +1102,7 @@ func (d *Database) StoreCrossSigningSigsForTarget(
 }
 
 // DeleteStaleDeviceLists deletes stale device list entries for users we don't share a room with anymore.
-func (d *Database) DeleteStaleDeviceLists(
+func (d *KeyDatabase) DeleteStaleDeviceLists(
 	ctx context.Context,
 	userIDs []string,
 ) error {

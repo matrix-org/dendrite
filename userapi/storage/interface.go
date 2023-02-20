@@ -90,7 +90,7 @@ type KeyBackup interface {
 
 type LoginToken interface {
 	// CreateLoginToken generates a token, stores and returns it. The lifetime is
-	// determined by the loginTokenLifetime given to the Database constructor.
+	// determined by the loginTokenLifetime given to the UserDatabase constructor.
 	CreateLoginToken(ctx context.Context, data *api.LoginTokenData) (*api.LoginTokenMetadata, error)
 
 	// RemoveLoginToken removes the named token (and may clean up other expired tokens).
@@ -130,7 +130,7 @@ type Notification interface {
 	DeleteOldNotifications(ctx context.Context) error
 }
 
-type Database interface {
+type UserDatabase interface {
 	Account
 	AccountData
 	Device
@@ -142,7 +142,6 @@ type Database interface {
 	Pusher
 	Statistics
 	ThreePID
-	KeyserverDatabase
 }
 
 type KeyChangeDatabase interface {
@@ -151,7 +150,7 @@ type KeyChangeDatabase interface {
 	StoreKeyChange(ctx context.Context, userID string) (int64, error)
 }
 
-type KeyserverDatabase interface {
+type KeyDatabase interface {
 	KeyChangeDatabase
 	// ExistingOneTimeKeys returns a map of keyIDWithAlgorithm to key JSON for the given parameters. If no keys exist with this combination
 	// of user/device/key/algorithm 4-uple then it is omitted from the map. Returns an error when failing to communicate with the database.

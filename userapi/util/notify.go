@@ -13,11 +13,11 @@ import (
 )
 
 // NotifyUserCountsAsync sends notifications to a local user's
-// notification destinations. Database lookups run synchronously, but
+// notification destinations. UserDatabase lookups run synchronously, but
 // a single goroutine is started when talking to the Push
 // gateways. There is no way to know when the background goroutine has
 // finished.
-func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, localpart string, serverName gomatrixserverlib.ServerName, db storage.Database) error {
+func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, localpart string, serverName gomatrixserverlib.ServerName, db storage.UserDatabase) error {
 	pusherDevices, err := GetPushDevices(ctx, localpart, serverName, nil, db)
 	if err != nil {
 		return err

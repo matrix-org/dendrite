@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/bcrypt"
 
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -361,12 +360,12 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateKeyserverDB(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
 
 	base, _, _ := testrig.Base(nil)
 	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)}, "localhost", bcrypt.MinCost, 2000, time.Second, "")
+	db, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)})
 	if err != nil {
 		t.Fatal(err)
 	}

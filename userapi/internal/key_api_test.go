@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
@@ -12,16 +11,15 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/storage"
-	"golang.org/x/crypto/bcrypt"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	base, _, _ := testrig.Base(nil)
-	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+	db, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, "localhost", bcrypt.MinCost, 2000, time.Second, "")
+	})
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
@@ -148,7 +146,7 @@ func Test_QueryDeviceMessages(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				a := &internal.UserInternalAPI{
-					DB: db,
+					KeyDatabase: db,
 				}
 				if err := a.QueryDeviceMessages(ctx, tt.args.req, tt.args.res); (err != nil) != tt.wantErr {
 					t.Errorf("QueryDeviceMessages() error = %v, wantErr %v", err, tt.wantErr)

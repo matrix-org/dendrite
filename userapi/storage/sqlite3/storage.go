@@ -30,8 +30,8 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 )
 
-// NewDatabase creates a new accounts and profiles database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+// NewUserDatabase creates a new accounts and profiles database
+func NewUserDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		return nil, err
@@ -102,6 +102,41 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
 	}
 
+	m = sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: server names populate",
+		Up: func(ctx context.Context, txn *sql.Tx) error {
+			return deltas.UpServerNamesPopulate(ctx, txn, serverName)
+		},
+	})
+	if err = m.Up(base.Context()); err != nil {
+		return nil, err
+	}
+
+	return &shared.Database{
+		AccountDatas:          accountDataTable,
+		Accounts:              accountsTable,
+		Devices:               devicesTable,
+		KeyBackups:            keyBackupTable,
+		KeyBackupVersions:     keyBackupVersionTable,
+		LoginTokens:           loginTokenTable,
+		OpenIDTokens:          openIDTable,
+		Profiles:              profilesTable,
+		ThreePIDs:             threePIDTable,
+		Pushers:               pusherTable,
+		Notifications:         notificationsTable,
+		Stats:                 statsTable,
+		ServerName:            serverName,
+		DB:                    db,
+		Writer:                writer,
+		LoginTokenLifetime:    loginTokenLifetime,
+		BcryptCost:            bcryptCost,
+		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
+	}, nil
+}
+
+func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		return nil, err
 	}
@@ -130,41 +165,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 
-	m = sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: server names populate",
-		Up: func(ctx context.Context, txn *sql.Tx) error {
-			return deltas.UpServerNamesPopulate(ctx, txn, serverName)
-		},
-	})
-	if err = m.Up(base.Context()); err != nil {
-		return nil, err
-	}
-
-	return &shared.Database{
-		AccountDatas:          accountDataTable,
-		Accounts:              accountsTable,
-		Devices:               devicesTable,
-		KeyBackups:            keyBackupTable,
-		KeyBackupVersions:     keyBackupVersionTable,
-		LoginTokens:           loginTokenTable,
-		OpenIDTokens:          openIDTable,
-		Profiles:              profilesTable,
-		ThreePIDs:             threePIDTable,
-		Pushers:               pusherTable,
-		Notifications:         notificationsTable,
-		Stats:                 statsTable,
+	return &shared.KeyDatabase{
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,
 		StaleDeviceListsTable: sdl,
 		CrossSigningKeysTable: csk,
 		CrossSigningSigsTable: css,
-		ServerName:            serverName,
-		DB:                    db,
 		Writer:                writer,
-		LoginTokenLifetime:    loginTokenLifetime,
-		BcryptCost:            bcryptCost,
-		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}, nil
 }

@@ -18,7 +18,7 @@ import (
 	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
