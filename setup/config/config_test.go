@@ -103,12 +103,6 @@ client_api:
 federation_api:
   database:
     connection_string: file:federationapi.db
-key_server:
-  database:
-    connection_string: file:keyserver.db
-    max_open_conns: 100
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 media_api:
   database:
     connection_string: file:mediaapi.db

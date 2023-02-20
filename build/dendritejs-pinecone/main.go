@@ -164,7 +164,6 @@ func startup() {
 	cfg.MediaAPI.Database.ConnectionString = "file:/idb/dendritejs_mediaapi.db"
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
-	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Global.JetStream.StoragePath = "file:/idb/dendritejs/"
 	cfg.Global.TrustedIDServers = []string{}
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
