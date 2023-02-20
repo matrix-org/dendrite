@@ -57,7 +57,6 @@ type Dendrite struct {
 	AppServiceAPI AppServiceAPI `yaml:"app_service_api"`
 	ClientAPI     ClientAPI     `yaml:"client_api"`
 	FederationAPI FederationAPI `yaml:"federation_api"`
-	KeyServer     KeyServer     `yaml:"key_server"`
 	MediaAPI      MediaAPI      `yaml:"media_api"`
 	RoomServer    RoomServer    `yaml:"room_server"`
 	SyncAPI       SyncAPI       `yaml:"sync_api"`
@@ -331,7 +330,6 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Global.Defaults(opts)
 	c.ClientAPI.Defaults(opts)
 	c.FederationAPI.Defaults(opts)
-	c.KeyServer.Defaults(opts)
 	c.MediaAPI.Defaults(opts)
 	c.RoomServer.Defaults(opts)
 	c.SyncAPI.Defaults(opts)
@@ -348,7 +346,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors) {
 	}
 	for _, c := range []verifiable{
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
-		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
+		&c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
 	} {
@@ -360,7 +358,6 @@ func (c *Dendrite) Wiring() {
 	c.Global.JetStream.Matrix = &c.Global
 	c.ClientAPI.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global
-	c.KeyServer.Matrix = &c.Global
 	c.MediaAPI.Matrix = &c.Global
 	c.RoomServer.Matrix = &c.Global
 	c.SyncAPI.Matrix = &c.Global

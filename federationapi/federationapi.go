@@ -145,7 +145,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start typing consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		base.ProcessContext, &base.Cfg.KeyServer, js, queues, federationDB, rsAPI,
+		base.ProcessContext, &base.Cfg.UserAPI, js, queues, federationDB, rsAPI,
 	)
 	if err = keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")

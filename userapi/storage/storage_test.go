@@ -577,7 +577,7 @@ func Test_Notification(t *testing.T) {
 
 func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewUserDatabase(base, &base.Cfg.KeyServer.Database, "localhost", bcrypt.MinCost, 2000, time.Second, "")
+	db, err := storage.NewUserDatabase(base, &base.Cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 2000, time.Second, "")
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}
