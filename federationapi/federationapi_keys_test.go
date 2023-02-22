@@ -77,8 +77,8 @@ func TestMain(m *testing.M) {
 			// API to work.
 			cfg := &config.Dendrite{}
 			cfg.Defaults(config.DefaultOpts{
-				Generate:   true,
-				Monolithic: true,
+				Generate:       true,
+				SingleDatabase: false,
 			})
 			cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 			cfg.Global.PrivateKey = testPriv
@@ -109,7 +109,7 @@ func TestMain(m *testing.M) {
 			)
 
 			// Finally, build the server key APIs.
-			sbase := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+			sbase := base.NewBaseDendrite(cfg, base.DisableMetrics)
 			s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, nil, true)
 		}
 

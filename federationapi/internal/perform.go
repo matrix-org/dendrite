@@ -121,8 +121,6 @@ func (r *FederationInternalAPI) PerformJoin(
 	var httpErr gomatrix.HTTPError
 	if ok := errors.As(lastErr, &httpErr); ok {
 		httpErr.Message = string(httpErr.Contents)
-		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
-		httpErr.WrappedError = nil
 		response.LastError = &httpErr
 	} else {
 		response.LastError = &gomatrix.HTTPError{
@@ -391,8 +389,6 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 	var httpErr gomatrix.HTTPError
 	if ok := errors.As(lastErr, &httpErr); ok {
 		httpErr.Message = string(httpErr.Contents)
-		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
-		httpErr.WrappedError = nil
 		response.LastError = &httpErr
 	} else {
 		response.LastError = &gomatrix.HTTPError{

@@ -21,7 +21,6 @@ const (
 	PublicMediaPathPrefix      = "/_matrix/media/"
 	PublicStaticPath           = "/_matrix/static/"
 	PublicWellKnownPrefix      = "/.well-known/matrix/"
-	InternalPathPrefix         = "/api/"
 	DendriteAdminPathPrefix    = "/_dendrite/"
 	SynapseAdminPathPrefix     = "/_synapse/"
 )

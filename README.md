@@ -24,7 +24,6 @@ This does not mean:
 - Dendrite is ready for massive homeserver deployments. There is no sharding of microservices (although it is possible to run them on separate machines) and there is no high-availability/clustering support.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
-In the future, we will be able to scale up to gigantic servers (equivalent to `matrix.org`) via polylith mode.
 
 If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
 

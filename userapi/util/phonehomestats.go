@@ -55,7 +55,7 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 		serverName: cfg.Global.ServerName,
 		cfg:        cfg,
 		db:         statsDB,
-		isMonolith: cfg.IsMonolith,
+		isMonolith: true,
 		client: &http.Client{
 			Timeout:   time.Second * 30,
 			Transport: http.DefaultTransport,

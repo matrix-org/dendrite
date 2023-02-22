@@ -35,7 +35,7 @@ func TestLandingPage(t *testing.T) {
 	s.Close()
 
 	// start base with the listener and wait for it to be started
-	go b.SetupAndServeHTTP("", config.HTTPAddress(s.URL), nil, nil)
+	go b.SetupAndServeHTTP(config.HTTPAddress(s.URL), nil, nil)
 	time.Sleep(time.Millisecond * 10)
 
 	// When hitting /, we should be redirected to /_matrix/static, which should contain the landing page

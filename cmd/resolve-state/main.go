@@ -40,7 +40,7 @@ func main() {
 		Level: "error",
 	})
 	cfg.ClientAPI.RegistrationDisabled = true
-	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
+	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	args := flag.Args()
 
 	fmt.Println("Room version", *roomVersion)

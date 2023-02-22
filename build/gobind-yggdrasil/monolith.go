@@ -127,8 +127,8 @@ func (m *DendriteMonolith) Start() {
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
@@ -149,7 +149,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := base.NewBaseDendrite(cfg, "Monolith")
+	base := base.NewBaseDendrite(cfg)
 	base.ConfigureAdminEndpoints()
 	m.processContext = base.ProcessContext
 	defer base.Close() // nolint: errcheck
@@ -194,7 +194,6 @@ func (m *DendriteMonolith) Start() {
 	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)

@@ -15,7 +15,6 @@
 package keyserver
 
 import (
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -24,19 +23,12 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/consumers"
 	"github.com/matrix-org/dendrite/keyserver/internal"
-	"github.com/matrix-org/dendrite/keyserver/inthttp"
 	"github.com/matrix-org/dendrite/keyserver/producers"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 )
-
-// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
-// on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI, enableMetrics bool) {
-	inthttp.AddRoutes(router, intAPI, enableMetrics)
-}
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.

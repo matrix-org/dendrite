@@ -17,7 +17,6 @@ see: https://www.matrix.org/security-disclosure-policy/
 ### Background information
 <!-- Please include versions of all software when known e.g database versions, docker versions, client versions -->
 - **Dendrite version or git SHA**:
-- **Monolith or Polylith?**:
 - **SQLite3 or Postgres?**:
 - **Running in Docker?**:
 - **`go version`**:
