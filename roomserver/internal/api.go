@@ -155,7 +155,6 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.Unpeeker = &perform.Unpeeker{
 		ServerName: r.ServerName,
 		Cfg:        r.Cfg,
-		DB:         r.DB,
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
 	}

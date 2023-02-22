@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -262,7 +263,7 @@ func (d *Database) addState(
 
 func (d *Database) EventNIDs(
 	ctx context.Context, eventIDs []string,
-) (map[string]types.EventNID, error) {
+) (map[string]types.EventMetadata, error) {
 	return d.eventNIDs(ctx, nil, eventIDs, NoFilter)
 }
 
@@ -275,7 +276,7 @@ const (
 
 func (d *Database) eventNIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string, filter UnsentFilter,
-) (map[string]types.EventNID, error) {
+) (map[string]types.EventMetadata, error) {
 	switch filter {
 	case FilterUnsentOnly:
 		return d.EventsTable.BulkSelectUnsentEventNID(ctx, txn, eventIDs)
@@ -325,11 +326,11 @@ func (d *Database) EventIDs(
 	return d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
 }
 
-func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	return d.eventsFromIDs(ctx, nil, eventIDs, NoFilter)
+func (d *Database) EventsFromIDs(ctx context.Context, roomNID types.RoomNID, eventIDs []string) ([]types.Event, error) {
+	return d.eventsFromIDs(ctx, nil, roomNID, eventIDs, NoFilter)
 }
 
-func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []string, filter UnsentFilter) ([]types.Event, error) {
+func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventIDs []string, filter UnsentFilter) ([]types.Event, error) {
 	nidMap, err := d.eventNIDs(ctx, txn, eventIDs, filter)
 	if err != nil {
 		return nil, err
@@ -337,10 +338,16 @@ func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []st
 
 	var nids []types.EventNID
 	for _, nid := range nidMap {
-		nids = append(nids, nid)
+		nids = append(nids, nid.EventNID)
+		if roomNID != 0 && roomNID != nid.RoomNID {
+			logrus.Errorf("expected events from room %d, but also found %d", roomNID, nid.RoomNID)
+		}
+		if roomNID == 0 {
+			roomNID = nid.RoomNID
+		}
 	}
 
-	return d.events(ctx, txn, nids)
+	return d.events(ctx, txn, roomNID, nids)
 }
 
 func (d *Database) LatestEventIDs(
@@ -480,14 +487,18 @@ func (d *Database) GetInvitesForUser(
 }
 
 func (d *Database) Events(
-	ctx context.Context, eventNIDs []types.EventNID,
+	ctx context.Context, roomNID types.RoomNID, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	return d.events(ctx, nil, eventNIDs)
+	return d.events(ctx, nil, roomNID, eventNIDs)
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, inputEventNIDs types.EventNIDs,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
+	if roomNID == 0 {
+		// No need to go further, as we won't find any events for this room.
+		return nil, nil
+	}
 	sort.Sort(inputEventNIDs)
 	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
@@ -519,40 +530,34 @@ func (d *Database) events(
 	if err != nil {
 		return nil, err
 	}
-	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, txn, eventNIDs)
+	eventIDs, err := d.EventsTable.BulkSelectEventID(ctx, txn, eventNIDs)
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
-	var roomNIDs map[types.EventNID]types.RoomNID
-	roomNIDs, err = d.EventsTable.SelectRoomNIDsForEventNIDs(ctx, txn, eventNIDs)
-	if err != nil {
-		return nil, err
-	}
-	uniqueRoomNIDs := make(map[types.RoomNID]struct{})
-	for _, n := range roomNIDs {
-		uniqueRoomNIDs[n] = struct{}{}
-	}
-	roomVersions := make(map[types.RoomNID]gomatrixserverlib.RoomVersion)
-	fetchNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
-	for n := range uniqueRoomNIDs {
-		if roomID, ok := d.Cache.GetRoomServerRoomID(n); ok {
-			if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
-				roomVersions[n] = roomVersion
-				continue
-			}
+
+	var roomVersion gomatrixserverlib.RoomVersion
+	var fetchRoomVersion bool
+	var ok bool
+	var roomID string
+	if roomID, ok = d.Cache.GetRoomServerRoomID(roomNID); ok {
+		roomVersion, ok = d.Cache.GetRoomVersion(roomID)
+		if !ok {
+			fetchRoomVersion = true
 		}
-		fetchNIDList = append(fetchNIDList, n)
 	}
-	dbRoomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, txn, fetchNIDList)
-	if err != nil {
-		return nil, err
+
+	if roomVersion == "" || fetchRoomVersion {
+		var dbRoomVersions map[types.RoomNID]gomatrixserverlib.RoomVersion
+		dbRoomVersions, err = d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, txn, []types.RoomNID{roomNID})
+		if err != nil {
+			return nil, err
+		}
+		if roomVersion, ok = dbRoomVersions[roomNID]; !ok {
+			return nil, fmt.Errorf("unable to find roomversion for room %d", roomNID)
+		}
 	}
-	for n, v := range dbRoomVersions {
-		roomVersions[n] = v
-	}
+
 	for _, eventJSON := range eventJSONs {
-		roomNID := roomNIDs[eventJSON.EventNID]
-		roomVersion := roomVersions[roomNID]
 		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
@@ -718,7 +723,7 @@ func (d *Database) storeEvent(
 			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
 		if !isRejected { // ignore rejected redaction events
-			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
+			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, roomNID, eventNID, event)
 			if err != nil {
 				return fmt.Errorf("d.handleRedactions: %w", err)
 			}
@@ -899,7 +904,7 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 //
 // Returns the redaction event and the event ID of the redacted event if this call resulted in a redaction.
 func (d *Database) handleRedactions(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*gomatrixserverlib.Event, string, error) {
 	var err error
 	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
@@ -919,7 +924,7 @@ func (d *Database) handleRedactions(
 		}
 	}
 
-	redactionEvent, redactedEvent, validated, err := d.loadRedactionPair(ctx, txn, eventNID, event)
+	redactionEvent, redactedEvent, validated, err := d.loadRedactionPair(ctx, txn, roomNID, eventNID, event)
 	if err != nil {
 		return nil, "", fmt.Errorf("d.loadRedactionPair: %w", err)
 	}
@@ -985,7 +990,7 @@ func (d *Database) handleRedactions(
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
 func (d *Database) loadRedactionPair(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*types.Event, *types.Event, bool, error) {
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
@@ -1017,9 +1022,9 @@ func (d *Database) loadRedactionPair(
 	}
 
 	if isRedactionEvent {
-		redactedEvent = d.loadEvent(ctx, info.RedactsEventID)
+		redactedEvent = d.loadEvent(ctx, roomNID, info.RedactsEventID)
 	} else {
-		redactionEvent = d.loadEvent(ctx, info.RedactionEventID)
+		redactionEvent = d.loadEvent(ctx, roomNID, info.RedactionEventID)
 	}
 
 	return redactionEvent, redactedEvent, info.Validated, nil
@@ -1035,7 +1040,7 @@ func (d *Database) applyRedactions(events []types.Event) {
 }
 
 // loadEvent loads a single event or returns nil on any problems/missing event
-func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
+func (d *Database) loadEvent(ctx context.Context, roomNID types.RoomNID, eventID string) *types.Event {
 	nids, err := d.EventNIDs(ctx, []string{eventID})
 	if err != nil {
 		return nil
@@ -1043,7 +1048,7 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 	if len(nids) == 0 {
 		return nil
 	}
-	evs, err := d.Events(ctx, []types.EventNID{nids[eventID]})
+	evs, err := d.Events(ctx, roomNID, []types.EventNID{nids[eventID].EventNID})
 	if err != nil {
 		return nil
 	}
@@ -1470,13 +1475,19 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error {
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		// un-publish old room
-		if err := d.PublishedTable.UpsertRoomPublished(ctx, txn, oldRoomID, "", "", false); err != nil {
-			return fmt.Errorf("failed to unpublish room: %w", err)
+		published, err := d.PublishedTable.SelectPublishedFromRoomID(ctx, txn, oldRoomID)
+		if err != nil {
+			return fmt.Errorf("failed to get published room: %w", err)
 		}
-		// publish new room
-		if err := d.PublishedTable.UpsertRoomPublished(ctx, txn, newRoomID, "", "", true); err != nil {
-			return fmt.Errorf("failed to publish room: %w", err)
+		if published {
+			// un-publish old room
+			if err = d.PublishedTable.UpsertRoomPublished(ctx, txn, oldRoomID, "", "", false); err != nil {
+				return fmt.Errorf("failed to unpublish room: %w", err)
+			}
+			// publish new room
+			if err = d.PublishedTable.UpsertRoomPublished(ctx, txn, newRoomID, "", "", true); err != nil {
+				return fmt.Errorf("failed to publish room: %w", err)
+			}
 		}
 
 		// Migrate any existing room aliases

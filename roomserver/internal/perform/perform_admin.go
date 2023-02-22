@@ -70,7 +70,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		return nil
 	}
 
-	memberEvents, err := r.DB.Events(ctx, memberNIDs)
+	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomNID, memberNIDs)
 	if err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,

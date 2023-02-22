@@ -85,7 +85,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 		return false, err
 	}
 
-	events, err := db.Events(ctx, eventNIDs)
+	events, err := db.Events(ctx, info.RoomNID, eventNIDs)
 	if err != nil {
 		return false, err
 	}
@@ -157,7 +157,7 @@ func IsInvitePending(
 // only keep the "m.room.member" events with a "join" membership. These events are returned.
 // Returns an error if there was an issue fetching the events.
 func GetMembershipsAtState(
-	ctx context.Context, db storage.Database, stateEntries []types.StateEntry, joinedOnly bool,
+	ctx context.Context, db storage.RoomDatabase, roomNID types.RoomNID, stateEntries []types.StateEntry, joinedOnly bool,
 ) ([]types.Event, error) {
 
 	var eventNIDs types.EventNIDs
@@ -177,7 +177,7 @@ func GetMembershipsAtState(
 	util.Unique(eventNIDs)
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, eventNIDs)
+	stateEvents, err := db.Events(ctx, roomNID, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -220,16 +220,16 @@ func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.Room
 	return roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 }
 
-func MembershipAtEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID) (map[string][]types.StateEntry, error) {
+func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID) (map[string][]types.StateEntry, error) {
 	roomState := state.NewStateResolution(db, info)
 	// Fetch the state as it was when this event was fired
 	return roomState.LoadMembershipAtEvent(ctx, eventIDs, stateKeyNID)
 }
 
 func LoadEvents(
-	ctx context.Context, db storage.Database, eventNIDs []types.EventNID,
+	ctx context.Context, db storage.RoomDatabase, roomNID types.RoomNID, eventNIDs []types.EventNID,
 ) ([]*gomatrixserverlib.Event, error) {
-	stateEvents, err := db.Events(ctx, eventNIDs)
+	stateEvents, err := db.Events(ctx, roomNID, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -242,13 +242,13 @@ func LoadEvents(
 }
 
 func LoadStateEvents(
-	ctx context.Context, db storage.Database, stateEntries []types.StateEntry,
+	ctx context.Context, db storage.RoomDatabase, roomNID types.RoomNID, stateEntries []types.StateEntry,
 ) ([]*gomatrixserverlib.Event, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
 		eventNIDs[i] = stateEntries[i].EventNID
 	}
-	return LoadEvents(ctx, db, eventNIDs)
+	return LoadEvents(ctx, db, roomNID, eventNIDs)
 }
 
 func CheckServerAllowedToSeeEvent(
@@ -326,7 +326,7 @@ func slowGetHistoryVisibilityState(
 		return nil, nil
 	}
 
-	return LoadStateEvents(ctx, db, filteredEntries)
+	return LoadStateEvents(ctx, db, info.RoomNID, filteredEntries)
 }
 
 // TODO: Remove this when we have tests to assert correctness of this function
@@ -366,7 +366,7 @@ BFSLoop:
 			next = make([]string, 0)
 		}
 		// Retrieve the events to process from the database.
-		events, err = db.EventsFromIDs(ctx, front)
+		events, err = db.EventsFromIDs(ctx, info.RoomNID, front)
 		if err != nil {
 			return resultNIDs, redactEventIDs, err
 		}
@@ -467,7 +467,7 @@ func QueryLatestEventsAndState(
 		return err
 	}
 
-	stateEvents, err := LoadStateEvents(ctx, db, stateEntries)
+	stateEvents, err := LoadStateEvents(ctx, db, roomInfo.RoomNID, stateEntries)
 	if err != nil {
 		return err
 	}

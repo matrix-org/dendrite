@@ -38,6 +38,11 @@ type EventNID int64
 // RoomNID is a numeric ID for a room.
 type RoomNID int64
 
+type EventMetadata struct {
+	EventNID EventNID
+	RoomNID  RoomNID
+}
+
 // StateSnapshotNID is a numeric ID for the state at an event.
 type StateSnapshotNID int64
 
