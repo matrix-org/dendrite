@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io/fs"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHttpAddress_ParseGood(t *testing.T) {
