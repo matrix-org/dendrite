@@ -3,7 +3,9 @@ package shared_test
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -48,11 +50,14 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 	}
 	assert.NoError(t, err)
 
+	cache := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
+
 	return &shared.Database{
 			DB:                  db,
 			EventStateKeysTable: stateKeyTable,
 			MembershipTable:     membershipTable,
 			Writer:              sqlutil.NewExclusiveWriter(),
+			Cache:               cache,
 		}, func() {
 			err := base.Close()
 			assert.NoError(t, err)
