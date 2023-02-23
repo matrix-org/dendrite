@@ -1,0 +1,68 @@
+dn: dc=example,dc=org
+objectClass: dcObject
+objectClass: organizationalUnit
+
+# administrator
+dn:                    cn=admin,dc=example,dc=org
+objectClass:           simpleSecurityObject
+objectClass:           organizationalRole
+cn:                    admin
+description:           Administrator
+userPassword:          password
+
+# Subtree for Users
+dn:                    ou=users,dc=example,dc=org
+ou:                    Users
+description:           Users
+objectClass:           organizationalUnit
+objectClass:           top
+
+# admin user
+dn:                    cn=user1,ou=users,dc=example,dc=org
+objectClass:           simpleSecurityObject
+objectClass:           Person
+objectClass:           inetOrgPerson
+objectClass:           posixAccount
+uidNumber:             10
+gidNumber:             10
+homeDirectory:         /home/user1
+uid:                   user1
+cn:                    user1
+sn:                    10
+displayName:           user1
+description:           user1
+userPassword:          user1
+mail:                  user1@example.com
+
+# regular user
+dn:                    cn=user2,ou=users,dc=example,dc=org
+objectClass:           simpleSecurityObject
+objectClass:           Person
+objectClass:           inetOrgPerson
+objectClass:           posixAccount
+uidNumber:             11
+gidNumber:             11
+homeDirectory:         /home/user2
+uid:                   user2
+cn:                    user2
+sn:                    11
+displayName:           user2
+description:           user2
+userPassword:          user2
+mail:                  user2@example.com
+
+# Subtree for Groups
+dn:                    ou=groups,dc=example,dc=org
+ou:                    Groups
+description:           Groups
+objectClass:           organizationalUnit
+objectClass:           top
+
+# Admin group
+dn:                    cn=admin,ou=groups,dc=example,dc=org
+objectClass:           posixGroup
+objectClass:           top
+gidNumber:             1
+cn:                    admin
+description:           admin
+memberUid:             user1

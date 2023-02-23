@@ -60,11 +60,12 @@ type Ldap struct {
 	Enabled             bool   `yaml:"enabled"`
 	Uri                 string `yaml:"uri"`
 	BaseDn              string `yaml:"base_dn"`
-	SearchFilter        string `yaml:"search_filter"`
-	SearchAttribute     string `yaml:"search_attribute"`
 	AdminBindEnabled    bool   `yaml:"admin_bind_enabled"`
 	AdminBindDn         string `yaml:"admin_bind_dn"`
 	AdminBindPassword   string `yaml:"admin_bind_password"`
+	SearchBaseDn        string `yaml:"search_base_dn"`
+	SearchFilter        string `yaml:"search_filter"`
+	SearchAttribute     string `yaml:"search_attribute"`
 	UserBindDn          string `yaml:"user_bind_dn"`
 	AdminGroupDn        string `yaml:"admin_group_dn"`
 	AdminGroupFilter    string `yaml:"admin_group_filter"`

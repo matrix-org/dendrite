@@ -17,7 +17,6 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"github.com/go-ldap/ldap/v3"
 	"github.com/google/uuid"
 	"github.com/matrix-org/gomatrixserverlib"
 	"net/http"
@@ -91,7 +90,8 @@ func (t *LoginTypePassword) Login(ctx context.Context, request *PasswordRequest)
 
 	var account *api.Account
 	if t.Config.Ldap.Enabled {
-		isAdmin, err := t.authenticateLdap(username, request.Password)
+		ldapAuthenticator := NewLdapAuthenticator(t.Config.Ldap)
+		isAdmin, err := ldapAuthenticator.Authenticate(username, request.Password)
 		if err != nil {
 			return nil, err
 		}
@@ -148,97 +148,6 @@ func (t *LoginTypePassword) authenticateDb(ctx context.Context, username string,
 		}
 	}
 	return res.Account, nil
-}
-func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *util.JSONResponse) {
-	var conn *ldap.Conn
-	conn, err := ldap.DialURL(t.Config.Ldap.Uri)
-	if err != nil {
-		return false, &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("unable to connect to ldap: " + err.Error()),
-		}
-	}
-	defer conn.Close()
-
-	if t.Config.Ldap.AdminBindEnabled {
-		err = conn.Bind(t.Config.Ldap.AdminBindDn, t.Config.Ldap.AdminBindPassword)
-		if err != nil {
-			return false, &util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("unable to bind to ldap: " + err.Error()),
-			}
-		}
-		filter := strings.ReplaceAll(t.Config.Ldap.SearchFilter, "{username}", username)
-		searchRequest := ldap.NewSearchRequest(
-			t.Config.Ldap.BaseDn, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases,
-			0, 0, false, filter, []string{t.Config.Ldap.SearchAttribute}, nil,
-		)
-		result, err := conn.Search(searchRequest)
-		if err != nil {
-			return false, &util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("unable to bind to search ldap: " + err.Error()),
-			}
-		}
-		if len(result.Entries) > 1 {
-			return false, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.BadJSON("'user' must be duplicated."),
-			}
-		}
-		if len(result.Entries) < 1 {
-			return false, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.BadJSON("'user' not found."),
-			}
-		}
-
-		userDN := result.Entries[0].DN
-		err = conn.Bind(userDN, password)
-		if err != nil {
-			return false, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.InvalidUsername(err.Error()),
-			}
-		}
-	} else {
-		bindDn := strings.ReplaceAll(t.Config.Ldap.UserBindDn, "{username}", username)
-		err = conn.Bind(bindDn, password)
-		if err != nil {
-			return false, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.InvalidUsername(err.Error()),
-			}
-		}
-	}
-
-	isAdmin, err := t.isLdapAdmin(conn, username)
-	if err != nil {
-		return false, &util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
-		}
-	}
-	return isAdmin, nil
-}
-
-func (t *LoginTypePassword) isLdapAdmin(conn *ldap.Conn, username string) (bool, error) {
-	searchRequest := ldap.NewSearchRequest(
-		t.Config.Ldap.AdminGroupDn,
-		ldap.ScopeWholeSubtree, ldap.DerefAlways, 0, 0, false,
-		strings.ReplaceAll(t.Config.Ldap.AdminGroupFilter, "{username}", username),
-		[]string{t.Config.Ldap.AdminGroupAttribute},
-		nil)
-
-	sr, err := conn.Search(searchRequest)
-	if err != nil {
-		return false, err
-	}
-
-	if len(sr.Entries) < 1 {
-		return false, nil
-	}
-	return true, nil
 }
 
 func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, username string, domain gomatrixserverlib.ServerName, admin bool) (*api.Account, *util.JSONResponse) {

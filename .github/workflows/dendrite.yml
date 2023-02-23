@@ -91,6 +91,11 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      openldap:
+        image: bitnami/openldap:2.5.14
+        volumes:
+          - ${{ github.workspace }}/test/openldap:/ldifs
+
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
