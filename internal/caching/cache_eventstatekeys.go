@@ -20,9 +20,6 @@ func (c Caches) StoreEventStateKey(eventStateKeyNID types.EventStateKeyNID, even
 }
 
 func (c Caches) GetEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, bool) {
-	if eventStateKey == "" {
-		return 1, true // 1 is the empty statekey as per the default value in the database
-	}
 	return c.RoomServerStateKeyNIDs.Get(eventStateKey)
 }
 
