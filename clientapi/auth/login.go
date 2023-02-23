@@ -32,7 +32,7 @@ import (
 // called after authorization has completed, with the result of the authorization.
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
-func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.UserLoginAPI, userAPI UserInternalAPIForLogin, cfg *config.ClientAPI) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+func LoginFromJSONReader(ctx context.Context, r io.Reader, userAPI UserInternalAPIForLogin, cfg *config.ClientAPI) (*Login, LoginCleanupFunc, *util.JSONResponse) {
 	reqBytes, err := io.ReadAll(r)
 	if err != nil {
 		err := &util.JSONResponse{
@@ -57,7 +57,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 	switch header.Type {
 	case authtypes.LoginTypePassword:
 		typ = &LoginTypePassword{
-			UserAPI: useraccountAPI,
+			UserAPI: userAPI,
 			Config:  cfg,
 		}
 	case authtypes.LoginTypeToken:
@@ -79,4 +79,5 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 // UserInternalAPIForLogin contains the aspects of UserAPI required for logging in.
 type UserInternalAPIForLogin interface {
 	uapi.LoginTokenInternalAPI
+	uapi.UserLoginAPI
 }

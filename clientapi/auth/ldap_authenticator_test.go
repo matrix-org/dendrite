@@ -8,7 +8,7 @@ import (
 
 func TestLdapAuthenticator_Authenticate_DirectBind_AdminUser(t *testing.T) {
 	authenticator := NewLdapAuthenticator(config.Ldap{
-		Uri:                 "ldap://openldap:1389",
+		Uri:                 "ldap://openldap:389",
 		BaseDn:              "dc=example,dc=org",
 		AdminBindEnabled:    false,
 		UserBindDn:          "cn={username},ou=users,dc=example,dc=org",
@@ -25,7 +25,7 @@ func TestLdapAuthenticator_Authenticate_DirectBind_AdminUser(t *testing.T) {
 
 func TestLdapAuthenticator_Authenticate_DirectBind_RegularUser(t *testing.T) {
 	authenticator := NewLdapAuthenticator(config.Ldap{
-		Uri:                 "ldap://openldap:1389",
+		Uri:                 "ldap://openldap:389",
 		BaseDn:              "dc=example,dc=org",
 		AdminBindEnabled:    false,
 		UserBindDn:          "cn={username},ou=users,dc=example,dc=org",
@@ -42,7 +42,7 @@ func TestLdapAuthenticator_Authenticate_DirectBind_RegularUser(t *testing.T) {
 
 func TestLdapAuthenticator_Authenticate_AdminBind(t *testing.T) {
 	authenticator := NewLdapAuthenticator(config.Ldap{
-		Uri:                 "ldap://openldap:1389",
+		Uri:                 "ldap://openldap:389",
 		BaseDn:              "dc=example,dc=org",
 		AdminBindEnabled:    true,
 		AdminBindDn:         "cn=admin,dc=example,dc=org",
@@ -63,7 +63,7 @@ func TestLdapAuthenticator_Authenticate_AdminBind(t *testing.T) {
 
 func TestLdapAuthenticator_Authenticate_AdminBind_UserNotFound(t *testing.T) {
 	authenticator := NewLdapAuthenticator(config.Ldap{
-		Uri:                 "ldap://openldap:1389",
+		Uri:                 "ldap://openldap:389",
 		BaseDn:              "dc=example,dc=org",
 		AdminBindEnabled:    true,
 		AdminBindDn:         "cn=admin,dc=example,dc=org",

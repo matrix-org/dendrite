@@ -93,8 +93,10 @@ jobs:
           --health-retries 5
       openldap:
         image: bitnami/openldap:2.5.14
+        ports:
+          389:1389
         volumes:
-          - ${{ github.workspace }}/test/openldap:/ldifs
+          - ./test/openldap:/ldifs
 
     steps:
       - uses: actions/checkout@v3

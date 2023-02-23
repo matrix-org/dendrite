@@ -16,8 +16,9 @@ var (
 	ctx        = context.Background()
 	serverName = gomatrixserverlib.ServerName("example.com")
 	// space separated localpart+password -> account
-	lookup = make(map[string]*api.Account)
-	device = &api.Device{
+	lookup   = make(map[string]*api.Account)
+	accounts = make(map[string]*api.Account)
+	device   = &api.Device{
 		AccessToken: "flibble",
 		DisplayName: "My Device",
 		ID:          "device_id_goes_here",
@@ -25,6 +26,26 @@ var (
 )
 
 type fakeAccountDatabase struct{}
+
+func (d *fakeAccountDatabase) QueryAccountByLocalpart(ctx context.Context, req *api.QueryAccountByLocalpartRequest, res *api.QueryAccountByLocalpartResponse) error {
+	acc, ok := lookup[req.Localpart]
+	if !ok {
+		return fmt.Errorf("unknown user/password")
+	}
+	res.Account = acc
+	return nil
+}
+
+func (d *fakeAccountDatabase) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
+	accounts[req.Localpart] = &api.Account{
+		UserID:       req.Localpart,
+		Localpart:    req.Localpart,
+		ServerName:   serverName,
+		AppServiceID: "ldap",
+		AccountType:  0,
+	}
+	return nil
+}
 
 func (d *fakeAccountDatabase) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
 	return nil

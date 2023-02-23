@@ -1,6 +1,7 @@
 dn: dc=example,dc=org
 objectClass: dcObject
-objectClass: organizationalUnit
+objectClass: organization
+o: Example, Inc
 
 # administrator
 dn:                    cn=admin,dc=example,dc=org
@@ -31,7 +32,7 @@ cn:                    user1
 sn:                    10
 displayName:           user1
 description:           user1
-userPassword:          user1
+userPassword:          password
 mail:                  user1@example.com
 
 # regular user
@@ -48,7 +49,7 @@ cn:                    user2
 sn:                    11
 displayName:           user2
 description:           user2
-userPassword:          user2
+userPassword:          password
 mail:                  user2@example.com
 
 # Subtree for Groups
