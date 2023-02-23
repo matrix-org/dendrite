@@ -8,14 +8,14 @@ import (
 )
 
 func TestHttpAddress_ParseGood(t *testing.T) {
-	address, err := HttpAddress("http://localhost:123")
+	address, err := HTTPAddress("http://localhost:123")
 	assert.NoError(t, err)
 	assert.Equal(t, "localhost:123", address.Address)
 	assert.Equal(t, "tcp", address.Network())
 }
 
 func TestHttpAddress_ParseBad(t *testing.T) {
-	_, err := HttpAddress(":")
+	_, err := HTTPAddress(":")
 	assert.Error(t, err)
 }
 

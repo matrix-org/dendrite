@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	NetworkTcp  = "tcp"
+	NetworkTCP  = "tcp"
 	NetworkUnix = "unix"
 )
 
@@ -28,7 +28,7 @@ func (s ServerAddress) Network() string {
 	if s.Scheme == NetworkUnix {
 		return NetworkUnix
 	} else {
-		return NetworkTcp
+		return NetworkTCP
 	}
 }
 
@@ -36,7 +36,7 @@ func UnixSocketAddress(path string, perm fs.FileMode) ServerAddress {
 	return ServerAddress{Address: path, Scheme: NetworkUnix, UnixSocketPermission: perm}
 }
 
-func HttpAddress(urlAddress string) (ServerAddress, error) {
+func HTTPAddress(urlAddress string) (ServerAddress, error) {
 	parsedUrl, err := url.Parse(urlAddress)
 	if err != nil {
 		return ServerAddress{}, err

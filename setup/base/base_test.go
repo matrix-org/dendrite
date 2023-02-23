@@ -2,6 +2,7 @@ package base_test
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"html/template"
 	"net"
@@ -10,8 +11,6 @@ import (
 	"path"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -39,7 +38,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	s.Close()
 
 	// start base with the listener and wait for it to be started
-	address, err := config.HttpAddress(s.URL)
+	address, err := config.HTTPAddress(s.URL)
 	assert.NoError(t, err)
 	go b.SetupAndServeHTTP(address, nil, nil)
 	time.Sleep(time.Millisecond * 10)

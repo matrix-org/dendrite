@@ -435,10 +435,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 				}
 			} else {
 				if externalHTTPAddr.IsUnixSocket() {
-					_ = os.Remove(externalHTTPAddr.Address)
+					err := os.RemoveAll(externalHTTPAddr.Address)
+					if err != nil {
+						logrus.WithError(err).Fatal("failed to remove existing unix socket")
+					}
 					listener, err := net.Listen(externalHTTPAddr.Network(), externalHTTPAddr.Address)
 					if err != nil {
-						logrus.WithError(err).Fatal("failed to serve unix socket HTTP")
+						logrus.WithError(err).Fatal("failed to serve unix socket")
 					}
 					err = os.Chmod(externalHTTPAddr.Address, externalHTTPAddr.UnixSocketPermission)
 					if err != nil {
@@ -446,7 +449,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					}
 					if err := externalServ.Serve(listener); err != nil {
 						if err != http.ErrServerClosed {
-							logrus.WithError(err).Fatal("failed to serve HTTP")
+							logrus.WithError(err).Fatal("failed to serve unix socket")
 						}
 					}
 
