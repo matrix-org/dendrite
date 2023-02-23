@@ -74,10 +74,7 @@ type Database interface {
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
 	BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.
-	StoreEvent(
-		ctx context.Context, event *gomatrixserverlib.Event, authEventNIDs []types.EventNID,
-		isRejected bool,
-	) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
+	StoreEvent(ctx context.Context, event *gomatrixserverlib.Event, roomNID types.RoomNID, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
 	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
 	// Returns a types.MissingEventError if the event IDs aren't in the database.
@@ -182,23 +179,10 @@ type Database interface {
 	GetMembershipForHistoryVisibility(
 		ctx context.Context, userNID types.EventStateKeyNID, info *types.RoomInfo, eventIDs ...string,
 	) (map[string]*gomatrixserverlib.HeaderedEvent, error)
+	GetOrCreateRoomNID(ctx context.Context, event *gomatrixserverlib.Event) (types.RoomNID, error)
+	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
+	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
 }
-
-/*
- RoomsTable
- EventsTable
- EventJSONTable
- MembershipTable
- StateSnapshotTable
- StateBlockTable
- EventTypesTable
- EventStateKeysTable
-
-
- PublishedTable?
- RoomAliases?
-
-*/
 
 type RoomDatabase interface {
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
@@ -207,7 +191,7 @@ type RoomDatabase interface {
 	IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (rejected bool, err error)
 	MissingAuthPrevEvents(ctx context.Context, e *gomatrixserverlib.Event) (missingAuth, missingPrev []string, err error)
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.
-	StoreEvent(ctx context.Context, event *gomatrixserverlib.Event, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
+	StoreEvent(ctx context.Context, event *gomatrixserverlib.Event, roomNID types.RoomNID, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
 	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
 	GetRoomUpdater(ctx context.Context, roomInfo *types.RoomInfo) (*shared.RoomUpdater, error)
 	StateEntriesForEventIDs(ctx context.Context, eventIDs []string, excludeRejected bool) ([]types.StateEntry, error)
@@ -224,4 +208,7 @@ type RoomDatabase interface {
 	LatestEventIDs(ctx context.Context, roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
 	EventTypeNIDs(ctx context.Context, eventTypes []string) (map[string]types.EventTypeNID, error)
 	EventStateKeyNIDs(ctx context.Context, eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
+	GetOrCreateRoomNID(ctx context.Context, event *gomatrixserverlib.Event) (types.RoomNID, error)
+	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
+	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
 }

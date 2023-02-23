@@ -332,8 +332,23 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	roomNID, err := r.DB.GetOrCreateRoomNID(ctx, event)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetOrCreateRoomNID: %w", err)
+	}
+
+	eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, event.Type())
+	if err != nil {
+		return fmt.Errorf("r.DB.GetOrCreateEventTypeNID: %w", err)
+	}
+
+	eventStateKeyNID, err := r.DB.GetOrCreateEventStateKeyNID(ctx, event.StateKey())
+	if err != nil {
+		return fmt.Errorf("r.DB.GetOrCreateEventStateKeyNID: %w", err)
+	}
+
 	// Store the event.
-	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
+	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, roomNID, eventTypeNID, eventStateKeyNID, authEventNIDs, isRejected)
 	if err != nil {
 		return fmt.Errorf("updater.StoreEvent: %w", err)
 	}
@@ -568,6 +583,7 @@ func (r *Inputer) processStateBefore(
 // we've failed to retrieve the auth chain altogether (in which case
 // an error is returned) or we've successfully retrieved them all and
 // they are now in the database.
+// nolint: gocyclo
 func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
 	logger *logrus.Entry,
@@ -674,8 +690,23 @@ nextAuthEvent:
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
 		}
 
+		roomNID, err := r.DB.GetOrCreateRoomNID(ctx, authEvent)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetOrCreateRoomNID: %w", err)
+		}
+
+		eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, authEvent.Type())
+		if err != nil {
+			return fmt.Errorf("r.DB.GetOrCreateEventTypeNID: %w", err)
+		}
+
+		eventStateKeyNID, err := r.DB.GetOrCreateEventStateKeyNID(ctx, event.StateKey())
+		if err != nil {
+			return fmt.Errorf("r.DB.GetOrCreateEventStateKeyNID: %w", err)
+		}
+
 		// Finally, store the event in the database.
-		eventNID, _, _, _, _, err := r.DB.StoreEvent(ctx, authEvent, authEventNIDs, isRejected)
+		eventNID, _, _, _, err := r.DB.StoreEvent(ctx, authEvent, roomNID, eventTypeNID, eventStateKeyNID, authEventNIDs, isRejected)
 		if err != nil {
 			return fmt.Errorf("updater.StoreEvent: %w", err)
 		}

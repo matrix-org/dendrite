@@ -605,9 +605,28 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			authNids[i] = nid.EventNID
 			i++
 		}
+
+		roomNID, err = db.GetOrCreateRoomNID(ctx, ev.Unwrap())
+		if err != nil {
+			logrus.WithError(err).Error("failed to get or create roomNID")
+			continue
+		}
+
+		eventTypeNID, err := db.GetOrCreateEventTypeNID(ctx, ev.Type())
+		if err != nil {
+			logrus.WithError(err).Error("failed to get or create eventType NID")
+			continue
+		}
+
+		eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(ctx, ev.StateKey())
+		if err != nil {
+			logrus.WithError(err).Error("failed to get or create eventStateKey NID")
+			continue
+		}
+
 		var redactedEventID string
 		var redactionEvent *gomatrixserverlib.Event
-		eventNID, roomNID, _, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
+		eventNID, _, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), roomNID, eventTypeNID, eventStateKeyNID, authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue
