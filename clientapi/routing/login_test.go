@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -39,12 +38,10 @@ func TestLogin(t *testing.T) {
 
 		rsAPI := roomserver.NewInternalAPI(base)
 		// Needed for /login
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
-		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
-		keyAPI.SetUserAPI(userAPI)
+		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		Setup(base, &base.Cfg.ClientAPI, nil, nil, userAPI, nil, nil, nil, nil, nil, keyAPI, nil, &base.Cfg.MSCs, nil)
+		Setup(base, &base.Cfg.ClientAPI, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, &base.Cfg.MSCs, nil)
 
 		// Create password
 		password := util.RandomString(8)

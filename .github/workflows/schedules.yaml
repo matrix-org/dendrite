@@ -243,6 +243,7 @@ jobs:
       - name: Build
         env:
           CI_PACKAGE: true
+          NODE_OPTIONS: "--openssl-legacy-provider"
         run: yarn build
         working-directory: ./element-web
       - name: Edit Test Config

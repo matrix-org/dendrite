@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/internal/caching"
-	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -42,12 +41,11 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fedAPI federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.FederationKeyAPI,
 	servers federationAPI.ServersInRoomProvider,
 ) {
 	cfg := &base.Cfg.FederationAPI
@@ -79,7 +77,7 @@ func AddPublicRoutes(
 	routing.Setup(
 		base,
 		rsAPI, f, keyRing,
-		federation, userAPI, keyAPI, mscCfg,
+		federation, userAPI, mscCfg,
 		servers, producer,
 	)
 }

@@ -17,7 +17,6 @@ type RoomserverInternalAPI interface {
 	ClientRoomserverAPI
 	UserRoomserverAPI
 	FederationRoomserverAPI
-	KeyserverRoomserverAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -167,6 +166,7 @@ type ClientRoomserverAPI interface {
 
 type UserRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
+	KeyserverRoomserverAPI
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
