@@ -22,11 +22,11 @@ func (l *LogAdapter) Noticef(format string, v ...interface{}) {
 }
 
 func (l *LogAdapter) Warnf(format string, v ...interface{}) {
-	l.entry.Errorf(format, v...)
+	l.entry.Warnf(format, v...)
 }
 
 func (l *LogAdapter) Fatalf(format string, v ...interface{}) {
-	l.entry.Errorf(format, v...)
+	l.entry.Fatalf(format, v...)
 }
 
 func (l *LogAdapter) Errorf(format string, v ...interface{}) {
