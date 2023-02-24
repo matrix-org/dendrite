@@ -215,7 +215,7 @@ func (p *P2PMonolith) WaitForShutdown() {
 func (p *P2PMonolith) closeAllResources() {
 	logrus.Info("Closing monolith resources")
 	if p.httpServer != nil {
-		p.httpServer.Shutdown(context.Background())
+		_ = p.httpServer.Shutdown(context.Background())
 	}
 
 	select {
