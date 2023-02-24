@@ -30,26 +30,6 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// RoomserverInternalAPIDatabase has the storage APIs needed to implement the alias API.
-type RoomserverInternalAPIDatabase interface {
-	// Save a given room alias with the room ID it refers to.
-	// Returns an error if there was a problem talking to the database.
-	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
-	// Look up the room ID a given alias refers to.
-	// Returns an error if there was a problem talking to the database.
-	GetRoomIDForAlias(ctx context.Context, alias string) (string, error)
-	// Look up all aliases referring to a given room ID.
-	// Returns an error if there was a problem talking to the database.
-	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
-	// Remove a given room alias.
-	// Returns an error if there was a problem talking to the database.
-	RemoveRoomAlias(ctx context.Context, alias string) error
-	// Look up the room version for a given room.
-	GetRoomVersionForRoom(
-		ctx context.Context, roomID string,
-	) (gomatrixserverlib.RoomVersion, error)
-}
-
 // SetRoomAlias implements alias.RoomserverInternalAPI
 func (r *RoomserverInternalAPI) SetRoomAlias(
 	ctx context.Context,

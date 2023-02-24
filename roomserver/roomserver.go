@@ -23,8 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 )
 
-// NewInternalAPI returns a concerete implementation of the internal API. Callers
-// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+// NewInternalAPI returns a concrete implementation of the internal API.
 func NewInternalAPI(
 	base *base.BaseDendrite,
 ) api.RoomserverInternalAPI {
