@@ -60,7 +60,7 @@ func TestRelayRetrieverInitialization(t *testing.T) {
 		"server",
 		&FakeFedAPI{},
 		&FakeRelayAPI{},
-		make(<-chan bool),
+		make(chan bool),
 	)
 
 	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
@@ -74,7 +74,7 @@ func TestRelayRetrieverSync(t *testing.T) {
 		"server",
 		&FakeFedAPI{},
 		&FakeRelayAPI{},
-		make(<-chan bool),
+		make(chan bool),
 	)
 
 	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
