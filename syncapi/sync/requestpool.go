@@ -192,7 +192,8 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 	}
 
 	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-		req.RemoteAddr = forwardedFor
+		ips := strings.Split(forwardedFor, ", ")
+		req.RemoteAddr = ips[0]
 	}
 	remoteAddr := req.RemoteAddr
 	if rp.cfg.RealIPHeader != "" {
