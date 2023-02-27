@@ -240,7 +240,8 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-			req.RemoteAddr = forwardedFor
+			ips := strings.Split(forwardedFor, ", ")
+			req.RemoteAddr = ips[0]
 		}
 		h.ServeHTTP(nextWriter, req)
 
