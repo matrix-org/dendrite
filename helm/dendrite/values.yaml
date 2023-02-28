@@ -348,3 +348,26 @@ ingress:
 service:
   type: ClusterIP
   port: 8008
+
+prometheus:
+  servicemonitor:
+    # -- Enable ServiceMonitor for Prometheus-Operator for scrape metric-endpoint
+    enabled: false
+    # -- Extra Labels on ServiceMonitor for selector of Prometheus Instance
+    labels: {}
+  rules:
+    # -- Enable PrometheusRules for Prometheus-Operator for setup alerting
+    enabled: false
+    # -- Extra Labels on PrometheusRules for selector of Prometheus Instance
+    labels: {}
+    # -- additional alertrules (no default alertrules are provided)
+    additionalRules: []
+
+grafana:
+  dashboards:
+    enabled: false
+    # -- Extra Labels on ConfigMap for selector of grafana sidecar
+    labels:
+      grafana_dashboard: "1"
+    # -- Extra Annotations on ConfigMap additional config in grafana sidecar
+    annotations: {}

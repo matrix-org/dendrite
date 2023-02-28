@@ -1,0 +1,16 @@
+{{- if and ( .Values.prometheus.rules.enabled ) ( .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" ) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "dendrite.fullname" . }}
+  labels:
+    {{- include "dendrite.labels" . | nindent 4 }}
+    {{- toYaml .Values.prometheus.rules.labels | nindent 4 }}
+spec:
+  groups:
+  {{- if .Values.prometheus.rules.additionalRules }}
+  - name: {{ template "dendrite.name" . }}-Additional
+    rules: {{- toYaml .Values.prometheus.rules.additionalRules | nindent 4 }}
+  {{- end }}
+{{- end }}

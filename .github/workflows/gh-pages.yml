@@ -4,7 +4,7 @@ name: Deploy GitHub Pages dependencies preinstalled
 on:
   # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
+    branches: ["gh-pages"]
     paths:
       - 'docs/**' # only execute if we have docs changes
 
