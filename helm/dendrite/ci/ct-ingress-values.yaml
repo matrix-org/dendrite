@@ -11,3 +11,8 @@ dendrite_config:
 
 ingress:
   enabled: true
+
+# dashboard is an ConfigMap with labels - it does not harm on testing
+grafana:
+  dashboards:
+    enabled: true
