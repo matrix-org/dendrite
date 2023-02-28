@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
@@ -553,9 +552,8 @@ func (d *EventDatabase) Events(ctx context.Context, roomInfo *types.RoomInfo, ev
 func (d *EventDatabase) events(
 	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
-	if roomInfo == nil {
-
-		roomInfo = &types.RoomInfo{RoomVersion: version.DefaultRoomVersion()}
+	if roomInfo == nil { // this should never happen
+		return nil, fmt.Errorf("unable to parse events without roomInfo")
 	}
 
 	sort.Sort(inputEventNIDs)

@@ -433,39 +433,39 @@ func (r *Queryer) QueryServerJoinedToRoom(
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
 func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
-	request *api.QueryServerAllowedToSeeEventRequest,
-	response *api.QueryServerAllowedToSeeEventResponse,
-) (err error) {
-	events, err := r.DB.EventsFromIDs(ctx, nil, []string{request.EventID})
+	serverName gomatrixserverlib.ServerName,
+	eventID string,
+) (allowed bool, err error) {
+	events, err := r.DB.EventNIDs(ctx, []string{eventID})
 	if err != nil {
 		return
 	}
 	if len(events) == 0 {
-		response.AllowedToSeeEvent = false // event doesn't exist so not allowed to see
-		return
+		return allowed, nil
 	}
-	roomID := events[0].RoomID()
-
-	inRoomReq := &api.QueryServerJoinedToRoomRequest{
-		RoomID:     roomID,
-		ServerName: request.ServerName,
-	}
-	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
-	if err = r.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
-		return fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
-	}
-
-	info, err := r.DB.RoomInfo(ctx, roomID)
+	info, err := r.DB.RoomInfoByNID(ctx, events[eventID].RoomNID)
 	if err != nil {
-		return err
+		return allowed, err
 	}
 	if info == nil || info.IsStub() {
-		return nil
+		return allowed, nil
 	}
-	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
+	var isInRoom bool
+	if r.IsLocalServerName(serverName) || serverName == "" {
+		isInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+		if err != nil {
+			return allowed, fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+		}
+	} else {
+		isInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, serverName)
+		if err != nil {
+			return allowed, fmt.Errorf("r.DB.GetServerInRoom: %w", err)
+		}
+	}
+
+	return helpers.CheckServerAllowedToSeeEvent(
+		ctx, r.DB, info, eventID, serverName, isInRoom,
 	)
-	return
 }
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
@@ -487,19 +487,22 @@ func (r *Queryer) QueryMissingEvents(
 			eventsToFilter[id] = true
 		}
 	}
-	events, err := r.DB.EventsFromIDs(ctx, nil, front)
+	if len(front) == 0 {
+		return nil // no events to query, give up.
+	}
+	events, err := r.DB.EventNIDs(ctx, []string{front[0]})
 	if err != nil {
 		return err
 	}
 	if len(events) == 0 {
 		return nil // we are missing the events being asked to search from, give up.
 	}
-	info, err := r.DB.RoomInfo(ctx, events[0].RoomID())
+	info, err := r.DB.RoomInfoByNID(ctx, events[front[0]].RoomNID)
 	if err != nil {
 		return err
 	}
 	if info == nil || info.IsStub() {
-		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
+		return fmt.Errorf("missing RoomInfo for room %d", events[front[0]].RoomNID)
 	}
 
 	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)

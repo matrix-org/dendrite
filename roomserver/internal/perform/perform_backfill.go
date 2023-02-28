@@ -631,6 +631,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 
 		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Unwrap(), true)
 		if err != nil {
+			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue
 		}
 		// If storing this event results in it being redacted, then do so.

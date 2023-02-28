@@ -60,21 +60,13 @@ func allowedToSeeEvent(
 	rsAPI api.FederationRoomserverAPI,
 	eventID string,
 ) *util.JSONResponse {
-	var authResponse api.QueryServerAllowedToSeeEventResponse
-	err := rsAPI.QueryServerAllowedToSeeEvent(
-		ctx,
-		&api.QueryServerAllowedToSeeEventRequest{
-			EventID:    eventID,
-			ServerName: origin,
-		},
-		&authResponse,
-	)
+	allowed, err := rsAPI.QueryServerAllowedToSeeEvent(ctx, origin, eventID)
 	if err != nil {
 		resErr := util.ErrorResponse(err)
 		return &resErr
 	}
 
-	if !authResponse.AllowedToSeeEvent {
+	if !allowed {
 		resErr := util.MessageResponse(http.StatusForbidden, "server not allowed to see event")
 		return &resErr
 	}
