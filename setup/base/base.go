@@ -20,9 +20,11 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -435,8 +437,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 				}
 			} else {
 				if externalHTTPAddr.IsUnixSocket() {
-					err := os.RemoveAll(externalHTTPAddr.Address)
-					if err != nil {
+					err := os.Remove(externalHTTPAddr.Address)
+					if err != nil && !errors.Is(err, fs.ErrNotExist) {
 						logrus.WithError(err).Fatal("failed to remove existing unix socket")
 					}
 					listener, err := net.Listen(externalHTTPAddr.Network(), externalHTTPAddr.Address)
