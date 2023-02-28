@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '**.go'                 # only execute on changes to go files
+      - '.github/workflows/**'  # or workflow changes
   pull_request:
+    paths:
+      - '**.go'
+      - '.github/workflows/**'
   release:
     types: [published]
   workflow_dispatch:
