@@ -30,8 +30,8 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 )
 
-// NewDatabase creates a new accounts and profiles database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+// NewUserDatabase creates a new accounts and profiles database
+func NewUserDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		return nil, err
@@ -132,5 +132,46 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		LoginTokenLifetime:    loginTokenLifetime,
 		BcryptCost:            bcryptCost,
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
+	}, nil
+}
+
+func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
+	if err != nil {
+		return nil, err
+	}
+	otk, err := NewSqliteOneTimeKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	dk, err := NewSqliteDeviceKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	kc, err := NewSqliteKeyChangesTable(db)
+	if err != nil {
+		return nil, err
+	}
+	sdl, err := NewSqliteStaleDeviceListsTable(db)
+	if err != nil {
+		return nil, err
+	}
+	csk, err := NewSqliteCrossSigningKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	css, err := NewSqliteCrossSigningSigsTable(db)
+	if err != nil {
+		return nil, err
+	}
+
+	return &shared.KeyDatabase{
+		OneTimeKeysTable:      otk,
+		DeviceKeysTable:       dk,
+		KeyChangesTable:       kc,
+		StaleDeviceListsTable: sdl,
+		CrossSigningKeysTable: csk,
+		CrossSigningSigsTable: css,
+		Writer:                writer,
 	}, nil
 }

@@ -49,6 +49,19 @@ type FederationQueueJSON interface {
 	SelectQueueJSON(ctx context.Context, txn *sql.Tx, jsonNIDs []int64) (map[int64][]byte, error)
 }
 
+type FederationQueueTransactions interface {
+	InsertQueueTransaction(ctx context.Context, txn *sql.Tx, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nid int64) error
+	DeleteQueueTransactions(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []int64) error
+	SelectQueueTransactions(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, limit int) ([]int64, error)
+	SelectQueueTransactionCount(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (int64, error)
+}
+
+type FederationTransactionJSON interface {
+	InsertTransactionJSON(ctx context.Context, txn *sql.Tx, json string) (int64, error)
+	DeleteTransactionJSON(ctx context.Context, txn *sql.Tx, nids []int64) error
+	SelectTransactionJSON(ctx context.Context, txn *sql.Tx, jsonNIDs []int64) (map[int64][]byte, error)
+}
+
 type FederationJoinedHosts interface {
 	InsertJoinedHosts(ctx context.Context, txn *sql.Tx, roomID, eventID string, serverName gomatrixserverlib.ServerName) error
 	DeleteJoinedHosts(ctx context.Context, txn *sql.Tx, eventIDs []string) error
@@ -64,6 +77,20 @@ type FederationBlacklist interface {
 	SelectBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (bool, error)
 	DeleteBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
 	DeleteAllBlacklist(ctx context.Context, txn *sql.Tx) error
+}
+
+type FederationAssumedOffline interface {
+	InsertAssumedOffline(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
+	SelectAssumedOffline(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (bool, error)
+	DeleteAssumedOffline(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
+	DeleteAllAssumedOffline(ctx context.Context, txn *sql.Tx) error
+}
+
+type FederationRelayServers interface {
+	InsertRelayServers(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+	SelectRelayServers(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
+	DeleteRelayServers(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+	DeleteAllRelayServers(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
 }
 
 type FederationOutboundPeeks interface {

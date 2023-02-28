@@ -25,7 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -33,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/userapi/api"
 )
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
@@ -42,7 +42,7 @@ type OutputSendToDeviceEventConsumer struct {
 	durable           string
 	topic             string
 	db                storage.Database
-	keyAPI            keyapi.SyncKeyAPI
+	userAPI           api.SyncKeyAPI
 	isLocalServerName func(gomatrixserverlib.ServerName) bool
 	stream            streams.StreamProvider
 	notifier          *notifier.Notifier
@@ -55,7 +55,7 @@ func NewOutputSendToDeviceEventConsumer(
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
-	keyAPI keyapi.SyncKeyAPI,
+	userAPI api.SyncKeyAPI,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
@@ -65,7 +65,7 @@ func NewOutputSendToDeviceEventConsumer(
 		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		durable:           cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
 		db:                store,
-		keyAPI:            keyAPI,
+		userAPI:           userAPI,
 		isLocalServerName: cfg.Matrix.IsLocalServerName,
 		notifier:          notifier,
 		stream:            stream,
@@ -116,7 +116,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		_, senderDomain, _ := gomatrixserverlib.SplitID('@', output.Sender)
 		if requestingDeviceID != "" && !s.isLocalServerName(senderDomain) {
 			// Mark the requesting device as stale, if we don't know about it.
-			if err = s.keyAPI.PerformMarkAsStaleIfNeeded(ctx, &keyapi.PerformMarkAsStaleRequest{
+			if err = s.userAPI.PerformMarkAsStaleIfNeeded(ctx, &api.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
 				logger.WithError(err).Errorf("failed to mark as stale if needed")

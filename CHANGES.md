@@ -1,5 +1,55 @@
 # Changelog
 
+## Dendrite 0.11.1 (2023-02-10)
+
+**⚠️ DEPRECATION WARNING: This is the last release to have polylith and HTTP API mode. Future releases are monolith only.**
+
+### Features
+
+* Dendrite can now be compiled against Go 1.20
+* Initial store and forward support has been added
+* A landing page showing that Dendrite is running has been added (contributed by [LukasLJL](https://github.com/LukasLJL))
+
+### Fixes
+
+- `/sync` is now using significantly less database round trips when using Postgres, resulting in faster initial syncs, allowing larger accounts to login again
+- Many under the hood pinecone improvements
+- Publishing rooms is now possible again
+
+## Dendrite 0.11.0 (2023-01-20)
+
+The last three missing federation API Sytests have been fixed - bringing us to 100% server-server Synapse parity, with client-server parity at 93% 🎉
+
+### Features
+
+* Added `/_dendrite/admin/purgeRoom/{roomID}` to clean up the database
+* The default room version was updated to 10 (contributed by [FSG-Cat](https://github.com/FSG-Cat))
+
+### Fixes
+
+* An oversight in the `create-config` binary, which now correctly sets the media path if specified (contributed by [BieHDC](https://github.com/BieHDC))
+* The Helm chart now uses the `$.Chart.AppVersion` as the default image version to pull, with the possibility to override it (contributed by [genofire](https://github.com/genofire))
+
+## Dendrite 0.10.9 (2023-01-17)
+
+### Features
+
+* Stale device lists are now cleaned up on startup, removing entries for users the server doesn't share a room with anymore
+* Dendrite now has its own Helm chart
+* Guest access is now handled correctly (disallow joins, kick guests on revocation of guest access, as well as over federation)
+
+### Fixes
+
+* Push rules have seen several tweaks and fixes, which should, for example, fix notifications for `m.read_receipts`
+* Outgoing presence will now correctly be sent to newly joined hosts
+* Fixes the `/_dendrite/admin/resetPassword/{userID}` admin endpoint to use the correct variable
+* Federated backfilling for medium/large rooms has been fixed
+* `/login` causing wrong device list updates has been resolved
+* `/sync` should now return the correct room summary heroes
+* The default config options for `recaptcha_sitekey_class` and `recaptcha_form_field` are now set correctly 
+* `/messages` now omits empty `state` to be more spec compliant (contributed by [handlerug](https://github.com/handlerug))
+* `/sync` has been optimised to only query state events for history visibility if they are really needed
+
 ## Dendrite 0.10.8 (2022-11-29)
 
 ### Features

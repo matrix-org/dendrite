@@ -17,7 +17,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
@@ -26,11 +26,11 @@ import (
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	keyAPI keyapi.FederationKeyAPI,
+	keyAPI api.FederationKeyAPI,
 	userID string,
 ) util.JSONResponse {
-	var res keyapi.QueryDeviceMessagesResponse
-	if err := keyAPI.QueryDeviceMessages(req.Context(), &keyapi.QueryDeviceMessagesRequest{
+	var res api.QueryDeviceMessagesResponse
+	if err := keyAPI.QueryDeviceMessages(req.Context(), &api.QueryDeviceMessagesRequest{
 		UserID: userID,
 	}, &res); err != nil {
 		return util.ErrorResponse(err)
@@ -40,12 +40,12 @@ func GetUserDevices(
 		return jsonerror.InternalServerError()
 	}
 
-	sigReq := &keyapi.QuerySignaturesRequest{
+	sigReq := &api.QuerySignaturesRequest{
 		TargetIDs: map[string][]gomatrixserverlib.KeyID{
 			userID: {},
 		},
 	}
-	sigRes := &keyapi.QuerySignaturesResponse{}
+	sigRes := &api.QuerySignaturesResponse{}
 	for _, dev := range res.Devices {
 		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
 	}

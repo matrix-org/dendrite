@@ -18,22 +18,22 @@ import (
 	"context"
 	"strings"
 
+	keytypes "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
-	keytypes "github.com/matrix-org/dendrite/keyserver/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/userapi/api"
 )
 
 // DeviceOTKCounts adds one-time key counts to the /sync response
-func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
-	var queryRes keyapi.QueryOneTimeKeysResponse
-	_ = keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
+func DeviceOTKCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
+	var queryRes api.QueryOneTimeKeysResponse
+	_ = keyAPI.QueryOneTimeKeys(ctx, &api.QueryOneTimeKeysRequest{
 		UserID:   userID,
 		DeviceID: deviceID,
 	}, &queryRes)
@@ -48,7 +48,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, devi
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
 func DeviceListCatchup(
-	ctx context.Context, db storage.SharedUsers, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
+	ctx context.Context, db storage.SharedUsers, userAPI api.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
 	userID string, res *types.Response, from, to types.StreamPosition,
 ) (newPos types.StreamPosition, hasNew bool, err error) {
 
@@ -74,8 +74,8 @@ func DeviceListCatchup(
 	if from > 0 {
 		offset = int64(from)
 	}
-	var queryRes keyapi.QueryKeyChangesResponse
-	_ = keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
+	var queryRes api.QueryKeyChangesResponse
+	_ = userAPI.QueryKeyChanges(ctx, &api.QueryKeyChangesRequest{
 		Offset:   offset,
 		ToOffset: toOffset,
 	}, &queryRes)
@@ -144,38 +144,42 @@ func TrackChangedUsers(
 	// - Loop set of users and decrement by 1 for each user in newly left room.
 	// - If count=0 then they share no more rooms so inform BOTH parties of this via 'left'=[...] in /sync.
 	var queryRes roomserverAPI.QuerySharedUsersResponse
-	err = rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID:         userID,
-		IncludeRoomIDs: newlyLeftRooms,
-	}, &queryRes)
-	if err != nil {
-		return nil, nil, err
-	}
 	var stateRes roomserverAPI.QueryBulkStateContentResponse
-	err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
-		RoomIDs: newlyLeftRooms,
-		StateTuples: []gomatrixserverlib.StateKeyTuple{
-			{
-				EventType: gomatrixserverlib.MRoomMember,
-				StateKey:  "*",
-			},
-		},
-		AllowWildcards: true,
-	}, &stateRes)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, state := range stateRes.Rooms {
-		for tuple, membership := range state {
-			if membership != gomatrixserverlib.Join {
-				continue
-			}
-			queryRes.UserIDsToCount[tuple.StateKey]--
+	if len(newlyLeftRooms) > 0 {
+		err = rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
+			UserID:         userID,
+			IncludeRoomIDs: newlyLeftRooms,
+		}, &queryRes)
+		if err != nil {
+			return nil, nil, err
 		}
-	}
-	for userID, count := range queryRes.UserIDsToCount {
-		if count <= 0 {
-			left = append(left, userID) // left is returned
+
+		err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
+			RoomIDs: newlyLeftRooms,
+			StateTuples: []gomatrixserverlib.StateKeyTuple{
+				{
+					EventType: gomatrixserverlib.MRoomMember,
+					StateKey:  "*",
+				},
+			},
+			AllowWildcards: true,
+		}, &stateRes)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, state := range stateRes.Rooms {
+			for tuple, membership := range state {
+				if membership != gomatrixserverlib.Join {
+					continue
+				}
+				queryRes.UserIDsToCount[tuple.StateKey]--
+			}
+		}
+
+		for userID, count := range queryRes.UserIDsToCount {
+			if count <= 0 {
+				left = append(left, userID) // left is returned
+			}
 		}
 	}
 

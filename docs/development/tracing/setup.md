@@ -46,10 +46,10 @@ tracing:
       param: 1
 ```
 
-then run the monolith server with `--api true` to use polylith components which do tracing spans:
+then run the monolith server:
 
 ```
-./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml --api true
+./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
 ## Checking traces

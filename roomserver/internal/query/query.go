@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -101,7 +102,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		return err
 	}
 
-	stateEvents, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
+	stateEvents, err := helpers.LoadStateEvents(ctx, r.DB, info.RoomNID, stateEntries)
 	if err != nil {
 		return err
 	}
@@ -137,17 +138,7 @@ func (r *Queryer) QueryEventsByID(
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
 ) error {
-	eventNIDMap, err := r.DB.EventNIDs(ctx, request.EventIDs)
-	if err != nil {
-		return err
-	}
-
-	var eventNIDs []types.EventNID
-	for _, nid := range eventNIDMap {
-		eventNIDs = append(eventNIDs, nid)
-	}
-
-	events, err := helpers.LoadEvents(ctx, r.DB, eventNIDs)
+	events, err := r.DB.EventsFromIDs(ctx, 0, request.EventIDs)
 	if err != nil {
 		return err
 	}
@@ -195,7 +186,7 @@ func (r *Queryer) QueryMembershipForUser(
 	response.IsInRoom = stillInRoom
 	response.HasBeenInRoom = true
 
-	evs, err := r.DB.Events(ctx, []types.EventNID{membershipEventNID})
+	evs, err := r.DB.Events(ctx, info.RoomNID, []types.EventNID{membershipEventNID})
 	if err != nil {
 		return err
 	}
@@ -216,7 +207,8 @@ func (r *Queryer) QueryMembershipAtEvent(
 	request *api.QueryMembershipAtEventRequest,
 	response *api.QueryMembershipAtEventResponse,
 ) error {
-	response.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
+	response.Membership = make(map[string]*gomatrixserverlib.HeaderedEvent)
+
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return fmt.Errorf("unable to get roomInfo: %w", err)
@@ -234,7 +226,17 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
 	}
 
-	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, request.EventIDs, stateKeyNIDs[request.UserID])
+	response.Membership, err = r.DB.GetMembershipForHistoryVisibility(ctx, stateKeyNIDs[request.UserID], info, request.EventIDs...)
+	switch err {
+	case nil:
+		return nil
+	case tables.OptimisationNotSupportedError: // fallthrough, slow way of getting the membership events for each event
+	default:
+		return err
+	}
+
+	response.Membership = make(map[string]*gomatrixserverlib.HeaderedEvent)
+	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, nil, request.EventIDs, stateKeyNIDs[request.UserID])
 	if err != nil {
 		return fmt.Errorf("unable to get state before event: %w", err)
 	}
@@ -258,7 +260,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 	for _, eventID := range request.EventIDs {
 		stateEntry, ok := stateEntries[eventID]
 		if !ok || len(stateEntry) == 0 {
-			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
+			response.Membership[eventID] = nil
 			continue
 		}
 
@@ -266,24 +268,24 @@ func (r *Queryer) QueryMembershipAtEvent(
 		// once. If we have more than one membership event, we need to get the state for each state entry.
 		if canShortCircuit {
 			if len(memberships) == 0 {
-				memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+				memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, info.RoomNID, stateEntry, false)
 			}
 		} else {
-			memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+			memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, info.RoomNID, stateEntry, false)
 		}
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
 		}
 
-		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
-
+		// Iterate over all membership events we got. Given we only query the membership for
+		// one user and assuming this user only ever has one membership event associated to
+		// a given event, overwrite any other existing membership events.
 		for i := range memberships {
 			ev := memberships[i]
 			if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
-				res = append(res, ev.Headered(info.RoomVersion))
+				response.Membership[eventID] = ev.Event.Headered(info.RoomVersion)
 			}
 		}
-		response.Memberships[eventID] = res
 	}
 
 	return nil
@@ -316,7 +318,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 			}
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}
-		events, err = r.DB.Events(ctx, eventNIDs)
+		events, err = r.DB.Events(ctx, info.RoomNID, eventNIDs)
 		if err != nil {
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
@@ -355,14 +357,14 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return err
 		}
 
-		events, err = r.DB.Events(ctx, eventNIDs)
+		events, err = r.DB.Events(ctx, info.RoomNID, eventNIDs)
 	} else {
 		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID)
 		if err != nil {
 			logrus.WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err
 		}
-		events, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntries, request.JoinedOnly)
+		events, err = helpers.GetMembershipsAtState(ctx, r.DB, info.RoomNID, stateEntries, request.JoinedOnly)
 	}
 
 	if err != nil {
@@ -413,7 +415,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
 ) (err error) {
-	events, err := r.DB.EventsFromIDs(ctx, []string{request.EventID})
+	events, err := r.DB.EventsFromIDs(ctx, 0, []string{request.EventID})
 	if err != nil {
 		return
 	}
@@ -464,7 +466,7 @@ func (r *Queryer) QueryMissingEvents(
 			eventsToFilter[id] = true
 		}
 	}
-	events, err := r.DB.EventsFromIDs(ctx, front)
+	events, err := r.DB.EventsFromIDs(ctx, 0, front)
 	if err != nil {
 		return err
 	}
@@ -484,7 +486,7 @@ func (r *Queryer) QueryMissingEvents(
 		return err
 	}
 
-	loadedEvents, err := helpers.LoadEvents(ctx, r.DB, resultNIDs)
+	loadedEvents, err := helpers.LoadEvents(ctx, r.DB, info.RoomNID, resultNIDs)
 	if err != nil {
 		return err
 	}
@@ -609,11 +611,11 @@ func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomI
 		return nil, rejected, false, err
 	}
 
-	events, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
+	events, err := helpers.LoadStateEvents(ctx, r.DB, roomInfo.RoomNID, stateEntries)
 	return events, rejected, false, err
 }
 
-type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
+type eventsFromIDs func(context.Context, types.RoomNID, []string) ([]types.Event, error)
 
 // GetAuthChain fetches the auth chain for the given auth events. An auth chain
 // is the list of all events that are referenced in the auth_events section, and
@@ -631,7 +633,7 @@ func GetAuthChain(
 
 	for len(eventsToFetch) > 0 {
 		// Try to retrieve the events from the database.
-		events, err := fn(ctx, eventsToFetch)
+		events, err := fn(ctx, 0, eventsToFetch)
 		if err != nil {
 			return nil, err
 		}
@@ -969,7 +971,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		// For each of the joined users, let's see if we can get a valid
 		// membership event.
 		for _, joinNID := range joinNIDs {
-			events, err := r.DB.Events(ctx, []types.EventNID{joinNID})
+			events, err := r.DB.Events(ctx, roomInfo.RoomNID, []types.EventNID{joinNID})
 			if err != nil || len(events) != 1 {
 				continue
 			}

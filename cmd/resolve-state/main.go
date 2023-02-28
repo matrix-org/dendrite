@@ -40,7 +40,7 @@ func main() {
 		Level: "error",
 	})
 	cfg.ClientAPI.RegistrationDisabled = true
-	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
+	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	args := flag.Args()
 
 	fmt.Println("Room version", *roomVersion)
@@ -87,7 +87,7 @@ func main() {
 		}
 
 		var eventEntries []types.Event
-		eventEntries, err = roomserverDB.Events(ctx, eventNIDs)
+		eventEntries, err = roomserverDB.Events(ctx, 0, eventNIDs)
 		if err != nil {
 			panic(err)
 		}
@@ -145,7 +145,7 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(eventNIDMap), "state events")
-	eventEntries, err := roomserverDB.Events(ctx, eventNIDs)
+	eventEntries, err := roomserverDB.Events(ctx, 0, eventNIDs)
 	if err != nil {
 		panic(err)
 	}
@@ -165,7 +165,7 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(authEventIDs), "auth events")
-	authEventEntries, err := roomserverDB.EventsFromIDs(ctx, authEventIDs)
+	authEventEntries, err := roomserverDB.EventsFromIDs(ctx, 0, authEventIDs)
 	if err != nil {
 		panic(err)
 	}

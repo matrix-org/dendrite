@@ -58,6 +58,9 @@ const insertRoomNIDSQL = "" +
 const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
 
+const selectRoomNIDForUpdateSQL = "" +
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1 FOR UPDATE"
+
 const selectLatestEventNIDsSQL = "" +
 	"SELECT latest_event_nids, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
 
@@ -85,6 +88,7 @@ const bulkSelectRoomNIDsSQL = "" +
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
+	selectRoomNIDForUpdateStmt         *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
@@ -106,6 +110,7 @@ func PrepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
 	return s, sqlutil.StatementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
+		{&s.selectRoomNIDForUpdateStmt, selectRoomNIDForUpdateSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
@@ -165,6 +170,15 @@ func (s *roomStatements) SelectRoomNID(
 ) (types.RoomNID, error) {
 	var roomNID int64
 	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	return types.RoomNID(roomNID), err
+}
+
+func (s *roomStatements) SelectRoomNIDForUpdate(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (types.RoomNID, error) {
+	var roomNID int64
+	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDForUpdateStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }

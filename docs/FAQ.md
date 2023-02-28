@@ -35,11 +35,6 @@ possible to migrate an existing Synapse deployment to Dendrite.
 
 No, Dendrite has a very different database schema to Synapse and the two are not interchangeable.
 
-## Should I run a monolith or a polylith deployment?
-
-Monolith deployments are always preferred where possible, and at this time, are far better tested than polylith deployments are. The only reason to consider a polylith deployment is if you wish to run different Dendrite components on separate physical machines, but this is an advanced configuration which we don't
-recommend.
-
 ## Can I configure which port Dendrite listens on?
 
 Yes, use the cli flag `-http-bind-address`. 

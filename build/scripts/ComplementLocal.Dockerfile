@@ -19,13 +19,13 @@ WORKDIR /runtime
 # This script compiles Dendrite for us.
 RUN echo '\
     #!/bin/bash -eux \n\
-    if test -f "/runtime/dendrite-monolith-server" && test -f "/runtime/dendrite-monolith-server-cover"; then \n\
+    if test -f "/runtime/dendrite" && test -f "/runtime/dendrite-cover"; then \n\
     echo "Skipping compilation; binaries exist" \n\
     exit 0 \n\
     fi \n\
     cd /dendrite \n\
-    go build -v -o /runtime /dendrite/cmd/dendrite-monolith-server \n\
-    go test -c -cover -covermode=atomic -o /runtime/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." /dendrite/cmd/dendrite-monolith-server \n\
+    go build -v -o /runtime /dendrite/cmd/dendrite \n\
+    go test -c -cover -covermode=atomic -o /runtime/dendrite-cover -coverpkg "github.com/matrix-org/..." /dendrite/cmd/dendrite \n\
     ' > compile.sh && chmod +x compile.sh
 
 # This script runs Dendrite for us. Must be run in the /runtime directory.
@@ -35,8 +35,8 @@ RUN echo '\
     ./generate-keys -keysize 1024 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key \n\
     ./generate-config -server $SERVER_NAME --ci > dendrite.yaml \n\
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates \n\
-    [ ${COVER} -eq 1 ] && exec ./dendrite-monolith-server-cover --test.coverprofile=integrationcover.log --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
-    exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
+    [ ${COVER} -eq 1 ] && exec ./dendrite-cover --test.coverprofile=integrationcover.log --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
+    exec ./dendrite --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
     ' > run.sh && chmod +x run.sh
 
 

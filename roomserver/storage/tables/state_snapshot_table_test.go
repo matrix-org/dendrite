@@ -29,6 +29,8 @@ func mustCreateStateSnapshotTable(t *testing.T, dbType test.DBType) (tab tables.
 		assert.NoError(t, err)
 		err = postgres.CreateEventsTable(db)
 		assert.NoError(t, err)
+		err = postgres.CreateEventJSONTable(db)
+		assert.NoError(t, err)
 		err = postgres.CreateStateBlockTable(db)
 		assert.NoError(t, err)
 		// ... and then the snapshot table itself

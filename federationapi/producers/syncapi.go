@@ -41,7 +41,7 @@ type SyncAPIProducer struct {
 	TopicSigningKeyUpdate  string
 	JetStream              nats.JetStreamContext
 	Config                 *config.FederationAPI
-	UserAPI                userapi.UserInternalAPI
+	UserAPI                userapi.FederationUserAPI
 }
 
 func (p *SyncAPIProducer) SendReceipt(

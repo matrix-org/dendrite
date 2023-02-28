@@ -9,9 +9,6 @@ type ClientAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
-
 	// If set disables new users from registering (except via shared
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
@@ -58,11 +55,6 @@ type ClientAPI struct {
 }
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {
-	if !opts.Monolithic {
-		c.InternalAPI.Listen = "http://localhost:7771"
-		c.InternalAPI.Connect = "http://localhost:7771"
-		c.ExternalAPI.Listen = "http://[::]:8071"
-	}
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""
@@ -74,7 +66,7 @@ func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.RateLimiting.Defaults()
 }
 
-func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
 	if c.RecaptchaEnabled {
@@ -85,10 +77,10 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 			c.RecaptchaApiJsUrl = "https://www.google.com/recaptcha/api.js"
 		}
 		if c.RecaptchaFormField == "" {
-			c.RecaptchaFormField = "g-recaptcha"
+			c.RecaptchaFormField = "g-recaptcha-response"
 		}
 		if c.RecaptchaSitekeyClass == "" {
-			c.RecaptchaSitekeyClass = "g-recaptcha-response"
+			c.RecaptchaSitekeyClass = "g-recaptcha"
 		}
 		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
 		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
@@ -108,12 +100,6 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 			)
 		}
 	}
-	if isMonolith { // polylith required configs below
-		return
-	}
-	checkURL(configErrs, "client_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "client_api.internal_api.connect", string(c.InternalAPI.Connect))
-	checkURL(configErrs, "client_api.external_api.listen", string(c.ExternalAPI.Listen))
 }
 
 type TURN struct {

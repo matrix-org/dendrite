@@ -63,6 +63,11 @@ type StreamEvent struct {
 	ExcludeFromSync bool
 }
 
+type RecentEvents struct {
+	Limited bool
+	Events  []StreamEvent
+}
+
 // Range represents a range between two stream positions.
 type Range struct {
 	// From is the position the client has already received.

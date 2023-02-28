@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/matrix-org/util"
 
@@ -37,6 +38,7 @@ import (
 // this unfortunately results in us adding the same hook multiple times.
 // This map ensures we only ever add one level hook.
 var stdLevelLogAdded = make(map[logrus.Level]bool)
+var levelLogAddedMu = &sync.Mutex{}
 
 type utcFormatter struct {
 	logrus.Formatter
@@ -99,6 +101,8 @@ func SetupPprof() {
 
 // SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
 func SetupStdLogging() {
+	levelLogAddedMu.Lock()
+	defer levelLogAddedMu.Unlock()
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&utcFormatter{
 		&logrus.TextFormatter{
@@ -125,9 +129,9 @@ func checkFileHookParams(params map[string]interface{}) {
 }
 
 // Add a new FSHook to the logger. Each component will log in its own file
-func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName string) {
+func setupFileHook(hook config.LogrusHook, level logrus.Level) {
 	dirPath := (hook.Params["path"]).(string)
-	fullPath := filepath.Join(dirPath, componentName+".log")
+	fullPath := filepath.Join(dirPath, "dendrite.log")
 
 	if err := os.MkdirAll(path.Dir(fullPath), os.ModePerm); err != nil {
 		logrus.Fatalf("Couldn't create directory %s: %q", path.Dir(fullPath), err)

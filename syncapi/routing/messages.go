@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -57,12 +58,13 @@ type messagesResp struct {
 	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
 	End         string                          `json:"end,omitempty"`
 	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
-	State       []gomatrixserverlib.ClientEvent `json:"state"`
+	State       []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
 }
 
 // OnIncomingMessagesRequest implements the /messages endpoint from the
 // client-server API.
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
+// nolint:gocyclo
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
 	rsAPI api.SyncRoomserverAPI,
@@ -177,10 +179,11 @@ func OnIncomingMessagesRequest(
 		// If "to" isn't provided, it defaults to either the earliest stream
 		// position (if we're going backward) or to the latest one (if we're
 		// going forward).
-		to, err = setToDefault(req.Context(), snapshot, backwardOrdering, roomID)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("setToDefault failed")
-			return jsonerror.InternalServerError()
+		to = types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
+		if backwardOrdering {
+			// go 1 earlier than the first event so we correctly fetch the earliest event
+			// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
+			to = types.TopologyToken{}
 		}
 		wasToProvided = false
 	}
@@ -244,7 +247,14 @@ func OnIncomingMessagesRequest(
 		Start: start.String(),
 		End:   end.String(),
 	}
-	res.applyLazyLoadMembers(req.Context(), snapshot, roomID, device, filter.LazyLoadMembers, lazyLoadCache)
+	if filter.LazyLoadMembers {
+		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
+			return jsonerror.InternalServerError()
+		}
+		res.State = append(res.State, gomatrixserverlib.HeaderedToClientEvents(membershipEvents, gomatrixserverlib.FormatAll)...)
+	}
 
 	// If we didn't return any events, set the end to an empty string, so it will be omitted
 	// in the response JSON.
@@ -260,40 +270,6 @@ func OnIncomingMessagesRequest(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
-	}
-}
-
-// applyLazyLoadMembers loads membership events for users returned in Chunk, if the filter has
-// LazyLoadMembers enabled.
-func (m *messagesResp) applyLazyLoadMembers(
-	ctx context.Context,
-	db storage.DatabaseTransaction,
-	roomID string,
-	device *userapi.Device,
-	lazyLoad bool,
-	lazyLoadCache caching.LazyLoadCache,
-) {
-	if !lazyLoad {
-		return
-	}
-	membershipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
-	for _, evt := range m.Chunk {
-		// Don't add membership events the client should already know about
-		if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, roomID, evt.Sender); cached {
-			continue
-		}
-		membership, err := db.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomMember, evt.Sender)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("failed to get membership event for user")
-			continue
-		}
-		if membership != nil {
-			membershipToUser[evt.Sender] = membership
-			lazyLoadCache.StoreLazyLoadedUser(device, roomID, evt.Sender, membership.EventID())
-		}
-	}
-	for _, evt := range membershipToUser {
-		m.State = append(m.State, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatAll))
 	}
 }
 
@@ -576,25 +552,4 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	}
 
 	return events, nil
-}
-
-// setToDefault returns the default value for the "to" query parameter of a
-// request to /messages if not provided. It defaults to either the earliest
-// topological position (if we're going backward) or to the latest one (if we're
-// going forward).
-// Returns an error if there was an issue with retrieving the latest position
-// from the database
-func setToDefault(
-	ctx context.Context, snapshot storage.DatabaseTransaction, backwardOrdering bool,
-	roomID string,
-) (to types.TopologyToken, err error) {
-	if backwardOrdering {
-		// go 1 earlier than the first event so we correctly fetch the earliest event
-		// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
-		to = types.TopologyToken{}
-	} else {
-		to, err = snapshot.MaxTopologicalPosition(ctx, roomID)
-	}
-
-	return
 }

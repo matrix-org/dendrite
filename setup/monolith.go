@@ -21,8 +21,9 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	keyAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/mediaapi"
+	"github.com/matrix-org/dendrite/relayapi"
+	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -43,7 +44,7 @@ type Monolith struct {
 	FederationAPI federationAPI.FederationInternalAPI
 	RoomserverAPI roomserverAPI.RoomserverInternalAPI
 	UserAPI       userapi.UserInternalAPI
-	KeyAPI        keyAPI.KeyInternalAPI
+	RelayAPI      relayAPI.RelayInternalAPI
 
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
@@ -58,17 +59,16 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 	}
 	clientapi.AddPublicRoutes(
 		base, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationAPI, m.UserAPI, userDirectoryProvider, m.KeyAPI,
+		m.FederationAPI, m.UserAPI, userDirectoryProvider,
 		m.ExtPublicRoomsProvider,
 	)
 	federationapi.AddPublicRoutes(
-		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI,
-		m.KeyAPI, nil,
+		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
 	)
-	mediaapi.AddPublicRoutes(
-		base, m.UserAPI, m.Client,
-	)
-	syncapi.AddPublicRoutes(
-		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI,
-	)
+	mediaapi.AddPublicRoutes(base, m.UserAPI, m.Client)
+	syncapi.AddPublicRoutes(base, m.UserAPI, m.RoomserverAPI)
+
+	if m.RelayAPI != nil {
+		relayapi.AddPublicRoutes(base, m.KeyRing, m.RelayAPI)
+	}
 }

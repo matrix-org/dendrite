@@ -76,7 +76,7 @@ type Inputer struct {
 	Cfg                 *config.RoomServer
 	Base                *base.BaseDendrite
 	ProcessContext      *process.ProcessContext
-	DB                  storage.Database
+	DB                  storage.RoomDatabase
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
