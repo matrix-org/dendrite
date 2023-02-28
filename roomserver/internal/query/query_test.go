@@ -80,7 +80,7 @@ func (db *getEventDB) addFakeEvents(graph map[string][]string) error {
 }
 
 // EventsFromIDs implements RoomserverInternalAPIEventDB
-func (db *getEventDB) EventsFromIDs(ctx context.Context, eventIDs []string) (res []types.Event, err error) {
+func (db *getEventDB) EventsFromIDs(ctx context.Context, roomNID types.RoomNID, eventIDs []string) (res []types.Event, err error) {
 	for _, evID := range eventIDs {
 		res = append(res, types.Event{
 			EventNID: 0,

@@ -29,7 +29,7 @@ import (
 )
 
 type InboundPeeker struct {
-	DB      storage.Database
+	DB      storage.RoomDatabase
 	Inputer *input.Inputer
 }
 
@@ -64,7 +64,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	latestEvents, err := r.DB.EventsFromIDs(ctx, []string{latestEventRefs[0].EventID})
+	latestEvents, err := r.DB.EventsFromIDs(ctx, info.RoomNID, []string{latestEventRefs[0].EventID})
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	stateEvents, err = helpers.LoadStateEvents(ctx, r.DB, stateEntries)
+	stateEvents, err = helpers.LoadStateEvents(ctx, r.DB, info.RoomNID, stateEntries)
 	if err != nil {
 		return err
 	}

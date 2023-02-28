@@ -38,7 +38,7 @@ type RelayServerRetriever struct {
 	relayServersQueried map[gomatrixserverlib.ServerName]bool
 	queriedServersMutex sync.Mutex
 	running             atomic.Bool
-	quit                <-chan bool
+	quit                chan bool
 }
 
 func NewRelayServerRetriever(
@@ -46,7 +46,7 @@ func NewRelayServerRetriever(
 	serverName gomatrixserverlib.ServerName,
 	federationAPI federationAPI.FederationInternalAPI,
 	relayAPI relayServerAPI.RelayInternalAPI,
-	quit <-chan bool,
+	quit chan bool,
 ) RelayServerRetriever {
 	return RelayServerRetriever{
 		ctx:                 ctx,
@@ -151,6 +151,7 @@ func (r *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
 			if !t.Stop() {
 				<-t.C
 			}
+			logrus.Info("Stopped relay server retriever")
 			return
 		case <-t.C:
 		}

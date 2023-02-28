@@ -22,7 +22,6 @@ import (
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
-	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -31,9 +30,7 @@ type Unpeeker struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
 	FSAPI      fsAPI.RoomserverFederationAPI
-	DB         storage.Database
-
-	Inputer *input.Inputer
+	Inputer    *input.Inputer
 }
 
 // PerformPeek handles peeking into matrix rooms, including over federation by talking to the federationapi.
