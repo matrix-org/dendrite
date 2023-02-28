@@ -52,12 +52,14 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 
 	cache := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 
+	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache}
+
 	return &shared.Database{
-			DB:                  db,
-			EventStateKeysTable: stateKeyTable,
-			MembershipTable:     membershipTable,
-			Writer:              sqlutil.NewExclusiveWriter(),
-			Cache:               cache,
+			DB:              db,
+			EventDatabase:   evDb,
+			MembershipTable: membershipTable,
+			Writer:          sqlutil.NewExclusiveWriter(),
+			Cache:           cache,
 		}, func() {
 			err := base.Close()
 			assert.NoError(t, err)

@@ -86,6 +86,7 @@ type QueryStateAfterEventsResponse struct {
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
 type QueryEventsByIDRequest struct {
+	RoomID string `json:"room_id"`
 	// The event IDs to look up.
 	EventIDs []string `json:"event_ids"`
 }

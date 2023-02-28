@@ -38,7 +38,7 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 		var authNIDs []types.EventNID
 		for _, x := range room.Events() {
 
-			roomNID, err := db.GetOrCreateRoomNID(context.Background(), x.Unwrap())
+			roomNID, roomInfo, err := db.GetOrCreateRoomNID(context.Background(), x.Unwrap())
 			assert.NoError(t, err)
 			assert.Greater(t, roomNID, types.RoomNID(0))
 
@@ -49,7 +49,7 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 			eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(context.Background(), x.StateKey())
 			assert.NoError(t, err)
 
-			evNID, _, _, _, err := db.StoreEvent(context.Background(), x.Event, roomNID, eventTypeNID, eventStateKeyNID, authNIDs, false)
+			evNID, _, err := db.StoreEvent(context.Background(), x.Event, roomInfo, eventTypeNID, eventStateKeyNID, authNIDs, false)
 			assert.NoError(t, err)
 			authNIDs = append(authNIDs, evNID)
 		}

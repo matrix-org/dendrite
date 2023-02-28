@@ -16,7 +16,9 @@
 // Hooks can only be run in monolith mode.
 package hooks
 
-import "sync"
+import (
+	"sync"
+)
 
 const (
 	// KindNewEventPersisted is a hook which is called with *gomatrixserverlib.HeaderedEvent

@@ -53,7 +53,7 @@ func (r *Inputer) updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := updater.Events(ctx, 0, eventNIDs)
+	events, err := updater.Events(ctx, nil, eventNIDs)
 	if err != nil {
 		return nil, err
 	}

@@ -395,7 +395,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 	for _, entry := range stateEntries {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
-	stateEvents, err := t.db.Events(ctx, t.roomInfo.RoomNID, stateEventNIDs)
+	stateEvents, err := t.db.Events(ctx, t.roomInfo, stateEventNIDs)
 	if err != nil {
 		t.log.WithError(err).Warnf("failed to load state events locally")
 		return nil
@@ -432,7 +432,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 			missingEventList = append(missingEventList, evID)
 		}
 		t.log.WithField("count", len(missingEventList)).Debugf("Fetching missing auth events")
-		events, err := t.db.EventsFromIDs(ctx, t.roomInfo.RoomNID, missingEventList)
+		events, err := t.db.EventsFromIDs(ctx, t.roomInfo, missingEventList)
 		if err != nil {
 			return nil
 		}
@@ -702,7 +702,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 	}
 	t.haveEventsMutex.Unlock()
 
-	events, err := t.db.EventsFromIDs(ctx, t.roomInfo.RoomNID, missingEventList)
+	events, err := t.db.EventsFromIDs(ctx, t.roomInfo, missingEventList)
 	if err != nil {
 		return nil, fmt.Errorf("t.db.EventsFromIDs: %w", err)
 	}
@@ -844,7 +844,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 
 	if localFirst {
 		// fetch from the roomserver
-		events, err := t.db.EventsFromIDs(ctx, t.roomInfo.RoomNID, []string{missingEventID})
+		events, err := t.db.EventsFromIDs(ctx, t.roomInfo, []string{missingEventID})
 		if err != nil {
 			t.log.Warnf("Failed to query roomserver for missing event %s: %s - falling back to remote", missingEventID, err)
 		} else if len(events) == 1 {

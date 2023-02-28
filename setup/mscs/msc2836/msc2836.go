@@ -253,7 +253,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 	var res MSC2836EventRelationshipsResponse
 	var returnEvents []*gomatrixserverlib.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
-	event := rc.getLocalEvent(rc.req.EventID)
+	event := rc.getLocalEvent(rc.req.RoomID, rc.req.EventID)
 	if event == nil {
 		event = rc.fetchUnknownEvent(rc.req.EventID, rc.req.RoomID)
 	}
@@ -592,7 +592,7 @@ func (rc *reqCtx) remoteEventRelationships(eventID string) *MSC2836EventRelation
 // lookForEvent returns the event for the event ID given, by trying to query remote servers
 // if the event ID is unknown via /event_relationships.
 func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
-	event := rc.getLocalEvent(eventID)
+	event := rc.getLocalEvent(rc.req.RoomID, eventID)
 	if event == nil {
 		queryRes := rc.remoteEventRelationships(eventID)
 		if queryRes != nil {
@@ -622,9 +622,10 @@ func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent 
 	return nil
 }
 
-func (rc *reqCtx) getLocalEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) getLocalEvent(roomID, eventID string) *gomatrixserverlib.HeaderedEvent {
 	var queryEventsRes roomserver.QueryEventsByIDResponse
 	err := rc.rsAPI.QueryEventsByID(rc.ctx, &roomserver.QueryEventsByIDRequest{
+		RoomID:   roomID,
 		EventIDs: []string{eventID},
 	}, &queryEventsRes)
 	if err != nil {

@@ -36,7 +36,7 @@ func GetEventAuth(
 		return *err
 	}
 
-	event, resErr := fetchEvent(ctx, rsAPI, eventID)
+	event, resErr := fetchEvent(ctx, rsAPI, roomID, eventID)
 	if resErr != nil {
 		return *resErr
 	}
