@@ -24,8 +24,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -335,9 +336,9 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	if roomInfo == nil {
-		_, roomInfo, err = r.DB.GetOrCreateRoomNID(ctx, event)
+		roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, event)
 		if err != nil {
-			return fmt.Errorf("r.DB.GetOrCreateRoomNID: %w", err)
+			return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
 		}
 	}
 
@@ -704,9 +705,9 @@ nextAuthEvent:
 		}
 
 		if roomInfo == nil {
-			_, roomInfo, err = r.DB.GetOrCreateRoomNID(ctx, authEvent)
+			roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, authEvent)
 			if err != nil {
-				return fmt.Errorf("r.DB.GetOrCreateRoomNID: %w", err)
+				return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
 			}
 		}
 

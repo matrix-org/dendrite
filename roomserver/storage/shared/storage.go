@@ -648,8 +648,7 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 	return d.EventsTable.SelectEventRejected(ctx, nil, roomNID, eventID)
 }
 
-// GetOrCreateRoomNID gets or creates a new roomNID for the given event. Also returns a RoomInfo, which is only safe to use
-// with functions only needing a roomVersion or roomNID.
+// GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
 func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
 	// then we will use our configured default to create the room.
