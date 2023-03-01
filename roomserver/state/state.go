@@ -41,8 +41,8 @@ type StateResolutionStorage interface {
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	Events(ctx context.Context, roomNID types.RoomNID, eventNIDs []types.EventNID) ([]types.Event, error)
-	EventsFromIDs(ctx context.Context, roomNID types.RoomNID, eventIDs []string) ([]types.Event, error)
+	Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error)
+	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 }
 
 type StateResolution struct {
@@ -975,7 +975,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 			// Store the newly found auth events in the auth set for this event.
 			var authEventMap map[string]types.StateEntry
-			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, v.roomInfo.RoomNID, conflictedEvent, knownAuthEvents)
+			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, v.roomInfo, conflictedEvent, knownAuthEvents)
 			if err != nil {
 				return err
 			}
@@ -1091,7 +1091,7 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	events, err := v.db.Events(ctx, v.roomInfo.RoomNID, eventNIDs)
+	events, err := v.db.Events(ctx, v.roomInfo, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1120,7 +1120,7 @@ type authEventLoader struct {
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
 func (l *authEventLoader) loadAuthEvents(
-	ctx context.Context, roomNID types.RoomNID, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
+	ctx context.Context, roomInfo *types.RoomInfo, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()
@@ -1155,7 +1155,7 @@ func (l *authEventLoader) loadAuthEvents(
 		// If we need to get events from the database, go and fetch
 		// those now.
 		if len(l.lookupFromDB) > 0 {
-			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, roomNID, l.lookupFromDB)
+			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, roomInfo, l.lookupFromDB)
 			if err != nil {
 				return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 			}

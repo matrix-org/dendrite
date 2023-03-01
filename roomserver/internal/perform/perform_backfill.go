@@ -23,7 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
@@ -86,7 +85,7 @@ func (r *Backfiller) PerformBackfill(
 	// Retrieve events from the list that was filled previously. If we fail to get
 	// events from the database then attempt once to get them from federation instead.
 	var loadedEvents []*gomatrixserverlib.Event
-	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, info.RoomNID, resultNIDs)
+	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, info, resultNIDs)
 	if err != nil {
 		if _, ok := err.(types.MissingEventError); ok {
 			return r.backfillViaFederation(ctx, request, response)
@@ -473,7 +472,7 @@ FindSuccessor:
 	// Retrieve all "m.room.member" state events of "join" membership, which
 	// contains the list of users in the room before the event, therefore all
 	// the servers in it at that moment.
-	memberEvents, err := helpers.GetMembershipsAtState(ctx, b.db, info.RoomNID, stateEntries, true)
+	memberEvents, err := helpers.GetMembershipsAtState(ctx, b.db, info, stateEntries, true)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
 		return nil
@@ -532,7 +531,7 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 			roomNID = nid.RoomNID
 		}
 	}
-	eventsWithNids, err := b.db.Events(ctx, roomNID, eventNIDs)
+	eventsWithNids, err := b.db.Events(ctx, &b.roomInfo, eventNIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_nids", eventNIDs).Error("Failed to load events")
 		return nil, err
@@ -562,7 +561,7 @@ func joinEventsFromHistoryVisibility(
 	}
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, roomInfo.RoomNID, eventNIDs)
+	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
 	if err != nil {
 		// even though the default should be shared, restricting the visibility to joined
 		// feels more secure here.
@@ -585,7 +584,7 @@ func joinEventsFromHistoryVisibility(
 	if err != nil {
 		return nil, visibility, err
 	}
-	evs, err := db.Events(ctx, roomInfo.RoomNID, joinEventNIDs)
+	evs, err := db.Events(ctx, roomInfo, joinEventNIDs)
 	return evs, visibility, err
 }
 
@@ -606,7 +605,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			i++
 		}
 
-		roomNID, err = db.GetOrCreateRoomNID(ctx, ev.Unwrap())
+		roomInfo, err := db.GetOrCreateRoomInfo(ctx, ev.Unwrap())
 		if err != nil {
 			logrus.WithError(err).Error("failed to get or create roomNID")
 			continue
@@ -624,23 +623,22 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			continue
 		}
 
-		var redactedEventID string
-		var redactionEvent *gomatrixserverlib.Event
-		eventNID, _, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), roomNID, eventTypeNID, eventStateKeyNID, authNids, false)
+		eventNID, _, err = db.StoreEvent(ctx, ev.Unwrap(), roomInfo, eventTypeNID, eventStateKeyNID, authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
+			continue
+		}
+
+		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Unwrap(), true)
+		if err != nil {
+			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue
 		}
 		// If storing this event results in it being redacted, then do so.
 		// It's also possible for this event to be a redaction which results in another event being
 		// redacted, which we don't care about since we aren't returning it in this backfill.
-		if redactedEventID == ev.EventID() {
-			eventToRedact := ev.Unwrap()
-			if err := eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
-				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
-				continue
-			}
-			ev = eventToRedact.Headered(ev.RoomVersion)
+		if redactedEvent != nil && redactedEvent.EventID() == ev.EventID() {
+			ev = redactedEvent.Headered(ev.RoomVersion)
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{

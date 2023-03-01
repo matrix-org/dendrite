@@ -122,6 +122,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 			if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
 				newEventID := output.NewRoomEvent.Event.EventID()
 				eventsReq := &api.QueryEventsByIDRequest{
+					RoomID:   output.NewRoomEvent.Event.RoomID(),
 					EventIDs: make([]string, 0, len(output.NewRoomEvent.AddsStateEventIDs)),
 				}
 				eventsRes := &api.QueryEventsByIDResponse{}

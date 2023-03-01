@@ -173,6 +173,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	// Finally, work out if there are any more events missing.
 	if len(missingEventIDs) > 0 {
 		eventsReq := &api.QueryEventsByIDRequest{
+			RoomID:   ore.Event.RoomID(),
 			EventIDs: missingEventIDs,
 		}
 		eventsRes := &api.QueryEventsByIDResponse{}
@@ -483,7 +484,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	// At this point the missing events are neither the event itself nor are
 	// they present in our local database. Our only option is to fetch them
 	// from the roomserver using the query API.
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
+	eventReq := api.QueryEventsByIDRequest{EventIDs: missing, RoomID: event.RoomID()}
 	var eventResp api.QueryEventsByIDResponse
 	if err := s.rsAPI.QueryEventsByID(s.ctx, &eventReq, &eventResp); err != nil {
 		return nil, err
