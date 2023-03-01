@@ -62,9 +62,10 @@ func main() {
 		panic(err)
 	}
 
-	stateres := state.NewStateResolution(roomserverDB, &types.RoomInfo{
+	roomInfo := &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
-	})
+	}
+	stateres := state.NewStateResolution(roomserverDB, roomInfo)
 
 	if *difference {
 		if len(snapshotNIDs) != 2 {
@@ -87,7 +88,7 @@ func main() {
 		}
 
 		var eventEntries []types.Event
-		eventEntries, err = roomserverDB.Events(ctx, 0, eventNIDs)
+		eventEntries, err = roomserverDB.Events(ctx, roomInfo, eventNIDs)
 		if err != nil {
 			panic(err)
 		}
@@ -145,7 +146,7 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(eventNIDMap), "state events")
-	eventEntries, err := roomserverDB.Events(ctx, 0, eventNIDs)
+	eventEntries, err := roomserverDB.Events(ctx, roomInfo, eventNIDs)
 	if err != nil {
 		panic(err)
 	}
@@ -165,7 +166,7 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(authEventIDs), "auth events")
-	authEventEntries, err := roomserverDB.EventsFromIDs(ctx, 0, authEventIDs)
+	authEventEntries, err := roomserverDB.EventsFromIDs(ctx, roomInfo, authEventIDs)
 	if err != nil {
 		panic(err)
 	}

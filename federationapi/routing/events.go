@@ -20,10 +20,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/roomserver/api"
 )
 
 // GetEvent returns the requested event
@@ -38,7 +39,9 @@ func GetEvent(
 	if err != nil {
 		return *err
 	}
-	event, err := fetchEvent(ctx, rsAPI, eventID)
+	// /_matrix/federation/v1/event/{eventId} doesn't have a roomID, we use an empty string,
+	// which results in `QueryEventsByID` to first get the event and use that to determine the roomID.
+	event, err := fetchEvent(ctx, rsAPI, "", eventID)
 	if err != nil {
 		return *err
 	}
@@ -60,21 +63,13 @@ func allowedToSeeEvent(
 	rsAPI api.FederationRoomserverAPI,
 	eventID string,
 ) *util.JSONResponse {
-	var authResponse api.QueryServerAllowedToSeeEventResponse
-	err := rsAPI.QueryServerAllowedToSeeEvent(
-		ctx,
-		&api.QueryServerAllowedToSeeEventRequest{
-			EventID:    eventID,
-			ServerName: origin,
-		},
-		&authResponse,
-	)
+	allowed, err := rsAPI.QueryServerAllowedToSeeEvent(ctx, origin, eventID)
 	if err != nil {
 		resErr := util.ErrorResponse(err)
 		return &resErr
 	}
 
-	if !authResponse.AllowedToSeeEvent {
+	if !allowed {
 		resErr := util.MessageResponse(http.StatusForbidden, "server not allowed to see event")
 		return &resErr
 	}
@@ -83,11 +78,11 @@ func allowedToSeeEvent(
 }
 
 // fetchEvent fetches the event without auth checks. Returns an error if the event cannot be found.
-func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, eventID string) (*gomatrixserverlib.Event, *util.JSONResponse) {
+func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, roomID, eventID string) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	var eventsResponse api.QueryEventsByIDResponse
 	err := rsAPI.QueryEventsByID(
 		ctx,
-		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}},
+		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}, RoomID: roomID},
 		&eventsResponse,
 	)
 	if err != nil {

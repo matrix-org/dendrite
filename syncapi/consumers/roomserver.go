@@ -212,6 +212,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	// Finally, work out if there are any more events missing.
 	if len(missingEventIDs) > 0 {
 		eventsReq := &api.QueryEventsByIDRequest{
+			RoomID:   ev.RoomID(),
 			EventIDs: missingEventIDs,
 		}
 		eventsRes := &api.QueryEventsByIDResponse{}

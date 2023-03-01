@@ -194,7 +194,7 @@ func (r *Inviter) PerformInvite(
 	// try and see if the user is allowed to make this invite. We can't do
 	// this for invites coming in over federation - we have to take those on
 	// trust.
-	_, err = helpers.CheckAuthEvents(ctx, r.DB, info.RoomNID, event, event.AuthEventIDs())
+	_, err = helpers.CheckAuthEvents(ctx, r.DB, info, event, event.AuthEventIDs())
 	if err != nil {
 		logger.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 			"processInviteEvent.checkAuthEvents failed for event",
@@ -291,7 +291,7 @@ func buildInviteStrippedState(
 	for _, stateNID := range stateEntries {
 		stateNIDs = append(stateNIDs, stateNID.EventNID)
 	}
-	stateEvents, err := db.Events(ctx, info.RoomNID, stateNIDs)
+	stateEvents, err := db.Events(ctx, info, stateNIDs)
 	if err != nil {
 		return nil, err
 	}

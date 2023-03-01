@@ -86,6 +86,9 @@ type QueryStateAfterEventsResponse struct {
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
 type QueryEventsByIDRequest struct {
+	// The roomID to query events for. If this is empty, we first try to fetch the roomID from the database
+	// as this is needed for further processing/parsing events.
+	RoomID string `json:"room_id"`
 	// The event IDs to look up.
 	EventIDs []string `json:"event_ids"`
 }

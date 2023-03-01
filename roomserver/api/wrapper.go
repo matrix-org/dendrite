@@ -108,9 +108,10 @@ func SendInputRoomEvents(
 }
 
 // GetEvent returns the event or nil, even on errors.
-func GetEvent(ctx context.Context, rsAPI QueryEventsAPI, eventID string) *gomatrixserverlib.HeaderedEvent {
+func GetEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID, eventID string) *gomatrixserverlib.HeaderedEvent {
 	var res QueryEventsByIDResponse
 	err := rsAPI.QueryEventsByID(ctx, &QueryEventsByIDRequest{
+		RoomID:   roomID,
 		EventIDs: []string{eventID},
 	}, &res)
 	if err != nil {
