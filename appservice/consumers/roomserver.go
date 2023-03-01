@@ -40,7 +40,6 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx       context.Context
 	cfg       *config.AppServiceAPI
-	client    *http.Client
 	jetstream nats.JetStreamContext
 	topic     string
 	rsAPI     api.AppserviceRoomserverAPI
@@ -56,14 +55,12 @@ type appserviceState struct {
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.AppServiceAPI,
-	client *http.Client,
 	js nats.JetStreamContext,
 	rsAPI api.AppserviceRoomserverAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:       process.Context(),
 		cfg:       cfg,
-		client:    client,
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		rsAPI:     rsAPI,
@@ -189,13 +186,13 @@ func (s *OutputRoomEventConsumer) sendEvents(
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
-	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
+	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.RequestUrl(), txnID, url.QueryEscape(state.HSToken))
 	req, err := http.NewRequestWithContext(ctx, "PUT", address, bytes.NewBuffer(transaction))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.client.Do(req)
+	resp, err := state.HTTPClient.Do(req)
 	if err != nil {
 		return state.backoffAndPause(err)
 	}
@@ -206,7 +203,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	case http.StatusOK:
 		state.backoff = 0
 	default:
-		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice", resp.StatusCode))
+		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice url %s", resp.StatusCode, address))
 	}
 	return nil
 }

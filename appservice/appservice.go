@@ -16,10 +16,7 @@ package appservice
 
 import (
 	"context"
-	"crypto/tls"
-	"net/http"
 	"sync"
-	"time"
 
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -44,20 +41,10 @@ func NewInternalAPI(
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
-	client := &http.Client{
-		Timeout: time.Second * 30,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: cfg.AppServiceAPI.DisableTLSValidation,
-			},
-			Proxy: http.ProxyFromEnvironment,
-		},
-	}
+
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient:    client,
 		Cfg:           &cfg.AppServiceAPI,
 		ProtocolCache: map[string]appserviceAPI.ASProtocolResponse{},
 		CacheMu:       sync.Mutex{},
@@ -84,7 +71,7 @@ func NewInternalAPI(
 	js, _ := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
 	consumer := consumers.NewOutputRoomEventConsumer(
 		processContext, &cfg.AppServiceAPI,
-		client, js, rsAPI,
+		js, rsAPI,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")

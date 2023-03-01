@@ -37,7 +37,6 @@ const userIDExistsPath = "/users/"
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
-	HTTPClient    *http.Client
 	Cfg           *config.AppServiceAPI
 	ProtocolCache map[string]api.ASProtocolResponse
 	CacheMu       sync.Mutex
@@ -57,7 +56,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
 			// The full path to the rooms API, includes hs token
-			URL, err := url.Parse(appservice.URL + roomAliasExistsPath)
+			URL, err := url.Parse(appservice.RequestUrl() + roomAliasExistsPath)
 			if err != nil {
 				return err
 			}
@@ -73,7 +72,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			}
 			req = req.WithContext(ctx)
 
-			resp, err := a.HTTPClient.Do(req)
+			resp, err := appservice.HTTPClient.Do(req)
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
@@ -124,7 +123,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
 			// The full path to the rooms API, includes hs token
-			URL, err := url.Parse(appservice.URL + userIDExistsPath)
+			URL, err := url.Parse(appservice.RequestUrl() + userIDExistsPath)
 			if err != nil {
 				return err
 			}
@@ -137,7 +136,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			if err != nil {
 				return err
 			}
-			resp, err := a.HTTPClient.Do(req.WithContext(ctx))
+			resp, err := appservice.HTTPClient.Do(req.WithContext(ctx))
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
@@ -212,12 +211,12 @@ func (a *AppServiceQueryAPI) Locations(
 		var asLocations []api.ASLocationResponse
 		params.Set("access_token", as.HSToken)
 
-		url := as.URL + api.ASLocationPath
+		url := as.RequestUrl() + api.ASLocationPath
 		if req.Protocol != "" {
 			url += "/" + req.Protocol
 		}
 
-		if err := requestDo[[]api.ASLocationResponse](a.HTTPClient, url+"?"+params.Encode(), &asLocations); err != nil {
+		if err := requestDo[[]api.ASLocationResponse](as.HTTPClient, url+"?"+params.Encode(), &asLocations); err != nil {
 			log.WithError(err).Error("unable to get 'locations' from application service")
 			continue
 		}
@@ -247,12 +246,12 @@ func (a *AppServiceQueryAPI) User(
 		var asUsers []api.ASUserResponse
 		params.Set("access_token", as.HSToken)
 
-		url := as.URL + api.ASUserPath
+		url := as.RequestUrl() + api.ASUserPath
 		if req.Protocol != "" {
 			url += "/" + req.Protocol
 		}
 
-		if err := requestDo[[]api.ASUserResponse](a.HTTPClient, url+"?"+params.Encode(), &asUsers); err != nil {
+		if err := requestDo[[]api.ASUserResponse](as.HTTPClient, url+"?"+params.Encode(), &asUsers); err != nil {
 			log.WithError(err).Error("unable to get 'user' from application service")
 			continue
 		}
@@ -290,7 +289,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		response := api.ASProtocolResponse{}
 		for _, as := range a.Cfg.Derived.ApplicationServices {
 			var proto api.ASProtocolResponse
-			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+req.Protocol, &proto); err != nil {
+			if err := requestDo[api.ASProtocolResponse](as.HTTPClient, as.RequestUrl()+api.ASProtocolPath+req.Protocol, &proto); err != nil {
 				log.WithError(err).Error("unable to get 'protocol' from application service")
 				continue
 			}
@@ -320,7 +319,7 @@ func (a *AppServiceQueryAPI) Protocols(
 	for _, as := range a.Cfg.Derived.ApplicationServices {
 		for _, p := range as.Protocols {
 			var proto api.ASProtocolResponse
-			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+p, &proto); err != nil {
+			if err := requestDo[api.ASProtocolResponse](as.HTTPClient, as.RequestUrl()+api.ASProtocolPath+p, &proto); err != nil {
 				log.WithError(err).Error("unable to get 'protocol' from application service")
 				continue
 			}
