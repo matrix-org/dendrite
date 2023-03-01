@@ -1,3 +1,4 @@
+
 # dendrite
 
 ![Version: 0.12.0](https://img.shields.io/badge/Version-0.12.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.12.0](https://img.shields.io/badge/AppVersion-0.12.0-informational?style=flat-square)
@@ -161,6 +162,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 * Works well with [Prometheus Operator](https://prometheus-operator.dev/) ([Helmchart](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)) and their setup of [Grafana](https://grafana.com/grafana/), by enabling the following values:
 ```yaml
+dendrite_config:
+  global:
+    metrics:
+      enabled: true
+
 prometheus:
   servicemonitor:
     enabled: true

@@ -5,6 +5,11 @@
 
 * Works well with [Prometheus Operator](https://prometheus-operator.dev/) ([Helmchart](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)) and their setup of [Grafana](https://grafana.com/grafana/), by enabling the following values:
 ```yaml
+dendrite_config:
+  global:
+    metrics:
+      enabled: true
+
 prometheus:
   servicemonitor:
     enabled: true
