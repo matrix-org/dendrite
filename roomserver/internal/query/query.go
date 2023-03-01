@@ -21,10 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -132,7 +133,8 @@ func (r *Queryer) QueryStateAfterEvents(
 	return nil
 }
 
-// QueryEventsByID implements api.RoomserverInternalAPI
+// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
+// which room to use by querying the first events roomID.
 func (r *Queryer) QueryEventsByID(
 	ctx context.Context,
 	request *api.QueryEventsByIDRequest,

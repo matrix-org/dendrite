@@ -55,22 +55,6 @@ type EventDatabase struct {
 	RedactionsTable     tables.Redactions
 }
 
-// GetEventDatabase returns an EventDatabase to work with events only.
-func (d *Database) GetEventDatabase() *EventDatabase {
-	db := &EventDatabase{
-		DB:                  d.DB,
-		Cache:               d.Cache,
-		Writer:              d.Writer,
-		EventsTable:         d.EventsTable,
-		EventJSONTable:      d.EventJSONTable,
-		EventTypesTable:     d.EventTypesTable,
-		EventStateKeysTable: d.EventStateKeysTable,
-		PrevEventsTable:     d.PrevEventsTable,
-		RedactionsTable:     d.RedactionsTable,
-	}
-	return db
-}
-
 func (d *Database) SupportsConcurrentRoomInputs() bool {
 	return true
 }
@@ -666,7 +650,7 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 
 // GetOrCreateRoomNID gets or creates a new roomNID for the given event. Also returns a RoomInfo, which is only safe to use
 // with functions only needing a roomVersion or roomNID.
-func (d *Database) GetOrCreateRoomNID(ctx context.Context, event *gomatrixserverlib.Event) (roomNID types.RoomNID, roomInfo *types.RoomInfo, err error) {
+func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
 	// then we will use our configured default to create the room.
 	// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
@@ -675,8 +659,9 @@ func (d *Database) GetOrCreateRoomNID(ctx context.Context, event *gomatrixserver
 	// room.
 	var roomVersion gomatrixserverlib.RoomVersion
 	if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
-		return 0, nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
+		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
+	var roomNID types.RoomNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion)
 		if err != nil {
@@ -684,7 +669,7 @@ func (d *Database) GetOrCreateRoomNID(ctx context.Context, event *gomatrixserver
 		}
 		return nil
 	})
-	return roomNID, &types.RoomInfo{
+	return &types.RoomInfo{
 		RoomVersion: roomVersion,
 		RoomNID:     roomNID,
 	}, err

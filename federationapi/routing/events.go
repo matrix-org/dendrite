@@ -20,10 +20,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/roomserver/api"
 )
 
 // GetEvent returns the requested event
@@ -38,6 +39,8 @@ func GetEvent(
 	if err != nil {
 		return *err
 	}
+	// /_matrix/federation/v1/event/{eventId} doesn't have a roomID, we use an empty string,
+	// which results in `QueryEventsByID` to first get the event and use that to determine the roomID.
 	event, err := fetchEvent(ctx, rsAPI, "", eventID)
 	if err != nil {
 		return *err

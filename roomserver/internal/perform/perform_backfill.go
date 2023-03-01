@@ -605,7 +605,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			i++
 		}
 
-		_, roomInfo, err := db.GetOrCreateRoomNID(ctx, ev.Unwrap())
+		roomInfo, err := db.GetOrCreateRoomInfo(ctx, ev.Unwrap())
 		if err != nil {
 			logrus.WithError(err).Error("failed to get or create roomNID")
 			continue

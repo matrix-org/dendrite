@@ -54,7 +54,8 @@ type QueryBulkStateContentAPI interface {
 }
 
 type QueryEventsAPI interface {
-	// Query a list of events by event ID.
+	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
+	// which room to use by querying the first events roomID.
 	QueryEventsByID(
 		ctx context.Context,
 		req *QueryEventsByIDRequest,
@@ -71,7 +72,8 @@ type SyncRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
-	// Query a list of events by event ID.
+	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
+	// which room to use by querying the first events roomID.
 	QueryEventsByID(
 		ctx context.Context,
 		req *QueryEventsByIDRequest,
@@ -108,7 +110,8 @@ type SyncRoomserverAPI interface {
 }
 
 type AppserviceRoomserverAPI interface {
-	// Query a list of events by event ID.
+	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
+	// which room to use by querying the first events roomID.
 	QueryEventsByID(
 		ctx context.Context,
 		req *QueryEventsByIDRequest,
@@ -182,6 +185,8 @@ type FederationRoomserverAPI interface {
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomVersionForRoom(ctx context.Context, req *QueryRoomVersionForRoomRequest, res *QueryRoomVersionForRoomResponse) error
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
+	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
+	// which room to use by querying the first events roomID.
 	QueryEventsByID(ctx context.Context, req *QueryEventsByIDRequest, res *QueryEventsByIDResponse) error
 	// Query to get state and auth chain for a (potentially hypothetical) event.
 	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
