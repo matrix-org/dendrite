@@ -14,8 +14,8 @@ index 8f0e209c..ad057e52 100644
  
     $output->diag( "Starting monolith server" );
     my @command = (
--      $self->{bindir} . '/dendrite-monolith-server',
-+      $self->{bindir} . '/dendrite-monolith-server', '--test.coverprofile=' . $self->{hs_dir} . '/integrationcover.log', "DEVEL",
+-      $self->{bindir} . '/dendrite',
++      $self->{bindir} . '/dendrite', '--test.coverprofile=' . $self->{hs_dir} . '/integrationcover.log', "DEVEL",
        '--config', $self->{paths}{config},
        '--http-bind-address', $self->{bind_host} . ':' . $self->unsecure_port,
        '--https-bind-address', $self->{bind_host} . ':' . $self->secure_port,
@@ -27,9 +27,9 @@ index f009332b..7ea79869 100755
  echo >&2 "--- Building dendrite from source"
  cd /src
  mkdir -p $GOBIN
--go install -v ./cmd/dendrite-monolith-server
-+# go install -v ./cmd/dendrite-monolith-server
-+go test -c -cover -covermode=atomic -o $GOBIN/dendrite-monolith-server -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server
+-go install -v ./cmd/dendrite
++# go install -v ./cmd/dendrite
++go test -c -cover -covermode=atomic -o $GOBIN/dendrite -coverpkg "github.com/matrix-org/..." ./cmd/dendrite
  go install -v ./cmd/generate-keys
  cd -
  ```
