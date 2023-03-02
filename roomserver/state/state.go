@@ -60,10 +60,10 @@ func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) Sta
 }
 
 type PowerLevelResolver interface {
-	Resolve(ctx context.Context, roomInfo *types.RoomInfo, eventID string) (*gomatrixserverlib.PowerLevelContent, error)
+	Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error)
 }
 
-func (p *StateResolution) Resolve(ctx context.Context, roomInfo *types.RoomInfo, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
+func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
 	stateEntries, err := p.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (p *StateResolution) Resolve(ctx context.Context, roomInfo *types.RoomInfo,
 		return nil, fmt.Errorf("unable to find power level event")
 	}
 
-	events, err := p.db.Events(ctx, roomInfo, []types.EventNID{plNID})
+	events, err := p.db.Events(ctx, p.roomInfo, []types.EventNID{plNID})
 	if err != nil {
 		return nil, err
 	}

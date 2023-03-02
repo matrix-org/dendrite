@@ -970,7 +970,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 		_, sender1, _ := gomatrixserverlib.SplitID('@', redactedEvent.Sender())
 		_, sender2, _ := gomatrixserverlib.SplitID('@', redactionEvent.Sender())
 		var powerlevels *gomatrixserverlib.PowerLevelContent
-		powerlevels, err = plResolver.Resolve(ctx, roomInfo, redactionEvent.EventID())
+		powerlevels, err = plResolver.Resolve(ctx, redactionEvent.EventID())
 		if err != nil {
 			return err
 		}
