@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -629,7 +630,9 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			continue
 		}
 
-		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Unwrap(), true)
+		resolver := state.NewStateResolution(db, roomInfo)
+
+		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Unwrap(), &resolver)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue

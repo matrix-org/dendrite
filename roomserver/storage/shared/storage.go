@@ -13,6 +13,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -926,7 +927,7 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 //
 // Returns the redaction event and the redacted event if this call resulted in a redaction.
 func (d *EventDatabase) MaybeRedactEvent(
-	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event, redactAllowed bool,
+	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event, plResolver state.PowerLevelResolver,
 ) (*gomatrixserverlib.Event, *gomatrixserverlib.Event, error) {
 	var (
 		redactionEvent, redactedEvent *types.Event
@@ -968,8 +969,14 @@ func (d *EventDatabase) MaybeRedactEvent(
 
 		_, sender1, _ := gomatrixserverlib.SplitID('@', redactedEvent.Sender())
 		_, sender2, _ := gomatrixserverlib.SplitID('@', redactionEvent.Sender())
+		var powerlevels *gomatrixserverlib.PowerLevelContent
+		powerlevels, err = plResolver.Resolve(ctx, roomInfo, redactionEvent.EventID())
+		if err != nil {
+			return err
+		}
+
 		switch {
-		case redactAllowed:
+		case powerlevels.UserLevel(redactionEvent.Sender()) >= powerlevels.Redact:
 			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
 		case sender1 == sender2:
 			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.

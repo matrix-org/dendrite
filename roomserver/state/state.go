@@ -59,6 +59,47 @@ func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) Sta
 	}
 }
 
+type PowerLevelResolver interface {
+	Resolve(ctx context.Context, roomInfo *types.RoomInfo, eventID string) (*gomatrixserverlib.PowerLevelContent, error)
+}
+
+func (p *StateResolution) Resolve(ctx context.Context, roomInfo *types.RoomInfo, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
+	stateEntries, err := p.LoadStateAtEvent(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	wantTuple := types.StateKeyTuple{
+		EventTypeNID:     types.MRoomPowerLevelsNID,
+		EventStateKeyNID: types.EmptyStateKeyNID,
+	}
+
+	var plNID types.EventNID
+	for _, entry := range stateEntries {
+		if entry.StateKeyTuple == wantTuple {
+			plNID = entry.EventNID
+			break
+		}
+	}
+	if plNID == 0 {
+		return nil, fmt.Errorf("unable to find power level event")
+	}
+
+	events, err := p.db.Events(ctx, roomInfo, []types.EventNID{plNID})
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, fmt.Errorf("unable to find power level event")
+	}
+	powerlevels, err := events[0].PowerLevels()
+	if err != nil {
+		return nil, err
+	}
+
+	return powerlevels, nil
+}
+
 // LoadStateAtSnapshot loads the full state of a room at a particular snapshot.
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.

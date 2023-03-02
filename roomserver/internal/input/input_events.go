@@ -26,13 +26,13 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
-
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
@@ -275,23 +275,10 @@ func (r *Inputer) processRoomEvent(
 
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
-	redactAllowed := true
 	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
 		isRejected = true
-		redactAllowed = false
 		rejectionErr = err
 		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
-	}
-
-	if event.Type() == gomatrixserverlib.MRoomRedaction {
-		ap, _ := authEvents.PowerLevels()
-		if ap != nil {
-			var powerLevels *gomatrixserverlib.PowerLevelContent
-			powerLevels, _ = ap.PowerLevels()
-			if powerLevels != nil {
-				redactAllowed = powerLevels.UserLevel(event.Sender()) >= powerLevels.Redact
-			}
-		}
 	}
 
 	// Accumulate the auth event NIDs.
@@ -369,22 +356,6 @@ func (r *Inputer) processRoomEvent(
 		return fmt.Errorf("updater.StoreEvent: %w", err)
 	}
 
-	// if storing this event results in it being redacted then do so.
-	var (
-		redactedEventID string
-		redactionEvent  *gomatrixserverlib.Event
-		redactedEvent   *gomatrixserverlib.Event
-	)
-	if !isRejected && !isCreateEvent {
-		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, redactAllowed)
-		if err != nil {
-			return err
-		}
-		if redactedEvent != nil {
-			redactedEventID = redactedEvent.EventID()
-		}
-	}
-
 	// For outliers we can stop after we've stored the event itself as it
 	// doesn't have any associated state to store and we don't need to
 	// notify anyone about it.
@@ -410,6 +381,23 @@ func (r *Inputer) processRoomEvent(
 		err = r.calculateAndSetState(ctx, input, roomInfo, &stateAtEvent, event, isRejected)
 		if err != nil {
 			return fmt.Errorf("r.calculateAndSetState: %w", err)
+		}
+	}
+
+	// if storing this event results in it being redacted then do so.
+	var (
+		redactedEventID string
+		redactionEvent  *gomatrixserverlib.Event
+		redactedEvent   *gomatrixserverlib.Event
+	)
+	if !isRejected && !isCreateEvent {
+		resolver := state.NewStateResolution(r.DB, roomInfo)
+		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver)
+		if err != nil {
+			return err
+		}
+		if redactedEvent != nil {
+			redactedEventID = redactedEvent.EventID()
 		}
 	}
 
