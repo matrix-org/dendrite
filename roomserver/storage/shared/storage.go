@@ -966,11 +966,14 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return nil
 		}
 
-		// 1. The power level of the redaction event’s sender is greater than or equal to the redact level. (redactAllowed)
-		// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
 		_, sender1, _ := gomatrixserverlib.SplitID('@', redactedEvent.Sender())
 		_, sender2, _ := gomatrixserverlib.SplitID('@', redactionEvent.Sender())
-		if !redactAllowed || sender1 != sender2 {
+		switch {
+		case redactAllowed:
+			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
+		case sender1 == sender2:
+			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
+		default:
 			ignoreRedaction = true
 			return nil
 		}

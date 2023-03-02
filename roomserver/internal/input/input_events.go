@@ -283,6 +283,17 @@ func (r *Inputer) processRoomEvent(
 		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
 	}
 
+	if event.Type() == gomatrixserverlib.MRoomRedaction {
+		ap, _ := authEvents.PowerLevels()
+		if ap != nil {
+			var powerLevels *gomatrixserverlib.PowerLevelContent
+			powerLevels, _ = ap.PowerLevels()
+			if powerLevels != nil {
+				redactAllowed = powerLevels.UserLevel(event.Sender()) >= powerLevels.Redact
+			}
+		}
+	}
+
 	// Accumulate the auth event NIDs.
 	authEventIDs := event.AuthEventIDs()
 	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
