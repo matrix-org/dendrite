@@ -385,6 +385,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// if storing this event results in it being redacted then do so.
+	// we do this after calculating state for this event as we may need to get power levels
 	var (
 		redactedEventID string
 		redactionEvent  *gomatrixserverlib.Event
