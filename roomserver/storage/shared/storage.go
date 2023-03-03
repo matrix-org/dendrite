@@ -661,6 +661,12 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserve
 	if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
 		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
+	if roomVersion == "" {
+		rv, ok := d.Cache.GetRoomVersion(event.RoomID())
+		if ok {
+			roomVersion = rv
+		}
+	}
 	var roomNID types.RoomNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion)
@@ -669,6 +675,9 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserve
 		}
 		return nil
 	})
+	if roomVersion != "" {
+		d.Cache.StoreRoomVersion(event.RoomID(), roomVersion)
+	}
 	return &types.RoomInfo{
 		RoomVersion: roomVersion,
 		RoomNID:     roomNID,
@@ -839,6 +848,7 @@ func (d *Database) assignRoomNID(
 		return 0, err
 	}
 	d.Cache.StoreRoomServerRoomID(roomNID, roomID)
+	d.Cache.StoreRoomVersion(roomID, roomVersion)
 	return roomNID, nil
 }
 
