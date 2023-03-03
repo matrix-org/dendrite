@@ -49,7 +49,7 @@ tracing:
 then run the monolith server:
 
 ```
-./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+./dendrite --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
 ## Checking traces
