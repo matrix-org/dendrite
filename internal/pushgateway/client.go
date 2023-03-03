@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-
-	"github.com/opentracing/opentracing-go"
 )
 
 type httpClient struct {
@@ -34,8 +32,8 @@ func NewHTTPClient(disableTLSValidation bool) Client {
 }
 
 func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest, resp *NotifyResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "Notify")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "Notify")
+	defer trace.End()
 
 	body, err := json.Marshal(req)
 	if err != nil {

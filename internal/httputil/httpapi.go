@@ -26,7 +26,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -34,6 +33,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -188,9 +188,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 
 		ctx, task := trace.NewTask(req.Context(), metricsName)
 		defer task.End()
-		span := opentracing.StartSpan(metricsName)
-		defer span.Finish()
-		req = req.WithContext(opentracing.ContextWithSpan(ctx, span))
+		trace, ctx := internal.StartRegion(ctx, metricsName)
+		defer trace.End()
+		req = req.WithContext(ctx)
 		h.ServeHTTP(nextWriter, req)
 
 	}
@@ -202,9 +202,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 // This is used to serve HTML alongside JSON error messages
 func MakeHTMLAPI(metricsName string, enableMetrics bool, f func(http.ResponseWriter, *http.Request)) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		span := opentracing.StartSpan(metricsName)
-		defer span.Finish()
-		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
+		trace, ctx := internal.StartRegion(req.Context(), metricsName)
+		defer trace.End()
+		req = req.WithContext(ctx)
 		f(w, req)
 	}
 

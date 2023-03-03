@@ -25,10 +25,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -50,8 +50,8 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	request *api.RoomAliasExistsRequest,
 	response *api.RoomAliasExistsResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceRoomAlias")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceRoomAlias")
+	defer trace.End()
 
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
@@ -117,8 +117,8 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	request *api.UserIDExistsRequest,
 	response *api.UserIDExistsResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceUserID")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceUserID")
+	defer trace.End()
 
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {

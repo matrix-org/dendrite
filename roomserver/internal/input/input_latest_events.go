@@ -23,9 +23,9 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -59,8 +59,8 @@ func (r *Inputer) updateLatestEvents(
 	rewritesState bool,
 	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "updateLatestEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "updateLatestEvents")
+	defer trace.End()
 
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
@@ -209,8 +209,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 }
 
 func (u *latestEventsUpdater) latestState() error {
-	span, ctx := opentracing.StartSpanFromContext(u.ctx, "processEventWithMissingState")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(u.ctx, "processEventWithMissingState")
+	defer trace.End()
 
 	var err error
 	roomState := state.NewStateResolution(u.updater, u.roomInfo)
@@ -329,8 +329,8 @@ func (u *latestEventsUpdater) calculateLatest(
 	newEvent *gomatrixserverlib.Event,
 	newStateAndRef types.StateAtEventAndReference,
 ) (bool, error) {
-	span, _ := opentracing.StartSpanFromContext(u.ctx, "calculateLatest")
-	defer span.Finish()
+	trace, _ := internal.StartRegion(u.ctx, "calculateLatest")
+	defer trace.End()
 
 	// First of all, get a list of all of the events in our current
 	// set of forward extremities.
