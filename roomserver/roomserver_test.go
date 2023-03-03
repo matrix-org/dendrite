@@ -278,6 +278,16 @@ func TestPurgeRoom(t *testing.T) {
 		if roomInfo == nil {
 			t.Fatalf("room does not exist")
 		}
+
+		//
+		roomInfo2, err := db.RoomInfoByNID(ctx, roomInfo.RoomNID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(roomInfo, roomInfo2) {
+			t.Fatalf("expected roomInfos to be the same, but they aren't")
+		}
+
 		// remember the roomInfo before purging
 		existingRoomInfo := roomInfo
 
@@ -332,6 +342,10 @@ func TestPurgeRoom(t *testing.T) {
 		}
 		if roomInfo != nil {
 			t.Fatalf("room should not exist after purging: %+v", roomInfo)
+		}
+		roomInfo2, err = db.RoomInfoByNID(ctx, existingRoomInfo.RoomNID)
+		if err == nil {
+			t.Fatalf("expected room to not exist, but it does: %#v", roomInfo2)
 		}
 
 		// validation below

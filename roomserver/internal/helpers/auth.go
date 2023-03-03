@@ -67,7 +67,7 @@ func CheckForSoftFail(
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, roomInfo.RoomNID, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
 	if err != nil {
 		return true, fmt.Errorf("loadAuthEvents: %w", err)
 	}
@@ -85,7 +85,7 @@ func CheckForSoftFail(
 func CheckAuthEvents(
 	ctx context.Context,
 	db storage.RoomDatabase,
-	roomNID types.RoomNID,
+	roomInfo *types.RoomInfo,
 	event *gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
@@ -100,7 +100,7 @@ func CheckAuthEvents(
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, roomNID, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
 	if err != nil {
 		return nil, fmt.Errorf("loadAuthEvents: %w", err)
 	}
@@ -193,7 +193,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 func loadAuthEvents(
 	ctx context.Context,
 	db state.StateResolutionStorage,
-	roomNID types.RoomNID,
+	roomInfo *types.RoomInfo,
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
 ) (result authEvents, err error) {
@@ -216,7 +216,7 @@ func loadAuthEvents(
 			eventNIDs = append(eventNIDs, eventNID)
 		}
 	}
-	if result.events, err = db.Events(ctx, roomNID, eventNIDs); err != nil {
+	if result.events, err = db.Events(ctx, roomInfo, eventNIDs); err != nil {
 		return
 	}
 	roomID := ""

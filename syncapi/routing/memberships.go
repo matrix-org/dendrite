@@ -109,7 +109,7 @@ func GetMemberships(
 	}
 
 	qryRes := &api.QueryEventsByIDResponse{}
-	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs}, qryRes); err != nil {
+	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return jsonerror.InternalServerError()
 	}
