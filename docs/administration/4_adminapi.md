@@ -38,9 +38,8 @@ This endpoint will instruct Dendrite to part all local users from the given `roo
 in the URL. It may take some time to complete. A JSON body will be returned containing
 the user IDs of all affected users.
 
-If the room has a published address set, the room's ID will not be in the URL, but may
-be found as the room's "internal ID" (e.g. under Advanced within the room settings in
-Element.)
+If the room has an alias set (e.g. is published), the room's ID will not be visible in the URL, but it can
+be found as the room's "internal ID" in Element Web (Settings -> Advanced)
 
 ## GET `/_dendrite/admin/evacuateUser/{userID}`
 
