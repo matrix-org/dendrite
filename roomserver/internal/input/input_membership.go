@@ -38,7 +38,7 @@ func (r *Inputer) updateMemberships(
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
 	trace, ctx := internal.StartRegion(ctx, "updateMemberships")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID

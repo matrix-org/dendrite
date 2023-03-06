@@ -60,7 +60,7 @@ func (r *Inputer) updateLatestEvents(
 	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
 	trace, ctx := internal.StartRegion(ctx, "updateLatestEvents")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
@@ -210,7 +210,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	trace, ctx := internal.StartRegion(u.ctx, "processEventWithMissingState")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	var err error
 	roomState := state.NewStateResolution(u.updater, u.roomInfo)
@@ -330,7 +330,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	newStateAndRef types.StateAtEventAndReference,
 ) (bool, error) {
 	trace, _ := internal.StartRegion(u.ctx, "calculateLatest")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	// First of all, get a list of all of the events in our current
 	// set of forward extremities.

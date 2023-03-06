@@ -33,7 +33,7 @@ func NewHTTPClient(disableTLSValidation bool) Client {
 
 func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest, resp *NotifyResponse) error {
 	trace, ctx := internal.StartRegion(ctx, "Notify")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	body, err := json.Marshal(req)
 	if err != nil {

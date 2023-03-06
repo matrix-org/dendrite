@@ -87,7 +87,7 @@ func (r *Inputer) processRoomEvent(
 	trace, ctx := internal.StartRegion(ctx, "processRoomEvent")
 	trace.SetTag("room_id", input.Event.RoomID())
 	trace.SetTag("event_id", input.Event.EventID())
-	defer trace.End()
+	defer trace.EndRegion()
 
 	// Measure how long it takes to process this event.
 	started := time.Now()
@@ -608,7 +608,7 @@ func (r *Inputer) fetchAuthEvents(
 	servers []gomatrixserverlib.ServerName,
 ) error {
 	trace, ctx := internal.StartRegion(ctx, "fetchAuthEvents")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	unknown := map[string]struct{}{}
 	authEventIDs := event.AuthEventIDs()
@@ -753,7 +753,7 @@ func (r *Inputer) calculateAndSetState(
 	isRejected bool,
 ) error {
 	trace, ctx := internal.StartRegion(ctx, "calculateAndSetState")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)

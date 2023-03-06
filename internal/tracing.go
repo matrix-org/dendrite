@@ -24,6 +24,16 @@ import (
 type Trace struct {
 	span   opentracing.Span
 	region *trace.Region
+	task   *trace.Task
+}
+
+func StartTask(inCtx context.Context, name string) (Trace, context.Context) {
+	ctx, task := trace.NewTask(inCtx, name)
+	span, ctx := opentracing.StartSpanFromContext(ctx, name)
+	return Trace{
+		span: span,
+		task: task,
+	}, ctx
 }
 
 func StartRegion(inCtx context.Context, name string) (Trace, context.Context) {
@@ -35,9 +45,18 @@ func StartRegion(inCtx context.Context, name string) (Trace, context.Context) {
 	}, ctx
 }
 
-func (t Trace) End() {
+func (t Trace) EndRegion() {
 	t.span.Finish()
-	t.region.End()
+	if t.region != nil {
+		t.region.End()
+	}
+}
+
+func (t Trace) EndTask() {
+	t.span.Finish()
+	if t.task != nil {
+		t.task.End()
+	}
 }
 
 func (t Trace) SetTag(key string, value any) {

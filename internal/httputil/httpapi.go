@@ -21,7 +21,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"os"
-	"runtime/trace"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
@@ -186,10 +185,8 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			}
 		}
 
-		ctx, task := trace.NewTask(req.Context(), metricsName)
-		defer task.End()
-		trace, ctx := internal.StartRegion(ctx, metricsName)
-		defer trace.End()
+		trace, ctx := internal.StartTask(req.Context(), metricsName)
+		defer trace.EndTask()
 		req = req.WithContext(ctx)
 		h.ServeHTTP(nextWriter, req)
 
@@ -202,8 +199,8 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 // This is used to serve HTML alongside JSON error messages
 func MakeHTMLAPI(metricsName string, enableMetrics bool, f func(http.ResponseWriter, *http.Request)) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		trace, ctx := internal.StartRegion(req.Context(), metricsName)
-		defer trace.End()
+		trace, ctx := internal.StartTask(req.Context(), metricsName)
+		defer trace.EndTask()
 		req = req.WithContext(ctx)
 		f(w, req)
 	}

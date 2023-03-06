@@ -51,7 +51,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	response *api.RoomAliasExistsResponse,
 ) error {
 	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceRoomAlias")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
@@ -118,7 +118,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	response *api.UserIDExistsResponse,
 ) error {
 	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceUserID")
-	defer trace.End()
+	defer trace.EndRegion()
 
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
