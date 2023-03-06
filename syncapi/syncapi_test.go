@@ -1137,8 +1137,8 @@ func TestUpdateRelations(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, _, _ := testrig.Base(nil)
-		defer base.Close()
+		base, shutdownBase := testrig.CreateBaseDendrite(t, dbType)
+		t.Cleanup(shutdownBase)
 		db, err := storage.NewSyncServerDatasource(base, &base.Cfg.SyncAPI.Database)
 		if err != nil {
 			t.Fatal(err)
