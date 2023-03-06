@@ -567,9 +567,14 @@ func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64
 }
 
 func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+	// No need to unmarshal if the event is a redaction
+	if event.Type() == gomatrixserverlib.MRoomRedaction {
+		return nil
+	}
 	var content gomatrixserverlib.RelationContent
 	if err := json.Unmarshal(event.Content(), &content); err != nil {
-		return fmt.Errorf("json.Unmarshal: %w", err)
+		logrus.WithError(err).Error("unable to unmarshal relation content")
+		return nil
 	}
 	switch {
 	case content.Relations == nil:
@@ -577,8 +582,6 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 	case content.Relations.EventID == "":
 		return nil
 	case content.Relations.RelationType == "":
-		return nil
-	case event.Type() == gomatrixserverlib.MRoomRedaction:
 		return nil
 	default:
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
