@@ -133,9 +133,6 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
-	if err != nil {
-		return err
-	}
 
 	for _, ev := range backfilledEventMap {
 		// now add state for these events
