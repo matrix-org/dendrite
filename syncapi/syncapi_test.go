@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/syncapi/routing"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -1072,6 +1074,90 @@ func testContext(t *testing.T, dbType test.DBType) {
 			}
 		})
 	}
+}
+
+func TestUpdateRelations(t *testing.T) {
+	testCases := []struct {
+		name         string
+		eventContent map[string]interface{}
+		eventType    string
+	}{
+		{
+			name: "empty event content should not error",
+		},
+		{
+			name: "unable to unmarshal event should not error",
+			eventContent: map[string]interface{}{
+				"m.relates_to": map[string]interface{}{
+					"event_id": map[string]interface{}{}, // this should be a string and not struct
+				},
+			},
+		},
+		{
+			name: "empty event ID is ignored",
+			eventContent: map[string]interface{}{
+				"m.relates_to": map[string]interface{}{
+					"event_id": "",
+				},
+			},
+		},
+		{
+			name: "empty rel_type is ignored",
+			eventContent: map[string]interface{}{
+				"m.relates_to": map[string]interface{}{
+					"event_id": "$randomEventID",
+					"rel_type": "",
+				},
+			},
+		},
+		{
+			name:      "redactions are ignored",
+			eventType: gomatrixserverlib.MRoomRedaction,
+			eventContent: map[string]interface{}{
+				"m.relates_to": map[string]interface{}{
+					"event_id": "$randomEventID",
+					"rel_type": "m.replace",
+				},
+			},
+		},
+		{
+			name: "valid event is correctly written",
+			eventContent: map[string]interface{}{
+				"m.relates_to": map[string]interface{}{
+					"event_id": "$randomEventID",
+					"rel_type": "m.replace",
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, shutdownBase := testrig.CreateBaseDendrite(t, dbType)
+		t.Cleanup(shutdownBase)
+		db, err := storage.NewSyncServerDatasource(base, &base.Cfg.SyncAPI.Database)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				evType := "m.room.message"
+				if tc.eventType != "" {
+					evType = tc.eventType
+				}
+				ev := room.CreateEvent(t, alice, evType, tc.eventContent)
+				err = db.UpdateRelations(ctx, ev)
+				if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	})
 }
 
 func syncUntil(t *testing.T,
