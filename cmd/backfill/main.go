@@ -24,6 +24,7 @@ var requestTo = flag.String("to", "", "the server name to start backfilling from
 var startEventID = flag.String("eventid", "", "the event ID to start backfilling from")
 var roomID = flag.String("room", "", "the room ID to backfill")
 
+// nolint: gocyclo
 func main() {
 	flag.Parse()
 
@@ -98,7 +99,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer f.Close() // nolint: errcheck
 	seenEvents := make(map[string]struct{})
 
 	encoder := json.NewEncoder(f)
