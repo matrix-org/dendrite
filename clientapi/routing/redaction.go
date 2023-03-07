@@ -57,7 +57,7 @@ func SendRedaction(
 		}
 	}
 
-	ev := roomserverAPI.GetEvent(req.Context(), rsAPI, eventID)
+	ev := roomserverAPI.GetEvent(req.Context(), rsAPI, roomID, eventID)
 	if ev == nil {
 		return util.JSONResponse{
 			Code: 400,

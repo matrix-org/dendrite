@@ -22,12 +22,12 @@ curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint
 An `access_token` can be obtained through most Element-based matrix clients by going to `Settings` -> `Help & About` -> `Advanced` -> `Access Token`.
 Be aware that an `access_token` allows a client to perform actions as an user and should be kept **secret**.
 
-The user must be an administrator in the `account_accounts` table in order to use these endpoints.
+The user must be an administrator in the `userapi_accounts` table in order to use these endpoints.
 
-Existing user accounts can be set to administrative accounts by changing `account_type` to `3` in `account_accounts`
+Existing user accounts can be set to administrative accounts by changing `account_type` to `3` in `userapi_accounts`
 
 ```
-UPDATE account_accounts SET account_type = 3 WHERE localpart = '$localpart';
+UPDATE userapi_accounts SET account_type = 3 WHERE localpart = '$localpart';
 ```
 
 Where `$localpart` is the username only (e.g. `alice`).
@@ -37,6 +37,9 @@ Where `$localpart` is the username only (e.g. `alice`).
 This endpoint will instruct Dendrite to part all local users from the given `roomID`
 in the URL. It may take some time to complete. A JSON body will be returned containing
 the user IDs of all affected users.
+
+If the room has an alias set (e.g. is published), the room's ID will not be visible in the URL, but it can
+be found as the room's "internal ID" in Element Web (Settings -> Advanced)
 
 ## GET `/_dendrite/admin/evacuateUser/{userID}`
 

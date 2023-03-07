@@ -41,8 +41,8 @@ type StateResolutionStorage interface {
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	Events(ctx context.Context, roomNID types.RoomNID, eventNIDs []types.EventNID) ([]types.Event, error)
-	EventsFromIDs(ctx context.Context, roomNID types.RoomNID, eventIDs []string) ([]types.Event, error)
+	Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error)
+	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 }
 
 type StateResolution struct {
@@ -57,6 +57,47 @@ func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) Sta
 		roomInfo: roomInfo,
 		events:   make(map[types.EventNID]*gomatrixserverlib.Event),
 	}
+}
+
+type PowerLevelResolver interface {
+	Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error)
+}
+
+func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
+	stateEntries, err := p.LoadStateAtEvent(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	wantTuple := types.StateKeyTuple{
+		EventTypeNID:     types.MRoomPowerLevelsNID,
+		EventStateKeyNID: types.EmptyStateKeyNID,
+	}
+
+	var plNID types.EventNID
+	for _, entry := range stateEntries {
+		if entry.StateKeyTuple == wantTuple {
+			plNID = entry.EventNID
+			break
+		}
+	}
+	if plNID == 0 {
+		return nil, fmt.Errorf("unable to find power level event")
+	}
+
+	events, err := p.db.Events(ctx, p.roomInfo, []types.EventNID{plNID})
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, fmt.Errorf("unable to find power level event")
+	}
+	powerlevels, err := events[0].PowerLevels()
+	if err != nil {
+		return nil, err
+	}
+
+	return powerlevels, nil
 }
 
 // LoadStateAtSnapshot loads the full state of a room at a particular snapshot.
@@ -975,7 +1016,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 			// Store the newly found auth events in the auth set for this event.
 			var authEventMap map[string]types.StateEntry
-			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, v.roomInfo.RoomNID, conflictedEvent, knownAuthEvents)
+			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, v.roomInfo, conflictedEvent, knownAuthEvents)
 			if err != nil {
 				return err
 			}
@@ -1091,7 +1132,7 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	events, err := v.db.Events(ctx, v.roomInfo.RoomNID, eventNIDs)
+	events, err := v.db.Events(ctx, v.roomInfo, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1120,7 +1161,7 @@ type authEventLoader struct {
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
 func (l *authEventLoader) loadAuthEvents(
-	ctx context.Context, roomNID types.RoomNID, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
+	ctx context.Context, roomInfo *types.RoomInfo, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()
@@ -1155,7 +1196,7 @@ func (l *authEventLoader) loadAuthEvents(
 		// If we need to get events from the database, go and fetch
 		// those now.
 		if len(l.lookupFromDB) > 0 {
-			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, roomNID, l.lookupFromDB)
+			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, roomInfo, l.lookupFromDB)
 			if err != nil {
 				return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 			}

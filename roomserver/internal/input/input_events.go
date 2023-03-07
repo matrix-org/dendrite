@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,6 +31,8 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
@@ -323,7 +324,7 @@ func (r *Inputer) processRoomEvent(
 	// burning CPU time.
 	historyVisibility := gomatrixserverlib.HistoryVisibilityShared // Default to shared.
 	if input.Kind != api.KindOutlier && rejectionErr == nil && !isRejected && !isCreateEvent {
-		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, roomInfo.RoomNID, input, missingPrev)
+		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, roomInfo, input, missingPrev)
 		if err != nil {
 			return fmt.Errorf("r.processStateBefore: %w", err)
 		}
@@ -332,9 +333,11 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	roomNID, err := r.DB.GetOrCreateRoomNID(ctx, event)
-	if err != nil {
-		return fmt.Errorf("r.DB.GetOrCreateRoomNID: %w", err)
+	if roomInfo == nil {
+		roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, event)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
+		}
 	}
 
 	eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, event.Type())
@@ -348,16 +351,9 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Store the event.
-	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, roomNID, eventTypeNID, eventStateKeyNID, authEventNIDs, isRejected)
+	eventNID, stateAtEvent, err := r.DB.StoreEvent(ctx, event, roomInfo, eventTypeNID, eventStateKeyNID, authEventNIDs, isRejected)
 	if err != nil {
 		return fmt.Errorf("updater.StoreEvent: %w", err)
-	}
-
-	// if storing this event results in it being redacted then do so.
-	if !isRejected && redactedEventID == event.EventID() {
-		if err = eventutil.RedactEvent(redactionEvent, event); err != nil {
-			return fmt.Errorf("eventutil.RedactEvent: %w", rerr)
-		}
 	}
 
 	// For outliers we can stop after we've stored the event itself as it
@@ -385,6 +381,24 @@ func (r *Inputer) processRoomEvent(
 		err = r.calculateAndSetState(ctx, input, roomInfo, &stateAtEvent, event, isRejected)
 		if err != nil {
 			return fmt.Errorf("r.calculateAndSetState: %w", err)
+		}
+	}
+
+	// if storing this event results in it being redacted then do so.
+	// we do this after calculating state for this event as we may need to get power levels
+	var (
+		redactedEventID string
+		redactionEvent  *gomatrixserverlib.Event
+		redactedEvent   *gomatrixserverlib.Event
+	)
+	if !isRejected && !isCreateEvent {
+		resolver := state.NewStateResolution(r.DB, roomInfo)
+		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver)
+		if err != nil {
+			return err
+		}
+		if redactedEvent != nil {
+			redactedEventID = redactedEvent.EventID()
 		}
 	}
 
@@ -489,7 +503,7 @@ func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event *gomatrixse
 // nolint:nakedret
 func (r *Inputer) processStateBefore(
 	ctx context.Context,
-	roomNID types.RoomNID,
+	roomInfo *types.RoomInfo,
 	input *api.InputRoomEvent,
 	missingPrev bool,
 ) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
@@ -505,7 +519,7 @@ func (r *Inputer) processStateBefore(
 	case input.HasState:
 		// If we're overriding the state then we need to go and retrieve
 		// them from the database. It's a hard error if they are missing.
-		stateEvents, err := r.DB.EventsFromIDs(ctx, roomNID, input.StateEventIDs)
+		stateEvents, err := r.DB.EventsFromIDs(ctx, roomInfo, input.StateEventIDs)
 		if err != nil {
 			return "", nil, fmt.Errorf("r.DB.EventsFromIDs: %w", err)
 		}
@@ -604,7 +618,7 @@ func (r *Inputer) fetchAuthEvents(
 	}
 
 	for _, authEventID := range authEventIDs {
-		authEvents, err := r.DB.EventsFromIDs(ctx, roomInfo.RoomNID, []string{authEventID})
+		authEvents, err := r.DB.EventsFromIDs(ctx, roomInfo, []string{authEventID})
 		if err != nil || len(authEvents) == 0 || authEvents[0].Event == nil {
 			unknown[authEventID] = struct{}{}
 			continue
@@ -690,9 +704,11 @@ nextAuthEvent:
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
 		}
 
-		roomNID, err := r.DB.GetOrCreateRoomNID(ctx, authEvent)
-		if err != nil {
-			return fmt.Errorf("r.DB.GetOrCreateRoomNID: %w", err)
+		if roomInfo == nil {
+			roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, authEvent)
+			if err != nil {
+				return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
+			}
 		}
 
 		eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, authEvent.Type())
@@ -706,7 +722,7 @@ nextAuthEvent:
 		}
 
 		// Finally, store the event in the database.
-		eventNID, _, _, _, err := r.DB.StoreEvent(ctx, authEvent, roomNID, eventTypeNID, eventStateKeyNID, authEventNIDs, isRejected)
+		eventNID, _, err := r.DB.StoreEvent(ctx, authEvent, roomInfo, eventTypeNID, eventStateKeyNID, authEventNIDs, isRejected)
 		if err != nil {
 			return fmt.Errorf("updater.StoreEvent: %w", err)
 		}
@@ -782,7 +798,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event
 		return err
 	}
 
-	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomNID, membershipNIDs)
+	memberEvents, err := r.DB.Events(ctx, roomInfo, membershipNIDs)
 	if err != nil {
 		return err
 	}

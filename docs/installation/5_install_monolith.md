@@ -11,11 +11,11 @@ permalink: /installation/install/monolith
 You can install the Dendrite monolith binary into `$GOPATH/bin` by using `go install`:
 
 ```sh
-go install ./cmd/dendrite-monolith-server
+go install ./cmd/dendrite
 ```
 
 Alternatively, you can specify a custom path for the binary to be written to using `go build`:
 
 ```sh
-go build -o /usr/local/bin/ ./cmd/dendrite-monolith-server
+go build -o /usr/local/bin/ ./cmd/dendrite
 ```

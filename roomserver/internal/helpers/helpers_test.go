@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 
 	"github.com/matrix-org/dendrite/setup/base"
 
@@ -38,9 +39,9 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 		var authNIDs []types.EventNID
 		for _, x := range room.Events() {
 
-			roomNID, err := db.GetOrCreateRoomNID(context.Background(), x.Unwrap())
+			roomInfo, err := db.GetOrCreateRoomInfo(context.Background(), x.Unwrap())
 			assert.NoError(t, err)
-			assert.Greater(t, roomNID, types.RoomNID(0))
+			assert.NotNil(t, roomInfo)
 
 			eventTypeNID, err := db.GetOrCreateEventTypeNID(context.Background(), x.Type())
 			assert.NoError(t, err)
@@ -49,7 +50,7 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 			eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(context.Background(), x.StateKey())
 			assert.NoError(t, err)
 
-			evNID, _, _, _, err := db.StoreEvent(context.Background(), x.Event, roomNID, eventTypeNID, eventStateKeyNID, authNIDs, false)
+			evNID, _, err := db.StoreEvent(context.Background(), x.Event, roomInfo, eventTypeNID, eventStateKeyNID, authNIDs, false)
 			assert.NoError(t, err)
 			authNIDs = append(authNIDs, evNID)
 		}

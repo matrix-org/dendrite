@@ -2,19 +2,25 @@ package roomserver_test
 
 import (
 	"context"
+	"crypto/ed25519"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -278,6 +284,16 @@ func TestPurgeRoom(t *testing.T) {
 		if roomInfo == nil {
 			t.Fatalf("room does not exist")
 		}
+
+		//
+		roomInfo2, err := db.RoomInfoByNID(ctx, roomInfo.RoomNID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(roomInfo, roomInfo2) {
+			t.Fatalf("expected roomInfos to be the same, but they aren't")
+		}
+
 		// remember the roomInfo before purging
 		existingRoomInfo := roomInfo
 
@@ -333,6 +349,10 @@ func TestPurgeRoom(t *testing.T) {
 		if roomInfo != nil {
 			t.Fatalf("room should not exist after purging: %+v", roomInfo)
 		}
+		roomInfo2, err = db.RoomInfoByNID(ctx, existingRoomInfo.RoomNID)
+		if err == nil {
+			t.Fatalf("expected room to not exist, but it does: %#v", roomInfo2)
+		}
 
 		// validation below
 
@@ -362,6 +382,192 @@ func TestPurgeRoom(t *testing.T) {
 		}
 		if isPublished {
 			t.Fatalf("room should not be published after purging")
+		}
+	})
+}
+
+type fledglingEvent struct {
+	Type       string
+	StateKey   *string
+	Sender     string
+	RoomID     string
+	Redacts    string
+	Depth      int64
+	PrevEvents []interface{}
+}
+
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+	t.Helper()
+	roomVer := gomatrixserverlib.RoomVersionV9
+	seed := make([]byte, ed25519.SeedSize) // zero seed
+	key := ed25519.NewKeyFromSeed(seed)
+	eb := gomatrixserverlib.EventBuilder{
+		Sender:     ev.Sender,
+		Type:       ev.Type,
+		StateKey:   ev.StateKey,
+		RoomID:     ev.RoomID,
+		Redacts:    ev.Redacts,
+		Depth:      ev.Depth,
+		PrevEvents: ev.PrevEvents,
+	}
+	err := eb.SetContent(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("mustCreateEvent: failed to marshal event content %v", err)
+	}
+	signedEvent, err := eb.Build(time.Now(), "localhost", "ed25519:test", key, roomVer)
+	if err != nil {
+		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
+	}
+	h := signedEvent.Headered(roomVer)
+	return h
+}
+
+func TestRedaction(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	charlie := test.NewUser(t, test.WithSigningServer("notlocalhost", "abc", test.PrivateKeyB))
+
+	testCases := []struct {
+		name             string
+		additionalEvents func(t *testing.T, room *test.Room)
+		wantRedacted     bool
+	}{
+		{
+			name:         "can redact own message",
+			wantRedacted: true,
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
+
+				builderEv := mustCreateEvent(t, fledglingEvent{
+					Type:       gomatrixserverlib.MRoomRedaction,
+					Sender:     alice.ID,
+					RoomID:     room.ID,
+					Redacts:    redactedEvent.EventID(),
+					Depth:      redactedEvent.Depth() + 1,
+					PrevEvents: []interface{}{redactedEvent.EventID()},
+				})
+				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+			},
+		},
+		{
+			name:         "can redact others message, allowed by PL",
+			wantRedacted: true,
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				redactedEvent := room.CreateAndInsert(t, bob, "m.room.message", map[string]interface{}{"body": "hello world"})
+
+				builderEv := mustCreateEvent(t, fledglingEvent{
+					Type:       gomatrixserverlib.MRoomRedaction,
+					Sender:     alice.ID,
+					RoomID:     room.ID,
+					Redacts:    redactedEvent.EventID(),
+					Depth:      redactedEvent.Depth() + 1,
+					PrevEvents: []interface{}{redactedEvent.EventID()},
+				})
+				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+			},
+		},
+		{
+			name:         "can redact others message, same server",
+			wantRedacted: true,
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
+
+				builderEv := mustCreateEvent(t, fledglingEvent{
+					Type:       gomatrixserverlib.MRoomRedaction,
+					Sender:     bob.ID,
+					RoomID:     room.ID,
+					Redacts:    redactedEvent.EventID(),
+					Depth:      redactedEvent.Depth() + 1,
+					PrevEvents: []interface{}{redactedEvent.EventID()},
+				})
+				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+			},
+		},
+		{
+			name: "can not redact others message, missing PL",
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				redactedEvent := room.CreateAndInsert(t, bob, "m.room.message", map[string]interface{}{"body": "hello world"})
+
+				builderEv := mustCreateEvent(t, fledglingEvent{
+					Type:       gomatrixserverlib.MRoomRedaction,
+					Sender:     charlie.ID,
+					RoomID:     room.ID,
+					Redacts:    redactedEvent.EventID(),
+					Depth:      redactedEvent.Depth() + 1,
+					PrevEvents: []interface{}{redactedEvent.EventID()},
+				})
+				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+			},
+		},
+	}
+
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		_, db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				authEvents := []types.EventNID{}
+				var roomInfo *types.RoomInfo
+				var err error
+
+				room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, charlie, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(charlie.ID))
+
+				if tc.additionalEvents != nil {
+					tc.additionalEvents(t, room)
+				}
+
+				for _, ev := range room.Events() {
+					roomInfo, err = db.GetOrCreateRoomInfo(ctx, ev.Event)
+					assert.NoError(t, err)
+					assert.NotNil(t, roomInfo)
+					evTypeNID, err := db.GetOrCreateEventTypeNID(ctx, ev.Type())
+					assert.NoError(t, err)
+
+					stateKeyNID, err := db.GetOrCreateEventStateKeyNID(ctx, ev.StateKey())
+					assert.NoError(t, err)
+
+					eventNID, stateAtEvent, err := db.StoreEvent(ctx, ev.Event, roomInfo, evTypeNID, stateKeyNID, authEvents, false)
+					assert.NoError(t, err)
+					if ev.StateKey() != nil {
+						authEvents = append(authEvents, eventNID)
+					}
+
+					// Calculate the snapshotNID etc.
+					plResolver := state.NewStateResolution(db, roomInfo)
+					stateAtEvent.BeforeStateSnapshotNID, err = plResolver.CalculateAndStoreStateBeforeEvent(ctx, ev.Event, false)
+					assert.NoError(t, err)
+
+					// Update the room
+					updater, err := db.GetRoomUpdater(ctx, roomInfo)
+					assert.NoError(t, err)
+					err = updater.SetState(ctx, eventNID, stateAtEvent.BeforeStateSnapshotNID)
+					assert.NoError(t, err)
+					err = updater.Commit()
+					assert.NoError(t, err)
+
+					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Event, &plResolver)
+					assert.NoError(t, err)
+					if redactedEvent != nil {
+						assert.Equal(t, ev.Redacts(), redactedEvent.EventID())
+					}
+					if ev.Type() == gomatrixserverlib.MRoomRedaction {
+						nids, err := db.EventNIDs(ctx, []string{ev.Redacts()})
+						assert.NoError(t, err)
+						evs, err := db.Events(ctx, roomInfo, []types.EventNID{nids[ev.Redacts()].EventNID})
+						assert.NoError(t, err)
+						assert.Equal(t, 1, len(evs))
+						assert.Equal(t, tc.wantRedacted, evs[0].Redacted())
+					}
+				}
+			})
 		}
 	})
 }
