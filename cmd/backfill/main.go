@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"regexp"
@@ -16,6 +15,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 )
 
@@ -27,6 +28,11 @@ var roomID = flag.String("room", "", "the room ID to backfill")
 
 // nolint: gocyclo
 func main() {
+	zerolog.TimeFieldFormat = time.RFC3339Nano
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: "15:04:05.000",
+	})
 	flag.Parse()
 
 	if requestFrom == nil || *requestFrom == "" {
@@ -54,7 +60,9 @@ func main() {
 
 	data, err := os.ReadFile(*requestKey)
 	if err != nil {
-		panic(err)
+		log.Fatal().
+			Err(err).
+			Msg("failed to read file")
 	}
 
 	var privateKey ed25519.PrivateKey
@@ -88,28 +96,38 @@ func main() {
 		servers: map[gomatrixserverlib.ServerName]struct{}{
 			gomatrixserverlib.ServerName(*requestTo): {},
 		},
+		preferServer: gomatrixserverlib.ServerName(*requestTo),
 	}
 
 	ctx := context.Background()
 	eventID := *startEventID
 	start := time.Now()
+	seenEvents := make(map[string]struct{})
+
 	defer func() {
-		log.Printf("Backfilling took: %s", time.Since(start))
+		log.Debug().
+			TimeDiff("duration", time.Now(), start).
+			Int("events", len(seenEvents)).
+			Msg("Finished backfilling")
 	}()
-	f, err := os.Create(tokenise(*roomID) + "_backfill.csv")
+	f, err := os.Create(tokenise(*roomID) + "_backfill.json")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().
+			Err(err).
+			Msg("failed to create JSON file")
 	}
 	defer f.Close() // nolint: errcheck
-	seenEvents := make(map[string]struct{})
 
 	encoder := json.NewEncoder(f)
 
 	for {
-		log.Printf("[%d] going to request %s\n", len(seenEvents), eventID)
+		log.Debug().
+			Int("events", len(seenEvents)).
+			Str("event_id", eventID).
+			Msg("requesting event")
 		evs, err := gomatrixserverlib.RequestBackfill(ctx, serverName, b, &nopJSONVerifier{}, *roomID, "9", []string{eventID}, 100)
 		if err != nil && len(evs) == 0 {
-			log.Printf("failed to backfill, retrying: %s", err)
+			log.Err(err).Msg("failed to backfill, retrying")
 			continue
 		}
 		var createSeen bool
@@ -131,15 +149,19 @@ func main() {
 			// The following ensures we preserve the "_event_id" field
 			err = encoder.Encode(x)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal().
+					Err(err).
+					Msg("failed to write to file")
 			}
 			if x.Type() == gomatrixserverlib.MRoomCreate {
 				createSeen = true
 			}
 		}
-		// We've reached the beginng of the room
+		// We've reached the beginning of the room
 		if createSeen {
-			log.Printf("[%d] Reached beginning of the room, exiting", len(seenEvents))
+			log.Debug().
+				Int("events", len(seenEvents)).
+				Msg("Reached beginning of the room, existing")
 			return
 		}
 
@@ -156,7 +178,8 @@ func main() {
 			break
 		}
 		if beforeEvID == eventID {
-			log.Printf("no new eventID found in backfill response")
+			log.Debug().
+				Msg("no new eventID found in backfill response")
 			return
 		}
 		// Finally store which events we've already seen
@@ -182,8 +205,9 @@ func (h headeredEvents) Swap(i, j int) {
 }
 
 type backfiller struct {
-	FedClient *gomatrixserverlib.FederationClient
-	servers   map[gomatrixserverlib.ServerName]struct{}
+	FedClient    *gomatrixserverlib.FederationClient
+	servers      map[gomatrixserverlib.ServerName]struct{}
+	preferServer gomatrixserverlib.ServerName
 }
 
 func (b backfiller) StateIDsBeforeEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) ([]string, error) {
@@ -201,7 +225,7 @@ func (b backfiller) Backfill(ctx context.Context, origin, server gomatrixserverl
 func (b backfiller) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
 	servers := make([]gomatrixserverlib.ServerName, 0, len(b.servers)+1)
 	for v := range b.servers {
-		if v == "matrix.org" { // will be added to the front anyway
+		if v == b.preferServer { // will be added to the front anyway
 			continue
 		}
 		servers = append(servers, v)
@@ -210,8 +234,8 @@ func (b backfiller) ServersAtEvent(ctx context.Context, roomID, eventID string) 
 		servers[i], servers[j] = servers[j], servers[i]
 	})
 
-	// always prefer matrix.org
-	servers = append([]gomatrixserverlib.ServerName{"matrix.org"}, servers...)
+	// always prefer specified server
+	servers = append([]gomatrixserverlib.ServerName{b.preferServer}, servers...)
 
 	if len(servers) > 5 {
 		servers = servers[:5]
