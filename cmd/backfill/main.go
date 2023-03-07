@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -112,6 +113,7 @@ func main() {
 			continue
 		}
 		var createSeen bool
+		sort.Sort(headeredEvents(evs))
 		for _, x := range evs {
 			if _, ok := seenEvents[x.EventID()]; ok {
 				continue
@@ -147,6 +149,9 @@ func main() {
 			if _, ok := seenEvents[x.EventID()]; ok {
 				continue
 			}
+			if x.EventID() == beforeEvID {
+				continue
+			}
 			eventID = x.EventID()
 			break
 		}
@@ -160,6 +165,20 @@ func main() {
 		}
 		time.Sleep(time.Second) // don't hit remotes to hard
 	}
+}
+
+type headeredEvents []*gomatrixserverlib.HeaderedEvent
+
+func (h headeredEvents) Len() int {
+	return len(h)
+}
+
+func (h headeredEvents) Less(i, j int) bool {
+	return h[i].Depth() < h[j].Depth()
+}
+
+func (h headeredEvents) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
 }
 
 type backfiller struct {
