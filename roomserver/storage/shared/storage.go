@@ -1020,7 +1020,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 		}
 
-		d.Cache.InvalidateRoomServerEvent(redactedEvent.EventNID)
+		d.Cache.StoreRoomServerEvent(redactedEvent.EventNID, redactedEvent.Event)
 
 		return nil
 	})
