@@ -564,9 +564,10 @@ func (d *EventDatabase) events(
 				Event:    event,
 			})
 		}
-		if !redactionsArePermanent {
+		if redactionsArePermanent {
 			d.applyRedactions(results)
 		}
+		return results, nil
 	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
@@ -578,8 +579,9 @@ func (d *EventDatabase) events(
 	}
 
 	for _, eventJSON := range eventJSONs {
+		redacted := gjson.GetBytes(eventJSON.EventJSON, "unsigned.redacted_because").Exists()
 		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomInfo.RoomVersion,
+			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, redacted, roomInfo.RoomVersion,
 		)
 		if err != nil {
 			return nil, err
@@ -599,7 +601,7 @@ func (d *EventDatabase) events(
 			Event:    event,
 		})
 	}
-	if !redactionsArePermanent {
+	if redactionsArePermanent {
 		d.applyRedactions(results)
 	}
 	return results, nil
