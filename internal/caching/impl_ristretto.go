@@ -22,11 +22,12 @@ import (
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/dgraph-io/ristretto/z"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 const (
@@ -98,9 +99,10 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 		},
 		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{ // event NID -> event
 			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
-				cache:  cache,
-				Prefix: roomEventsCache,
-				MaxAge: maxAge,
+				cache:   cache,
+				Prefix:  roomEventsCache,
+				MaxAge:  maxAge,
+				Mutable: true,
 			},
 		},
 		RoomServerStateKeys: &RistrettoCachePartition[types.EventStateKeyNID, string]{ // event NID -> event state key

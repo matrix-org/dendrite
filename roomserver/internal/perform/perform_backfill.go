@@ -133,9 +133,6 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
-	if err != nil {
-		return err
-	}
 
 	for _, ev := range backfilledEventMap {
 		// now add state for these events
@@ -611,6 +608,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			logrus.WithError(err).Error("failed to get or create roomNID")
 			continue
 		}
+		roomNID = roomInfo.RoomNID
 
 		eventTypeNID, err := db.GetOrCreateEventTypeNID(ctx, ev.Type())
 		if err != nil {
