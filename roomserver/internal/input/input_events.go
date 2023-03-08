@@ -333,11 +333,9 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	if roomInfo == nil {
-		roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, event)
-		if err != nil {
-			return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
-		}
+	roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, event)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
 	}
 
 	eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, event.Type())
@@ -704,11 +702,9 @@ nextAuthEvent:
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
 		}
 
-		if roomInfo == nil {
-			roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, authEvent)
-			if err != nil {
-				return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
-			}
+		roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, authEvent)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
 		}
 
 		eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, authEvent.Type())
