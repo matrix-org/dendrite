@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - '**.go'                 # only execute on changes to go files
+      - 'go.sum'                # or dependency updates
       - '.github/workflows/**'  # or workflow changes
   pull_request:
     paths:
       - '**.go'
+      - 'go.sum'                # or dependency updates
       - '.github/workflows/**'
   release:
     types: [published]
