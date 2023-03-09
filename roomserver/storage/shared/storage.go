@@ -564,7 +564,7 @@ func (d *EventDatabase) events(
 				Event:    event,
 			})
 		}
-		if redactionsArePermanent {
+		if !redactionsArePermanent {
 			d.applyRedactions(results)
 		}
 		return results, nil
@@ -601,7 +601,7 @@ func (d *EventDatabase) events(
 			Event:    event,
 		})
 	}
-	if redactionsArePermanent {
+	if !redactionsArePermanent {
 		d.applyRedactions(results)
 	}
 	return results, nil
@@ -1022,6 +1022,8 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 		}
 
+		// We remove the entry from the cache, as if we just "StoreRoomServerEvent", we can't be
+		// certain that the cached entry actually is updated, since ristretto is eventual-persistent.
 		d.Cache.InvalidateRoomServerEvent(redactedEvent.EventNID)
 
 		return nil
