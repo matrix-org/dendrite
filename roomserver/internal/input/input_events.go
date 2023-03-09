@@ -360,6 +360,12 @@ func (r *Inputer) processRoomEvent(
 	// doesn't have any associated state to store and we don't need to
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
+		// if the event is an ACL, update our in-memory ACLs now, even if it is an outlier. This is
+		// going to happen on a restart of Dendrite anyway.
+		// ACL updates for non-outliers are handled in `ProduceRoomEvents`
+		if !isRejected && event.Type() == "m.room.server_acl" && event.StateKeyEquals("") {
+			r.ACLs.OnServerACLUpdate(event)
+		}
 		logger.WithField("rejected", isRejected).Debug("Stored outlier")
 		hooks.Run(hooks.KindNewEventPersisted, headered)
 		return nil
