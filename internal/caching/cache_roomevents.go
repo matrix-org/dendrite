@@ -10,6 +10,7 @@ import (
 type RoomServerEventsCache interface {
 	GetRoomServerEvent(eventNID types.EventNID) (*gomatrixserverlib.Event, bool)
 	StoreRoomServerEvent(eventNID types.EventNID, event *gomatrixserverlib.Event)
+	InvalidateRoomServerEvent(eventNID types.EventNID)
 }
 
 func (c Caches) GetRoomServerEvent(eventNID types.EventNID) (*gomatrixserverlib.Event, bool) {
@@ -18,4 +19,8 @@ func (c Caches) GetRoomServerEvent(eventNID types.EventNID) (*gomatrixserverlib.
 
 func (c Caches) StoreRoomServerEvent(eventNID types.EventNID, event *gomatrixserverlib.Event) {
 	c.RoomServerEvents.Set(int64(eventNID), event)
+}
+
+func (c Caches) InvalidateRoomServerEvent(eventNID types.EventNID) {
+	c.RoomServerEvents.Unset(int64(eventNID))
 }

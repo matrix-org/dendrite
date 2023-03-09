@@ -567,6 +567,7 @@ func (d *EventDatabase) events(
 		if !redactionsArePermanent {
 			d.applyRedactions(results)
 		}
+		return results, nil
 	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
@@ -578,8 +579,9 @@ func (d *EventDatabase) events(
 	}
 
 	for _, eventJSON := range eventJSONs {
+		redacted := gjson.GetBytes(eventJSON.EventJSON, "unsigned.redacted_because").Exists()
 		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomInfo.RoomVersion,
+			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, redacted, roomInfo.RoomVersion,
 		)
 		if err != nil {
 			return nil, err
@@ -1020,7 +1022,9 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 		}
 
-		d.Cache.StoreRoomServerEvent(redactedEvent.EventNID, redactedEvent.Event)
+		// We remove the entry from the cache, as if we just "StoreRoomServerEvent", we can't be
+		// certain that the cached entry actually is updated, since ristretto is eventual-persistent.
+		d.Cache.InvalidateRoomServerEvent(redactedEvent.EventNID)
 
 		return nil
 	})
