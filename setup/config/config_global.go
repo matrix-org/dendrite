@@ -319,10 +319,15 @@ type ReportStats struct {
 
 func (c *ReportStats) Defaults() {
 	c.Enabled = false
-	c.Endpoint = "https://matrix.org/report-usage-stats/push"
+	c.Endpoint = "https://panopticon.matrix.org/push"
 }
 
 func (c *ReportStats) Verify(configErrs *ConfigErrors) {
+	// We prefer to hit panopticon (https://github.com/matrix-org/panopticon) directly over
+	// the "old" matrix.org endpoint.
+	if c.Endpoint == "https://matrix.org/report-usage-stats/push" {
+		c.Endpoint = "https://panopticon.matrix.org/push"
+	}
 	if c.Enabled {
 		checkNotEmpty(configErrs, "global.report_stats.endpoint", c.Endpoint)
 	}
