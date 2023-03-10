@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -569,5 +570,40 @@ func TestRedaction(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestNewServerACLs(t *testing.T) {
+	alice := test.NewUser(t)
+	roomWithACL := test.NewRoom(t, alice)
+
+	roomWithACL.CreateAndInsert(t, alice, "m.room.server_acl", acls.ServerACL{
+		Allowed:         []string{"*"},
+		Denied:          []string{"localhost"},
+		AllowIPLiterals: false,
+	}, test.WithStateKey(""))
+
+	roomWithoutACL := test.NewRoom(t, alice)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, db, closeBase := mustCreateDatabase(t, dbType)
+		defer closeBase()
+
+		// start JetStream listeners
+		rsAPI := roomserver.NewInternalAPI(base)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		// let the RS create the events
+		err := api.SendEvents(context.Background(), rsAPI, api.KindNew, roomWithACL.Events(), "test", "test", "test", nil, false)
+		assert.NoError(t, err)
+		err = api.SendEvents(context.Background(), rsAPI, api.KindNew, roomWithoutACL.Events(), "test", "test", "test", nil, false)
+		assert.NoError(t, err)
+
+		// create new server ACLs and verify server is banned/not banned
+		serverACLs := acls.NewServerACLs(db)
+		banned := serverACLs.IsServerBannedFromRoom("localhost", roomWithACL.ID)
+		assert.Equal(t, true, banned)
+		banned = serverACLs.IsServerBannedFromRoom("localhost", roomWithoutACL.ID)
+		assert.Equal(t, false, banned)
 	})
 }

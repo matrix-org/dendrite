@@ -1154,7 +1154,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if roomInfo.IsStub() {
 		return nil, nil
 	}
-	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	eventTypeNIDMap, err := d.eventTypeNIDs(ctx, nil, []string{evType})
 	if err == sql.ErrNoRows {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
@@ -1162,7 +1162,8 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
+	eventTypeNID := eventTypeNIDMap[evType]
+	stateKeyNIDMap, err := d.eventStateKeyNIDs(ctx, nil, []string{stateKey})
 	if err == sql.ErrNoRows {
 		// No rooms have a state event with this state key, otherwise we'd have an state key NID
 		return nil, nil
@@ -1170,6 +1171,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
+	stateKeyNID := stateKeyNIDMap[stateKey]
 	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
