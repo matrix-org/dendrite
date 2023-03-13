@@ -1155,10 +1155,6 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, nil
 	}
 	eventTypeNIDMap, err := d.eventTypeNIDs(ctx, nil, []string{evType})
-	if err == sql.ErrNoRows {
-		// No rooms have an event of this type, otherwise we'd have an event type NID
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
