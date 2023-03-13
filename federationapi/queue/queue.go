@@ -21,18 +21,15 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
@@ -41,7 +38,6 @@ type OutgoingQueues struct {
 	db          storage.Database
 	process     *process.ProcessContext
 	disabled    bool
-	rsAPI       api.FederationRoomserverAPI
 	origin      gomatrixserverlib.ServerName
 	client      fedapi.FederationClient
 	statistics  *statistics.Statistics
@@ -88,7 +84,6 @@ func NewOutgoingQueues(
 	disabled bool,
 	origin gomatrixserverlib.ServerName,
 	client fedapi.FederationClient,
-	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
 	signing []*gomatrixserverlib.SigningIdentity,
 ) *OutgoingQueues {
@@ -96,7 +91,6 @@ func NewOutgoingQueues(
 		disabled:   disabled,
 		process:    process,
 		db:         db,
-		rsAPI:      rsAPI,
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
@@ -160,7 +154,6 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			queues:      oqs,
 			db:          oqs.db,
 			process:     oqs.process,
-			rsAPI:       oqs.rsAPI,
 			origin:      oqs.origin,
 			destination: destination,
 			client:      oqs.client,
@@ -209,18 +202,6 @@ func (oqs *OutgoingQueues) SendEvent(
 	delete(destmap, oqs.origin)
 	for local := range oqs.signing {
 		delete(destmap, local)
-	}
-
-	// Check if any of the destinations are prohibited by server ACLs.
-	for destination := range destmap {
-		if api.IsServerBannedFromRoom(
-			oqs.process.Context(),
-			oqs.rsAPI,
-			ev.RoomID(),
-			destination,
-		) {
-			delete(destmap, destination)
-		}
 	}
 
 	// If there are no remaining destinations then give up.
@@ -299,24 +280,6 @@ func (oqs *OutgoingQueues) SendEDU(
 	delete(destmap, oqs.origin)
 	for local := range oqs.signing {
 		delete(destmap, local)
-	}
-
-	// There is absolutely no guarantee that the EDU will have a room_id
-	// field, as it is not required by the spec. However, if it *does*
-	// (e.g. typing notifications) then we should try to make sure we don't
-	// bother sending them to servers that are prohibited by the server
-	// ACLs.
-	if result := gjson.GetBytes(e.Content, "room_id"); result.Exists() {
-		for destination := range destmap {
-			if api.IsServerBannedFromRoom(
-				oqs.process.Context(),
-				oqs.rsAPI,
-				result.Str,
-				destination,
-			) {
-				delete(destmap, destination)
-			}
-		}
 	}
 
 	// If there are no remaining destinations then give up.

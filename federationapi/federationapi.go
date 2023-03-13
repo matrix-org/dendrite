@@ -115,7 +115,7 @@ func NewInternalAPI(
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, rsAPI, &stats,
+		cfg.Matrix.ServerName, federation, &stats,
 		signingInfo,
 	)
 
