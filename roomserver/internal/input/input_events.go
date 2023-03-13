@@ -360,12 +360,6 @@ func (r *Inputer) processRoomEvent(
 	// doesn't have any associated state to store and we don't need to
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
-		// if the event is an ACL, update our in-memory ACLs now, even if it is an outlier. This is
-		// going to happen on a restart of Dendrite anyway.
-		// ACL updates for non-outliers are handled in `ProduceRoomEvents`
-		if !isRejected && event.Type() == "m.room.server_acl" && event.StateKeyEquals("") {
-			r.ACLs.OnServerACLUpdate(event)
-		}
 		logger.WithField("rejected", isRejected).Debug("Stored outlier")
 		hooks.Run(hooks.KindNewEventPersisted, headered)
 		return nil
@@ -555,6 +549,12 @@ func (r *Inputer) processStateBefore(
 			EventType: gomatrixserverlib.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
+		// We also query the m.room.server_acl, if any, so we can correctly set
+		// them after joining a room.
+		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
+			EventType: "m.room.server_acl",
+			StateKey:  "",
+		})
 		stateBeforeReq := &api.QueryStateAfterEventsRequest{
 			RoomID:       event.RoomID(),
 			PrevEventIDs: event.PrevEventIDs(),
@@ -582,15 +582,17 @@ func (r *Inputer) processStateBefore(
 	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
 		return
 	}
-	// Work out what the history visibility was at the time of the
+	// Work out what the history visibility/ACLs was at the time of the
 	// event.
 	for _, event := range stateBeforeEvent {
+		if event.Type() == "m.room.server_acl" && event.StateKeyEquals("") {
+			r.ACLs.OnServerACLUpdate(event)
+		}
 		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
 			continue
 		}
 		if hisVis, err := event.HistoryVisibility(); err == nil {
 			historyVisibility = hisVis
-			break
 		}
 	}
 	return
