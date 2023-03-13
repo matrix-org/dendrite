@@ -27,6 +27,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const MRoomServerACL = "m.room.server_acl"
+
 type ServerACLDatabase interface {
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
@@ -55,7 +57,7 @@ func NewServerACLs(db ServerACLDatabase) *ServerACLs {
 	// do then we'll process it into memory so that we have the regexes to
 	// hand.
 	for _, room := range rooms {
-		state, err := db.GetStateEvent(ctx, room, "m.room.server_acl", "")
+		state, err := db.GetStateEvent(ctx, room, MRoomServerACL, "")
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get server ACLs for room %q", room)
 			continue

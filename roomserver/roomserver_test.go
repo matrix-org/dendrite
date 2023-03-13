@@ -577,7 +577,7 @@ func TestNewServerACLs(t *testing.T) {
 	alice := test.NewUser(t)
 	roomWithACL := test.NewRoom(t, alice)
 
-	roomWithACL.CreateAndInsert(t, alice, "m.room.server_acl", acls.ServerACL{
+	roomWithACL.CreateAndInsert(t, alice, acls.MRoomServerACL, acls.ServerACL{
 		Allowed:         []string{"*"},
 		Denied:          []string{"localhost"},
 		AllowIPLiterals: false,

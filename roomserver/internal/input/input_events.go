@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -552,7 +553,7 @@ func (r *Inputer) processStateBefore(
 		// We also query the m.room.server_acl, if any, so we can correctly set
 		// them after joining a room.
 		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
-			EventType: "m.room.server_acl",
+			EventType: acls.MRoomServerACL,
 			StateKey:  "",
 		})
 		stateBeforeReq := &api.QueryStateAfterEventsRequest{
@@ -585,7 +586,7 @@ func (r *Inputer) processStateBefore(
 	// Work out what the history visibility/ACLs was at the time of the
 	// event.
 	for _, event := range stateBeforeEvent {
-		if event.Type() == "m.room.server_acl" && event.StateKeyEquals("") {
+		if input.Kind == api.KindNew && event.Type() == acls.MRoomServerACL && event.StateKeyEquals("") {
 			r.ACLs.OnServerACLUpdate(event)
 		}
 		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
