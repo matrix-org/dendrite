@@ -11,6 +11,7 @@
 - The Helm chart now has the ability to deploy a Grafana chart as well (contributed by [genofire](https://github.com/genofire))
 - Support for listening on unix sockets has been added (contributed by [cyberb](https://github.com/cyberb))
 - The internal NATS server was updated to v2.9.15
+- Initial support for `runtime/trace` has been added, to further track down long-running tasks
 
 ### Fixes
 
@@ -18,7 +19,6 @@
 - An issue where device keys could be removed if a device ID is reused has been fixed
 - A possible DoS issue related to relations has been fixed (reported by [sleroq](https://github.com/sleroq))
 - When backfilling events, errors are now ignored if we still could fetch events
-- `m.room.server_acl` events are now correctly handled when joining federated rooms (reported by [sleroq](https://github.com/sleroq))
 
 ### Other
 
