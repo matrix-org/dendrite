@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
 )
 
@@ -51,7 +50,6 @@ type destinationQueue struct {
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
-	rsAPI              api.FederationRoomserverAPI
 	client             fedapi.FederationClient         // federation client
 	origin             gomatrixserverlib.ServerName    // origin of requests
 	destination        gomatrixserverlib.ServerName    // destination of requests
