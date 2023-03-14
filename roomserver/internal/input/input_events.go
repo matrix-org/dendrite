@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
@@ -449,6 +449,26 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// If this is a membership event, it is possible we newly joined a federated room and eventually
+	// missed to update our m.room.server_acl - the following ensures we set the ACLs
+	// TODO: This probably performs badly in benchmarks
+	if event.Type() == gomatrixserverlib.MRoomMember {
+		membership, _ := event.Membership()
+		if membership == gomatrixserverlib.Join {
+			_, serverName, _ := gomatrixserverlib.SplitID('@', *event.StateKey())
+			// only handle local membership events
+			if r.Cfg.Matrix.IsLocalServerName(serverName) {
+				ev, err := r.DB.GetStateEvent(ctx, event.RoomID(), acls.MRoomServerACL, "")
+				if err != nil {
+					logrus.WithError(err).Error("failed to get server ACLs")
+				}
+				if ev != nil {
+					r.ACLs.OnServerACLUpdate(ev.Event)
+				}
+			}
+		}
+	}
+
 	// Handle remote room upgrades, e.g. remove published room
 	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
 		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
@@ -549,12 +569,6 @@ func (r *Inputer) processStateBefore(
 			EventType: gomatrixserverlib.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
-		// We also query the m.room.server_acl, if any, so we can correctly set
-		// them after joining a room.
-		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
-			EventType: acls.MRoomServerACL,
-			StateKey:  "",
-		})
 		stateBeforeReq := &api.QueryStateAfterEventsRequest{
 			RoomID:       event.RoomID(),
 			PrevEventIDs: event.PrevEventIDs(),
@@ -582,17 +596,15 @@ func (r *Inputer) processStateBefore(
 	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
 		return
 	}
-	// Work out what the history visibility/ACLs was at the time of the
+	// Work out what the history visibility was at the time of the
 	// event.
 	for _, event := range stateBeforeEvent {
-		if input.Kind == api.KindNew && event.Type() == acls.MRoomServerACL && event.StateKeyEquals("") {
-			r.ACLs.OnServerACLUpdate(event)
-		}
 		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
 			continue
 		}
 		if hisVis, err := event.HistoryVisibility(); err == nil {
 			historyVisibility = hisVis
+			break
 		}
 	}
 	return
