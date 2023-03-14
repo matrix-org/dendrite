@@ -86,7 +86,7 @@ that you chose.
 
 ### Global connection pool
 
-If you  want to use a single connection pool to a single PostgreSQL database, then you must
+If you want to use a single connection pool to a single PostgreSQL database, then you must
 uncomment and configure the `database` section within the `global` section:
 
 ```yaml
