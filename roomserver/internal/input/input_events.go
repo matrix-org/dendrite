@@ -458,12 +458,13 @@ func (r *Inputer) processRoomEvent(
 			_, serverName, _ := gomatrixserverlib.SplitID('@', *event.StateKey())
 			// only handle local membership events
 			if r.Cfg.Matrix.IsLocalServerName(serverName) {
-				ev, err := r.DB.GetStateEvent(ctx, event.RoomID(), acls.MRoomServerACL, "")
+				var aclEvent *gomatrixserverlib.HeaderedEvent
+				aclEvent, err = r.DB.GetStateEvent(ctx, event.RoomID(), acls.MRoomServerACL, "")
 				if err != nil {
 					logrus.WithError(err).Error("failed to get server ACLs")
 				}
-				if ev != nil {
-					r.ACLs.OnServerACLUpdate(ev.Event)
+				if aclEvent != nil {
+					r.ACLs.OnServerACLUpdate(aclEvent.Event)
 				}
 			}
 		}
