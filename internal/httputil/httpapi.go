@@ -25,8 +25,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -34,6 +32,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -186,9 +185,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			}
 		}
 
-		span := opentracing.StartSpan(metricsName)
-		defer span.Finish()
-		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
+		trace, ctx := internal.StartTask(req.Context(), metricsName)
+		defer trace.EndTask()
+		req = req.WithContext(ctx)
 		h.ServeHTTP(nextWriter, req)
 
 	}
@@ -200,9 +199,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 // This is used to serve HTML alongside JSON error messages
 func MakeHTMLAPI(metricsName string, enableMetrics bool, f func(http.ResponseWriter, *http.Request)) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		span := opentracing.StartSpan(metricsName)
-		defer span.Finish()
-		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
+		trace, ctx := internal.StartTask(req.Context(), metricsName)
+		defer trace.EndTask()
+		req = req.WithContext(ctx)
 		f(w, req)
 	}
 
@@ -220,57 +219,6 @@ func MakeHTMLAPI(metricsName string, enableMetrics bool, f func(http.ResponseWri
 			[]string{"code"},
 		),
 		http.HandlerFunc(withSpan),
-	)
-}
-
-// MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.
-// This is used for APIs that are internal to dendrite.
-// If we are passed a tracing context in the request headers then we use that
-// as the parent of any tracing spans we create.
-func MakeInternalAPI(metricsName string, enableMetrics bool, f func(*http.Request) util.JSONResponse) http.Handler {
-	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
-	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		carrier := opentracing.HTTPHeadersCarrier(req.Header)
-		tracer := opentracing.GlobalTracer()
-		clientContext, err := tracer.Extract(opentracing.HTTPHeaders, carrier)
-		var span opentracing.Span
-		if err == nil {
-			// Default to a span without RPC context.
-			span = tracer.StartSpan(metricsName)
-		} else {
-			// Set the RPC context.
-			span = tracer.StartSpan(metricsName, ext.RPCServerOption(clientContext))
-		}
-		defer span.Finish()
-		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		h.ServeHTTP(w, req)
-	}
-
-	if !enableMetrics {
-		return http.HandlerFunc(withSpan)
-	}
-
-	return promhttp.InstrumentHandlerCounter(
-		promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name:      metricsName + "_requests_total",
-				Help:      "Total number of internal API calls",
-				Namespace: "dendrite",
-			},
-			[]string{"code"},
-		),
-		promhttp.InstrumentHandlerResponseSize(
-			promauto.NewHistogramVec(
-				prometheus.HistogramOpts{
-					Namespace: "dendrite",
-					Name:      metricsName + "_response_size_bytes",
-					Help:      "A histogram of response sizes for requests.",
-					Buckets:   []float64{200, 500, 900, 1500, 5000, 15000, 50000, 100000},
-				},
-				[]string{},
-			),
-			http.HandlerFunc(withSpan),
-		),
 	)
 }
 

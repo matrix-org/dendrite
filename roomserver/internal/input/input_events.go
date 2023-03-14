@@ -29,7 +29,6 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
@@ -86,10 +85,10 @@ func (r *Inputer) processRoomEvent(
 	default:
 	}
 
-	span, ctx := opentracing.StartSpanFromContext(ctx, "processRoomEvent")
-	span.SetTag("room_id", input.Event.RoomID())
-	span.SetTag("event_id", input.Event.EventID())
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "processRoomEvent")
+	trace.SetTag("room_id", input.Event.RoomID())
+	trace.SetTag("event_id", input.Event.EventID())
+	defer trace.EndRegion()
 
 	// Measure how long it takes to process this event.
 	started := time.Now()
@@ -617,8 +616,8 @@ func (r *Inputer) fetchAuthEvents(
 	known map[string]*types.Event,
 	servers []gomatrixserverlib.ServerName,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "fetchAuthEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "fetchAuthEvents")
+	defer trace.EndRegion()
 
 	unknown := map[string]struct{}{}
 	authEventIDs := event.AuthEventIDs()
@@ -762,8 +761,8 @@ func (r *Inputer) calculateAndSetState(
 	event *gomatrixserverlib.Event,
 	isRejected bool,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "calculateAndSetState")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "calculateAndSetState")
+	defer trace.EndRegion()
 
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
