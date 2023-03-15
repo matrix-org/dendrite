@@ -1,6 +1,6 @@
 steps:
   - name: gcr.io/cloud-builders/docker
-    args: ['build', '--build-arg', 'BUILDPLATFORM=linux/amd64', '-t', 'gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA', '-f', 'Dockerfile', '.']
+    args: ['build', '--build-arg', 'BUILDPLATFORM=${_BUILD_PLATFORM}', '-t', 'gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA', '-f', 'Dockerfile', '.']
   - name: gcr.io/cloud-builders/kubectl
     args: ['-n', 'dendrite', 'set', 'image', 'deployment/dendrite', 'dendrite=gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA']
     env:
