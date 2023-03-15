@@ -11,7 +11,7 @@ Type=simple
 User=dendrite
 Group=dendrite
 WorkingDirectory=/opt/dendrite/
-ExecStart=/opt/dendrite/bin/dendrite-monolith-server
+ExecStart=/opt/dendrite/bin/dendrite
 Restart=always
 LimitNOFILE=65535
 

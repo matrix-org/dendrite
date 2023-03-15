@@ -58,6 +58,7 @@ dendrite.yaml
 
 # Database files
 *.db
+*.db-journal
 
 # Log files
 *.log*

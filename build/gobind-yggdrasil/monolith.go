@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -127,8 +126,8 @@ func (m *DendriteMonolith) Start() {
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
+		Generate:       true,
+		SingleDatabase: true,
 	})
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
@@ -149,7 +148,8 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := base.NewBaseDendrite(cfg, "Monolith")
+	base := base.NewBaseDendrite(cfg)
+	base.ConfigureAdminEndpoints()
 	m.processContext = base.ProcessContext
 	defer base.Close() // nolint: errcheck
 
@@ -164,9 +164,7 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
-	keyAPI.SetUserAPI(userAPI)
+	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
@@ -185,7 +183,6 @@ func (m *DendriteMonolith) Start() {
 		FederationAPI: fsAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
-		KeyAPI:        keyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),
@@ -193,9 +190,10 @@ func (m *DendriteMonolith) Start() {
 	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 
 	yggRouter := mux.NewRouter()
 	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)

@@ -21,30 +21,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
-	"github.com/matrix-org/dendrite/appservice/inthttp"
 	"github.com/matrix-org/dendrite/appservice/query"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
-
-// AddInternalRoutes registers HTTP handlers for internal API calls
-func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI) {
-	inthttp.AddRoutes(queryAPI, router)
-}
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
 	client := &http.Client{

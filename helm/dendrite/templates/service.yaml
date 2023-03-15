@@ -1,0 +1,17 @@
+{{ template "validate.config" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ include "dendrite.fullname" . }}
+  labels:
+    {{- include "dendrite.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "dendrite.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.service.port }}
+      targetPort: 8008

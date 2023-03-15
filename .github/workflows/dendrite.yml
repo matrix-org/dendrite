@@ -4,7 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '**.go'                 # only execute on changes to go files
+      - 'go.sum'                # or dependency updates
+      - '.github/workflows/**'  # or workflow changes
   pull_request:
+    paths:
+      - '**.go'
+      - 'go.sum'                # or dependency updates
+      - '.github/workflows/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -25,7 +33,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: "stable"
           cache: true
 
       - name: Install Node
@@ -62,14 +70,14 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: "stable"
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
 
   # run go test with go 1.19
   test:
-    timeout-minutes: 5
-    name: Unit tests (Go ${{ matrix.go }})
+    timeout-minutes: 10
+    name: Unit tests
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
     services:
@@ -91,17 +99,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    strategy:
-      fail-fast: false
-      matrix:
-        go: ["1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
-          cache: true
+          go-version: "stable"
+      - uses: actions/cache@v3
+        # manually set up caches, as they otherwise clash with different steps using setup-go with cache=true
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-stable-unit-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-stable-unit-
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
         with:
@@ -122,7 +134,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.19"]
         goos: ["linux"]
         goarch: ["amd64"]
     steps:
@@ -130,15 +141,15 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
+          go-version: "stable"
       - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-stable-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-
+            key: ${{ runner.os }}-go-stable-${{ matrix.goos }}-${{ matrix.goarch }}-
       - name: Install dependencies x86
         if: ${{ matrix.goarch == '386' }}
         run: sudo apt update && sudo apt-get install -y gcc-multilib
@@ -156,23 +167,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.18", "1.19"]
         goos: ["windows"]
         goarch: ["amd64"]
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Go ${{ matrix.go }}
+      - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
+          go-version: "stable"
       - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-stable-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-
+            key: ${{ runner.os }}-go-stable-${{ matrix.goos }}-${{ matrix.goarch }}-
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
       - env:
@@ -194,6 +204,63 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
+  # run go test with different go versions
+  integration:
+    timeout-minutes: 20
+    needs: initial-tests-done
+    name: Integration tests
+    runs-on: ubuntu-latest
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:13-alpine
+        # Provide the password for postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dendrite
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "stable"
+      - name: Set up gotestfmt
+        uses: gotesttools/gotestfmt-action@v2
+        with:
+          # Optional: pass GITHUB_TOKEN to avoid rate limiting.
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-stable-test-race-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-stable-test-race-
+      - run: go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dendrite
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: unittests
+          fail_ci_if_error: false
+
   # run database upgrade tests
   upgrade_test:
     name: Upgrade tests
@@ -205,7 +272,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.18"
+          go-version: "stable"
           cache: true
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
@@ -223,7 +290,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.18"
+          go-version: "stable"
           cache: true
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
@@ -243,18 +310,14 @@ jobs:
           - label: PostgreSQL
             postgres: postgres
 
-          - label: PostgreSQL, full HTTP APIs
-            postgres: postgres
-            api: full-http
     container:
-      image: matrixdotorg/sytest-dendrite:latest
+      image: matrixdotorg/sytest-dendrite
       volumes:
         - ${{ github.workspace }}:/src
         - /root/.cache/go-build:/github/home/.cache/go-build
         - /root/.cache/go-mod:/gopath/pkg/mod
       env:
         POSTGRES: ${{ matrix.postgres && 1}}
-        API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
         CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
@@ -302,11 +365,6 @@ jobs:
           - label: PostgreSQL
             postgres: Postgres
             cgo: 0
-
-          - label: PostgreSQL, full HTTP APIs
-            postgres: Postgres
-            api: full-http
-            cgo: 0
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
       # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
@@ -349,7 +407,7 @@ jobs:
             (wget -O - "https://github.com/globekeeper/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
       # Build initial Dendrite image
-      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
         env:
           DOCKER_BUILDKIT: 1
@@ -361,8 +419,8 @@ jobs:
         shell: bash
         name: Run Complement Tests
         env:
-          COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }}
-          API: ${{ matrix.api && 1 }}
+          COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.cgo }}
+          COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_DENDRITE_
         working-directory: complement
 
   integration-tests-done:
@@ -372,6 +430,7 @@ jobs:
         initial-tests-done,
         sytest,
         complement,
+        integration
       ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped

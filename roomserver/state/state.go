@@ -25,9 +25,9 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -41,8 +41,8 @@ type StateResolutionStorage interface {
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	Events(ctx context.Context, eventNIDs []types.EventNID) ([]types.Event, error)
-	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
+	Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error)
+	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 }
 
 type StateResolution struct {
@@ -59,14 +59,55 @@ func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) Sta
 	}
 }
 
+type PowerLevelResolver interface {
+	Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error)
+}
+
+func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
+	stateEntries, err := p.LoadStateAtEvent(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	wantTuple := types.StateKeyTuple{
+		EventTypeNID:     types.MRoomPowerLevelsNID,
+		EventStateKeyNID: types.EmptyStateKeyNID,
+	}
+
+	var plNID types.EventNID
+	for _, entry := range stateEntries {
+		if entry.StateKeyTuple == wantTuple {
+			plNID = entry.EventNID
+			break
+		}
+	}
+	if plNID == 0 {
+		return nil, fmt.Errorf("unable to find power level event")
+	}
+
+	events, err := p.db.Events(ctx, p.roomInfo, []types.EventNID{plNID})
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, fmt.Errorf("unable to find power level event")
+	}
+	powerlevels, err := events[0].PowerLevels()
+	if err != nil {
+		return nil, err
+	}
+
+	return powerlevels, nil
+}
+
 // LoadStateAtSnapshot loads the full state of a room at a particular snapshot.
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
 func (v *StateResolution) LoadStateAtSnapshot(
 	ctx context.Context, stateNID types.StateSnapshotNID,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadStateAtSnapshot")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtSnapshot")
+	defer trace.EndRegion()
 
 	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
 	if err != nil {
@@ -106,8 +147,8 @@ func (v *StateResolution) LoadStateAtSnapshot(
 func (v *StateResolution) LoadStateAtEvent(
 	ctx context.Context, eventID string,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadStateAtEvent")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtEvent")
+	defer trace.EndRegion()
 
 	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
@@ -128,8 +169,8 @@ func (v *StateResolution) LoadStateAtEvent(
 func (v *StateResolution) LoadMembershipAtEvent(
 	ctx context.Context, eventIDs []string, stateKeyNID types.EventStateKeyNID,
 ) (map[string][]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadMembershipAtEvent")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadMembershipAtEvent")
+	defer trace.EndRegion()
 
 	// Get a mapping from snapshotNID -> eventIDs
 	snapshotNIDMap, err := v.db.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
@@ -197,8 +238,8 @@ func (v *StateResolution) LoadMembershipAtEvent(
 func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
 	ctx context.Context, eventID string,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadStateAtEvent")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtEventForHistoryVisibility")
+	defer trace.EndRegion()
 
 	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
@@ -222,8 +263,8 @@ func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
 func (v *StateResolution) LoadCombinedStateAfterEvents(
 	ctx context.Context, prevStates []types.StateAtEvent,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadCombinedStateAfterEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadCombinedStateAfterEvents")
+	defer trace.EndRegion()
 
 	stateNIDs := make([]types.StateSnapshotNID, len(prevStates))
 	for i, state := range prevStates {
@@ -297,8 +338,8 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 func (v *StateResolution) DifferenceBetweeenStateSnapshots(
 	ctx context.Context, oldStateNID, newStateNID types.StateSnapshotNID,
 ) (removed, added []types.StateEntry, err error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.DifferenceBetweeenStateSnapshots")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.DifferenceBetweeenStateSnapshots")
+	defer trace.EndRegion()
 
 	if oldStateNID == newStateNID {
 		// If the snapshot NIDs are the same then nothing has changed
@@ -361,8 +402,8 @@ func (v *StateResolution) LoadStateAtSnapshotForStringTuples(
 	stateNID types.StateSnapshotNID,
 	stateKeyTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadStateAtSnapshotForStringTuples")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtSnapshotForStringTuples")
+	defer trace.EndRegion()
 
 	numericTuples, err := v.stringTuplesToNumericTuples(ctx, stateKeyTuples)
 	if err != nil {
@@ -378,8 +419,8 @@ func (v *StateResolution) stringTuplesToNumericTuples(
 	ctx context.Context,
 	stringTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateKeyTuple, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.stringTuplesToNumericTuples")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.stringTuplesToNumericTuples")
+	defer trace.EndRegion()
 
 	eventTypes := make([]string, len(stringTuples))
 	stateKeys := make([]string, len(stringTuples))
@@ -423,8 +464,8 @@ func (v *StateResolution) loadStateAtSnapshotForNumericTuples(
 	stateNID types.StateSnapshotNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.loadStateAtSnapshotForNumericTuples")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateAtSnapshotForNumericTuples")
+	defer trace.EndRegion()
 
 	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
 	if err != nil {
@@ -474,8 +515,8 @@ func (v *StateResolution) LoadStateAfterEventsForStringTuples(
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadStateAfterEventsForStringTuples")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAfterEventsForStringTuples")
+	defer trace.EndRegion()
 
 	numericTuples, err := v.stringTuplesToNumericTuples(ctx, stateKeyTuples)
 	if err != nil {
@@ -489,8 +530,8 @@ func (v *StateResolution) loadStateAfterEventsForNumericTuples(
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.loadStateAfterEventsForNumericTuples")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateAfterEventsForNumericTuples")
+	defer trace.EndRegion()
 
 	if len(prevStates) == 1 {
 		// Fast path for a single event.
@@ -664,8 +705,8 @@ func (v *StateResolution) CalculateAndStoreStateBeforeEvent(
 	event *gomatrixserverlib.Event,
 	isRejected bool,
 ) (types.StateSnapshotNID, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.CalculateAndStoreStateBeforeEvent")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.CalculateAndStoreStateBeforeEvent")
+	defer trace.EndRegion()
 
 	// Load the state at the prev events.
 	prevStates, err := v.db.StateAtEventIDs(ctx, event.PrevEventIDs())
@@ -683,8 +724,8 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 	ctx context.Context,
 	prevStates []types.StateAtEvent,
 ) (types.StateSnapshotNID, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.CalculateAndStoreStateAfterEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.CalculateAndStoreStateAfterEvents")
+	defer trace.EndRegion()
 
 	metrics := calculateStateMetrics{startTime: time.Now(), prevEventLength: len(prevStates)}
 
@@ -758,8 +799,8 @@ func (v *StateResolution) calculateAndStoreStateAfterManyEvents(
 	prevStates []types.StateAtEvent,
 	metrics calculateStateMetrics,
 ) (types.StateSnapshotNID, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.calculateAndStoreStateAfterManyEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.calculateAndStoreStateAfterManyEvents")
+	defer trace.EndRegion()
 
 	state, algorithm, conflictLength, err :=
 		v.calculateStateAfterManyEvents(ctx, v.roomInfo.RoomVersion, prevStates)
@@ -779,8 +820,8 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 	ctx context.Context, roomVersion gomatrixserverlib.RoomVersion,
 	prevStates []types.StateAtEvent,
 ) (state []types.StateEntry, algorithm string, conflictLength int, err error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.calculateStateAfterManyEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.calculateStateAfterManyEvents")
+	defer trace.EndRegion()
 
 	var combined []types.StateEntry
 	// Conflict resolution.
@@ -834,8 +875,8 @@ func (v *StateResolution) resolveConflicts(
 	ctx context.Context, version gomatrixserverlib.RoomVersion,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.resolveConflicts")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflicts")
+	defer trace.EndRegion()
 
 	stateResAlgo, err := version.StateResAlgorithm()
 	if err != nil {
@@ -861,8 +902,8 @@ func (v *StateResolution) resolveConflictsV1(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.resolveConflictsV1")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflictsV1")
+	defer trace.EndRegion()
 
 	// Load the conflicted events
 	conflictedEvents, eventIDMap, err := v.loadStateEvents(ctx, conflicted)
@@ -926,8 +967,8 @@ func (v *StateResolution) resolveConflictsV2(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.resolveConflictsV2")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflictsV2")
+	defer trace.EndRegion()
 
 	estimate := len(conflicted) + len(notConflicted)
 	eventIDMap := make(map[string]types.StateEntry, estimate)
@@ -959,8 +1000,8 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// For each conflicted event, let's try and get the needed auth events.
 	if err = func() error {
-		span, sctx := opentracing.StartSpanFromContext(ctx, "StateResolution.loadAuthEvents")
-		defer span.Finish()
+		loadAuthEventsTrace, sctx := internal.StartRegion(ctx, "StateResolution.loadAuthEvents")
+		defer loadAuthEventsTrace.EndRegion()
 
 		loader := authEventLoader{
 			v:              v,
@@ -975,7 +1016,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 			// Store the newly found auth events in the auth set for this event.
 			var authEventMap map[string]types.StateEntry
-			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, conflictedEvent, knownAuthEvents)
+			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, v.roomInfo, conflictedEvent, knownAuthEvents)
 			if err != nil {
 				return err
 			}
@@ -1004,8 +1045,8 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// Resolve the conflicts.
 	resolvedEvents := func() []*gomatrixserverlib.Event {
-		span, _ := opentracing.StartSpanFromContext(ctx, "gomatrixserverlib.ResolveStateConflictsV2")
-		defer span.Finish()
+		resolvedTrace, _ := internal.StartRegion(ctx, "StateResolution.ResolveStateConflictsV2")
+		defer resolvedTrace.EndRegion()
 
 		return gomatrixserverlib.ResolveStateConflictsV2(
 			conflictedEvents,
@@ -1077,8 +1118,8 @@ func (v *StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.E
 func (v *StateResolution) loadStateEvents(
 	ctx context.Context, entries []types.StateEntry,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.loadStateEvents")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateEvents")
+	defer trace.EndRegion()
 
 	result := make([]*gomatrixserverlib.Event, 0, len(entries))
 	eventEntries := make([]types.StateEntry, 0, len(entries))
@@ -1091,7 +1132,7 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	events, err := v.db.Events(ctx, eventNIDs)
+	events, err := v.db.Events(ctx, v.roomInfo, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1120,7 +1161,7 @@ type authEventLoader struct {
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
 func (l *authEventLoader) loadAuthEvents(
-	ctx context.Context, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
+	ctx context.Context, roomInfo *types.RoomInfo, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()
@@ -1155,7 +1196,7 @@ func (l *authEventLoader) loadAuthEvents(
 		// If we need to get events from the database, go and fetch
 		// those now.
 		if len(l.lookupFromDB) > 0 {
-			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, l.lookupFromDB)
+			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, roomInfo, l.lookupFromDB)
 			if err != nil {
 				return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 			}

@@ -197,24 +197,35 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
+	purge, err := PreparePurgeStatements(db, stateSnapshot)
+	if err != nil {
+		return err
+	}
+
 	d.Database = shared.Database{
-		DB:                  db,
-		Cache:               cache,
-		Writer:              writer,
-		EventsTable:         events,
-		EventTypesTable:     eventTypes,
-		EventStateKeysTable: eventStateKeys,
-		EventJSONTable:      eventJSON,
-		RoomsTable:          rooms,
-		StateBlockTable:     stateBlock,
-		StateSnapshotTable:  stateSnapshot,
-		PrevEventsTable:     prevEvents,
-		RoomAliasesTable:    roomAliases,
-		InvitesTable:        invites,
-		MembershipTable:     membership,
-		PublishedTable:      published,
-		RedactionsTable:     redactions,
-		GetRoomUpdaterFn:    d.GetRoomUpdater,
+		DB: db,
+		EventDatabase: shared.EventDatabase{
+			DB:                  db,
+			Cache:               cache,
+			Writer:              writer,
+			EventsTable:         events,
+			EventTypesTable:     eventTypes,
+			EventStateKeysTable: eventStateKeys,
+			EventJSONTable:      eventJSON,
+			PrevEventsTable:     prevEvents,
+			RedactionsTable:     redactions,
+		},
+		Cache:              cache,
+		Writer:             writer,
+		RoomsTable:         rooms,
+		StateBlockTable:    stateBlock,
+		StateSnapshotTable: stateSnapshot,
+		RoomAliasesTable:   roomAliases,
+		InvitesTable:       invites,
+		MembershipTable:    membership,
+		PublishedTable:     published,
+		GetRoomUpdaterFn:   d.GetRoomUpdater,
+		Purge:              purge,
 	}
 	return nil
 }

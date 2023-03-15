@@ -38,7 +38,6 @@ type Global struct {
 	// component does not specify any database options of its own, then this pool of
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
-	// In a polylith deployment, this will be ignored.
 	DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
 
 	// The server name to delegate server-server communications to, with optional port
@@ -93,7 +92,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 		}
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-	if opts.Monolithic {
+	if opts.SingleDatabase {
 		c.DatabaseOptions.Defaults(90)
 	}
 	c.JetStream.Defaults(opts)
@@ -105,7 +104,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.Cache.Defaults()
 }
 
-func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *Global) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
@@ -113,13 +112,13 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		v.Verify(configErrs)
 	}
 
-	c.JetStream.Verify(configErrs, isMonolith)
-	c.Metrics.Verify(configErrs, isMonolith)
-	c.Sentry.Verify(configErrs, isMonolith)
-	c.DNSCache.Verify(configErrs, isMonolith)
-	c.ServerNotices.Verify(configErrs, isMonolith)
-	c.ReportStats.Verify(configErrs, isMonolith)
-	c.Cache.Verify(configErrs, isMonolith)
+	c.JetStream.Verify(configErrs)
+	c.Metrics.Verify(configErrs)
+	c.Sentry.Verify(configErrs)
+	c.DNSCache.Verify(configErrs)
+	c.ServerNotices.Verify(configErrs)
+	c.ReportStats.Verify(configErrs)
+	c.Cache.Verify(configErrs)
 }
 
 func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool {
@@ -174,7 +173,7 @@ func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*g
 			return id, nil
 		}
 	}
-	return nil, fmt.Errorf("no signing identity %q", serverName)
+	return nil, fmt.Errorf("no signing identity for %q", serverName)
 }
 
 func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
@@ -267,7 +266,7 @@ func (c *Metrics) Defaults(opts DefaultOpts) {
 	}
 }
 
-func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *Metrics) Verify(configErrs *ConfigErrors) {
 }
 
 // ServerNotices defines the configuration used for sending server notices
@@ -293,7 +292,7 @@ func (c *ServerNotices) Defaults(opts DefaultOpts) {
 	}
 }
 
-func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
+func (c *ServerNotices) Verify(errors *ConfigErrors) {}
 
 type Cache struct {
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
@@ -305,7 +304,7 @@ func (c *Cache) Defaults() {
 	c.MaxAge = time.Hour
 }
 
-func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
+func (c *Cache) Verify(errors *ConfigErrors) {
 	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
 }
 
@@ -320,10 +319,15 @@ type ReportStats struct {
 
 func (c *ReportStats) Defaults() {
 	c.Enabled = false
-	c.Endpoint = "https://matrix.org/report-usage-stats/push"
+	c.Endpoint = "https://panopticon.matrix.org/push"
 }
 
-func (c *ReportStats) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *ReportStats) Verify(configErrs *ConfigErrors) {
+	// We prefer to hit panopticon (https://github.com/matrix-org/panopticon) directly over
+	// the "old" matrix.org endpoint.
+	if c.Endpoint == "https://matrix.org/report-usage-stats/push" {
+		c.Endpoint = "https://panopticon.matrix.org/push"
+	}
 	if c.Enabled {
 		checkNotEmpty(configErrs, "global.report_stats.endpoint", c.Endpoint)
 	}
@@ -344,7 +348,7 @@ func (c *Sentry) Defaults() {
 	c.Enabled = false
 }
 
-func (c *Sentry) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *Sentry) Verify(configErrs *ConfigErrors) {
 }
 
 type DatabaseOptions struct {
@@ -364,8 +368,7 @@ func (c *DatabaseOptions) Defaults(conns int) {
 	c.ConnMaxLifetimeSeconds = -1
 }
 
-func (c *DatabaseOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
-}
+func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {}
 
 // MaxIdleConns returns maximum idle connections to the DB
 func (c DatabaseOptions) MaxIdleConns() int {
@@ -397,7 +400,7 @@ func (c *DNSCacheOptions) Defaults() {
 	c.CacheLifetime = time.Minute * 5
 }
 
-func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors) {
 	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
 	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }

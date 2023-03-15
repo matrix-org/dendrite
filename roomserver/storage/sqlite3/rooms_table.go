@@ -74,10 +74,14 @@ const bulkSelectRoomIDsSQL = "" +
 const bulkSelectRoomNIDsSQL = "" +
 	"SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
 
+const selectRoomNIDForUpdateSQL = "" +
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
+
 type roomStatements struct {
 	db                                 *sql.DB
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
+	selectRoomNIDForUpdateStmt         *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
@@ -105,6 +109,7 @@ func PrepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		//{&s.selectRoomVersionForRoomNIDsStmt, selectRoomVersionForRoomNIDsSQL},
 		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
 		{&s.selectRoomIDsStmt, selectRoomIDsSQL},
+		{&s.selectRoomNIDForUpdateStmt, selectRoomNIDForUpdateSQL},
 	}.Prepare(db)
 }
 
@@ -165,6 +170,15 @@ func (s *roomStatements) SelectRoomNID(
 ) (types.RoomNID, error) {
 	var roomNID int64
 	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	return types.RoomNID(roomNID), err
+}
+
+func (s *roomStatements) SelectRoomNIDForUpdate(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (types.RoomNID, error) {
+	var roomNID int64
+	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDForUpdateStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }

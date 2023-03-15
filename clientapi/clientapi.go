@@ -15,18 +15,18 @@
 package clientapi
 
 import (
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
@@ -39,7 +39,6 @@ func AddPublicRoutes(
 	fsAPI federationAPI.ClientFederationAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
-	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
 	cfg := &base.Cfg.ClientAPI
@@ -58,13 +57,10 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.SynapseAdminMux,
-		base.DendriteAdminMux,
+		base,
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
-		syncProducer, transactionsCache, fsAPI, keyAPI,
+		syncProducer, transactionsCache, fsAPI,
 		extRoomsProvider, mscCfg, natsClient,
 	)
 }

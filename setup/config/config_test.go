@@ -16,21 +16,32 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
 func TestLoadConfigRelative(t *testing.T) {
-	_, err := loadConfig("/my/config/dir", []byte(testConfig),
+	cfg, err := loadConfig("/my/config/dir", []byte(testConfig),
 		mockReadFile{
 			"/my/config/dir/matrix_key.pem": testKey,
 			"/my/config/dir/tls_cert.pem":   testCert,
 		}.readFile,
-		false,
 	)
 	if err != nil {
 		t.Error("failed to load config:", err)
+	}
+
+	configErrors := &ConfigErrors{}
+	cfg.Verify(configErrors)
+	if len(*configErrors) > 0 {
+		for _, err := range *configErrors {
+			logrus.Errorf("Configuration error: %s", err)
+		}
+		t.Error("configuration verification failed")
 	}
 }
 
@@ -66,10 +77,9 @@ global:
     display_name: "Server alerts"
     avatar: ""
     room_name: "Server Alerts"	
+  jetstream:
+    addresses: ["test"]
 app_service_api:
-  internal_api:
-    listen: http://localhost:7777
-    connect: http://localhost:7777
   database:
     connection_string: file:appservice.db
     max_open_conns: 100
@@ -77,12 +87,7 @@ app_service_api:
     conn_max_lifetime: -1
   config_files: []
 client_api:
-  internal_api:
-    listen: http://localhost:7771
-    connect: http://localhost:7771
-  external_api:
-    listen: http://[::]:8071
-  registration_disabled: false
+  registration_disabled: true
   registration_shared_secret: ""
   enable_registration_captcha: false
   recaptcha_public_key: ""
@@ -95,36 +100,16 @@ client_api:
     turn_shared_secret: ""
     turn_username: ""
     turn_password: ""
-current_state_server:
-  internal_api:
-    listen: http://localhost:7782
-    connect: http://localhost:7782
-  database:
-    connection_string: file:currentstate.db
-    max_open_conns: 100
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 federation_api:
-  internal_api:
-    listen: http://localhost:7772
-    connect: http://localhost:7772
-  external_api:
-    listen: http://[::]:8072
+  database:
+    connection_string: file:federationapi.db
 key_server:
-  internal_api:
-    listen: http://localhost:7779
-    connect: http://localhost:7779
   database:
     connection_string: file:keyserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 media_api:
-  internal_api:
-    listen: http://localhost:7774
-    connect: http://localhost:7774
-  external_api:
-    listen: http://[::]:8074
   database:
     connection_string: file:mediaapi.db
     max_open_conns: 100
@@ -145,18 +130,12 @@ media_api:
     height: 480
     method: scale
 room_server:
-  internal_api:
-    listen: http://localhost:7770
-    connect: http://localhost:7770
   database:
     connection_string: file:roomserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 server_key_api:
-  internal_api:
-    listen: http://localhost:7780
-    connect: http://localhost:7780
   database:
     connection_string: file:serverkeyapi.db
     max_open_conns: 100
@@ -170,18 +149,12 @@ server_key_api:
     - key_id: ed25519:a_RXGa
       public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 sync_api:
-  internal_api:
-    listen: http://localhost:7773
-    connect: http://localhost:7773
   database:
     connection_string: file:syncapi.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 user_api:
-  internal_api:
-    listen: http://localhost:7781
-    connect: http://localhost:7781
   account_database:
     connection_string: file:userapi_accounts.db
     max_open_conns: 100
@@ -192,6 +165,12 @@ user_api:
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
+relay_api:
+  database:
+    connection_string: file:relayapi.db
+mscs:
+  database:
+    connection_string: file:mscs.db
 tracing:
   enabled: false
   jaeger:
@@ -288,5 +267,57 @@ func TestUnmarshalDataUnit(t *testing.T) {
 		} else if target.Got != expect {
 			t.Fatalf("expected value %d but got %d", expect, target.Got)
 		}
+	}
+}
+
+func Test_SigningIdentityFor(t *testing.T) {
+	tests := []struct {
+		name         string
+		virtualHosts []*VirtualHost
+		serverName   gomatrixserverlib.ServerName
+		want         *gomatrixserverlib.SigningIdentity
+		wantErr      bool
+	}{
+		{
+			name:    "no virtual hosts defined",
+			wantErr: true,
+		},
+		{
+			name:       "no identity found",
+			serverName: gomatrixserverlib.ServerName("doesnotexist"),
+			wantErr:    true,
+		},
+		{
+			name:       "found identity",
+			serverName: gomatrixserverlib.ServerName("main"),
+			want:       &gomatrixserverlib.SigningIdentity{ServerName: "main"},
+		},
+		{
+			name:       "identity found on virtual hosts",
+			serverName: gomatrixserverlib.ServerName("vh2"),
+			virtualHosts: []*VirtualHost{
+				{SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"}},
+				{SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh2"}},
+			},
+			want: &gomatrixserverlib.SigningIdentity{ServerName: "vh2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Global{
+				VirtualHosts: tt.virtualHosts,
+				SigningIdentity: gomatrixserverlib.SigningIdentity{
+					ServerName: "main",
+				},
+			}
+			got, err := c.SigningIdentityFor(tt.serverName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SigningIdentityFor() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SigningIdentityFor() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

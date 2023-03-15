@@ -80,7 +80,7 @@ func (db *getEventDB) addFakeEvents(graph map[string][]string) error {
 }
 
 // EventsFromIDs implements RoomserverInternalAPIEventDB
-func (db *getEventDB) EventsFromIDs(ctx context.Context, eventIDs []string) (res []types.Event, err error) {
+func (db *getEventDB) EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) (res []types.Event, err error) {
 	for _, evID := range eventIDs {
 		res = append(res, types.Event{
 			EventNID: 0,
@@ -106,7 +106,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, []string{"e"})
+	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, nil, []string{"e"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, []string{"e", "f"})
+	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, nil, []string{"e", "f"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}

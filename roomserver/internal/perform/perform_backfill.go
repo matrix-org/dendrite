@@ -23,10 +23,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -86,7 +86,7 @@ func (r *Backfiller) PerformBackfill(
 	// Retrieve events from the list that was filled previously. If we fail to get
 	// events from the database then attempt once to get them from federation instead.
 	var loadedEvents []*gomatrixserverlib.Event
-	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, resultNIDs)
+	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, info, resultNIDs)
 	if err != nil {
 		if _, ok := err.(types.MissingEventError); ok {
 			return r.backfillViaFederation(ctx, request, response)
@@ -122,17 +122,17 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 		ctx, req.VirtualHost, requester,
 		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100,
 	)
-	if err != nil {
+	// Only return an error if we really couldn't get any events.
+	if err != nil && len(events) == 0 {
 		logrus.WithError(err).Errorf("gomatrixserverlib.RequestBackfill failed")
 		return err
 	}
-	logrus.WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
+	// If we got an error but still got events, that's fine, because a server might have returned a 404 (or something)
+	// but other servers could provide the missing event.
+	logrus.WithError(err).WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
-	if err != nil {
-		return err
-	}
 
 	for _, ev := range backfilledEventMap {
 		// now add state for these events
@@ -255,6 +255,7 @@ type backfillRequester struct {
 	eventIDToBeforeStateIDs map[string][]string
 	eventIDMap              map[string]*gomatrixserverlib.Event
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
+	roomInfo                types.RoomInfo
 }
 
 func newBackfillRequester(
@@ -319,6 +320,7 @@ FederationHit:
 			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
+			Origin:             b.virtualHost,
 		}
 		res, err := c.StateIDsBeforeEvent(ctx, targetEvent)
 		if err != nil {
@@ -394,6 +396,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
+			Origin:             b.virtualHost,
 		}
 		result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
 		if err != nil {
@@ -449,14 +452,14 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID])
+	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID].EventNID)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil
 	}
 
 	// possibly return all joined servers depending on history visiblity
-	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries, b.virtualHost)
+	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, info, stateEntries, b.virtualHost)
 	b.historyVisiblity = visibility
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
@@ -467,7 +470,7 @@ FindSuccessor:
 	// Retrieve all "m.room.member" state events of "join" membership, which
 	// contains the list of users in the room before the event, therefore all
 	// the servers in it at that moment.
-	memberEvents, err := helpers.GetMembershipsAtState(ctx, b.db, stateEntries, true)
+	memberEvents, err := helpers.GetMembershipsAtState(ctx, b.db, info, stateEntries, true)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
 		return nil
@@ -518,11 +521,15 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 	}
 	eventNIDs := make([]types.EventNID, len(nidMap))
 	i := 0
+	roomNID := b.roomInfo.RoomNID
 	for _, nid := range nidMap {
-		eventNIDs[i] = nid
+		eventNIDs[i] = nid.EventNID
 		i++
+		if roomNID == 0 {
+			roomNID = nid.RoomNID
+		}
 	}
-	eventsWithNids, err := b.db.Events(ctx, eventNIDs)
+	eventsWithNids, err := b.db.Events(ctx, &b.roomInfo, eventNIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_nids", eventNIDs).Error("Failed to load events")
 		return nil, err
@@ -539,7 +546,7 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 // TODO: Long term we probably want a history_visibility table which stores eventNID | visibility_enum so we can just
 // pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
-	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry,
+	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
 	thisServer gomatrixserverlib.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
 
 	var eventNIDs []types.EventNID
@@ -552,7 +559,7 @@ func joinEventsFromHistoryVisibility(
 	}
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, eventNIDs)
+	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
 	if err != nil {
 		// even though the default should be shared, restricting the visibility to joined
 		// feels more secure here.
@@ -565,21 +572,17 @@ func joinEventsFromHistoryVisibility(
 
 	// Can we see events in the room?
 	canSeeEvents := auth.IsServerAllowed(thisServer, true, events)
-	visibility := gomatrixserverlib.HistoryVisibility(auth.HistoryVisibilityForRoom(events))
+	visibility := auth.HistoryVisibilityForRoom(events)
 	if !canSeeEvents {
 		logrus.Infof("ServersAtEvent history not visible to us: %s", visibility)
 		return nil, visibility, nil
 	}
 	// get joined members
-	info, err := db.RoomInfo(ctx, roomID)
-	if err != nil {
-		return nil, visibility, nil
-	}
-	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
+	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, false)
 	if err != nil {
 		return nil, visibility, err
 	}
-	evs, err := db.Events(ctx, joinEventNIDs)
+	evs, err := db.Events(ctx, roomInfo, joinEventNIDs)
 	return evs, visibility, err
 }
 
@@ -596,26 +599,47 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 		authNids := make([]types.EventNID, len(nidMap))
 		i := 0
 		for _, nid := range nidMap {
-			authNids[i] = nid
+			authNids[i] = nid.EventNID
 			i++
 		}
-		var redactedEventID string
-		var redactionEvent *gomatrixserverlib.Event
-		eventNID, roomNID, _, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
+
+		roomInfo, err := db.GetOrCreateRoomInfo(ctx, ev.Unwrap())
+		if err != nil {
+			logrus.WithError(err).Error("failed to get or create roomNID")
+			continue
+		}
+		roomNID = roomInfo.RoomNID
+
+		eventTypeNID, err := db.GetOrCreateEventTypeNID(ctx, ev.Type())
+		if err != nil {
+			logrus.WithError(err).Error("failed to get or create eventType NID")
+			continue
+		}
+
+		eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(ctx, ev.StateKey())
+		if err != nil {
+			logrus.WithError(err).Error("failed to get or create eventStateKey NID")
+			continue
+		}
+
+		eventNID, _, err = db.StoreEvent(ctx, ev.Unwrap(), roomInfo, eventTypeNID, eventStateKeyNID, authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
+			continue
+		}
+
+		resolver := state.NewStateResolution(db, roomInfo)
+
+		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Unwrap(), &resolver)
+		if err != nil {
+			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue
 		}
 		// If storing this event results in it being redacted, then do so.
 		// It's also possible for this event to be a redaction which results in another event being
 		// redacted, which we don't care about since we aren't returning it in this backfill.
-		if redactedEventID == ev.EventID() {
-			eventToRedact := ev.Unwrap()
-			if err := eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
-				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
-				continue
-			}
-			ev = eventToRedact.Headered(ev.RoomVersion)
+		if redactedEvent != nil && redactedEvent.EventID() == ev.EventID() {
+			ev = redactedEvent.Headered(ev.RoomVersion)
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{

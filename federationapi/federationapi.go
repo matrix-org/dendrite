@@ -17,20 +17,17 @@ package federationapi
 import (
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/internal"
-	"github.com/matrix-org/dendrite/federationapi/inthttp"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/internal/caching"
-	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -41,21 +38,14 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/routing"
 )
 
-// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
-// on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
-	inthttp.AddRoutes(intAPI, router)
-}
-
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fedAPI federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.FederationKeyAPI,
 	servers federationAPI.ServersInRoomProvider,
 ) {
 	cfg := &base.Cfg.FederationAPI
@@ -85,12 +75,9 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		cfg,
+		base,
 		rsAPI, f, keyRing,
-		federation, userAPI, keyAPI, mscCfg,
+		federation, userAPI, mscCfg,
 		servers, producer,
 	)
 }
@@ -116,7 +103,10 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
+	stats := statistics.NewStatistics(
+		federationDB,
+		cfg.FederationMaxRetries+1,
+		cfg.P2PFederationRetriesUntilAssumedOffline+1)
 
 	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 

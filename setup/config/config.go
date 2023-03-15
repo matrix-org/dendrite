@@ -20,7 +20,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,7 +29,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -79,8 +78,6 @@ type Dendrite struct {
 
 	// Any information derived from the configuration options for later use.
 	Derived Derived `yaml:"-"`
-
-	IsMonolith bool `yaml:"-"`
 }
 
 // TODO: Kill Derived
@@ -114,15 +111,6 @@ type Derived struct {
 	// servers from creating RoomIDs in exclusive application service namespaces
 }
 
-type InternalAPIOptions struct {
-	Listen  HTTPAddress `yaml:"listen"`
-	Connect HTTPAddress `yaml:"connect"`
-}
-
-type ExternalAPIOptions struct {
-	Listen HTTPAddress `yaml:"listen"`
-}
-
 // A Path on the filesystem.
 type Path string
 
@@ -141,20 +129,6 @@ func (d DataSource) IsPostgres() bool {
 
 // A Topic in kafka.
 type Topic string
-
-// An Address to listen on.
-type Address string
-
-// An HTTPAddress to listen on, starting with either http:// or https://.
-type HTTPAddress string
-
-func (h HTTPAddress) Address() (Address, error) {
-	url, err := url.Parse(string(h))
-	if err != nil {
-		return "", err
-	}
-	return Address(url.Host), nil
-}
 
 // FileSizeBytes is a file size in bytes
 type FileSizeBytes int64
@@ -191,7 +165,7 @@ type ConfigErrors []string
 
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
-func Load(configPath string, monolith bool) (*Dendrite, error) {
+func Load(configPath string) (*Dendrite, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -202,34 +176,32 @@ func Load(configPath string, monolith bool) (*Dendrite, error) {
 	}
 	// Pass the current working directory and os.ReadFile so that they can
 	// be mocked in the tests
-	return loadConfig(basePath, configData, os.ReadFile, monolith)
+	return loadConfig(basePath, configData, os.ReadFile)
 }
 
 func loadConfig(
 	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
-	monolithic bool,
 ) (*Dendrite, error) {
 	var c Dendrite
 	c.Defaults(DefaultOpts{
-		Generate:   false,
-		Monolithic: monolithic,
+		Generate:       false,
+		SingleDatabase: true,
 	})
-	c.IsMonolith = monolithic
 
 	var err error
 	if err = yaml.Unmarshal(configData, &c); err != nil {
 		return nil, err
 	}
 
-	if err = c.check(monolithic); err != nil {
+	if err = c.check(); err != nil {
 		return nil, err
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
 	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load private_key: %w", err)
 	}
 
 	for _, v := range c.Global.VirtualHosts {
@@ -243,7 +215,7 @@ func loadConfig(
 		}
 		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
 		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load private_key for virtualhost %s: %w", v.ServerName, err)
 		}
 	}
 
@@ -324,11 +296,13 @@ func (config *Dendrite) Derive() error {
 
 	if config.ClientAPI.RecaptchaEnabled {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
+		}
 	} else {
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
+		}
 	}
 	if config.ClientAPI.ThreePidDelegate != "" {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
@@ -343,8 +317,8 @@ func (config *Dendrite) Derive() error {
 }
 
 type DefaultOpts struct {
-	Generate   bool
-	Monolithic bool
+	Generate       bool
+	SingleDatabase bool
 }
 
 // SetDefaults sets default config values if they are not explicitly set.
@@ -364,9 +338,9 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Wiring()
 }
 
-func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
+func (c *Dendrite) Verify(configErrs *ConfigErrors) {
 	type verifiable interface {
-		Verify(configErrs *ConfigErrors, isMonolith bool)
+		Verify(configErrs *ConfigErrors)
 	}
 	for _, c := range []verifiable{
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
@@ -374,7 +348,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI, &c.MSCs,
 	} {
-		c.Verify(configErrs, isMonolith)
+		c.Verify(configErrs)
 	}
 }
 
@@ -423,39 +397,11 @@ func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
 	}
 }
 
-// checkNotZero verifies the given value is not zero in the configuration.
-// If it is, adds an error to the list.
-func checkNotZero(configErrs *ConfigErrors, key string, value int64) {
-	if value == 0 {
-		configErrs.Add(fmt.Sprintf("missing config key %q", key))
-	}
-}
-
 // checkPositive verifies the given value is positive (zero included)
 // in the configuration. If it is not, adds an error to the list.
 func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 	if value < 0 {
 		configErrs.Add(fmt.Sprintf("invalid value for config key %q: %d", key, value))
-	}
-}
-
-// checkURL verifies that the parameter is a valid URL
-func checkURL(configErrs *ConfigErrors, key, value string) {
-	if value == "" {
-		configErrs.Add(fmt.Sprintf("missing config key %q", key))
-		return
-	}
-	url, err := url.Parse(value)
-	if err != nil {
-		configErrs.Add(fmt.Sprintf("config key %q contains invalid URL (%s)", key, err.Error()))
-		return
-	}
-	switch url.Scheme {
-	case "http":
-	case "https":
-	default:
-		configErrs.Add(fmt.Sprintf("config key %q URL should be http:// or https://", key))
-		return
 	}
 }
 
@@ -469,7 +415,7 @@ func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
 
 // check returns an error type containing all errors found within the config
 // file.
-func (config *Dendrite) check(_ bool) error { // monolithic
+func (config *Dendrite) check() error { // monolithic
 	var configErrs ConfigErrors
 
 	if config.Version != Version {
@@ -536,58 +482,13 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 	}
 }
 
-// AppServiceURL returns a HTTP URL for where the appservice component is listening.
-func (config *Dendrite) AppServiceURL() string {
-	// Hard code the appservice server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.AppServiceAPI.InternalAPI.Connect)
-}
-
-// FederationAPIURL returns an HTTP URL for where the federation API is listening.
-func (config *Dendrite) FederationAPIURL() string {
-	// Hard code the federationapi to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.FederationAPI.InternalAPI.Connect)
-}
-
-// RoomServerURL returns an HTTP URL for where the roomserver is listening.
-func (config *Dendrite) RoomServerURL() string {
-	// Hard code the roomserver to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.RoomServer.InternalAPI.Connect)
-}
-
-// UserAPIURL returns an HTTP URL for where the userapi is listening.
-func (config *Dendrite) UserAPIURL() string {
-	// Hard code the userapi to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.UserAPI.InternalAPI.Connect)
-}
-
-// KeyServerURL returns an HTTP URL for where the key server is listening.
-func (config *Dendrite) KeyServerURL() string {
-	// Hard code the key server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.KeyServer.InternalAPI.Connect)
-}
-
 // SetupTracing configures the opentracing using the supplied configuration.
-func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err error) {
+func (config *Dendrite) SetupTracing() (closer io.Closer, err error) {
 	if !config.Tracing.Enabled {
 		return io.NopCloser(bytes.NewReader([]byte{})), nil
 	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
-		serviceName,
+		"Dendrite",
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)

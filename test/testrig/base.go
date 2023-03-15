@@ -15,41 +15,37 @@
 package testrig
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"strings"
+	"path/filepath"
 	"testing"
-
-	"github.com/nats-io/nats.go"
 
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/nats-io/nats.go"
 )
 
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(config.DefaultOpts{
-		Generate:   false,
-		Monolithic: true,
+		Generate:       false,
+		SingleDatabase: true,
 	})
 	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{ // use in memory fts
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: true,
 		})
 		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
@@ -62,34 +58,38 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
+		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
+		return base, func() {
+			base.ShutdownDendrite()
+			base.WaitForShutdown()
+			close()
+		}
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
-			Generate:   true,
-			Monolithic: false, // because we need a database per component
+			Generate:       true,
+			SingleDatabase: false,
 		})
 		cfg.Global.ServerName = "test"
+
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
-		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), func() {
-			// cleanup db files. This risks getting out of sync as we add more database strings :(
-			dbFiles := []config.DataSource{
-				cfg.FederationAPI.Database.ConnectionString,
-				cfg.KeyServer.Database.ConnectionString,
-				cfg.MSCs.Database.ConnectionString,
-				cfg.MediaAPI.Database.ConnectionString,
-				cfg.RoomServer.Database.ConnectionString,
-				cfg.SyncAPI.Database.ConnectionString,
-				cfg.UserAPI.AccountDatabase.ConnectionString,
-			}
-			for _, fileURI := range dbFiles {
-				path := strings.TrimPrefix(string(fileURI), "file:")
-				err := os.Remove(path)
-				if err != nil && !errors.Is(err, fs.ErrNotExist) {
-					t.Fatalf("failed to cleanup sqlite db '%s': %s", fileURI, err)
-				}
-			}
+
+		// Use a temp dir provided by go for tests, this will be cleanup by a call to t.CleanUp()
+		tempDir := t.TempDir()
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "federationapi.db"))
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "keyserver.db"))
+		cfg.MSCs.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "mscs.db"))
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "mediaapi.db"))
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "roomserver.db"))
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "syncapi.db"))
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
+
+		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
+		return base, func() {
+			base.ShutdownDendrite()
+			base.WaitForShutdown()
+			t.Cleanup(func() {}) // removes t.TempDir, where all database files are created
 		}
 	default:
 		t.Fatalf("unknown db type: %v", dbType)
@@ -101,14 +101,14 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 	if cfg == nil {
 		cfg = &config.Dendrite{}
 		cfg.Defaults(config.DefaultOpts{
-			Generate:   true,
-			Monolithic: true,
+			Generate:       true,
+			SingleDatabase: false,
 		})
 	}
 	cfg.Global.JetStream.InMemory = true
 	cfg.SyncAPI.Fulltext.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	base := base.NewBaseDendrite(cfg, "Tests")
+	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
 }

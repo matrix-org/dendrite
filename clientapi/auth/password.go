@@ -96,7 +96,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			}
 		}
 	} else {
-		username = strings.ToLower(r.Username())
+		username = r.Username()
 	}
 	if username == "" {
 		return nil, &util.JSONResponse{
@@ -146,6 +146,8 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 	}
 
+	// If we couldn't find the user by the lower cased localpart, try the provided
+	// localpart as is.
 	if !res.Exists {
 		err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
@@ -170,6 +172,9 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			}
 		}
 	}
+	// Set the user, so login.Username() can do the right thing
+	r.Identifier.User = res.Account.UserID
+	r.User = res.Account.UserID
 	r.Login.User = username
 	return &r.Login, nil
 }

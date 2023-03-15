@@ -140,3 +140,44 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}, nil
 }
+
+func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+	if err != nil {
+		return nil, err
+	}
+	otk, err := NewPostgresOneTimeKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	dk, err := NewPostgresDeviceKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	kc, err := NewPostgresKeyChangesTable(db)
+	if err != nil {
+		return nil, err
+	}
+	sdl, err := NewPostgresStaleDeviceListsTable(db)
+	if err != nil {
+		return nil, err
+	}
+	csk, err := NewPostgresCrossSigningKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	css, err := NewPostgresCrossSigningSigsTable(db)
+	if err != nil {
+		return nil, err
+	}
+
+	return &shared.KeyDatabase{
+		OneTimeKeysTable:      otk,
+		DeviceKeysTable:       dk,
+		KeyChangesTable:       kc,
+		StaleDeviceListsTable: sdl,
+		CrossSigningKeysTable: csk,
+		CrossSigningSigsTable: css,
+		Writer:                writer,
+	}, nil
+}

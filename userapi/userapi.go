@@ -17,40 +17,34 @@ package userapi
 import (
 	"time"
 
-	"github.com/gorilla/mux"
+	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/pushgateway"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/consumers"
 	"github.com/matrix-org/dendrite/userapi/internal"
-	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/util"
 )
 
-// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
-// on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
-	inthttp.AddRoutes(router, intAPI)
-}
-
-// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite, cfg *config.UserAPI,
-	appServices []config.ApplicationService, keyAPI keyapi.UserKeyAPI,
-	rsAPI rsapi.UserRoomserverAPI, pgClient pushgateway.Client,
-) api.UserInternalAPI {
+	base *base.BaseDendrite,
+	rsAPI rsapi.UserRoomserverAPI,
+	fedClient fedsenderapi.KeyserverFederationAPI,
+) *internal.UserInternalAPI {
+	cfg := &base.Cfg.UserAPI
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	appServices := base.Cfg.Derived.ApplicationServices
 
-	db, err := storage.NewUserAPIDatabase(
+	pgClient := base.PushGatewayHTTPClient()
+
+	db, err := storage.NewUserDatabase(
 		base,
 		&cfg.AccountDatabase,
 		cfg.Matrix.ServerName,
@@ -63,6 +57,11 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
+	keyDB, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to key db")
+	}
+
 	syncProducer := producers.NewSyncAPI(
 		db, js,
 		// TODO: user API should handle syncs for account data. Right now,
@@ -72,17 +71,50 @@ func NewInternalAPI(
 		cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
 		cfg.Matrix.JetStream.Prefixed(jetstream.OutputNotificationData),
 	)
+	keyChangeProducer := &producers.KeyChange{
+		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		JetStream: js,
+		DB:        keyDB,
+	}
 
 	userAPI := &internal.UserInternalAPI{
 		DB:                   db,
+		KeyDatabase:          keyDB,
 		SyncProducer:         syncProducer,
+		KeyChangeProducer:    keyChangeProducer,
 		Config:               cfg,
 		AppServices:          appServices,
-		KeyAPI:               keyAPI,
 		RSAPI:                rsAPI,
 		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
 		PgClient:             pgClient,
-		Cfg:                  cfg,
+		FedClient:            fedClient,
+	}
+
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, keyDB, userAPI, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
+	userAPI.Updater = updater
+	// Remove users which we don't share a room with anymore
+	if err := updater.CleanUp(); err != nil {
+		logrus.WithError(err).Error("failed to cleanup stale device lists")
+	}
+
+	go func() {
+		if err := updater.Start(); err != nil {
+			logrus.WithError(err).Panicf("failed to start device list updater")
+		}
+	}()
+
+	dlConsumer := consumers.NewDeviceListUpdateConsumer(
+		base.ProcessContext, cfg, js, updater,
+	)
+	if err := dlConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start device list consumer")
+	}
+
+	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
+		base.ProcessContext, cfg, js, userAPI,
+	)
+	if err := sigConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(

@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -74,11 +76,12 @@ type Inputer struct {
 	Cfg                 *config.RoomServer
 	Base                *base.BaseDendrite
 	ProcessContext      *process.ProcessContext
-	DB                  storage.Database
+	DB                  storage.RoomDatabase
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
 	ServerName          gomatrixserverlib.ServerName
+	SigningIdentity     *gomatrixserverlib.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
@@ -87,6 +90,7 @@ type Inputer struct {
 	workers             sync.Map // room ID -> *worker
 
 	Queryer *query.Queryer
+	UserAPI userapi.RoomserverUserAPI
 }
 
 // If a room consumer is inactive for a while then we will allow NATS

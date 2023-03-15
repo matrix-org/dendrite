@@ -29,15 +29,21 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	SendRouteName           = "Send"
+	QueryDirectoryRouteName = "QueryDirectory"
+	QueryProfileRouteName   = "QueryProfile"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -49,21 +55,26 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	fedMux, keyMux, wkMux *mux.Router,
-	cfg *config.FederationAPI,
+	base *base.BaseDendrite,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI *fedInternal.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation federationAPI.FederationClient,
 	userAPI userapi.FederationUserAPI,
-	keyAPI keyserverAPI.FederationKeyAPI,
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) {
-	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal,
-	)
+	fedMux := base.PublicFederationAPIMux
+	keyMux := base.PublicKeyAPIMux
+	wkMux := base.PublicWellKnownAPIMux
+	cfg := &base.Cfg.FederationAPI
+
+	if base.EnableMetrics {
+		prometheus.MustRegister(
+			internal.PDUCountTotal, internal.EDUCountTotal,
+		)
+	}
 
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
@@ -128,10 +139,10 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
+				cfg, rsAPI, userAPI, keys, federation, mu, servers, producer,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions)
+	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRouteName)
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
@@ -241,7 +252,7 @@ func Setup(
 				httpReq, federation, cfg, rsAPI, fsAPI,
 			)
 		},
-	)).Methods(http.MethodGet)
+	)).Methods(http.MethodGet).Name(QueryDirectoryRouteName)
 
 	v1fedmux.Handle("/query/profile", MakeFedAPI(
 		"federation_query_profile", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
@@ -250,13 +261,13 @@ func Setup(
 				httpReq, userAPI, cfg,
 			)
 		},
-	)).Methods(http.MethodGet)
+	)).Methods(http.MethodGet).Name(QueryProfileRouteName)
 
 	v1fedmux.Handle("/user/devices/{userID}", MakeFedAPI(
 		"federation_user_devices", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return GetUserDevices(
-				httpReq, keyAPI, vars["userID"],
+				httpReq, userAPI, vars["userID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -481,14 +492,14 @@ func Setup(
 	v1fedmux.Handle("/user/keys/claim", MakeFedAPI(
 		"federation_keys_claim", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
-			return ClaimOneTimeKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
+			return ClaimOneTimeKeys(httpReq, request, userAPI, cfg.Matrix.ServerName)
 		},
 	)).Methods(http.MethodPost)
 
 	v1fedmux.Handle("/user/keys/query", MakeFedAPI(
 		"federation_keys_query", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
-			return QueryDeviceKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
+			return QueryDeviceKeys(httpReq, request, userAPI, cfg.Matrix.ServerName)
 		},
 	)).Methods(http.MethodPost)
 

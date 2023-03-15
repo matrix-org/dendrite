@@ -9,6 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -147,8 +148,8 @@ func Password(
 	}
 
 	// Check the new password strength.
-	if resErr = validatePassword(r.NewPassword); resErr != nil {
-		return *resErr
+	if err := internal.ValidatePassword(r.NewPassword); err != nil {
+		return *internal.PasswordResponse(err)
 	}
 
 	// Ask the user API to perform the password change.

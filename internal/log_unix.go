@@ -18,8 +18,10 @@
 package internal
 
 import (
+	"io"
 	"log/syslog"
 
+	"github.com/MFAshby/stdemuxerhook"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
@@ -28,7 +30,9 @@ import (
 // SetupHookLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
+func SetupHookLogging(hooks []config.LogrusHook) {
+	levelLogAddedMu.Lock()
+	defer levelLogAddedMu.Unlock()
 	for _, hook := range hooks {
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
@@ -39,15 +43,19 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		switch hook.Type {
 		case "file":
 			checkFileHookParams(hook.Params)
-			setupFileHook(hook, level, componentName)
+			setupFileHook(hook, level)
 		case "syslog":
 			checkSyslogHookParams(hook.Params)
-			setupSyslogHook(hook, level, componentName)
+			setupSyslogHook(hook, level)
 		case "std":
+			setupStdLogHook(level)
 		default:
 			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
 		}
 	}
+	setupStdLogHook(logrus.InfoLevel)
+	// Hooks are now configured for stdout/err, so throw away the default logger output
+	logrus.SetOutput(io.Discard)
 }
 
 func checkSyslogHookParams(params map[string]interface{}) {
@@ -71,8 +79,16 @@ func checkSyslogHookParams(params map[string]interface{}) {
 
 }
 
-func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {
-	syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, componentName)
+func setupStdLogHook(level logrus.Level) {
+	if stdLevelLogAdded[level] {
+		return
+	}
+	logrus.AddHook(&logLevelHook{level, stdemuxerhook.New(logrus.StandardLogger())})
+	stdLevelLogAdded[level] = true
+}
+
+func setupSyslogHook(hook config.LogrusHook, level logrus.Level) {
+	syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, "dendrite")
 	if err == nil {
 		logrus.AddHook(&logLevelHook{level, syslogHook})
 	}

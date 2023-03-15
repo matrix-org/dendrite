@@ -6,6 +6,12 @@ permalink: /faq
 
 # FAQ
 
+## Why does Dendrite exist?
+
+Dendrite aims to provide a matrix compatible server that has low resource usage compared to [Synapse](https://github.com/matrix-org/synapse).
+It also aims to provide more flexibility when scaling either up or down.
+Dendrite's code is also very easy to hack on which makes it suitable for experimenting with new matrix features such as peer-to-peer.
+
 ## Is Dendrite stable?
 
 Mostly, although there are still bugs and missing features. If you are a confident power user and you are happy to spend some time debugging things when they go wrong, then please try out Dendrite. If you are a community, organisation or business that demands stability and uptime, then Dendrite is not for you yet - please install Synapse instead.
@@ -29,10 +35,9 @@ possible to migrate an existing Synapse deployment to Dendrite.
 
 No, Dendrite has a very different database schema to Synapse and the two are not interchangeable.
 
-## Should I run a monolith or a polylith deployment?
+## Can I configure which port Dendrite listens on?
 
-Monolith deployments are always preferred where possible, and at this time, are far better tested than polylith deployments are. The only reason to consider a polylith deployment is if you wish to run different Dendrite components on separate physical machines, but this is an advanced configuration which we don't
-recommend.
+Yes, use the cli flag `-http-bind-address`. 
 
 ## I've installed Dendrite but federation isn't working
 
@@ -42,12 +47,20 @@ Check the [Federation Tester](https://federationtester.matrix.org). You need at 
 * A valid TLS certificate for that DNS name
 * Either DNS SRV records or well-known files
 
+## Whenever I try to connect from Element it says unable to connect to homeserver
+
+Check that your dendrite instance is running. Otherwise this is most likely due to a reverse proxy misconfiguration.
+
 ## Does Dendrite work with my favourite client?
 
 It should do, although we are aware of some minor issues:
 
 * **Element Android**: registration does not work, but logging in with an existing account does
 * **Hydrogen**: occasionally sync can fail due to gaps in the `since` parameter, but clearing the cache fixes this
+
+## Is there a public instance of Dendrite I can try out?
+
+Use [dendrite.matrix.org](https://dendrite.matrix.org) which we officially support.
 
 ## Does Dendrite support Space Summaries?
 
@@ -84,14 +97,46 @@ Remember to add the config file(s) to the `app_service_api` section of the confi
 
 Yes, you can do this by disabling federation - set `disable_federation` to `true` in the `global` section of the Dendrite configuration file.
 
+## How can I migrate a room in order to change the internal ID?
+
+This can be done by performing a room upgrade. Use the command `/upgraderoom <version>` in Element to do this.
+
+## How do I reset somebody's password on my server?
+
+Use the admin endpoint [resetpassword](https://matrix-org.github.io/dendrite/administration/adminapi#post-_dendriteadminresetpassworduserid)
+
 ## Should I use PostgreSQL or SQLite for my databases?
 
 Please use PostgreSQL wherever possible, especially if you are planning to run a homeserver that caters to more than a couple of users.
 
+## What data needs to be kept if transferring/backing up Dendrite?
+
+The list of files that need to be stored is:
+- matrix-key.pem
+- dendrite.yaml
+- the postgres or sqlite DB
+- the media store
+- the search index (although this can be regenerated)
+
+Note that this list may change / be out of date. We don't officially maintain instructions for migrations like this.
+
+## How can I prepare enough storage for media caches?
+
+This might be what you want: [matrix-media-repo](https://github.com/turt2live/matrix-media-repo)
+We don't officially support this or any other dedicated media storage solutions.
+
+## Is there an upgrade guide for Dendrite?
+
+Run a newer docker image. We don't officially support deployments other than Docker. 
+Most of the time you should be able to just 
+- stop 
+- replace binary
+- start
+
 ## Dendrite is using a lot of CPU
 
 Generally speaking, you should expect to see some CPU spikes, particularly if you are joining or participating in large rooms. However, constant/sustained high CPU usage is not expected - if you are experiencing that, please join `#dendrite-dev:matrix.org` and let us know what you were doing when the
-CPU usage shot up, or file a GitHub issue. If you can take a [CPU profile](PROFILING.md) then that would
+CPU usage shot up, or file a GitHub issue. If you can take a [CPU profile](development/PROFILING.md) then that would
 be a huge help too, as that will help us to understand where the CPU time is going.
 
 ## Dendrite is using a lot of RAM
@@ -99,8 +144,12 @@ be a huge help too, as that will help us to understand where the CPU time is goi
 As above with CPU usage, some memory spikes are expected if Dendrite is doing particularly heavy work
 at a given instant. However, if it is using more RAM than you expect for a long time, that's probably
 not expected. Join `#dendrite-dev:matrix.org` and let us know what you were doing when the memory usage
-ballooned, or file a GitHub issue if you can. If you can take a [memory profile](PROFILING.md) then that
+ballooned, or file a GitHub issue if you can. If you can take a [memory profile](development/PROFILING.md) then that
 would be a huge help too, as that will help us to understand where the memory usage is happening.
+
+## Do I need to generate the self-signed certificate if I'm going to use a reverse proxy?
+
+No, if you already have a proper certificate from some provider, like Let's Encrypt, and use that on your reverse proxy, and the reverse proxy does TLS termination, then you’re good and can use HTTP to the dendrite process.
 
 ## Dendrite is running out of PostgreSQL database connections
 

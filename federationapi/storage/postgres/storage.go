@@ -62,6 +62,14 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
+	assumedOffline, err := NewPostgresAssumedOfflineTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	relayServers, err := NewPostgresRelayServersTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	inboundPeeks, err := NewPostgresInboundPeeksTable(d.db)
 	if err != nil {
 		return nil, err
@@ -104,6 +112,8 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationQueueEDUs:      queueEDUs,
 		FederationQueueJSON:      queueJSON,
 		FederationBlacklist:      blacklist,
+		FederationAssumedOffline: assumedOffline,
+		FederationRelayServers:   relayServers,
 		FederationInboundPeeks:   inboundPeeks,
 		FederationOutboundPeeks:  outboundPeeks,
 		NotaryServerKeysJSON:     notaryJSON,

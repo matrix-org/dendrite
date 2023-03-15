@@ -22,7 +22,7 @@ import (
 // SetupHookLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
+func SetupHookLogging(hooks []config.LogrusHook) {
 	logrus.SetReportCaller(true)
 	for _, hook := range hooks {
 		// Check we received a proper logging level
@@ -40,7 +40,7 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		switch hook.Type {
 		case "file":
 			checkFileHookParams(hook.Params)
-			setupFileHook(hook, level, componentName)
+			setupFileHook(hook, level)
 		default:
 			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
 		}

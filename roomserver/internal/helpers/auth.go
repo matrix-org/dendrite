@@ -31,7 +31,8 @@ import (
 // the soft-fail bool.
 func CheckForSoftFail(
 	ctx context.Context,
-	db storage.Database,
+	db storage.RoomDatabase,
+	roomInfo *types.RoomInfo,
 	event *gomatrixserverlib.HeaderedEvent,
 	stateEventIDs []string,
 ) (bool, error) {
@@ -45,16 +46,6 @@ func CheckForSoftFail(
 			return true, fmt.Errorf("StateEntriesForEventIDs failed: %w", err)
 		}
 	} else {
-		// Work out if the room exists.
-		var roomInfo *types.RoomInfo
-		roomInfo, err = db.RoomInfo(ctx, event.RoomID())
-		if err != nil {
-			return false, fmt.Errorf("db.RoomNID: %w", err)
-		}
-		if roomInfo == nil || roomInfo.IsStub() {
-			return false, nil
-		}
-
 		// Then get the state entries for the current state snapshot.
 		// We'll use this to check if the event is allowed right now.
 		roomState := state.NewStateResolution(db, roomInfo)
@@ -76,7 +67,7 @@ func CheckForSoftFail(
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
 	if err != nil {
 		return true, fmt.Errorf("loadAuthEvents: %w", err)
 	}
@@ -93,7 +84,8 @@ func CheckForSoftFail(
 // Returns the numeric IDs for the auth events.
 func CheckAuthEvents(
 	ctx context.Context,
-	db storage.Database,
+	db storage.RoomDatabase,
+	roomInfo *types.RoomInfo,
 	event *gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
@@ -108,7 +100,7 @@ func CheckAuthEvents(
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
 	if err != nil {
 		return nil, fmt.Errorf("loadAuthEvents: %w", err)
 	}
@@ -201,6 +193,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 func loadAuthEvents(
 	ctx context.Context,
 	db state.StateResolutionStorage,
+	roomInfo *types.RoomInfo,
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
 ) (result authEvents, err error) {
@@ -223,7 +216,7 @@ func loadAuthEvents(
 			eventNIDs = append(eventNIDs, eventNID)
 		}
 	}
-	if result.events, err = db.Events(ctx, eventNIDs); err != nil {
+	if result.events, err = db.Events(ctx, roomInfo, eventNIDs); err != nil {
 		return
 	}
 	roomID := ""

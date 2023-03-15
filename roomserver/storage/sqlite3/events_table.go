@@ -110,10 +110,10 @@ const bulkSelectEventIDSQL = "" +
 	"SELECT event_nid, event_id FROM roomserver_events WHERE event_nid IN ($1)"
 
 const bulkSelectEventNIDSQL = "" +
-	"SELECT event_id, event_nid FROM roomserver_events WHERE event_id IN ($1)"
+	"SELECT event_id, event_nid, room_nid FROM roomserver_events WHERE event_id IN ($1)"
 
 const bulkSelectUnsentEventNIDSQL = "" +
-	"SELECT event_id, event_nid FROM roomserver_events WHERE sent_to_output = 0 AND event_id IN ($1)"
+	"SELECT event_id, event_nid, room_nid FROM roomserver_events WHERE sent_to_output = 0 AND event_id IN ($1)"
 
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
@@ -572,20 +572,20 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 
 // BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventMetadata, error) {
 	return s.bulkSelectEventNID(ctx, txn, eventIDs, false)
 }
 
 // BulkSelectEventNIDs returns a map from string event ID to numeric event ID
 // only for events that haven't already been sent to the roomserver output.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+func (s *eventStatements) BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventMetadata, error) {
 	return s.bulkSelectEventNID(ctx, txn, eventIDs, true)
 }
 
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventNID, error) {
+func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventMetadata, error) {
 	///////////////
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for k, v := range eventIDs {
@@ -609,14 +609,18 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
-	results := make(map[string]types.EventNID, len(eventIDs))
+	results := make(map[string]types.EventMetadata, len(eventIDs))
 	var eventID string
 	var eventNID int64
+	var roomNID int64
 	for rows.Next() {
-		if err = rows.Scan(&eventID, &eventNID); err != nil {
+		if err = rows.Scan(&eventID, &eventNID, &roomNID); err != nil {
 			return nil, err
 		}
-		results[eventID] = types.EventNID(eventNID)
+		results[eventID] = types.EventMetadata{
+			EventNID: types.EventNID(eventNID),
+			RoomNID:  types.RoomNID(roomNID),
+		}
 	}
 	return results, nil
 }

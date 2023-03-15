@@ -18,11 +18,11 @@ import (
 	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
 	if err != nil {
@@ -81,11 +81,6 @@ func Test_evaluatePushRules(t *testing.T) {
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{
 					{Kind: pushrules.NotifyAction},
-					{
-						Kind:  pushrules.SetTweakAction,
-						Tweak: pushrules.HighlightTweak,
-						Value: false,
-					},
 				},
 			},
 			{
@@ -103,7 +98,6 @@ func Test_evaluatePushRules(t *testing.T) {
 					{
 						Kind:  pushrules.SetTweakAction,
 						Tweak: pushrules.HighlightTweak,
-						Value: true,
 					},
 				},
 			},

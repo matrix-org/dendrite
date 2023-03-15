@@ -14,6 +14,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
@@ -24,6 +25,10 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	request *api.PerformDirectoryLookupRequest,
 	response *api.PerformDirectoryLookupResponse,
 ) (err error) {
+	if !r.shouldAttemptDirectFederation(request.ServerName) {
+		return fmt.Errorf("relay servers have no meaningful response for directory lookup.")
+	}
+
 	dir, err := r.federation.LookupRoomAlias(
 		ctx,
 		r.cfg.Matrix.ServerName,
@@ -36,7 +41,7 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	}
 	response.RoomID = dir.RoomID
 	response.ServerNames = dir.Servers
-	r.statistics.ForServer(request.ServerName).Success()
+	r.statistics.ForServer(request.ServerName).Success(statistics.SendDirect)
 	return nil
 }
 
@@ -116,8 +121,6 @@ func (r *FederationInternalAPI) PerformJoin(
 	var httpErr gomatrix.HTTPError
 	if ok := errors.As(lastErr, &httpErr); ok {
 		httpErr.Message = string(httpErr.Contents)
-		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
-		httpErr.WrappedError = nil
 		response.LastError = &httpErr
 	} else {
 		response.LastError = &gomatrix.HTTPError{
@@ -144,6 +147,10 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	supportedVersions []gomatrixserverlib.RoomVersion,
 	unsigned map[string]interface{},
 ) error {
+	if !r.shouldAttemptDirectFederation(serverName) {
+		return fmt.Errorf("relay servers have no meaningful response for join.")
+	}
+
 	_, origin, err := r.cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
 		return err
@@ -164,7 +171,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.MakeJoin: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success()
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
@@ -219,7 +226,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success()
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// If the remote server returned an event in the "event" key of
 	// the send_join request then we should use that instead. It may
@@ -382,8 +389,6 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 	var httpErr gomatrix.HTTPError
 	if ok := errors.As(lastErr, &httpErr); ok {
 		httpErr.Message = string(httpErr.Contents)
-		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
-		httpErr.WrappedError = nil
 		response.LastError = &httpErr
 	} else {
 		response.LastError = &gomatrix.HTTPError{
@@ -407,6 +412,10 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
+	if !r.shouldAttemptDirectFederation(serverName) {
+		return fmt.Errorf("relay servers have no meaningful response for outbound peek.")
+	}
+
 	// create a unique ID for this peek.
 	// for now we just use the room ID again. In future, if we ever
 	// support concurrent peeks to the same room with different filters
@@ -446,7 +455,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.Peek: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success()
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// Work out if we support the room version that has been supplied in
 	// the peek response.
@@ -516,6 +525,10 @@ func (r *FederationInternalAPI) PerformLeave(
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-leave send-leave dance.
 	for _, serverName := range request.ServerNames {
+		if !r.shouldAttemptDirectFederation(serverName) {
+			continue
+		}
+
 		// Try to perform a make_leave using the information supplied in the
 		// request.
 		respMakeLeave, err := r.federation.MakeLeave(
@@ -585,7 +598,7 @@ func (r *FederationInternalAPI) PerformLeave(
 			continue
 		}
 
-		r.statistics.ForServer(serverName).Success()
+		r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 		return nil
 	}
 
@@ -614,6 +627,12 @@ func (r *FederationInternalAPI) PerformInvite(
 	_, destination, err := gomatrixserverlib.SplitID('@', *request.Event.StateKey())
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+	}
+
+	// TODO (devon): This should be allowed via a relay. Currently only transactions
+	// can be sent to relays. Would need to extend relays to handle invites.
+	if !r.shouldAttemptDirectFederation(destination) {
+		return fmt.Errorf("relay servers have no meaningful response for invite.")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -682,12 +701,8 @@ func (r *FederationInternalAPI) PerformWakeupServers(
 
 func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
 	for _, srv := range destinations {
-		// Check the statistics cache for the blacklist status to prevent hitting
-		// the database unnecessarily.
-		if r.queues.IsServerBlacklisted(srv) {
-			_ = r.db.RemoveServerFromBlacklist(srv)
-		}
-		r.queues.RetryServer(srv)
+		wasBlacklisted := r.statistics.ForServer(srv).MarkServerAlive()
+		r.queues.RetryServer(srv, wasBlacklisted)
 	}
 }
 
@@ -719,7 +734,9 @@ func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {
 	return fmt.Errorf("auth chain response is missing m.room.create event")
 }
 
-func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder) gomatrixserverlib.RoomVersion {
+func setDefaultRoomVersionFromJoinEvent(
+	joinEvent gomatrixserverlib.EventBuilder,
+) gomatrixserverlib.RoomVersion {
 	// if auth events are not event references we know it must be v3+
 	// we have to do these shenanigans to satisfy sytest, specifically for:
 	// "Outbound federation rejects m.room.create events with an unknown room version"
@@ -801,4 +818,62 @@ func federatedAuthProvider(
 		}
 		return returning, nil
 	}
+}
+
+// P2PQueryRelayServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) P2PQueryRelayServers(
+	ctx context.Context,
+	request *api.P2PQueryRelayServersRequest,
+	response *api.P2PQueryRelayServersResponse,
+) error {
+	logrus.Infof("Getting relay servers for: %s", request.Server)
+	relayServers, err := r.db.P2PGetRelayServersForServer(ctx, request.Server)
+	if err != nil {
+		return err
+	}
+
+	response.RelayServers = relayServers
+	return nil
+}
+
+// P2PAddRelayServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) P2PAddRelayServers(
+	ctx context.Context,
+	request *api.P2PAddRelayServersRequest,
+	response *api.P2PAddRelayServersResponse,
+) error {
+	logrus.Infof("Adding relay servers for: %s", request.Server)
+	err := r.db.P2PAddRelayServersForServer(ctx, request.Server, request.RelayServers)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// P2PRemoveRelayServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) P2PRemoveRelayServers(
+	ctx context.Context,
+	request *api.P2PRemoveRelayServersRequest,
+	response *api.P2PRemoveRelayServersResponse,
+) error {
+	logrus.Infof("Adding relay servers for: %s", request.Server)
+	err := r.db.P2PRemoveRelayServersForServer(ctx, request.Server, request.RelayServers)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *FederationInternalAPI) shouldAttemptDirectFederation(
+	destination gomatrixserverlib.ServerName,
+) bool {
+	var shouldRelay bool
+	stats := r.statistics.ForServer(destination)
+	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		shouldRelay = true
+	}
+
+	return !shouldRelay
 }

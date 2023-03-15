@@ -40,7 +40,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	}
 	if s.Server == nil {
 		var err error
-		s.Server, err = natsserver.NewServer(&natsserver.Options{
+		opts := &natsserver.Options{
 			ServerName:      "monolith",
 			DontListen:      true,
 			JetStream:       true,
@@ -49,11 +49,12 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			MaxPayload:      16 * 1024 * 1024,
 			NoSigs:          true,
 			NoLog:           cfg.NoLog,
-		})
+		}
+		s.Server, err = natsserver.NewServer(opts)
 		if err != nil {
 			panic(err)
 		}
-		s.ConfigureLogger()
+		s.SetLogger(NewLogAdapter(), opts.Debug, opts.Trace)
 		go func() {
 			process.ComponentStarted()
 			s.Start()

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type Admin struct {
@@ -69,7 +70,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		return nil
 	}
 
-	memberEvents, err := r.DB.Events(ctx, memberNIDs)
+	memberEvents, err := r.DB.Events(ctx, roomInfo, memberNIDs)
 	if err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -240,6 +241,42 @@ func (r *Admin) PerformAdminEvacuateUser(
 		res.Affected = append(res.Affected, roomID)
 	}
 	return nil
+}
+
+func (r *Admin) PerformAdminPurgeRoom(
+	ctx context.Context,
+	req *api.PerformAdminPurgeRoomRequest,
+	res *api.PerformAdminPurgeRoomResponse,
+) error {
+	// Validate we actually got a room ID and nothing else
+	if _, _, err := gomatrixserverlib.SplitID('!', req.RoomID); err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("Malformed room ID: %s", err),
+		}
+		return nil
+	}
+
+	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
+	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
+		logrus.WithField("room_id", req.RoomID).WithError(err).Warn("Failed to purge room from roomserver")
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  err.Error(),
+		}
+		return nil
+	}
+
+	logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
+
+	return r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
+		{
+			Type: api.OutputTypePurgeRoom,
+			PurgeRoom: &api.OutputPurgeRoom{
+				RoomID: req.RoomID,
+			},
+		},
+	})
 }
 
 func (r *Admin) PerformAdminDownloadState(

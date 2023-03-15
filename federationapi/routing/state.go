@@ -107,7 +107,7 @@ func getState(
 		return nil, nil, err
 	}
 
-	event, resErr := fetchEvent(ctx, rsAPI, eventID)
+	event, resErr := fetchEvent(ctx, rsAPI, roomID, eventID)
 	if resErr != nil {
 		return nil, nil, resErr
 	}

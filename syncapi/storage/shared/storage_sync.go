@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -92,12 +94,65 @@ func (d *DatabaseTransaction) MembershipCount(ctx context.Context, roomID, membe
 	return d.Memberships.SelectMembershipCount(ctx, d.txn, roomID, membership, pos)
 }
 
-func (d *DatabaseTransaction) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
-	return d.Memberships.SelectHeroes(ctx, d.txn, roomID, userID, memberships)
+func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID string) (*types.Summary, error) {
+	summary := &types.Summary{Heroes: []string{}}
+
+	joinCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, gomatrixserverlib.Join)
+	if err != nil {
+		return summary, err
+	}
+	inviteCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, gomatrixserverlib.Invite)
+	if err != nil {
+		return summary, err
+	}
+	summary.InvitedMemberCount = &inviteCount
+	summary.JoinedMemberCount = &joinCount
+
+	// Get the room name and canonical alias, if any
+	filter := gomatrixserverlib.DefaultStateFilter()
+	filterTypes := []string{gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias}
+	filterRooms := []string{roomID}
+
+	filter.Types = &filterTypes
+	filter.Rooms = &filterRooms
+	evs, err := d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, &filter, nil)
+	if err != nil {
+		return summary, err
+	}
+
+	for _, ev := range evs {
+		switch ev.Type() {
+		case gomatrixserverlib.MRoomName:
+			if gjson.GetBytes(ev.Content(), "name").Str != "" {
+				return summary, nil
+			}
+		case gomatrixserverlib.MRoomCanonicalAlias:
+			if gjson.GetBytes(ev.Content(), "alias").Str != "" {
+				return summary, nil
+			}
+		}
+	}
+
+	// If there's no room name or canonical alias, get the room heroes, excluding the user
+	heroes, err := d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{gomatrixserverlib.Join, gomatrixserverlib.Invite})
+	if err != nil {
+		return summary, err
+	}
+
+	// "When no joined or invited members are available, this should consist of the banned and left users"
+	if len(heroes) == 0 {
+		heroes, err = d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{gomatrixserverlib.Leave, gomatrixserverlib.Ban})
+		if err != nil {
+			return summary, err
+		}
+	}
+	summary.Heroes = heroes
+
+	return summary, nil
 }
 
-func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
-	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
+func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomIDs []string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
+	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, roomIDs, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
 func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
@@ -215,16 +270,6 @@ func (d *DatabaseTransaction) BackwardExtremitiesForRoom(
 	return d.BackwardExtremities.SelectBackwardExtremitiesForRoom(ctx, d.txn, roomID)
 }
 
-func (d *DatabaseTransaction) MaxTopologicalPosition(
-	ctx context.Context, roomID string,
-) (types.TopologyToken, error) {
-	depth, streamPos, err := d.Topology.SelectMaxPositionInTopology(ctx, d.txn, roomID)
-	if err != nil {
-		return types.TopologyToken{}, err
-	}
-	return types.TopologyToken{Depth: depth, PDUPosition: streamPos}, nil
-}
-
 func (d *DatabaseTransaction) EventPositionInTopology(
 	ctx context.Context, eventID string,
 ) (types.TopologyToken, error) {
@@ -243,11 +288,7 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 	case err == sql.ErrNoRows && backwardOrdering: // no events in range, going backward
 		return types.TopologyToken{PDUPosition: streamPos}, nil
 	case err == sql.ErrNoRows && !backwardOrdering: // no events in range, going forward
-		topoPos, streamPos, err = d.Topology.SelectMaxPositionInTopology(ctx, d.txn, roomID)
-		if err != nil {
-			return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectMaxPositionInTopology: %w", err)
-		}
-		return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
+		return types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}, nil
 	case err != nil: // some other error happened
 		return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectStreamToTopologicalPosition: %w", err)
 	default:
@@ -329,19 +370,25 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	}
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeededFiltered, eventMapFiltered, err := d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil, nil
+	stateFiltered := state
+	// avoid hitting the database if the result would be the same as above
+	if !isStatefilterEmpty(stateFilter) {
+		var stateNeededFiltered map[string]map[string]bool
+		var eventMapFiltered map[string]types.StreamEvent
+		stateNeededFiltered, eventMapFiltered, err = d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil, nil, nil
+			}
+			return nil, nil, err
 		}
-		return nil, nil, err
-	}
-	stateFiltered, err := d.fetchStateEvents(ctx, d.txn, stateNeededFiltered, eventMapFiltered)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil, nil
+		stateFiltered, err = d.fetchStateEvents(ctx, d.txn, stateNeededFiltered, eventMapFiltered)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil, nil, nil
+			}
+			return nil, nil, err
 		}
-		return nil, nil, err
 	}
 
 	// find out which rooms this user is peeking, if any.
@@ -596,8 +643,8 @@ func (d *DatabaseTransaction) GetUserUnreadNotificationCountsForRooms(ctx contex
 	return d.NotificationData.SelectUserUnreadCountsForRooms(ctx, d.txn, userID, roomIDs)
 }
 
-func (d *DatabaseTransaction) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
-	return d.Presence.GetPresenceForUser(ctx, d.txn, userID)
+func (d *DatabaseTransaction) GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUsers(ctx, d.txn, userIDs)
 }
 
 func (d *DatabaseTransaction) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
@@ -608,9 +655,78 @@ func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) 
 	return d.Presence.GetMaxPresenceID(ctx, d.txn)
 }
 
+func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		if err := d.BackwardExtremities.PurgeBackwardExtremities(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge backward extremities: %w", err)
+		}
+		if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge current room state: %w", err)
+		}
+		if err := d.Invites.PurgeInvites(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge invites: %w", err)
+		}
+		if err := d.Memberships.PurgeMemberships(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge memberships: %w", err)
+		}
+		if err := d.NotificationData.PurgeNotificationData(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge notification data: %w", err)
+		}
+		if err := d.OutputEvents.PurgeEvents(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge events: %w", err)
+		}
+		if err := d.Topology.PurgeEventsTopology(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge events topology: %w", err)
+		}
+		if err := d.Peeks.PurgePeeks(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge peeks: %w", err)
+		}
+		if err := d.Receipts.PurgeReceipts(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge receipts: %w", err)
+		}
+		return nil
+	})
+}
+
+func (d *Database) PurgeRoomState(
+	ctx context.Context, roomID string,
+) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		// If the event is a create event then we'll delete all of the existing
+		// data for the room. The only reason that a create event would be replayed
+		// to us in this way is if we're about to receive the entire room state.
+		if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateForRoom: %w", err)
+		}
+		return nil
+	})
+}
+
 func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Relations.SelectMaxRelationID(ctx, d.txn)
 	return types.StreamPosition(id), err
+}
+
+func isStatefilterEmpty(filter *gomatrixserverlib.StateFilter) bool {
+	if filter == nil {
+		return true
+	}
+	switch {
+	case filter.NotTypes != nil && len(*filter.NotTypes) > 0:
+		return false
+	case filter.Types != nil && len(*filter.Types) > 0:
+		return false
+	case filter.Senders != nil && len(*filter.Senders) > 0:
+		return false
+	case filter.NotSenders != nil && len(*filter.NotSenders) > 0:
+		return false
+	case filter.NotRooms != nil && len(*filter.NotRooms) > 0:
+		return false
+	case filter.ContainsURL != nil:
+		return false
+	default:
+		return true
+	}
 }
 
 func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (

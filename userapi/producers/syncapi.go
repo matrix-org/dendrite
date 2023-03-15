@@ -19,13 +19,13 @@ type JetStreamPublisher interface {
 
 // SyncAPI produces messages for the Sync API server to consume.
 type SyncAPI struct {
-	db                    storage.Database
+	db                    storage.Notification
 	producer              JetStreamPublisher
 	clientDataTopic       string
 	notificationDataTopic string
 }
 
-func NewSyncAPI(db storage.Database, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
+func NewSyncAPI(db storage.UserDatabase, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
 	return &SyncAPI{
 		db:                    db,
 		producer:              js,

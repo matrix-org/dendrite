@@ -5,7 +5,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -29,7 +28,7 @@ type Streams struct {
 
 func NewSyncStreamProviders(
 	d storage.Database, userAPI userapi.SyncUserAPI,
-	rsAPI rsapi.SyncRoomserverAPI, keyAPI keyapi.SyncKeyAPI,
+	rsAPI rsapi.SyncRoomserverAPI,
 	eduCache *caching.EDUCache, lazyLoadCache caching.LazyLoadCache, notifier *notifier.Notifier,
 	mrdb *mrd.Queries,
 ) *Streams {
@@ -63,7 +62,7 @@ func NewSyncStreamProviders(
 		DeviceListStreamProvider: &DeviceListStreamProvider{
 			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 			rsAPI:                 rsAPI,
-			keyAPI:                keyAPI,
+			userAPI:               userAPI,
 		},
 		PresenceStreamProvider: &PresenceStreamProvider{
 			DefaultStreamProvider: DefaultStreamProvider{DB: d},

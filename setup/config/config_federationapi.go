@@ -1,12 +1,11 @@
 package config
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 type FederationAPI struct {
 	Matrix *Global `yaml:"-"`
-
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
 
 	// The database stores information used by the federation destination queues to
 	// send transactions to remote servers.
@@ -17,6 +16,12 @@ type FederationAPI struct {
 	// is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc.
 	// The default value is 16 if not specified, which is circa 18 hours.
 	FederationMaxRetries uint32 `yaml:"send_max_retries"`
+
+	// P2P Feature: How many consecutive failures that we should tolerate when
+	// sending federation requests to a specific server until we should assume they
+	// are offline. If we assume they are offline then we will attempt to send
+	// messages to their relay server if we know of one that is appropriate.
+	P2PFederationRetriesUntilAssumedOffline uint32 `yaml:"p2p_retries_until_assumed_offline"`
 
 	// FederationDisableTLSValidation disables the validation of X.509 TLS certs
 	// on remote federation endpoints. This is not recommended in production!
@@ -36,13 +41,8 @@ type FederationAPI struct {
 }
 
 func (c *FederationAPI) Defaults(opts DefaultOpts) {
-	if !opts.Monolithic {
-		c.InternalAPI.Listen = "http://localhost:7772"
-		c.InternalAPI.Connect = "http://localhost:7772"
-		c.ExternalAPI.Listen = "http://[::]:8072"
-		c.Database.Defaults(10)
-	}
 	c.FederationMaxRetries = 16
+	c.P2PFederationRetriesUntilAssumedOffline = 1
 	c.DisableTLSValidation = false
 	c.DisableHTTPKeepalives = false
 	if opts.Generate {
@@ -61,22 +61,16 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 				},
 			},
 		}
-		if !opts.Monolithic {
+		if !opts.SingleDatabase {
 			c.Database.ConnectionString = "file:federationapi.db"
 		}
 	}
 }
 
-func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if isMonolith { // polylith required configs below
-		return
-	}
+func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
 	}
-	checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
-	checkURL(configErrs, "federation_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "federation_api.internal_api.connect", string(c.InternalAPI.Connect))
 }
 
 // The config for setting a proxy to use for server->server requests

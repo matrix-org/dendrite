@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
@@ -29,14 +32,14 @@ var (
 	ctx              = context.Background()
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
-		t.Fatalf("NewUserAPIDatabase returned %s", err)
+		t.Fatalf("NewUserDatabase returned %s", err)
 	}
 	return db, func() {
 		close()
@@ -47,7 +50,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		alice := test.NewUser(t)
 		localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -78,7 +81,7 @@ func Test_AccountData(t *testing.T) {
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		alice := test.NewUser(t)
 		aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -163,7 +166,7 @@ func Test_Devices(t *testing.T) {
 	accessToken := util.RandomString(16)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
@@ -243,7 +246,7 @@ func Test_KeyBackup(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		wantAuthData := json.RawMessage("my auth data")
@@ -320,7 +323,7 @@ func Test_KeyBackup(t *testing.T) {
 func Test_LoginToken(t *testing.T) {
 	alice := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		// create a new token
@@ -352,7 +355,7 @@ func Test_OpenID(t *testing.T) {
 	token := util.RandomString(24)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
@@ -373,7 +376,7 @@ func Test_Profile(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		// create account, which also creates a profile
@@ -422,7 +425,7 @@ func Test_Pusher(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 
 		appID := util.RandomString(8)
@@ -473,7 +476,7 @@ func Test_ThreePID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
@@ -512,7 +515,7 @@ func Test_Notification(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateUserDatabase(t, dbType)
 		defer close()
 		// generate some dummy notifications
 		for i := 0; i < 10; i++ {
@@ -574,5 +577,186 @@ func Test_Notification(t *testing.T) {
 		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(0), total)
+	})
+}
+
+func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
+	base, close := testrig.CreateBaseDendrite(t, dbType)
+	db, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
+	if err != nil {
+		t.Fatalf("failed to create new database: %v", err)
+	}
+	return db, close
+}
+
+func MustNotError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		return
+	}
+	t.Fatalf("operation failed: %s", err)
+}
+
+func TestKeyChanges(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clean := mustCreateKeyDatabase(t, dbType)
+		defer clean()
+		_, err := db.StoreKeyChange(ctx, "@alice:localhost")
+		MustNotError(t, err)
+		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@bob:localhost")
+		MustNotError(t, err)
+		deviceChangeIDC, err := db.StoreKeyChange(ctx, "@charlie:localhost")
+		MustNotError(t, err)
+		userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDB, types.OffsetNewest)
+		if err != nil {
+			t.Fatalf("Failed to KeyChanges: %s", err)
+		}
+		if latest != deviceChangeIDC {
+			t.Fatalf("KeyChanges: got latest=%d want %d", latest, deviceChangeIDC)
+		}
+		if !reflect.DeepEqual(userIDs, []string{"@charlie:localhost"}) {
+			t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
+		}
+	})
+}
+
+func TestKeyChangesNoDupes(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clean := mustCreateKeyDatabase(t, dbType)
+		defer clean()
+		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
+		MustNotError(t, err)
+		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@alice:localhost")
+		MustNotError(t, err)
+		if deviceChangeIDA == deviceChangeIDB {
+			t.Fatalf("Expected change ID to be different even when inserting key change for the same user, got %d for both changes", deviceChangeIDA)
+		}
+		deviceChangeID, err := db.StoreKeyChange(ctx, "@alice:localhost")
+		MustNotError(t, err)
+		userIDs, latest, err := db.KeyChanges(ctx, 0, types.OffsetNewest)
+		if err != nil {
+			t.Fatalf("Failed to KeyChanges: %s", err)
+		}
+		if latest != deviceChangeID {
+			t.Fatalf("KeyChanges: got latest=%d want %d", latest, deviceChangeID)
+		}
+		if !reflect.DeepEqual(userIDs, []string{"@alice:localhost"}) {
+			t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
+		}
+	})
+}
+
+func TestKeyChangesUpperLimit(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clean := mustCreateKeyDatabase(t, dbType)
+		defer clean()
+		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
+		MustNotError(t, err)
+		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@bob:localhost")
+		MustNotError(t, err)
+		_, err = db.StoreKeyChange(ctx, "@charlie:localhost")
+		MustNotError(t, err)
+		userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDA, deviceChangeIDB)
+		if err != nil {
+			t.Fatalf("Failed to KeyChanges: %s", err)
+		}
+		if latest != deviceChangeIDB {
+			t.Fatalf("KeyChanges: got latest=%d want %d", latest, deviceChangeIDB)
+		}
+		if !reflect.DeepEqual(userIDs, []string{"@bob:localhost"}) {
+			t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
+		}
+	})
+}
+
+var dbLock sync.Mutex
+var deviceArray = []string{"AAA", "another_device"}
+
+// The purpose of this test is to make sure that the storage layer is generating sequential stream IDs per user,
+// and that they are returned correctly when querying for device keys.
+func TestDeviceKeysStreamIDGeneration(t *testing.T) {
+	var err error
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clean := mustCreateKeyDatabase(t, dbType)
+		defer clean()
+		alice := "@alice:TestDeviceKeysStreamIDGeneration"
+		bob := "@bob:TestDeviceKeysStreamIDGeneration"
+		msgs := []api.DeviceMessage{
+			{
+				Type: api.TypeDeviceKeyUpdate,
+				DeviceKeys: &api.DeviceKeys{
+					DeviceID: "AAA",
+					UserID:   alice,
+					KeyJSON:  []byte(`{"key":"v1"}`),
+				},
+				// StreamID: 1
+			},
+			{
+				Type: api.TypeDeviceKeyUpdate,
+				DeviceKeys: &api.DeviceKeys{
+					DeviceID: "AAA",
+					UserID:   bob,
+					KeyJSON:  []byte(`{"key":"v1"}`),
+				},
+				// StreamID: 1 as this is a different user
+			},
+			{
+				Type: api.TypeDeviceKeyUpdate,
+				DeviceKeys: &api.DeviceKeys{
+					DeviceID: "another_device",
+					UserID:   alice,
+					KeyJSON:  []byte(`{"key":"v1"}`),
+				},
+				// StreamID: 2 as this is a 2nd device key
+			},
+		}
+		MustNotError(t, db.StoreLocalDeviceKeys(ctx, msgs))
+		if msgs[0].StreamID != 1 {
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=1 but got %d", msgs[0].StreamID)
+		}
+		if msgs[1].StreamID != 1 {
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=1 (different user) but got %d", msgs[1].StreamID)
+		}
+		if msgs[2].StreamID != 2 {
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=2 (another device) but got %d", msgs[2].StreamID)
+		}
+
+		// updating a device sets the next stream ID for that user
+		msgs = []api.DeviceMessage{
+			{
+				Type: api.TypeDeviceKeyUpdate,
+				DeviceKeys: &api.DeviceKeys{
+					DeviceID: "AAA",
+					UserID:   alice,
+					KeyJSON:  []byte(`{"key":"v2"}`),
+				},
+				// StreamID: 3
+			},
+		}
+		MustNotError(t, db.StoreLocalDeviceKeys(ctx, msgs))
+		if msgs[0].StreamID != 3 {
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=3 (new key same device) but got %d", msgs[0].StreamID)
+		}
+
+		dbLock.Lock()
+		defer dbLock.Unlock()
+		// Querying for device keys returns the latest stream IDs
+		msgs, err = db.DeviceKeysForUser(ctx, alice, deviceArray, false)
+
+		if err != nil {
+			t.Fatalf("DeviceKeysForUser returned error: %s", err)
+		}
+		wantStreamIDs := map[string]int64{
+			"AAA":            3,
+			"another_device": 2,
+		}
+		if len(msgs) != len(wantStreamIDs) {
+			t.Fatalf("DeviceKeysForUser: wrong number of devices, got %d want %d", len(msgs), len(wantStreamIDs))
+		}
+		for _, m := range msgs {
+			if m.StreamID != wantStreamIDs[m.DeviceID] {
+				t.Errorf("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
+			}
+		}
 	})
 }

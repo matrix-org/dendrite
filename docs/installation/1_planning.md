@@ -16,12 +16,6 @@ Users can run Dendrite in one of two modes which dictate how these components ar
   server with generally low overhead. This mode dramatically simplifies deployment complexity and offers the
   best balance between performance and resource usage for low-to-mid volume deployments.
 
-* **Polylith mode** runs all components in isolated processes. Components communicate through an external NATS
-  server and HTTP APIs, which incur considerable overhead. While this mode allows for more granular control of
-  resources dedicated toward individual processes, given the additional communications overhead, it is only
-  necessary for very large deployments.
-
-Given our current state of development, **we recommend monolith mode** for all deployments.
 
 ## Databases
 
@@ -85,21 +79,15 @@ If using the PostgreSQL database engine, you should install PostgreSQL 12 or lat
 
 ### NATS Server
 
-Monolith deployments come with a built-in [NATS Server](https://github.com/nats-io/nats-server) and
-therefore do not need this to be manually installed. If you are planning a monolith installation, you
+Dendrite comes with a built-in [NATS Server](https://github.com/nats-io/nats-server) and
+therefore does not need this to be manually installed. If you are planning a monolith installation, you
 do not need to do anything.
 
-Polylith deployments, however, currently need a standalone NATS Server installation with JetStream
-enabled.
-
-To do so, follow the [NATS Server installation instructions](https://docs.nats.io/running-a-nats-service/introduction/installation) and then [start your NATS deployment](https://docs.nats.io/running-a-nats-service/introduction/running). JetStream must be enabled, either by passing the `-js` flag to `nats-server`,
-or by specifying the `store_dir` option in the the `jetstream` configuration.
 
 ### Reverse proxy
 
 A reverse proxy such as [Caddy](https://caddyserver.com), [NGINX](https://www.nginx.com) or
-[HAProxy](http://www.haproxy.org) is required for polylith deployments and is useful for monolith
-deployments. Configuring those is not covered in this documentation, although sample configurations
+[HAProxy](http://www.haproxy.org) is useful for deployments. Configuring those is not covered in this documentation, although sample configurations
 for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy) and
 [NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx) are provided.
 

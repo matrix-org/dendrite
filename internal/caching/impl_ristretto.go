@@ -22,11 +22,12 @@ import (
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/dgraph-io/ristretto/z"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 const (
@@ -40,6 +41,9 @@ const (
 	spaceSummaryRoomsCache
 	lazyLoadingCache
 	eventStateKeyCache
+	eventTypeCache
+	eventTypeNIDCache
+	eventStateKeyNIDCache
 )
 
 func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
@@ -95,14 +99,30 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 		},
 		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{ // event NID -> event
 			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
-				cache:  cache,
-				Prefix: roomEventsCache,
-				MaxAge: maxAge,
+				cache:   cache,
+				Prefix:  roomEventsCache,
+				MaxAge:  maxAge,
+				Mutable: true,
 			},
 		},
 		RoomServerStateKeys: &RistrettoCachePartition[types.EventStateKeyNID, string]{ // event NID -> event state key
 			cache:  cache,
 			Prefix: eventStateKeyCache,
+			MaxAge: maxAge,
+		},
+		RoomServerStateKeyNIDs: &RistrettoCachePartition[string, types.EventStateKeyNID]{ // eventStateKey -> eventStateKey NID
+			cache:  cache,
+			Prefix: eventStateKeyNIDCache,
+			MaxAge: maxAge,
+		},
+		RoomServerEventTypeNIDs: &RistrettoCachePartition[string, types.EventTypeNID]{ // eventType -> eventType NID
+			cache:  cache,
+			Prefix: eventTypeCache,
+			MaxAge: maxAge,
+		},
+		RoomServerEventTypes: &RistrettoCachePartition[types.EventTypeNID, string]{ // eventType NID -> eventType
+			cache:  cache,
+			Prefix: eventTypeNIDCache,
 			MaxAge: maxAge,
 		},
 		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{ // queue NID -> PDU

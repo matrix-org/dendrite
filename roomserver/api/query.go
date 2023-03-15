@@ -86,6 +86,9 @@ type QueryStateAfterEventsResponse struct {
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
 type QueryEventsByIDRequest struct {
+	// The roomID to query events for. If this is empty, we first try to fetch the roomID from the database
+	// as this is needed for further processing/parsing events.
+	RoomID string `json:"room_id"`
 	// The event IDs to look up.
 	EventIDs []string `json:"event_ids"`
 }
@@ -433,7 +436,7 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// QueryMembershipAtEventRequest requests the membership events for a user
+// QueryMembershipAtEventRequest requests the membership event for a user
 // for a list of eventIDs.
 type QueryMembershipAtEventRequest struct {
 	RoomID   string
@@ -443,7 +446,20 @@ type QueryMembershipAtEventRequest struct {
 
 // QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
 type QueryMembershipAtEventResponse struct {
-	// Memberships is a map from eventID to a list of events (if any). Events that
-	// do not have known state will return an empty array here.
-	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
+	// Membership is a map from eventID to membership event. Events that
+	// do not have known state will return a nil event, resulting in a "leave" membership
+	// when calculating history visibility.
+	Membership map[string]*gomatrixserverlib.HeaderedEvent `json:"membership"`
+}
+
+// QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a
+// a room with anymore. This is used to cleanup stale device list entries, where we would
+// otherwise keep on trying to get device lists.
+type QueryLeftUsersRequest struct {
+	StaleDeviceListUsers []string `json:"user_ids"`
+}
+
+// QueryLeftUsersResponse is the response to QueryLeftUsersRequest.
+type QueryLeftUsersResponse struct {
+	LeftUsers []string `json:"user_ids"`
 }

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 type httpClient struct {
@@ -32,8 +32,8 @@ func NewHTTPClient(disableTLSValidation bool) Client {
 }
 
 func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest, resp *NotifyResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "Notify")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "Notify")
+	defer trace.EndRegion()
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -50,8 +50,7 @@ func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest,
 		return err
 	}
 
-	//nolint:errcheck
-	defer hresp.Body.Close()
+	defer internal.CloseAndLogIfError(ctx, hresp.Body, "failed to close response body")
 
 	if hresp.StatusCode == http.StatusOK {
 		return json.NewDecoder(hresp.Body).Decode(resp)

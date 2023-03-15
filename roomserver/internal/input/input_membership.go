@@ -18,13 +18,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/opentracing/opentracing-go"
 )
 
 // updateMembership updates the current membership and the invites for each
@@ -36,8 +37,8 @@ func (r *Inputer) updateMemberships(
 	updater *shared.RoomUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "updateMemberships")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "updateMemberships")
+	defer trace.EndRegion()
 
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID
@@ -53,7 +54,7 @@ func (r *Inputer) updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := updater.Events(ctx, eventNIDs)
+	events, err := updater.Events(ctx, nil, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
