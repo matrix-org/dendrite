@@ -62,7 +62,6 @@ type Dendrite struct {
 	RoomServer    RoomServer    `yaml:"room_server"`
 	SyncAPI       SyncAPI       `yaml:"sync_api"`
 	UserAPI       UserAPI       `yaml:"user_api"`
-	RelayAPI      RelayAPI      `yaml:"relay_api"`
 
 	MSCs MSCs `yaml:"mscs"`
 
@@ -335,7 +334,6 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.SyncAPI.Defaults(opts)
 	c.UserAPI.Defaults(opts)
 	c.AppServiceAPI.Defaults(opts)
-	c.RelayAPI.Defaults(opts)
 	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
@@ -348,7 +346,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors) {
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
+		&c.AppServiceAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs)
 	}
@@ -364,7 +362,6 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
-	c.RelayAPI.Matrix = &c.Global
 	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived
