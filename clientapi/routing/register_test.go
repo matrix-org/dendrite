@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
@@ -407,7 +408,8 @@ func Test_register(t *testing.T) {
 		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
 		defer baseClose()
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		for _, tc := range testCases {
@@ -578,7 +580,8 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 		defer baseClose()
 		base.Cfg.Global.ServerName = "server"
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 		deviceName, deviceID := "deviceName", "deviceID"
 		expectedDisplayName := "DisplayName"
@@ -616,8 +619,8 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		base.Cfg.Global.ServerName = "server"
 		sharedSecret := "dendritetest"
 		base.Cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
-
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		expectedDisplayName := "rabbit"

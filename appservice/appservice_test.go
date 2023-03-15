@@ -12,6 +12,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
@@ -123,8 +124,9 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			},
 		}
 
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(base)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(base, usrAPI, rsAPI)
 

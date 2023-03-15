@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -17,10 +18,11 @@ import (
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	b, baseClose := testrig.CreateBaseDendrite(t, dbType)
+	caches := caching.NewRistrettoCache(b.Cfg.Global.Cache.EstimatedMaxSize, b.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewDatabase(b, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, b.Caches, func(server gomatrixserverlib.ServerName) bool { return server == "localhost" })
+	}, caches, func(server gomatrixserverlib.ServerName) bool { return server == "localhost" })
 	if err != nil {
 		t.Fatalf("NewDatabase returned %s", err)
 	}

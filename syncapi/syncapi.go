@@ -42,6 +42,7 @@ func AddPublicRoutes(
 	base *base.BaseDendrite,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
+	caches *caching.Caches,
 ) {
 	cfg := &base.Cfg.SyncAPI
 
@@ -54,7 +55,7 @@ func AddPublicRoutes(
 
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, base.Caches, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -140,6 +141,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches, fts,
+		rsAPI, cfg, caches, fts,
 	)
 }

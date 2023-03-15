@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -163,6 +164,7 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
+	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 	base.Cfg.FederationAPI.PreferDirectFetch = true
 	base.Cfg.FederationAPI.KeyPerspectives = nil
 	defer close()
@@ -212,7 +214,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(base, fc, rsapi, base.Caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(base, fc, rsapi, caches, nil, false)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{

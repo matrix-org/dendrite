@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
 
@@ -41,10 +42,11 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase
 	if realDatabase {
 		// Real Database/s
 		b, baseClose := testrig.CreateBaseDendrite(t, dbType)
+		caches := caching.NewRistrettoCache(b.Cfg.Global.Cache.EstimatedMaxSize, b.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
 		db, err := storage.NewDatabase(b, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
-		}, b.Caches, b.Cfg.Global.IsLocalServerName)
+		}, caches, b.Cfg.Global.IsLocalServerName)
 		if err != nil {
 			t.Fatalf("NewDatabase returned %s", err)
 		}

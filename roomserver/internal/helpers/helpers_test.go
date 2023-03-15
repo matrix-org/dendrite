@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -18,7 +19,8 @@ import (
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, base.Caches)
+	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
