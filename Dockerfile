@@ -4,8 +4,23 @@
 FROM --platform=${BUILDPLATFORM} docker.io/golang:1.20-alpine AS base
 RUN apk --update --no-cache add bash build-base curl
 
-WORKDIR /build
-COPY . /build
+#
+# build creates all needed binaries
+#
+FROM --platform=${BUILDPLATFORM} base AS build
+WORKDIR /src
+ARG TARGETOS
+ARG TARGETARCH
+ARG FLAGS
+RUN --mount=target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    USERARCH=`go env GOARCH` \
+    GOARCH="$TARGETARCH" \
+    GOOS="linux" \
+    CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
+    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
+
 
 #
 # Builds the Dendrite image containing all required binaries
