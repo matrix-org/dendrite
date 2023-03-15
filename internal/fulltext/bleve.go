@@ -55,6 +55,13 @@ type Search struct {
 	FulltextIndex bleve.Index
 }
 
+type Indexer interface {
+	Index(elements ...IndexElement) error
+	Delete(eventID string) error
+	Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (*bleve.SearchResult, error)
+	Close() error
+}
+
 // IndexElement describes the layout of an element to index
 type IndexElement struct {
 	EventID        string
