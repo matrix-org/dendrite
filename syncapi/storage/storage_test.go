@@ -23,7 +23,7 @@ var ctx = context.Background()
 func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func(), func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	base, closeBase := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewSyncServerDatasource(base, &config.DatabaseOptions{
+	db, _, err := storage.NewSyncServerDatasource(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {

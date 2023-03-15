@@ -49,7 +49,7 @@ type RequestPool struct {
 	userAPI  userapi.SyncUserAPI
 	rsAPI    roomserverAPI.SyncRoomserverAPI
 	lastseen *sync.Map
-	presence *sync.Map
+	Presence *sync.Map
 	streams  *streams.Streams
 	Notifier *notifier.Notifier
 	producer PresencePublisher
@@ -83,14 +83,14 @@ func NewRequestPool(
 		userAPI:  userAPI,
 		rsAPI:    rsAPI,
 		lastseen: &sync.Map{},
-		presence: &sync.Map{},
+		Presence: &sync.Map{},
 		streams:  streams,
 		Notifier: notifier,
 		producer: producer,
 		consumer: consumer,
 	}
 	go rp.cleanLastSeen()
-	go rp.cleanPresence(db, time.Minute*5)
+	// go rp.cleanPresence(db, time.Minute*5)
 	return rp
 }
 
@@ -109,11 +109,11 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 		return
 	}
 	for {
-		rp.presence.Range(func(key interface{}, v interface{}) bool {
+		rp.Presence.Range(func(key interface{}, v interface{}) bool {
 			p := v.(types.PresenceInternal)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
 				rp.updatePresence(db, types.PresenceUnavailable.String(), p.UserID)
-				rp.presence.Delete(key)
+				rp.Presence.Delete(key)
 			}
 			return true
 		})
@@ -151,9 +151,9 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	}
 	newPresence.ClientFields.Presence = presenceID.String()
 
-	defer rp.presence.Store(userID, newPresence)
+	defer rp.Presence.Store(userID, newPresence)
 	// avoid spamming presence updates when syncing
-	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
+	existingPresence, ok := rp.Presence.LoadOrStore(userID, newPresence)
 	if ok {
 		p := existingPresence.(types.PresenceInternal)
 		if p.ClientFields.Presence == newPresence.ClientFields.Presence {
@@ -179,6 +179,10 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 		return
 	}
 
+	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		ips := strings.Split(forwardedFor, ", ")
+		req.RemoteAddr = ips[0]
+	}
 	remoteAddr := req.RemoteAddr
 	if rp.cfg.RealIPHeader != "" {
 		if header := req.Header.Get(rp.cfg.RealIPHeader); header != "" {
@@ -245,7 +249,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(rp.db, req.FormValue("set_presence"), device.UserID)
+	rp.updatePresence(rp.db, "", device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
@@ -395,6 +399,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 						)
 					},
 				),
+				MultiRoomDataPosition: withTransaction(
+					syncReq.Since.MultiRoomDataPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.MultiRoomStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
+				),
 			}
 		} else {
 			// Incremental sync
@@ -477,6 +489,15 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 						return rp.streams.PresenceStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
 							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
+						)
+					},
+				),
+				MultiRoomDataPosition: withTransaction(
+					syncReq.Since.MultiRoomDataPosition,
+					func(snapshot storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.MultiRoomStreamProvider.IncrementalSync(
+							syncReq.Context, snapshot, syncReq,
+							syncReq.Since.MultiRoomDataPosition, rp.Notifier.CurrentPosition().MultiRoomDataPosition,
 						)
 					},
 				),

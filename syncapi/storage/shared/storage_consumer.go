@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/tidwall/gjson"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage/mrd"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -54,6 +56,8 @@ type Database struct {
 	Ignores             tables.Ignores
 	Presence            tables.Presence
 	Relations           tables.Relations
+	MultiRoomQ          *mrd.Queries
+	MultiRoom           tables.MultiRoom
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
@@ -311,6 +315,13 @@ func (d *Database) updateRoomState(
 			membership = &value
 			if err = d.Memberships.UpsertMembership(ctx, txn, event, pduPosition, topoPosition); err != nil {
 				return fmt.Errorf("d.Memberships.UpsertMembership: %w", err)
+			}
+		}
+
+		if strings.HasPrefix(event.Type(), "connect.multiroom") {
+			err := d.UpdateMultiRoomVisibility(ctx, event)
+			if err != nil {
+				logrus.WithError(err).WithField("event_id", event.EventID()).Error("failed to update multi room visibility")
 			}
 		}
 
@@ -605,4 +616,50 @@ func (d *Database) SelectMemberships(
 	membership, notMembership *string,
 ) (eventIDs []string, err error) {
 	return d.Memberships.SelectMemberships(ctx, nil, roomID, pos, membership, notMembership)
+}
+
+func (s *Database) ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error) {
+	return s.Presence.ExpirePresence(ctx)
+}
+
+func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return d.Presence.GetMaxPresenceID(ctx, nil)
+}
+
+func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceAfter(ctx, nil, after, filter)
+}
+
+func (s *Database) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	return s.Presence.UpdateLastActive(ctx, userId, lastActiveTs)
+}
+
+func (d *Database) UpdateMultiRoomVisibility(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+	var mrdEv mrd.StateEvent
+	err := json.Unmarshal(event.Content(), &mrdEv)
+	if err != nil {
+		return fmt.Errorf("unmarshal multiroom visibility failed: %w", err)
+	}
+	if mrdEv.Hidden {
+		err = d.MultiRoomQ.DeleteMultiRoomVisibility(ctx, mrd.DeleteMultiRoomVisibilityParams{
+			UserID: event.Sender(),
+			Type:   event.Type(),
+			RoomID: event.RoomID(),
+		})
+		if err != nil {
+			return fmt.Errorf("delete multiroom visibility failed: %w", err)
+		}
+	}
+	if mrdEv.ExpireTs > 0 {
+		err = d.MultiRoomQ.InsertMultiRoomVisibility(ctx, mrd.InsertMultiRoomVisibilityParams{
+			UserID:   event.Sender(),
+			Type:     event.Type(),
+			RoomID:   event.RoomID(),
+			ExpireTs: int64(mrdEv.ExpireTs),
+		})
+		if err != nil {
+			return fmt.Errorf("insert multiroom visibility failed: %w", err)
+		}
+	}
+	return nil
 }

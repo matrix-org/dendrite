@@ -219,6 +219,8 @@ type Presence interface {
 	GetPresenceForUsers(ctx context.Context, txn *sql.Tx, userIDs []string) (presence []*types.PresenceInternal, err error)
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
 	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (presences map[string]*types.PresenceInternal, err error)
+	ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error)
+	UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error
 }
 
 type Relations interface {
@@ -238,4 +240,8 @@ type Relations interface {
 	// should be if there are no boundaries supplied (i.e. we want to work backwards but don't have a
 	// "from" or want to work forwards and don't have a "to").
 	SelectMaxRelationID(ctx context.Context, txn *sql.Tx) (id int64, err error)
+}
+
+type MultiRoom interface {
+	SelectMultiRoomData(ctx context.Context, r *types.Range, joinedRooms []string, txn *sql.Tx) ([]*types.MultiRoomDataRow, error)
 }

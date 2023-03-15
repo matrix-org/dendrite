@@ -21,7 +21,6 @@ import (
 	"regexp"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -335,11 +334,11 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 
 		// TODO: Remove once rate_limited is implemented
 		if appservice.RateLimited {
-			log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
+			// log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
 		}
 		// TODO: Remove once protocols is implemented
 		if len(appservice.Protocols) > 0 {
-			log.Warn("WARNING: Application service option protocols is currently unimplemented")
+			// log.Warn("WARNING: Application service option protocols is currently unimplemented")
 		}
 	}
 
@@ -365,7 +364,7 @@ func validateNamespace(
 	// Check if GroupID for the users namespace is in the correct format
 	if key == "users" && namespace.GroupID != "" {
 		// TODO: Remove once group_id is implemented
-		log.Warn("WARNING: Application service option group_id is currently unimplemented")
+		// log.Warn("WARNING: Application service option group_id is currently unimplemented")
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {

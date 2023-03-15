@@ -8,6 +8,7 @@ import (
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/storage/mrd"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -22,12 +23,14 @@ type Streams struct {
 	DeviceListStreamProvider       StreamProvider
 	NotificationDataStreamProvider StreamProvider
 	PresenceStreamProvider         StreamProvider
+	MultiRoomStreamProvider        StreamProvider
 }
 
 func NewSyncStreamProviders(
 	d storage.Database, userAPI userapi.SyncUserAPI,
 	rsAPI rsapi.SyncRoomserverAPI,
 	eduCache *caching.EDUCache, lazyLoadCache caching.LazyLoadCache, notifier *notifier.Notifier,
+	mrdb *mrd.Queries,
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
@@ -65,6 +68,11 @@ func NewSyncStreamProviders(
 			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 			notifier:              notifier,
 		},
+		MultiRoomStreamProvider: &MultiRoomDataStreamProvider{
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			notifier:              notifier,
+			mrdDb:                 mrdb,
+		},
 	}
 
 	ctx := context.TODO()
@@ -84,6 +92,7 @@ func NewSyncStreamProviders(
 	streams.NotificationDataStreamProvider.Setup(ctx, snapshot)
 	streams.DeviceListStreamProvider.Setup(ctx, snapshot)
 	streams.PresenceStreamProvider.Setup(ctx, snapshot)
+	streams.MultiRoomStreamProvider.Setup(ctx, snapshot)
 
 	succeeded = true
 	return streams

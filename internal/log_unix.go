@@ -22,10 +22,9 @@ import (
 	"log/syslog"
 
 	"github.com/MFAshby/stdemuxerhook"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
-
-	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // SetupHookLogging configures the logging hooks defined in the configuration.
@@ -39,12 +38,6 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 		level, err := logrus.ParseLevel(hook.Level)
 		if err != nil {
 			logrus.Fatalf("Unrecognised logging level %s: %q", hook.Level, err)
-		}
-
-		// Perform a first filter on the logs according to the lowest level of all
-		// (Eg: If we have hook for info and above, prevent logrus from processing debug logs)
-		if logrus.GetLevel() < level {
-			logrus.SetLevel(level)
 		}
 
 		switch hook.Type {

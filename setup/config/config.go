@@ -16,6 +16,7 @@ package config
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -254,6 +255,15 @@ func loadConfig(
 			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
 		}
 	}
+	if c.ClientAPI.JwtConfig.Enabled {
+		pubPki, _ := pem.Decode([]byte(c.ClientAPI.JwtConfig.Secret))
+		var pub interface{}
+		pub, err = x509.ParsePKIXPublicKey(pubPki.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		c.ClientAPI.JwtConfig.SecretKey = pub.(ed25519.PublicKey)
+	}
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
 
@@ -295,7 +305,10 @@ func (config *Dendrite) Derive() error {
 			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
 		}
 	}
-
+	if config.ClientAPI.ThreePidDelegate != "" {
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
+			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeEmail}})
+	}
 	// Load application service configuration files
 	if err := loadAppServices(&config.AppServiceAPI, &config.Derived); err != nil {
 		return err

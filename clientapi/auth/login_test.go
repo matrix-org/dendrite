@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
@@ -72,8 +73,11 @@ func TestLoginFromJSONReader(t *testing.T) {
 						ServerName: serverName,
 					},
 				},
+				RtFailedLogin: ratelimit.RtFailedLoginConfig{
+					Enabled: false,
+				},
 			}
-			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
+			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, cfg, nil)
 			if err != nil {
 				t.Fatalf("LoginFromJSONReader failed: %+v", err)
 			}
@@ -153,7 +157,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 					},
 				},
 			}
-			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
+			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, cfg, nil)
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
@@ -165,6 +169,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 }
 
 type fakeUserInternalAPI struct {
+	uapi.ClientUserAPI
 	UserInternalAPIForLogin
 	DeletedTokens []string
 }

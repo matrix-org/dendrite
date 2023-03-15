@@ -804,3 +804,22 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	return events, prevBatch, nextBatch, nil
 }
+
+func (d *DatabaseTransaction) SelectMultiRoomData(ctx context.Context, r *types.Range, joinedRooms []string) (types.MultiRoom, error) {
+	rows, err := d.MultiRoom.SelectMultiRoomData(ctx, r, joinedRooms, d.txn)
+	if err != nil {
+		return nil, fmt.Errorf("select multi room data: %w", err)
+	}
+	mr := make(types.MultiRoom, 3)
+	for _, row := range rows {
+		if mr[row.UserId] == nil {
+			mr[row.UserId] = make(map[string]types.MultiRoomData)
+		}
+		mr[row.UserId][row.Type] = types.MultiRoomData{
+			Content:   row.Data,
+			Timestamp: row.Timestamp,
+		}
+	}
+	return mr, nil
+
+}

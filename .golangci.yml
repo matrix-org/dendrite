@@ -179,7 +179,6 @@ linters-settings:
 
 linters:
   enable:
-    - deadcode
     - errcheck
     - goconst
     - gocyclo
@@ -191,10 +190,8 @@ linters:
     - misspell # Check code comments, whereas misspell in CI checks *.md files
     - nakedret
     - staticcheck
-    - structcheck
     - unparam
     - unused
-    - varcheck
   enable-all: false
   disable:
     - bodyclose

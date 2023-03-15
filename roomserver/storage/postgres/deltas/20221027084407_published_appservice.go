@@ -29,6 +29,13 @@ func UpPulishedAppservice(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
+	_, err = tx.ExecContext(ctx, `
+		ALTER TABLE roomserver_published DROP CONSTRAINT IF EXISTS roomserver_published_pkey;
+		ALTER TABLE roomserver_published ADD PRIMARY KEY (room_id, appservice_id, network_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
 	return nil
 }
 

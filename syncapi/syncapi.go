@@ -16,6 +16,7 @@ package syncapi
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
@@ -46,14 +48,26 @@ func AddPublicRoutes(
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
+	syncDB, mrq, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
+	go func() {
+		var affected int64
+		for {
+			affected, err = mrq.DeleteMultiRoomVisibilityByExpireTS(context.Background(), time.Now().Unix())
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire multiroom visibility")
+			}
+			logrus.WithField("rows", affected).Info("expired multiroom visibility")
+			time.Sleep(time.Minute)
+		}
+	}()
+
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, base.Caches, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, base.Caches, notifier, mrq)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -128,8 +142,35 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
+	multiRoomConsumer := consumers.NewOutputMultiRoomDataConsumer(
+		base.ProcessContext, cfg, js, mrq, notifier, streams.MultiRoomStreamProvider,
+	)
+	if err = multiRoomConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start multiroom consumer")
+	}
+
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
 		rsAPI, cfg, base.Caches, base.Fulltext,
 	)
+
+	go func() {
+		ctx := context.Background()
+		for {
+			notify, err := syncDB.ExpirePresence(ctx)
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire presence")
+			}
+			for i := range notify {
+				requestPool.Presence.Store(notify[i].UserID, types.PresenceInternal{
+					Presence: types.PresenceOffline,
+				})
+				notifier.OnNewPresence(types.StreamingToken{
+					PresencePosition: notify[i].StreamPos,
+				}, notify[i].UserID)
+
+			}
+			time.Sleep(types.PresenceExpireInterval)
+		}
+	}()
 }
