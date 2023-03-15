@@ -7,6 +7,8 @@ steps:
       - CLOUDSDK_CORE_PROJECT=globekeeper-development
       - CLOUDSDK_COMPUTE_ZONE=europe-west2-a
       - CLOUDSDK_CONTAINER_CLUSTER=synapse
+substitutions:
+  _BUILD_PLATFORM: linux/amd64 # default
 images:
   - gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA
 timeout: 480s

@@ -1,6 +1,7 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
+ARG BUILDPLATFORM=${BUILDPLATFORM}
 FROM --platform=${BUILDPLATFORM} docker.io/golang:1.20-alpine AS base
 RUN apk --update --no-cache add bash build-base curl
 
