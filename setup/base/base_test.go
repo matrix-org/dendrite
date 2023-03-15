@@ -76,7 +76,7 @@ func TestLandingPage_UnixSocket(t *testing.T) {
 	tempDir := t.TempDir()
 	socket := path.Join(tempDir, "socket")
 	// start base with the listener and wait for it to be started
-	address := config.UnixSocketAddress(socket, 0755)
+	address, err := config.UnixSocketAddress(socket, "755")
 	assert.NoError(t, err)
 	go b.SetupAndServeHTTP(address, nil, nil)
 	time.Sleep(time.Millisecond * 100)
