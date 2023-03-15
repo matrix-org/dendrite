@@ -22,6 +22,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/atomic"
+	"gotest.tools/v3/poll"
+
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -30,11 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	keyAPI "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/atomic"
-	"gotest.tools/v3/poll"
 )
 
 const (
@@ -427,7 +428,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		roomID: map[string]interface{}{
 			"m.read": map[string]interface{}{
 				"@john:kaer.morhen": map[string]interface{}{
-					"data": map[string]interface{}{
+					"data": map[string]int64{
 						"ts": 1533358089009,
 					},
 					"event_ids": []string{
@@ -446,7 +447,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		roomID: map[string]interface{}{
 			"m.read": map[string]interface{}{
 				"johnkaer.morhen": map[string]interface{}{
-					"data": map[string]interface{}{
+					"data": map[string]int64{
 						"ts": 1533358089009,
 					},
 					"event_ids": []string{
@@ -463,7 +464,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		roomID: map[string]interface{}{
 			"m.read": map[string]interface{}{
 				"@john:bad.domain": map[string]interface{}{
-					"data": map[string]interface{}{
+					"data": map[string]int64{
 						"ts": 1533358089009,
 					},
 					"event_ids": []string{
