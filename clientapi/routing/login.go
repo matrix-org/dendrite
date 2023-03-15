@@ -129,6 +129,7 @@ func completeAuth(
 		JSON: loginResponse{
 			UserID:      performRes.Device.UserID,
 			AccessToken: performRes.Device.AccessToken,
+			HomeServer:  serverName,
 			DeviceID:    performRes.Device.ID,
 		},
 	}
