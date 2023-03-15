@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -25,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func mustOpenIndex(t *testing.T, tempDir string) *fulltext.Search {
+func mustOpenIndex(t *testing.T, tempDir string) (*fulltext.Search, *process.ProcessContext) {
 	t.Helper()
 	cfg := config.Fulltext{
 		Enabled:  true,
@@ -36,11 +37,12 @@ func mustOpenIndex(t *testing.T, tempDir string) *fulltext.Search {
 		cfg.IndexPath = config.Path(tempDir)
 		cfg.InMemory = false
 	}
-	fts, err := fulltext.New(cfg)
+	ctx := process.NewProcessContext()
+	fts, err := fulltext.New(ctx.Context(), cfg)
 	if err != nil {
 		t.Fatal("failed to open fulltext index:", err)
 	}
-	return fts
+	return fts, ctx
 }
 
 func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (eventIDs, roomIDs []string) {
@@ -93,19 +95,17 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 
 func TestOpen(t *testing.T) {
 	dataDir := t.TempDir()
-	fts := mustOpenIndex(t, dataDir)
-	if err := fts.Close(); err != nil {
-		t.Fatal("unable to close fulltext index", err)
-	}
+	_, ctx := mustOpenIndex(t, dataDir)
+	ctx.ShutdownDendrite()
 
 	// open existing index
-	fts = mustOpenIndex(t, dataDir)
-	defer fts.Close()
+	_, ctx = mustOpenIndex(t, dataDir)
+	ctx.ShutdownDendrite()
 }
 
 func TestIndex(t *testing.T) {
-	fts := mustOpenIndex(t, "")
-	defer fts.Close()
+	fts, ctx := mustOpenIndex(t, "")
+	defer ctx.ShutdownDendrite()
 
 	// add some data
 	var streamPos int64 = 1
@@ -128,8 +128,8 @@ func TestIndex(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	fts := mustOpenIndex(t, "")
-	defer fts.Close()
+	fts, ctx := mustOpenIndex(t, "")
+	defer ctx.ShutdownDendrite()
 	eventIDs, roomIDs := mustAddTestData(t, fts, 0)
 	res1, err := fts.Search("lorem", roomIDs[:1], nil, 50, 0, false)
 	if err != nil {
@@ -224,7 +224,8 @@ func TestSearch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := mustOpenIndex(t, "")
+			f, ctx := mustOpenIndex(t, "")
+			defer ctx.ShutdownDendrite()
 			eventIDs, roomIDs := mustAddTestData(t, f, 0)
 			var searchRooms []string
 			for _, x := range tt.args.roomIndex {

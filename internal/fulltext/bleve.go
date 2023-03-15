@@ -18,10 +18,10 @@
 package fulltext
 
 import (
+	"context"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
-
 	// side effect imports to allow all possible languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/cjk"
@@ -77,12 +77,16 @@ func (i *IndexElement) SetContentType(v string) {
 }
 
 // New opens a new/existing fulltext index
-func New(cfg config.Fulltext) (fts *Search, err error) {
+func New(ctx context.Context, cfg config.Fulltext) (fts *Search, err error) {
 	fts = &Search{}
 	fts.FulltextIndex, err = openIndex(cfg)
 	if err != nil {
 		return nil, err
 	}
+	go func() {
+		<-ctx.Done()
+		_ = fts.Close()
+	}()
 	return fts, nil
 }
 

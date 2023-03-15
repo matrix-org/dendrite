@@ -17,6 +17,7 @@ package syncapi
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -59,6 +60,15 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
+	var fts *fulltext.Search
+	if cfg.Fulltext.Enabled {
+		fts, err = fulltext.New(base.ProcessContext.Context(), cfg.Fulltext)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to create full text")
+		}
+		base.ProcessContext.ComponentStarted()
+	}
+
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		JetStream: js,
@@ -86,7 +96,7 @@ func AddPublicRoutes(
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, base.Fulltext,
+		streams.InviteStreamProvider, rsAPI, fts,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -94,7 +104,7 @@ func AddPublicRoutes(
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
 		base.ProcessContext, cfg, js, natsClient, syncDB, notifier,
-		streams.AccountDataStreamProvider, base.Fulltext,
+		streams.AccountDataStreamProvider, fts,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -130,6 +140,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches, base.Fulltext,
+		rsAPI, cfg, base.Caches, fts,
 	)
 }

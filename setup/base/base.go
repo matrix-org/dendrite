@@ -42,7 +42,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -83,7 +82,6 @@ type BaseDendrite struct {
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
 	EnableMetrics          bool
-	Fulltext               *fulltext.Search
 	startupLock            sync.Mutex
 }
 
@@ -128,14 +126,6 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	closer, err := cfg.SetupTracing()
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
-	}
-
-	var fts *fulltext.Search
-	if cfg.SyncAPI.Fulltext.Enabled {
-		fts, err = fulltext.New(cfg.SyncAPI.Fulltext)
-		if err != nil {
-			logrus.WithError(err).Panicf("failed to create full text")
-		}
 	}
 
 	if cfg.Global.Sentry.Enabled {
@@ -212,7 +202,6 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
 		EnableMetrics:          enableMetrics,
-		Fulltext:               fts,
 	}
 }
 
@@ -491,12 +480,6 @@ func (b *BaseDendrite) WaitForShutdown() {
 	if b.Cfg.Global.Sentry.Enabled {
 		if !sentry.Flush(time.Second * 5) {
 			logrus.Warnf("failed to flush all Sentry events!")
-		}
-	}
-	if b.Fulltext != nil {
-		err := b.Fulltext.Close()
-		if err != nil {
-			logrus.Warnf("failed to close full text search!")
 		}
 	}
 
