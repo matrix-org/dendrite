@@ -125,11 +125,11 @@ func Enable(
 		}
 	})
 
-	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
+	base.Routers.Client.Handle("/unstable/event_relationships",
 		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
+	base.Routers.Federation.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
 		"msc2836_event_relationships", func(req *http.Request) util.JSONResponse {
 			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
 				req, time.Now(), base.Cfg.Global.ServerName, base.Cfg.Global.IsLocalServerName, keyRing,

@@ -192,14 +192,14 @@ func (m *DendriteMonolith) Start() {
 	monolith.AddAllPublicRoutes(base, caches)
 
 	httpRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
-	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
-	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
-	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.Routers.DendriteAdmin)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.Routers.SynapseAdmin)
 
 	yggRouter := mux.NewRouter()
-	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
-	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.Routers.Federation)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
 
 	// Build both ends of a HTTP multiplex.
 	m.httpServer = &http.Server{

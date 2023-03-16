@@ -140,7 +140,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
+		base.Routers.Client, requestPool, syncDB, userAPI,
 		rsAPI, cfg, caches, fts,
 	)
 }

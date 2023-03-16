@@ -116,7 +116,7 @@ func TestLogin(t *testing.T) {
 					"password": password,
 				}))
 				rec := httptest.NewRecorder()
-				base.PublicClientAPIMux.ServeHTTP(rec, req)
+				base.Routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("failed to login: %s", rec.Body.String())
 				}

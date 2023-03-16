@@ -38,6 +38,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicMediaAPIMux, cfg, rateCfg, mediaDB, userAPI, client,
+		base.Routers.Media, cfg, rateCfg, mediaDB, userAPI, client,
 	)
 }

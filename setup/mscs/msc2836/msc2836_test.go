@@ -555,9 +555,8 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}
 	base := &base.BaseDendrite{
-		Cfg:                    cfg,
-		PublicClientAPIMux:     mux.NewRouter().PathPrefix(httputil.PublicClientPathPrefix).Subrouter(),
-		PublicFederationAPIMux: mux.NewRouter().PathPrefix(httputil.PublicFederationPathPrefix).Subrouter(),
+		Cfg:     cfg,
+		Routers: httputil.NewRouters(),
 	}
 
 	err := msc2836.Enable(base, rsAPI, nil, userAPI, nil)
@@ -567,7 +566,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	for _, ev := range events {
 		hooks.Run(hooks.KindNewEventPersisted, ev)
 	}
-	return base.PublicClientAPIMux
+	return base.Routers.Client
 }
 
 type fledglingEvent struct {

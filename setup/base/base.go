@@ -64,22 +64,15 @@ var staticContent embed.FS
 // Must be closed when shutting down.
 type BaseDendrite struct {
 	*process.ProcessContext
-	tracerCloser           io.Closer
-	PublicClientAPIMux     *mux.Router
-	PublicFederationAPIMux *mux.Router
-	PublicKeyAPIMux        *mux.Router
-	PublicMediaAPIMux      *mux.Router
-	PublicWellKnownAPIMux  *mux.Router
-	PublicStaticMux        *mux.Router
-	DendriteAdminMux       *mux.Router
-	SynapseAdminMux        *mux.Router
-	NATS                   *jetstream.NATSInstance
-	Cfg                    *config.Dendrite
-	DNSCache               *gomatrixserverlib.DNSCache
-	Database               *sql.DB
-	DatabaseWriter         sqlutil.Writer
-	EnableMetrics          bool
-	startupLock            sync.Mutex
+	tracerCloser   io.Closer
+	Routers        httputil.Routers
+	NATS           *jetstream.NATSInstance
+	Cfg            *config.Dendrite
+	DNSCache       *gomatrixserverlib.DNSCache
+	Database       *sql.DB
+	DatabaseWriter sqlutil.Writer
+	EnableMetrics  bool
+	startupLock    sync.Mutex
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -182,22 +175,15 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// directory traversal attack e.g /../../../etc/passwd
 
 	return &BaseDendrite{
-		ProcessContext:         process.NewProcessContext(),
-		tracerCloser:           closer,
-		Cfg:                    cfg,
-		DNSCache:               dnsCache,
-		PublicClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicClientPathPrefix).Subrouter().UseEncodedPath(),
-		PublicFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
-		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
-		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
-		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
-		PublicStaticMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicStaticPath).Subrouter().UseEncodedPath(),
-		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
-		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
-		NATS:                   &jetstream.NATSInstance{},
-		Database:               db,     // set if monolith with global connection pool only
-		DatabaseWriter:         writer, // set if monolith with global connection pool only
-		EnableMetrics:          enableMetrics,
+		ProcessContext: process.NewProcessContext(),
+		tracerCloser:   closer,
+		Cfg:            cfg,
+		DNSCache:       dnsCache,
+		Routers:        httputil.NewRouters(),
+		NATS:           &jetstream.NATSInstance{},
+		Database:       db,     // set if monolith with global connection pool only
+		DatabaseWriter: writer, // set if monolith with global connection pool only
+		EnableMetrics:  enableMetrics,
 	}
 }
 
@@ -275,40 +261,11 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	return client
 }
 
-func (b *BaseDendrite) configureHTTPErrors() {
-	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
-	}
-
-	clientNotFoundHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
-	}
-
-	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
-	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
-
-	for _, router := range []*mux.Router{
-		b.PublicMediaAPIMux, b.DendriteAdminMux,
-		b.SynapseAdminMux, b.PublicWellKnownAPIMux,
-		b.PublicStaticMux,
-	} {
-		router.NotFoundHandler = notFoundCORSHandler
-		router.MethodNotAllowedHandler = notAllowedCORSHandler
-	}
-
-	// Special case so that we don't upset clients on the CS API.
-	b.PublicClientAPIMux.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
-	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
-}
-
 func (b *BaseDendrite) ConfigureAdminEndpoints() {
-	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+	b.Routers.DendriteAdmin.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	})
-	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+	b.Routers.DendriteAdmin.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
 		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
 			w.WriteHeader(503)
 			_ = json.NewEncoder(w).Encode(struct {
@@ -343,8 +300,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		},
 	}
 
-	b.configureHTTPErrors()
-
 	//Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
@@ -365,36 +320,36 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		logrus.WithError(err).Fatal("failed to execute landing page template")
 	}
 
-	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	b.Routers.Static.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(landingPage.Bytes())
 	})
 
 	var clientHandler http.Handler
-	clientHandler = b.PublicClientAPIMux
+	clientHandler = b.Routers.Client
 	if b.Cfg.Global.Sentry.Enabled {
 		sentryHandler := sentryhttp.New(sentryhttp.Options{
 			Repanic: true,
 		})
-		clientHandler = sentryHandler.Handle(b.PublicClientAPIMux)
+		clientHandler = sentryHandler.Handle(b.Routers.Client)
 	}
 	var federationHandler http.Handler
-	federationHandler = b.PublicFederationAPIMux
+	federationHandler = b.Routers.Federation
 	if b.Cfg.Global.Sentry.Enabled {
 		sentryHandler := sentryhttp.New(sentryhttp.Options{
 			Repanic: true,
 		})
-		federationHandler = sentryHandler.Handle(b.PublicFederationAPIMux)
+		federationHandler = sentryHandler.Handle(b.Routers.Federation)
 	}
-	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.DendriteAdminMux)
+	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.Routers.DendriteAdmin)
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !b.Cfg.Global.DisableFederation {
-		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
+		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.Routers.Keys)
 		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(federationHandler)
 	}
-	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.SynapseAdminMux)
-	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
-	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
-	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.PublicStaticMux)
+	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.Routers.SynapseAdmin)
+	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.Routers.Media)
+	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.Routers.WellKnown)
+	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.Routers.Static)
 
 	b.startupLock.Unlock()
 

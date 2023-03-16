@@ -164,7 +164,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 
 	for _, tc := range testCases {
 		w := httptest.NewRecorder()
-		base.PublicClientAPIMux.ServeHTTP(w, tc.req)
+		base.Routers.Client.ServeHTTP(w, tc.req)
 		if w.Code != tc.wantCode {
 			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 		}
@@ -226,7 +226,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 		testrig.MustPublishMsgs(t, jsctx, msg)
 		time.Sleep(100 * time.Millisecond)
 		w := httptest.NewRecorder()
-		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+		base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 			"access_token": alice.AccessToken,
 			"timeout":      "0",
 		})))
@@ -256,7 +256,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	t.Logf("waited for events to be consumed; syncing with %v", sinceTokens)
 	for i, since := range sinceTokens {
 		w := httptest.NewRecorder()
-		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+		base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 			"access_token": alice.AccessToken,
 			"timeout":      "0",
 			"since":        since,
@@ -308,7 +308,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches)
 	w := httptest.NewRecorder()
-	base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+	base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 		"access_token": alice.AccessToken,
 		"timeout":      "0",
 		"set_presence": "online",
@@ -448,7 +448,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 				// There is only one event, we expect only to be able to see this, if the room is world_readable
 				w := httptest.NewRecorder()
-				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+				base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
 					"access_token": bobDev.AccessToken,
 					"dir":          "b",
 					"filter":       `{"lazy_load_members":true}`, // check that lazy loading doesn't break history visibility
@@ -488,7 +488,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 				// Verify the messages after/before invite are visible or not
 				w = httptest.NewRecorder()
-				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+				base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
 					"access_token": bobDev.AccessToken,
 					"dir":          "b",
 				})))
@@ -753,7 +753,7 @@ func TestGetMembership(t *testing.T) {
 				}
 
 				w := httptest.NewRecorder()
-				base.PublicClientAPIMux.ServeHTTP(w, tc.request(t, room))
+				base.Routers.Client.ServeHTTP(w, tc.request(t, room))
 				if w.Code != 200 && tc.wantOK {
 					t.Logf("%s", w.Body.String())
 					t.Fatalf("got HTTP %d want %d", w.Code, 200)
@@ -890,7 +890,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 
 		// Execute a /sync request, recording the response
 		w := httptest.NewRecorder()
-		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+		base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 			"access_token": alice.AccessToken,
 			"since":        tc.since,
 		})))
@@ -1055,7 +1055,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 					params[k] = v
 				}
 			}
-			base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
+			base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
 
 			if tc.wantError && w.Code == 200 {
 				t.Fatalf("Expected an error, but got none")
@@ -1184,7 +1184,7 @@ func syncUntil(t *testing.T,
 	go func() {
 		for {
 			w := httptest.NewRecorder()
-			base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+			base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 				"access_token": accessToken,
 				"timeout":      "1000",
 			})))

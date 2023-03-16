@@ -15,7 +15,11 @@
 package httputil
 
 import (
+	"fmt"
+	"net/http"
 	"net/url"
+
+	"github.com/gorilla/mux"
 )
 
 // URLDecodeMapValues is a function that iterates through each of the items in a
@@ -32,4 +36,59 @@ func URLDecodeMapValues(vmap map[string]string) (map[string]string, error) {
 	}
 
 	return decoded, nil
+}
+
+type Routers struct {
+	Client        *mux.Router
+	Federation    *mux.Router
+	Keys          *mux.Router
+	Media         *mux.Router
+	WellKnown     *mux.Router
+	Static        *mux.Router
+	DendriteAdmin *mux.Router
+	SynapseAdmin  *mux.Router
+}
+
+func NewRouters() Routers {
+	r := Routers{
+		Client:        mux.NewRouter().SkipClean(true).PathPrefix(PublicClientPathPrefix).Subrouter().UseEncodedPath(),
+		Federation:    mux.NewRouter().SkipClean(true).PathPrefix(PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
+		Keys:          mux.NewRouter().SkipClean(true).PathPrefix(PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
+		Media:         mux.NewRouter().SkipClean(true).PathPrefix(PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
+		WellKnown:     mux.NewRouter().SkipClean(true).PathPrefix(PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
+		Static:        mux.NewRouter().SkipClean(true).PathPrefix(PublicStaticPath).Subrouter().UseEncodedPath(),
+		DendriteAdmin: mux.NewRouter().SkipClean(true).PathPrefix(DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
+		SynapseAdmin:  mux.NewRouter().SkipClean(true).PathPrefix(SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+	}
+	r.configureHTTPErrors()
+	return r
+}
+
+func (r *Routers) configureHTTPErrors() {
+	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
+	}
+
+	clientNotFoundHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+	}
+
+	notFoundCORSHandler := WrapHandlerInCORS(http.NotFoundHandler())
+	notAllowedCORSHandler := WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
+
+	for _, router := range []*mux.Router{
+		r.Media, r.DendriteAdmin,
+		r.SynapseAdmin, r.WellKnown,
+		r.Static,
+	} {
+		router.NotFoundHandler = notFoundCORSHandler
+		router.MethodNotAllowedHandler = notAllowedCORSHandler
+	}
+
+	// Special case so that we don't upset clients on the CS API.
+	r.Client.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
+	r.Client.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
 }

@@ -280,7 +280,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
 	federationapi.AddPublicRoutes(b, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil)
-	baseURL, cancel := test.ListenAndServe(t, b.PublicFederationAPIMux, true)
+	baseURL, cancel := test.ListenAndServe(t, b.Routers.Federation, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
 

@@ -42,7 +42,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
+		base.Routers.Federation,
 		fedCfg,
 		relay,
 		keyRing,

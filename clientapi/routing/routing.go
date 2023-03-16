@@ -63,10 +63,10 @@ func Setup(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
-	publicAPIMux := base.PublicClientAPIMux
-	wkMux := base.PublicWellKnownAPIMux
-	synapseAdminRouter := base.SynapseAdminMux
-	dendriteAdminRouter := base.DendriteAdminMux
+	publicAPIMux := base.Routers.Client
+	wkMux := base.Routers.WellKnown
+	synapseAdminRouter := base.Routers.SynapseAdmin
+	dendriteAdminRouter := base.Routers.DendriteAdmin
 
 	if base.EnableMetrics {
 		prometheus.MustRegister(amtRegUsers, sendEventDuration)

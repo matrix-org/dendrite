@@ -73,7 +73,7 @@ func TestAdminResetPassword(t *testing.T) {
 				"password": password,
 			}))
 			rec := httptest.NewRecorder()
-			base.PublicClientAPIMux.ServeHTTP(rec, req)
+			base.Routers.Client.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to login: %s", rec.Body.String())
 			}
@@ -126,7 +126,7 @@ func TestAdminResetPassword(t *testing.T) {
 				}
 
 				rec := httptest.NewRecorder()
-				base.DendriteAdminMux.ServeHTTP(rec, req)
+				base.Routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
@@ -196,7 +196,7 @@ func TestPurgeRoom(t *testing.T) {
 				"password": password,
 			}))
 			rec := httptest.NewRecorder()
-			base.PublicClientAPIMux.ServeHTTP(rec, req)
+			base.Routers.Client.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to login: %s", rec.Body.String())
 			}
@@ -221,7 +221,7 @@ func TestPurgeRoom(t *testing.T) {
 				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 
 				rec := httptest.NewRecorder()
-				base.DendriteAdminMux.ServeHTTP(rec, req)
+				base.Routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())

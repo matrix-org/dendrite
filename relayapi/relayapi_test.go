@@ -147,7 +147,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 		for _, tc := range testCases {
 			w := httptest.NewRecorder()
-			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			base.Routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
 				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
@@ -187,7 +187,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 
 		for _, tc := range testCases {
 			w := httptest.NewRecorder()
-			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			base.Routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
 				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}

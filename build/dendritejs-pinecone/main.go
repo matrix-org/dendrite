@@ -213,12 +213,12 @@ func startup() {
 	monolith.AddAllPublicRoutes(base, caches)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
-	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
 
 	p2pRouter := pSessions.Protocol("matrix").HTTP().Mux()
-	p2pRouter.Handle(httputil.PublicFederationPathPrefix, base.PublicFederationAPIMux)
-	p2pRouter.Handle(httputil.PublicMediaPathPrefix, base.PublicMediaAPIMux)
+	p2pRouter.Handle(httputil.PublicFederationPathPrefix, base.Routers.Federation)
+	p2pRouter.Handle(httputil.PublicMediaPathPrefix, base.Routers.Media)
 
 	// Expose the matrix APIs via fetch - for local traffic
 	go func() {
