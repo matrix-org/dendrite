@@ -3,6 +3,7 @@ package config
 import (
 	"io/fs"
 	"net/url"
+	"strconv"
 )
 
 const (
@@ -32,8 +33,12 @@ func (s ServerAddress) Network() string {
 	}
 }
 
-func UnixSocketAddress(path string, perm fs.FileMode) ServerAddress {
-	return ServerAddress{Address: path, Scheme: NetworkUnix, UnixSocketPermission: perm}
+func UnixSocketAddress(path string, perm string) (ServerAddress, error) {
+	permission, err := strconv.ParseInt(perm, 8, 32)
+	if err != nil {
+		return ServerAddress{}, err
+	}
+	return ServerAddress{Address: path, Scheme: NetworkUnix, UnixSocketPermission: fs.FileMode(permission)}, nil
 }
 
 func HTTPAddress(urlAddress string) (ServerAddress, error) {

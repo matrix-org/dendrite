@@ -16,7 +16,6 @@ package main
 
 import (
 	"flag"
-	"io/fs"
 
 	"github.com/sirupsen/logrus"
 
@@ -34,8 +33,8 @@ var (
 	unixSocket = flag.String("unix-socket", "",
 		"EXPERIMENTAL(unstable): The HTTP listening unix socket for the server (disables http[s]-bind-address feature)",
 	)
-	unixSocketPermission = flag.Int("unix-socket-permission", 0755,
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket permission for the server",
+	unixSocketPermission = flag.String("unix-socket-permission", "755",
+		"EXPERIMENTAL(unstable): The HTTP listening unix socket permission for the server (in chmod format like 755)",
 	)
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
@@ -59,7 +58,11 @@ func main() {
 		}
 		httpsAddr = https
 	} else {
-		httpAddr = config.UnixSocketAddress(*unixSocket, fs.FileMode(*unixSocketPermission))
+		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
+		if err != nil {
+			logrus.WithError(err).Fatalf("Failed to parse unix socket")
+		}
+		httpAddr = socket
 	}
 
 	options := []basepkg.BaseDendriteOptions{}
