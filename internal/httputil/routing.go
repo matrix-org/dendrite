@@ -15,7 +15,6 @@
 package httputil
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -64,31 +63,25 @@ func NewRouters() Routers {
 	return r
 }
 
+var NotAllowedHandler = WrapHandlerInCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusMethodNotAllowed)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+}))
+
+var NotFoundCORSHandler = WrapHandlerInCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+}))
+
 func (r *Routers) configureHTTPErrors() {
-	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
-	}
-
-	clientNotFoundHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
-	}
-
-	notFoundCORSHandler := WrapHandlerInCORS(http.NotFoundHandler())
-	notAllowedCORSHandler := WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
-
 	for _, router := range []*mux.Router{
-		r.Media, r.DendriteAdmin,
-		r.SynapseAdmin, r.WellKnown,
-		r.Static,
+		r.Client, r.Federation, r.Keys,
+		r.Media, r.WellKnown, r.Static,
+		r.DendriteAdmin, r.SynapseAdmin,
 	} {
-		router.NotFoundHandler = notFoundCORSHandler
-		router.MethodNotAllowedHandler = notAllowedCORSHandler
+		router.NotFoundHandler = NotFoundCORSHandler
+		router.MethodNotAllowedHandler = NotAllowedHandler
 	}
-
-	// Special case so that we don't upset clients on the CS API.
-	r.Client.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
-	r.Client.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
 }

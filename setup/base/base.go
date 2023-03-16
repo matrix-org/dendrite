@@ -353,6 +353,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	b.startupLock.Unlock()
 
+	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
+	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
+
 	if externalHTTPAddr.Enabled() {
 		go func() {
 			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
