@@ -18,6 +18,7 @@ import (
 	"time"
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/sirupsen/logrus"
 
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -42,7 +43,7 @@ func NewInternalAPI(
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	appServices := base.Cfg.Derived.ApplicationServices
 
-	pgClient := base.PushGatewayHTTPClient()
+	pgClient := pushgateway.NewHTTPClient(cfg.PushGatewayDisableTLSValidation)
 
 	db, err := storage.NewUserDatabase(
 		base,

@@ -43,7 +43,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/gorilla/mux"
@@ -230,11 +229,6 @@ func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, 
 		return b.Database, b.DatabaseWriter, nil
 	}
 	return nil, nil, fmt.Errorf("no database connections configured")
-}
-
-// PushGatewayHTTPClient returns a new client for interacting with (external) Push Gateways.
-func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
-	return pushgateway.NewHTTPClient(b.Cfg.UserAPI.PushGatewayDisableTLSValidation)
 }
 
 // CreateClient creates a new client (normally used for media fetch requests).
