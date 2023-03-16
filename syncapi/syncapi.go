@@ -42,7 +42,7 @@ func AddPublicRoutes(
 	base *base.BaseDendrite,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
-	caches *caching.Caches,
+	caches caching.LazyLoadCache,
 ) {
 	cfg := &base.Cfg.SyncAPI
 

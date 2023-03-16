@@ -27,7 +27,7 @@ import (
 // NewInternalAPI returns a concrete implementation of the internal API.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	caches *caching.Caches,
+	caches caching.RoomServerCaches,
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 

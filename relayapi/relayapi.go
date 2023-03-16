@@ -56,7 +56,7 @@ func NewRelayInternalAPI(
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
 	relayingEnabled bool,
-	caches *caching.Caches,
+	caches caching.FederationCache,
 ) api.RelayInternalAPI {
 	cfg := &base.Cfg.RelayAPI
 	relayDB, err := storage.NewDatabase(base, &cfg.Database, caches, base.Cfg.Global.IsLocalServerName)
