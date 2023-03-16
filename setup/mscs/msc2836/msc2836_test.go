@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -554,9 +555,11 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}
+	cm := sqlutil.NewConnectionManager()
 	base := &base.BaseDendrite{
-		Cfg:     cfg,
-		Routers: httputil.NewRouters(),
+		Cfg:               cfg,
+		Routers:           httputil.NewRouters(),
+		ConnectionManager: &cm,
 	}
 
 	err := msc2836.Enable(base, rsAPI, nil, userAPI, nil)
