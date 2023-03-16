@@ -1145,7 +1145,7 @@ func TestUpdateRelations(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, shutdownBase := testrig.CreateBaseDendrite(t, dbType)
 		t.Cleanup(shutdownBase)
-		db, err := storage.NewSyncServerDatasource(base, &base.Cfg.SyncAPI.Database)
+		db, err := storage.NewSyncServerDatasource(base.Context(), base.ConnectionManager, &base.Cfg.SyncAPI.Database)
 		if err != nil {
 			t.Fatal(err)
 		}

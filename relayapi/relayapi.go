@@ -59,7 +59,7 @@ func NewRelayInternalAPI(
 	caches caching.FederationCache,
 ) api.RelayInternalAPI {
 	cfg := &base.Cfg.RelayAPI
-	relayDB, err := storage.NewDatabase(base, &cfg.Database, caches, base.Cfg.Global.IsLocalServerName)
+	relayDB, err := storage.NewDatabase(base.ConnectionManager, &cfg.Database, caches, base.Cfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to relay db")
 	}

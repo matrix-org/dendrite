@@ -34,7 +34,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, s
 	t.Helper()
 	base, close := testrig.CreateBaseDendrite(t, dbType)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, caches)
+	db, err := storage.Open(base.ProcessContext.Context(), base.ConnectionManager, &base.Cfg.RoomServer.Database, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}

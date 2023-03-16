@@ -48,7 +48,7 @@ func AddPublicRoutes(
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
+	syncDB, err := storage.NewSyncServerDatasource(base.Context(), base.ConnectionManager, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}

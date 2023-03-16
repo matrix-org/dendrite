@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
@@ -49,8 +50,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	// create testdata folder and remove when done
 	_ = os.Mkdir(testdataPath, os.ModePerm)
 	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
-
-	db, err := storage.NewMediaAPIDatasource(nil, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager()
+	db, err := storage.NewMediaAPIDatasource(&cm, &config.DatabaseOptions{
 		ConnectionString:       "file::memory:?cache=shared",
 		MaxOpenConnections:     100,
 		MaxIdleConnections:     2,

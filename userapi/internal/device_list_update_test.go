@@ -27,13 +27,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 )
@@ -363,9 +363,9 @@ func TestDebounce(t *testing.T) {
 func mustCreateKeyserverDB(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
 
-	base, _, _ := testrig.Base(nil)
 	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)})
+	cm := sqlutil.NewConnectionManager()
+	db, err := storage.NewKeyDatabase(&cm, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)})
 	if err != nil {
 		t.Fatal(err)
 	}

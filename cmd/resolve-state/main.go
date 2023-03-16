@@ -55,7 +55,7 @@ func main() {
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
 	roomserverDB, err := storage.Open(
-		base, &cfg.RoomServer.Database,
+		base.ProcessContext.Context(), base.ConnectionManager, &cfg.RoomServer.Database,
 		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
 	)
 	if err != nil {

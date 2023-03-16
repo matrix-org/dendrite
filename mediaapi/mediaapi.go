@@ -32,7 +32,7 @@ func AddPublicRoutes(
 	cfg := &base.Cfg.MediaAPI
 	rateCfg := &base.Cfg.ClientAPI.RateLimiting
 
-	mediaDB, err := storage.NewMediaAPIDatasource(base, &cfg.Database)
+	mediaDB, err := storage.NewMediaAPIDatasource(base.ConnectionManager, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}

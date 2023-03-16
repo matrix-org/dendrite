@@ -46,7 +46,8 @@ func NewInternalAPI(
 	pgClient := pushgateway.NewHTTPClient(cfg.PushGatewayDisableTLSValidation)
 
 	db, err := storage.NewUserDatabase(
-		base,
+		base.ProcessContext.Context(),
+		base.ConnectionManager,
 		&cfg.AccountDatabase,
 		cfg.Matrix.ServerName,
 		cfg.BCryptCost,
@@ -58,7 +59,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
+	keyDB, err := storage.NewKeyDatabase(base.ConnectionManager, &base.Cfg.KeyServer.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}

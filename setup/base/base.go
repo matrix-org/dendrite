@@ -64,15 +64,14 @@ var staticContent embed.FS
 // Must be closed when shutting down.
 type BaseDendrite struct {
 	*process.ProcessContext
-	tracerCloser   io.Closer
-	Routers        httputil.Routers
-	NATS           *jetstream.NATSInstance
-	Cfg            *config.Dendrite
-	DNSCache       *gomatrixserverlib.DNSCache
-	Database       *sql.DB
-	DatabaseWriter sqlutil.Writer
-	EnableMetrics  bool
-	startupLock    sync.Mutex
+	tracerCloser      io.Closer
+	Routers           httputil.Routers
+	NATS              *jetstream.NATSInstance
+	Cfg               *config.Dendrite
+	DNSCache          *gomatrixserverlib.DNSCache
+	ConnectionManager sqlutil.ConnectionManager
+	EnableMetrics     bool
+	startupLock       sync.Mutex
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -149,14 +148,13 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// If we're in monolith mode, we'll set up a global pool of database
 	// connections. A component is welcome to use this pool if they don't
 	// have a separate database config of their own.
-	var db *sql.DB
-	var writer sqlutil.Writer
+	cm := sqlutil.NewConnectionManager()
 	if cfg.Global.DatabaseOptions.ConnectionString != "" {
 		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
 			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
 		}
-		writer = sqlutil.NewDummyWriter()
-		if db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer); err != nil {
+		_, _, err := cm.Connection(&cfg.Global.DatabaseOptions)
+		if err != nil {
 			logrus.WithError(err).Panic("Failed to set up global database connections")
 		}
 		logrus.Debug("Using global database connection pool")
@@ -175,15 +173,14 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// directory traversal attack e.g /../../../etc/passwd
 
 	return &BaseDendrite{
-		ProcessContext: process.NewProcessContext(),
-		tracerCloser:   closer,
-		Cfg:            cfg,
-		DNSCache:       dnsCache,
-		Routers:        httputil.NewRouters(),
-		NATS:           &jetstream.NATSInstance{},
-		Database:       db,     // set if monolith with global connection pool only
-		DatabaseWriter: writer, // set if monolith with global connection pool only
-		EnableMetrics:  enableMetrics,
+		ProcessContext:    process.NewProcessContext(),
+		tracerCloser:      closer,
+		Cfg:               cfg,
+		DNSCache:          dnsCache,
+		Routers:           httputil.NewRouters(),
+		NATS:              &jetstream.NATSInstance{},
+		ConnectionManager: &cm,
+		EnableMetrics:     enableMetrics,
 	}
 }
 
@@ -204,17 +201,12 @@ func (b *BaseDendrite) Close() error {
 // have a BaseDendrite and just want a connection with the supplied config
 // without any pooling stuff.
 func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
+	logrus.Infof("%#v", dbProperties)
 	if dbProperties.ConnectionString != "" || b == nil {
-		// Open a new database connection using the supplied config.
-		db, err := sqlutil.Open(dbProperties, writer)
-		return db, writer, err
+		cm := sqlutil.NewConnectionManager()
+		return cm.Connection(dbProperties)
 	}
-	if b.Database != nil && b.DatabaseWriter != nil {
-		// Ignore the supplied config and return the global pool and
-		// writer.
-		return b.Database, b.DatabaseWriter, nil
-	}
-	return nil, nil, fmt.Errorf("no database connections configured")
+	return b.ConnectionManager.Connection(dbProperties)
 }
 
 // CreateClient creates a new client (normally used for media fetch requests).

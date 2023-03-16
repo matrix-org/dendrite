@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
@@ -31,8 +30,8 @@ import (
 )
 
 // NewUserDatabase creates a new accounts and profiles database
-func NewUserDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
-	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
+func NewUserDatabase(ctx context.Context, conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +48,7 @@ func NewUserDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptio
 			return deltas.UpServerNames(ctx, txn, serverName)
 		},
 	})
-	if err = m.Up(base.Context()); err != nil {
+	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
 
@@ -109,7 +108,7 @@ func NewUserDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptio
 			return deltas.UpServerNamesPopulate(ctx, txn, serverName)
 		},
 	})
-	if err = m.Up(base.Context()); err != nil {
+	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
 
@@ -135,8 +134,8 @@ func NewUserDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptio
 	}, nil
 }
 
-func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
-	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
+func NewKeyDatabase(conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err
 	}

@@ -18,21 +18,22 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (Database, error) {
+func NewSyncServerDatasource(ctx context.Context, conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(base, dbProperties)
+		return sqlite3.NewDatabase(ctx, conMan, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(base, dbProperties)
+		return postgres.NewDatabase(ctx, conMan, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

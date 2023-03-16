@@ -8,19 +8,20 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	b, baseClose := testrig.CreateBaseDendrite(t, dbType)
-	caches := caching.NewRistrettoCache(b.Cfg.Global.Cache.EstimatedMaxSize, b.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewDatabase(b, &config.DatabaseOptions{
+	ctx := context.Background()
+	cm := sqlutil.NewConnectionManager()
+	db, err := storage.NewDatabase(ctx, &cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, caches, func(server gomatrixserverlib.ServerName) bool { return server == "localhost" })
 	if err != nil {
@@ -28,7 +29,6 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 	}
 	return db, func() {
 		dbClose()
-		baseClose()
 	}
 }
 
