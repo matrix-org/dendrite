@@ -15,20 +15,21 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.FederationCache, serverName gomatrixserverlib.ServerName) (Database, error) {
+func NewDatabase(ctx context.Context, conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(gomatrixserverlib.ServerName) bool) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(base, dbProperties, cache, serverName)
+		return sqlite3.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,20 +15,25 @@
 package storage
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
+	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// NewPublicRoomsServerDatabase opens a database connection.
-func Open(ctx context.Context, conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
+// NewDatabase opens a new database
+func NewDatabase(
+	conMan sqlutil.ConnectionManager,
+	dbProperties *config.DatabaseOptions,
+	cache caching.FederationCache,
+	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.Open(ctx, conMan, dbProperties, cache)
+		return sqlite3.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:
