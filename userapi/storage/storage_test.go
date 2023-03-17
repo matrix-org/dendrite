@@ -36,7 +36,7 @@ var (
 func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	cm := sqlutil.NewConnectionManager()
-	db, err := storage.NewUserDatabase(context.Background(), &cm, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {

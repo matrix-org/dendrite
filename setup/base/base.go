@@ -68,7 +68,7 @@ type BaseDendrite struct {
 	NATS              *jetstream.NATSInstance
 	Cfg               *config.Dendrite
 	DNSCache          *gomatrixserverlib.DNSCache
-	ConnectionManager sqlutil.ConnectionManager
+	ConnectionManager sqlutil.Connections
 	EnableMetrics     bool
 	startupLock       sync.Mutex
 }
@@ -178,7 +178,7 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 		DNSCache:          dnsCache,
 		Routers:           httputil.NewRouters(),
 		NATS:              &jetstream.NATSInstance{},
-		ConnectionManager: &cm,
+		ConnectionManager: cm,
 		EnableMetrics:     enableMetrics,
 	}
 }

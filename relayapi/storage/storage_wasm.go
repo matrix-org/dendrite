@@ -26,7 +26,7 @@ import (
 
 // NewDatabase opens a new database
 func NewDatabase(
-	conMan sqlutil.ConnectionManager,
+	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
 	isLocalServerName func(gomatrixserverlib.ServerName) bool,

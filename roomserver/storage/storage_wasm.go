@@ -25,7 +25,7 @@ import (
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func Open(ctx context.Context, conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
+func Open(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.Open(ctx, conMan, dbProperties, cache)

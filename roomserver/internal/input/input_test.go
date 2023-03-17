@@ -51,7 +51,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 	}
 	cm := sqlutil.NewConnectionManager()
 	db, err := storage.Open(
-		context.Background(), &cm,
+		context.Background(), cm,
 		&config.DatabaseOptions{
 			ConnectionString:   "",
 			MaxOpenConnections: 1,

@@ -91,6 +91,8 @@ func New(ctx context.Context, cfg config.Fulltext) (fts *Search, err error) {
 		return nil, err
 	}
 	go func() {
+		// Wait for the context (should be from process.ProcessContext) to be
+		// done, indicating that Dendrite is shutting down.
 		<-ctx.Done()
 		_ = fts.Close()
 	}()

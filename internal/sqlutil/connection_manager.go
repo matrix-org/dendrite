@@ -21,10 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-type ConnectionManager interface {
-	Connection(dbProperties *config.DatabaseOptions) (*sql.DB, Writer, error)
-}
-
 type Connections struct {
 	db     *sql.DB
 	writer Writer

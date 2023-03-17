@@ -15,7 +15,7 @@ import (
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	cm := sqlutil.NewConnectionManager()
-	db, err := storage.NewMediaAPIDatasource(&cm, &config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {

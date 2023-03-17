@@ -76,7 +76,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	}
 	cm := sqlutil.NewConnectionManager()
 	ctx := context.Background()
-	accountDB, err := storage.NewUserDatabase(ctx, &cm, &config.DatabaseOptions{
+	accountDB, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {

@@ -22,7 +22,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	cm := sqlutil.NewConnectionManager()
-	db, err := storage.NewUserDatabase(context.Background(), &cm, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
 	if err != nil {

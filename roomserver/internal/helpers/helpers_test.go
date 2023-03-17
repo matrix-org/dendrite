@@ -20,7 +20,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	conStr, close := test.PrepareDBConnectionString(t, dbType)
 	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
 	cm := sqlutil.NewConnectionManager()
-	db, err := storage.Open(context.Background(), &cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
+	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}

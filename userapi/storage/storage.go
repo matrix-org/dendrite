@@ -34,7 +34,7 @@ import (
 // and sets postgres connection parameters
 func NewUserDatabase(
 	ctx context.Context,
-	conMan sqlutil.ConnectionManager,
+	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	bcryptCost int,
@@ -54,7 +54,7 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres or Sqlite database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(conMan sqlutil.ConnectionManager, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+func NewKeyDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewKeyDatabase(conMan, dbProperties)

@@ -559,7 +559,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	base := &base.BaseDendrite{
 		Cfg:               cfg,
 		Routers:           httputil.NewRouters(),
-		ConnectionManager: &cm,
+		ConnectionManager: cm,
 	}
 
 	err := msc2836.Enable(base, rsAPI, nil, userAPI, nil)

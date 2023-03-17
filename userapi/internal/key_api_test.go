@@ -17,7 +17,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, 
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	cm := sqlutil.NewConnectionManager()
-	db, err := storage.NewKeyDatabase(&cm, &config.DatabaseOptions{
+	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
