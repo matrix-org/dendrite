@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -72,10 +73,11 @@ func main() {
 
 	federation := base.CreateFederationClient()
 
-	rsAPI := roomserver.NewInternalAPI(base)
+	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
 
+	rsAPI := roomserver.NewInternalAPI(base, caches)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, nil, false,
+		base, federation, rsAPI, caches, nil, false,
 	)
 
 	keyRing := fsAPI.KeyRing()
@@ -104,10 +106,10 @@ func main() {
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
 	}
-	monolith.AddAllPublicRoutes(base)
+	monolith.AddAllPublicRoutes(base, caches)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {
-		if err := mscs.Enable(base, &monolith); err != nil {
+		if err := mscs.Enable(base, &monolith, caches); err != nil {
 			logrus.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}

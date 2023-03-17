@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -73,14 +74,16 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	if opts.serverName != "" {
 		sName = gomatrixserverlib.ServerName(opts.serverName)
 	}
-	accountDB, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager()
+	ctx := context.Background()
+	accountDB, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
 
-	keyDB, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{
+	keyDB, err := storage.NewKeyDatabase(base.ConnectionManager, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {

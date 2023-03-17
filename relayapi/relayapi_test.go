@@ -24,6 +24,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/relayapi"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -34,9 +35,10 @@ import (
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		defer close()
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 	})
 }
@@ -52,7 +54,7 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 		defer close()
 
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
+			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true, nil)
 		})
 	})
 }
@@ -107,8 +109,9 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
@@ -144,7 +147,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 		for _, tc := range testCases {
 			w := httptest.NewRecorder()
-			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			base.Routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
 				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
@@ -156,8 +159,9 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, false)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, false, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
@@ -183,7 +187,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 
 		for _, tc := range testCases {
 			w := httptest.NewRecorder()
-			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			base.Routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
 				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}

@@ -60,7 +60,7 @@ type RoomserverInternalAPI struct {
 
 func NewRoomserverAPI(
 	base *base.BaseDendrite, roomserverDB storage.Database,
-	js nats.JetStreamContext, nc *nats.Conn,
+	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []gomatrixserverlib.ServerName
 	for _, kp := range base.Cfg.FederationAPI.KeyPerspectives {
@@ -78,7 +78,7 @@ func NewRoomserverAPI(
 		DB:                     roomserverDB,
 		Base:                   base,
 		Cfg:                    &base.Cfg.RoomServer,
-		Cache:                  base.Caches,
+		Cache:                  caches,
 		ServerName:             base.Cfg.Global.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
 		InputRoomEventTopic:    base.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent),
@@ -89,7 +89,7 @@ func NewRoomserverAPI(
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
 			DB:                roomserverDB,
-			Cache:             base.Caches,
+			Cache:             caches,
 			IsLocalServerName: base.Cfg.Global.IsLocalServerName,
 			ServerACLs:        serverACLs,
 		},

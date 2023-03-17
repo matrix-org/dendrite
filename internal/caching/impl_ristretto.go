@@ -46,6 +46,11 @@ const (
 	eventStateKeyNIDCache
 )
 
+const (
+	DisableMetrics = false
+	EnableMetrics  = true
+)
+
 func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64((maxCost / 1024) * 10), // 10 counters per 1KB data, affects bloom filter size

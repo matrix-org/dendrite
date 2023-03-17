@@ -37,7 +37,7 @@ import (
 )
 
 // nolint:gocyclo
-func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts *fulltext.Search, from *string) util.JSONResponse {
+func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts fulltext.Indexer, from *string) util.JSONResponse {
 	start := time.Now()
 	var (
 		searchReq SearchRequest

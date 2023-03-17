@@ -18,10 +18,10 @@
 package fulltext
 
 import (
+	"context"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
-
 	// side effect imports to allow all possible languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/cjk"
@@ -55,6 +55,13 @@ type Search struct {
 	FulltextIndex bleve.Index
 }
 
+type Indexer interface {
+	Index(elements ...IndexElement) error
+	Delete(eventID string) error
+	Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (*bleve.SearchResult, error)
+	Close() error
+}
+
 // IndexElement describes the layout of an element to index
 type IndexElement struct {
 	EventID        string
@@ -77,12 +84,18 @@ func (i *IndexElement) SetContentType(v string) {
 }
 
 // New opens a new/existing fulltext index
-func New(cfg config.Fulltext) (fts *Search, err error) {
+func New(ctx context.Context, cfg config.Fulltext) (fts *Search, err error) {
 	fts = &Search{}
 	fts.FulltextIndex, err = openIndex(cfg)
 	if err != nil {
 		return nil, err
 	}
+	go func() {
+		// Wait for the context (should be from process.ProcessContext) to be
+		// done, indicating that Dendrite is shutting down.
+		<-ctx.Done()
+		_ = fts.Close()
+	}()
 	return fts, nil
 }
 

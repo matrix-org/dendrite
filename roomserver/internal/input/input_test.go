@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -48,14 +49,15 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		Kind:  api.KindOutlier, // don't panic if we generate an output event
 		Event: event.Headered(gomatrixserverlib.RoomVersionV6),
 	}
+	cm := sqlutil.NewConnectionManager()
 	db, err := storage.Open(
-		nil,
+		context.Background(), cm,
 		&config.DatabaseOptions{
 			ConnectionString:   "",
 			MaxOpenConnections: 1,
 			MaxIdleConnections: 1,
 		},
-		caching.NewRistrettoCache(8*1024*1024, time.Hour, false),
+		caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics),
 	)
 	if err != nil {
 		t.Logf("PostgreSQL not available (%s), skipping", err)

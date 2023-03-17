@@ -51,7 +51,7 @@ type OutputRoomEventConsumer struct {
 	pduStream    streams.StreamProvider
 	inviteStream streams.StreamProvider
 	notifier     *notifier.Notifier
-	fts          *fulltext.Search
+	fts          fulltext.Indexer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.

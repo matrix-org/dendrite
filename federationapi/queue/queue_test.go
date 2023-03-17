@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
 
@@ -34,17 +36,17 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
 	if realDatabase {
 		// Real Database/s
 		b, baseClose := testrig.CreateBaseDendrite(t, dbType)
+		caches := caching.NewRistrettoCache(b.Cfg.Global.Cache.EstimatedMaxSize, b.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
-		db, err := storage.NewDatabase(b, &config.DatabaseOptions{
+		db, err := storage.NewDatabase(b.ProcessContext.Context(), b.ConnectionManager, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
-		}, b.Caches, b.Cfg.Global.IsLocalServerName)
+		}, caches, b.Cfg.Global.IsLocalServerName)
 		if err != nil {
 			t.Fatalf("NewDatabase returned %s", err)
 		}
@@ -55,10 +57,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase
 	} else {
 		// Fake Database
 		db := test.NewInMemoryFederationDatabase()
-		b := struct {
-			ProcessContext *process.ProcessContext
-		}{ProcessContext: process.NewProcessContext()}
-		return db, b.ProcessContext, func() {}
+		return db, process.NewProcessContext(), func() {}
 	}
 }
 

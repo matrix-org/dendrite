@@ -50,7 +50,7 @@ type OutputClientDataConsumer struct {
 	stream       streams.StreamProvider
 	notifier     *notifier.Notifier
 	serverName   gomatrixserverlib.ServerName
-	fts          *fulltext.Search
+	fts          fulltext.Indexer
 	cfg          *config.SyncAPI
 }
 

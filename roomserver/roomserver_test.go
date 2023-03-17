@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -32,7 +33,8 @@ import (
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
 	t.Helper()
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, base.Caches)
+	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	db, err := storage.Open(base.ProcessContext.Context(), base.ConnectionManager, &base.Cfg.RoomServer.Database, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
@@ -43,7 +45,8 @@ func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 
@@ -181,7 +184,8 @@ func Test_QueryLeftUsers(t *testing.T) {
 		base, _, close := mustCreateDatabase(t, dbType)
 		defer close()
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 		// Create the room
@@ -232,12 +236,13 @@ func TestPurgeRoom(t *testing.T) {
 		defer jetstream.DeleteAllStreams(jsCtx, &base.Cfg.Global.JetStream)
 
 		fedClient := base.CreateFederationClient()
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI)
-		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI, caches)
+		federationapi.NewInternalAPI(base, fedClient, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room

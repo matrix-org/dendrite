@@ -7,22 +7,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
-	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager()
+	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
 	if err != nil {
@@ -30,7 +30,6 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 	}
 	return db, func() {
 		close()
-		baseclose()
 	}
 }
 

@@ -16,6 +16,7 @@ package relayapi
 
 import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/relayapi/routing"
@@ -41,7 +42,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
+		base.Routers.Federation,
 		fedCfg,
 		relay,
 		keyRing,
@@ -55,10 +56,10 @@ func NewRelayInternalAPI(
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
 	relayingEnabled bool,
+	caches caching.FederationCache,
 ) api.RelayInternalAPI {
 	cfg := &base.Cfg.RelayAPI
-
-	relayDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.IsLocalServerName)
+	relayDB, err := storage.NewDatabase(base.ConnectionManager, &cfg.Database, caches, base.Cfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to relay db")
 	}

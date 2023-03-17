@@ -43,7 +43,7 @@ func Setup(
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	lazyLoadCache caching.LazyLoadCache,
-	fts *fulltext.Search,
+	fts fulltext.Indexer,
 ) {
 	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()

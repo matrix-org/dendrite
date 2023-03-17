@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -27,7 +28,8 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
 		defer baseClose()
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(base, caches)
 		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc

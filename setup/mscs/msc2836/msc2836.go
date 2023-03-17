@@ -102,7 +102,7 @@ func Enable(
 	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(base, &base.Cfg.MSCs.Database)
+	db, err := NewDatabase(base.ConnectionManager, &base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}
@@ -125,11 +125,11 @@ func Enable(
 		}
 	})
 
-	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
+	base.Routers.Client.Handle("/unstable/event_relationships",
 		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
+	base.Routers.Federation.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
 		"msc2836_event_relationships", func(req *http.Request) util.JSONResponse {
 			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
 				req, time.Now(), base.Cfg.Global.ServerName, base.Cfg.Global.IsLocalServerName, keyRing,

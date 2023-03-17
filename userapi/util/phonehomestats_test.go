@@ -21,7 +21,7 @@ func TestCollect(t *testing.T) {
 		b, _, _ := testrig.Base(nil)
 		connStr, closeDB := test.PrepareDBConnectionString(t, dbType)
 		defer closeDB()
-		db, err := storage.NewUserDatabase(b, &config.DatabaseOptions{
+		db, err := storage.NewUserDatabase(b.Context(), b.ConnectionManager, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
 		}, "localhost", bcrypt.MinCost, 1000, 1000, "")
 		if err != nil {

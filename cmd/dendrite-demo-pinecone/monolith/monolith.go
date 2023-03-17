@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/relayapi"
 	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
@@ -134,17 +135,17 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.NewInternalAPI(p.BaseDendrite)
-	rsAPI := rsComponent
+	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
+	rsAPI := roomserver.NewInternalAPI(p.BaseDendrite, caches)
 	fsAPI := federationapi.NewInternalAPI(
-		p.BaseDendrite, federation, rsAPI, p.BaseDendrite.Caches, keyRing, true,
+		p.BaseDendrite, federation, rsAPI, caches, keyRing, true,
 	)
 
 	userAPI := userapi.NewInternalAPI(p.BaseDendrite, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(p.BaseDendrite, userAPI, rsAPI)
 
-	rsComponent.SetFederationAPI(fsAPI, keyRing)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(p.Router, p.Sessions, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(p.Router, p.Sessions, fsAPI, federation)
@@ -161,7 +162,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		Config:                 &p.BaseDendrite.Cfg.FederationAPI,
 		UserAPI:                userAPI,
 	}
-	relayAPI := relayapi.NewRelayInternalAPI(p.BaseDendrite, federation, rsAPI, keyRing, producer, enableRelaying)
+	relayAPI := relayapi.NewRelayInternalAPI(p.BaseDendrite, federation, rsAPI, keyRing, producer, enableRelaying, caches)
 	logrus.Infof("Relaying enabled: %v", relayAPI.RelayingEnabled())
 
 	p.dendrite = setup.Monolith{
@@ -178,7 +179,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
-	p.dendrite.AddAllPublicRoutes(p.BaseDendrite)
+	p.dendrite.AddAllPublicRoutes(p.BaseDendrite, caches)
 
 	p.setupHttpServers(userProvider, enableWebsockets)
 }
@@ -247,10 +248,10 @@ func (p *P2PMonolith) Addr() string {
 
 func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider, enableWebsockets bool) {
 	p.httpMux = mux.NewRouter().SkipClean(true).UseEncodedPath()
-	p.httpMux.PathPrefix(httputil.PublicClientPathPrefix).Handler(p.BaseDendrite.PublicClientAPIMux)
-	p.httpMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.PublicMediaAPIMux)
-	p.httpMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(p.BaseDendrite.DendriteAdminMux)
-	p.httpMux.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(p.BaseDendrite.SynapseAdminMux)
+	p.httpMux.PathPrefix(httputil.PublicClientPathPrefix).Handler(p.BaseDendrite.Routers.Client)
+	p.httpMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.Routers.Media)
+	p.httpMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(p.BaseDendrite.Routers.DendriteAdmin)
+	p.httpMux.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(p.BaseDendrite.Routers.SynapseAdmin)
 
 	if enableWebsockets {
 		wsUpgrader := websocket.Upgrader{
@@ -283,8 +284,8 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 
 	p.pineconeMux = mux.NewRouter().SkipClean(true).UseEncodedPath()
 	p.pineconeMux.PathPrefix(users.PublicURL).HandlerFunc(userProvider.FederatedUserProfiles)
-	p.pineconeMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(p.BaseDendrite.PublicFederationAPIMux)
-	p.pineconeMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.PublicMediaAPIMux)
+	p.pineconeMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(p.BaseDendrite.Routers.Federation)
+	p.pineconeMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.Routers.Media)
 
 	pHTTP := p.Sessions.Protocol(SessionProtocol).HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, p.pineconeMux)

@@ -17,6 +17,7 @@ package syncapi
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -41,22 +42,32 @@ func AddPublicRoutes(
 	base *base.BaseDendrite,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
+	caches caching.LazyLoadCache,
 ) {
 	cfg := &base.Cfg.SyncAPI
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
+	syncDB, err := storage.NewSyncServerDatasource(base.Context(), base.ConnectionManager, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, base.Caches, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
+	}
+
+	var fts *fulltext.Search
+	if cfg.Fulltext.Enabled {
+		fts, err = fulltext.New(base.ProcessContext.Context(), cfg.Fulltext)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to create full text")
+		}
+		base.ProcessContext.ComponentStarted()
 	}
 
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
@@ -86,7 +97,7 @@ func AddPublicRoutes(
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, base.Fulltext,
+		streams.InviteStreamProvider, rsAPI, fts,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -94,7 +105,7 @@ func AddPublicRoutes(
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
 		base.ProcessContext, cfg, js, natsClient, syncDB, notifier,
-		streams.AccountDataStreamProvider, base.Fulltext,
+		streams.AccountDataStreamProvider, fts,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -129,7 +140,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches, base.Fulltext,
+		base.Routers.Client, requestPool, syncDB, userAPI,
+		rsAPI, cfg, caches, fts,
 	)
 }

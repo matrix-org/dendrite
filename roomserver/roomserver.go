@@ -15,6 +15,7 @@
 package roomserver
 
 import (
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -26,10 +27,11 @@ import (
 // NewInternalAPI returns a concrete implementation of the internal API.
 func NewInternalAPI(
 	base *base.BaseDendrite,
+	caches caching.RoomServerCaches,
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	roomserverDB, err := storage.Open(base, &cfg.Database, base.Caches)
+	roomserverDB, err := storage.Open(base.ProcessContext.Context(), base.ConnectionManager, &cfg.Database, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
@@ -37,6 +39,6 @@ func NewInternalAPI(
 	js, nc := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	return internal.NewRoomserverAPI(
-		base, roomserverDB, js, nc,
+		base, roomserverDB, js, nc, caches,
 	)
 }

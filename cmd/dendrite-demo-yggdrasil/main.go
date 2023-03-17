@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/gorilla/mux"
@@ -156,16 +157,15 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.NewInternalAPI(
-		base,
-	)
+	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(base, caches)
 
 	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, keyRing, true,
+		base, federation, rsAPI, caches, keyRing, true,
 	)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
@@ -184,21 +184,21 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base)
-	if err := mscs.Enable(base, &monolith); err != nil {
+	monolith.AddAllPublicRoutes(base, caches)
+	if err := mscs.Enable(base, &monolith, caches); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")
 	}
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
-	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
-	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
-	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.Routers.DendriteAdmin)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.Routers.SynapseAdmin)
 	embed.Embed(httpRouter, *instancePort, "Yggdrasil Demo")
 
 	yggRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
-	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.Routers.Federation)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{

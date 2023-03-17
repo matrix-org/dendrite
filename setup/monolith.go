@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/federationapi"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/relayapi"
@@ -52,7 +53,7 @@ type Monolith struct {
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
-func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
+func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, caches *caching.Caches) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
 	if userDirectoryProvider == nil {
 		userDirectoryProvider = m.UserAPI
@@ -66,7 +67,7 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
 	)
 	mediaapi.AddPublicRoutes(base, m.UserAPI, m.Client)
-	syncapi.AddPublicRoutes(base, m.UserAPI, m.RoomserverAPI)
+	syncapi.AddPublicRoutes(base, m.UserAPI, m.RoomserverAPI, caches)
 
 	if m.RelayAPI != nil {
 		relayapi.AddPublicRoutes(base, m.KeyRing, m.RelayAPI)

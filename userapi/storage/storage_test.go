@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -33,9 +34,9 @@ var (
 )
 
 func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
-	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager()
+	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
@@ -43,7 +44,6 @@ func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatab
 	}
 	return db, func() {
 		close()
-		baseclose()
 	}
 }
 
@@ -577,7 +577,7 @@ func Test_Notification(t *testing.T) {
 
 func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
+	db, err := storage.NewKeyDatabase(base.ConnectionManager, &base.Cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}

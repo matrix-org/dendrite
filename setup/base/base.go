@@ -17,7 +17,6 @@ package base
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -36,15 +35,13 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/gorilla/mux"
@@ -53,7 +50,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 )
 
@@ -67,24 +63,14 @@ var staticContent embed.FS
 // Must be closed when shutting down.
 type BaseDendrite struct {
 	*process.ProcessContext
-	tracerCloser           io.Closer
-	PublicClientAPIMux     *mux.Router
-	PublicFederationAPIMux *mux.Router
-	PublicKeyAPIMux        *mux.Router
-	PublicMediaAPIMux      *mux.Router
-	PublicWellKnownAPIMux  *mux.Router
-	PublicStaticMux        *mux.Router
-	DendriteAdminMux       *mux.Router
-	SynapseAdminMux        *mux.Router
-	NATS                   *jetstream.NATSInstance
-	Cfg                    *config.Dendrite
-	Caches                 *caching.Caches
-	DNSCache               *gomatrixserverlib.DNSCache
-	Database               *sql.DB
-	DatabaseWriter         sqlutil.Writer
-	EnableMetrics          bool
-	Fulltext               *fulltext.Search
-	startupLock            sync.Mutex
+	tracerCloser      io.Closer
+	Routers           httputil.Routers
+	NATS              *jetstream.NATSInstance
+	Cfg               *config.Dendrite
+	DNSCache          *gomatrixserverlib.DNSCache
+	ConnectionManager sqlutil.Connections
+	EnableMetrics     bool
+	startupLock       sync.Mutex
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -130,14 +116,6 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
 
-	var fts *fulltext.Search
-	if cfg.SyncAPI.Fulltext.Enabled {
-		fts, err = fulltext.New(cfg.SyncAPI.Fulltext)
-		if err != nil {
-			logrus.WithError(err).Panicf("failed to create full text")
-		}
-	}
-
 	if cfg.Global.Sentry.Enabled {
 		logrus.Info("Setting up Sentry for debugging...")
 		err = sentry.Init(sentry.ClientOptions{
@@ -169,14 +147,13 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// If we're in monolith mode, we'll set up a global pool of database
 	// connections. A component is welcome to use this pool if they don't
 	// have a separate database config of their own.
-	var db *sql.DB
-	var writer sqlutil.Writer
+	cm := sqlutil.NewConnectionManager()
 	if cfg.Global.DatabaseOptions.ConnectionString != "" {
 		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
 			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
 		}
-		writer = sqlutil.NewDummyWriter()
-		if db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer); err != nil {
+		_, _, err := cm.Connection(&cfg.Global.DatabaseOptions)
+		if err != nil {
 			logrus.WithError(err).Panic("Failed to set up global database connections")
 		}
 		logrus.Debug("Using global database connection pool")
@@ -195,24 +172,14 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// directory traversal attack e.g /../../../etc/passwd
 
 	return &BaseDendrite{
-		ProcessContext:         process.NewProcessContext(),
-		tracerCloser:           closer,
-		Cfg:                    cfg,
-		Caches:                 caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics),
-		DNSCache:               dnsCache,
-		PublicClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicClientPathPrefix).Subrouter().UseEncodedPath(),
-		PublicFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
-		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
-		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
-		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
-		PublicStaticMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicStaticPath).Subrouter().UseEncodedPath(),
-		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
-		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
-		NATS:                   &jetstream.NATSInstance{},
-		Database:               db,     // set if monolith with global connection pool only
-		DatabaseWriter:         writer, // set if monolith with global connection pool only
-		EnableMetrics:          enableMetrics,
-		Fulltext:               fts,
+		ProcessContext:    process.NewProcessContext(),
+		tracerCloser:      closer,
+		Cfg:               cfg,
+		DNSCache:          dnsCache,
+		Routers:           httputil.NewRouters(),
+		NATS:              &jetstream.NATSInstance{},
+		ConnectionManager: cm,
+		EnableMetrics:     enableMetrics,
 	}
 }
 
@@ -221,34 +188,6 @@ func (b *BaseDendrite) Close() error {
 	b.ProcessContext.ShutdownDendrite()
 	b.ProcessContext.WaitForShutdown()
 	return b.tracerCloser.Close()
-}
-
-// DatabaseConnection assists in setting up a database connection. It accepts
-// the database properties and a new writer for the given component. If we're
-// running in monolith mode with a global connection pool configured then we
-// will return that connection, along with the global writer, effectively
-// ignoring the options provided. Otherwise we'll open a new database connection
-// using the supplied options and writer. Note that it's possible for the pointer
-// receiver to be nil here – that's deliberate as some of the unit tests don't
-// have a BaseDendrite and just want a connection with the supplied config
-// without any pooling stuff.
-func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
-	if dbProperties.ConnectionString != "" || b == nil {
-		// Open a new database connection using the supplied config.
-		db, err := sqlutil.Open(dbProperties, writer)
-		return db, writer, err
-	}
-	if b.Database != nil && b.DatabaseWriter != nil {
-		// Ignore the supplied config and return the global pool and
-		// writer.
-		return b.Database, b.DatabaseWriter, nil
-	}
-	return nil, nil, fmt.Errorf("no database connections configured")
-}
-
-// PushGatewayHTTPClient returns a new client for interacting with (external) Push Gateways.
-func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
-	return pushgateway.NewHTTPClient(b.Cfg.UserAPI.PushGatewayDisableTLSValidation)
 }
 
 // CreateClient creates a new client (normally used for media fetch requests).
@@ -295,40 +234,11 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	return client
 }
 
-func (b *BaseDendrite) configureHTTPErrors() {
-	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
-	}
-
-	clientNotFoundHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
-	}
-
-	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
-	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
-
-	for _, router := range []*mux.Router{
-		b.PublicMediaAPIMux, b.DendriteAdminMux,
-		b.SynapseAdminMux, b.PublicWellKnownAPIMux,
-		b.PublicStaticMux,
-	} {
-		router.NotFoundHandler = notFoundCORSHandler
-		router.MethodNotAllowedHandler = notAllowedCORSHandler
-	}
-
-	// Special case so that we don't upset clients on the CS API.
-	b.PublicClientAPIMux.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
-	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
-}
-
 func (b *BaseDendrite) ConfigureAdminEndpoints() {
-	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+	b.Routers.DendriteAdmin.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	})
-	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+	b.Routers.DendriteAdmin.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
 		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
 			w.WriteHeader(503)
 			_ = json.NewEncoder(w).Encode(struct {
@@ -363,8 +273,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		},
 	}
 
-	b.configureHTTPErrors()
-
 	//Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
@@ -385,38 +293,41 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		logrus.WithError(err).Fatal("failed to execute landing page template")
 	}
 
-	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	b.Routers.Static.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(landingPage.Bytes())
 	})
 
 	var clientHandler http.Handler
-	clientHandler = b.PublicClientAPIMux
+	clientHandler = b.Routers.Client
 	if b.Cfg.Global.Sentry.Enabled {
 		sentryHandler := sentryhttp.New(sentryhttp.Options{
 			Repanic: true,
 		})
-		clientHandler = sentryHandler.Handle(b.PublicClientAPIMux)
+		clientHandler = sentryHandler.Handle(b.Routers.Client)
 	}
 	var federationHandler http.Handler
-	federationHandler = b.PublicFederationAPIMux
+	federationHandler = b.Routers.Federation
 	if b.Cfg.Global.Sentry.Enabled {
 		sentryHandler := sentryhttp.New(sentryhttp.Options{
 			Repanic: true,
 		})
-		federationHandler = sentryHandler.Handle(b.PublicFederationAPIMux)
+		federationHandler = sentryHandler.Handle(b.Routers.Federation)
 	}
-	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.DendriteAdminMux)
+	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.Routers.DendriteAdmin)
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !b.Cfg.Global.DisableFederation {
-		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
+		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.Routers.Keys)
 		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(federationHandler)
 	}
-	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.SynapseAdminMux)
-	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
-	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
-	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.PublicStaticMux)
+	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.Routers.SynapseAdmin)
+	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.Routers.Media)
+	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.Routers.WellKnown)
+	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.Routers.Static)
 
 	b.startupLock.Unlock()
+
+	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
+	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
 
 	if externalHTTPAddr.Enabled() {
 		go func() {
@@ -491,12 +402,6 @@ func (b *BaseDendrite) WaitForShutdown() {
 	if b.Cfg.Global.Sentry.Enabled {
 		if !sentry.Flush(time.Second * 5) {
 			logrus.Warnf("failed to flush all Sentry events!")
-		}
-	}
-	if b.Fulltext != nil {
-		err := b.Fulltext.Close()
-		if err != nil {
-			logrus.Warnf("failed to close full text search!")
 		}
 	}
 

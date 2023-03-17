@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -13,7 +14,8 @@ import (
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewMediaAPIDatasource(nil, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager()
+	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {

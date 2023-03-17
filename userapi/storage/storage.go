@@ -18,12 +18,13 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
@@ -32,7 +33,8 @@ import (
 // NewUserDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
 func NewUserDatabase(
-	base *base.BaseDendrite,
+	ctx context.Context,
+	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	bcryptCost int,
@@ -42,9 +44,9 @@ func NewUserDatabase(
 ) (UserDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewUserDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+		return sqlite3.NewUserDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+		return postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}
@@ -52,12 +54,12 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres or Sqlite database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+func NewKeyDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewKeyDatabase(base, dbProperties)
+		return sqlite3.NewKeyDatabase(conMan, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewKeyDatabase(base, dbProperties)
+		return postgres.NewKeyDatabase(conMan, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

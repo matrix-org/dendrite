@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !wasm
-// +build !wasm
-
 package storage
 
 import (
@@ -22,7 +19,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/relayapi/storage/postgres"
 	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -39,7 +35,7 @@ func NewDatabase(
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
+		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

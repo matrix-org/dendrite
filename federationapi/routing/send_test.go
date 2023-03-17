@@ -48,7 +48,7 @@ func TestHandleSend(t *testing.T) {
 		defer close()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-		base.PublicFederationAPIMux = fedMux
+		base.Routers.Federation = fedMux
 		base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
 		base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
 		fedapi := fedAPI.NewInternalAPI(base, nil, nil, nil, nil, true)

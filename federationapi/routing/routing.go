@@ -65,9 +65,9 @@ func Setup(
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) {
-	fedMux := base.PublicFederationAPIMux
-	keyMux := base.PublicKeyAPIMux
-	wkMux := base.PublicWellKnownAPIMux
+	fedMux := base.Routers.Federation
+	keyMux := base.Routers.Keys
+	wkMux := base.Routers.WellKnown
 	cfg := &base.Cfg.FederationAPI
 
 	if base.EnableMetrics {

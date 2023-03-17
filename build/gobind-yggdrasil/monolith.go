@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggrooms"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
@@ -158,10 +159,11 @@ func (m *DendriteMonolith) Start() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.NewInternalAPI(base)
+	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(base, caches)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, keyRing, true,
+		base, federation, rsAPI, caches, keyRing, true,
 	)
 
 	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
@@ -187,17 +189,17 @@ func (m *DendriteMonolith) Start() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base)
+	monolith.AddAllPublicRoutes(base, caches)
 
 	httpRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
-	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
-	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
-	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.Routers.DendriteAdmin)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.Routers.SynapseAdmin)
 
 	yggRouter := mux.NewRouter()
-	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
-	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.Routers.Federation)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
 
 	// Build both ends of a HTTP multiplex.
 	m.httpServer = &http.Server{
