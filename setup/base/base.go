@@ -17,7 +17,6 @@ package base
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -189,24 +188,6 @@ func (b *BaseDendrite) Close() error {
 	b.ProcessContext.ShutdownDendrite()
 	b.ProcessContext.WaitForShutdown()
 	return b.tracerCloser.Close()
-}
-
-// DatabaseConnection assists in setting up a database connection. It accepts
-// the database properties and a new writer for the given component. If we're
-// running in monolith mode with a global connection pool configured then we
-// will return that connection, along with the global writer, effectively
-// ignoring the options provided. Otherwise we'll open a new database connection
-// using the supplied options and writer. Note that it's possible for the pointer
-// receiver to be nil here – that's deliberate as some of the unit tests don't
-// have a BaseDendrite and just want a connection with the supplied config
-// without any pooling stuff.
-func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
-	logrus.Infof("%#v", dbProperties)
-	if dbProperties.ConnectionString != "" || b == nil {
-		cm := sqlutil.NewConnectionManager()
-		return cm.Connection(dbProperties)
-	}
-	return b.ConnectionManager.Connection(dbProperties)
 }
 
 // CreateClient creates a new client (normally used for media fetch requests).
