@@ -145,7 +145,8 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// If we're in monolith mode, we'll set up a global pool of database
 	// connections. A component is welcome to use this pool if they don't
 	// have a separate database config of their own.
-	cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+	pCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(pCtx, cfg.Global.DatabaseOptions)
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
@@ -160,7 +161,7 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// directory traversal attack e.g /../../../etc/passwd
 
 	return &BaseDendrite{
-		ProcessContext:    process.NewProcessContext(),
+		ProcessContext:    pCtx,
 		tracerCloser:      closer,
 		Cfg:               cfg,
 		DNSCache:          dnsCache,

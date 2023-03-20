@@ -50,7 +50,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	// create testdata folder and remove when done
 	_ = os.Mkdir(testdataPath, os.ModePerm)
 	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
-	cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
 		ConnectionString:       "file::memory:?cache=shared",
 		MaxOpenConnections:     100,

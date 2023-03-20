@@ -413,7 +413,7 @@ func Test_register(t *testing.T) {
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
@@ -587,7 +587,7 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		deviceName, deviceID := "deviceName", "deviceID"
@@ -628,7 +628,7 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		sharedSecret := "dendritetest"
 		cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
 
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)

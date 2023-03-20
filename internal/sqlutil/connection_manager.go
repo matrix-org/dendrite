@@ -19,17 +19,20 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 )
 
 type Connections struct {
-	db           *sql.DB
-	writer       Writer
-	globalConfig config.DatabaseOptions
+	db             *sql.DB
+	writer         Writer
+	globalConfig   config.DatabaseOptions
+	processContext *process.ProcessContext
 }
 
-func NewConnectionManager(globalConfig config.DatabaseOptions) Connections {
+func NewConnectionManager(processCtx *process.ProcessContext, globalConfig config.DatabaseOptions) Connections {
 	return Connections{
-		globalConfig: globalConfig,
+		globalConfig:   globalConfig,
+		processContext: processCtx,
 	}
 }
 
@@ -50,6 +53,15 @@ func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB,
 			return nil, nil, err
 		}
 		c.writer = writer
+		go func() {
+			if c.processContext == nil {
+				return
+			}
+			c.processContext.ComponentStarted()
+			<-c.processContext.WaitForShutdown()
+			_ = c.db.Close()
+			c.processContext.ComponentFinished()
+		}()
 		return c.db, c.writer, nil
 	}
 	if c.db != nil && c.writer != nil {

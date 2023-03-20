@@ -43,7 +43,7 @@ func TestAdminResetPassword(t *testing.T) {
 		})
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		// Needed for changing the password/login
@@ -161,7 +161,7 @@ func TestPurgeRoom(t *testing.T) {
 		defer close()
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 

@@ -134,7 +134,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)

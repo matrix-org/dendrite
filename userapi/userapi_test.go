@@ -73,7 +73,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	if opts.serverName != "" {
 		sName = gomatrixserverlib.ServerName(opts.serverName)
 	}
-	cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
 	accountDB, err := storage.NewUserDatabase(ctx.Context(), cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {

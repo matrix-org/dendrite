@@ -30,7 +30,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
 
-		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
