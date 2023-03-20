@@ -83,7 +83,7 @@ func main() {
 
 	keyRing := fsAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 

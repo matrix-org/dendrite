@@ -142,7 +142,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
-	userAPI := userapi.NewInternalAPI(p.BaseDendrite, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, &natsInstance, userAPI, rsAPI)
 

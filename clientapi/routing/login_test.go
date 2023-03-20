@@ -42,7 +42,7 @@ func TestLogin(t *testing.T) {
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, nil)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
 		Setup(base.Routers, base.Cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, base.EnableMetrics)

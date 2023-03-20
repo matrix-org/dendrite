@@ -129,7 +129,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
-		usrAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
+		usrAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, usrAPI, rsAPI)
 
 		runCases(t, asAPI)

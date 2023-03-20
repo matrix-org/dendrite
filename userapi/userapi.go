@@ -19,10 +19,12 @@ import (
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/sirupsen/logrus"
 
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/consumers"
@@ -35,32 +37,33 @@ import (
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite,
+	processContext *process.ProcessContext,
+	dendriteCfg *config.Dendrite,
+	cm sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
 ) *internal.UserInternalAPI {
-	cfg := &base.Cfg.UserAPI
-	js, _ := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
-	appServices := base.Cfg.Derived.ApplicationServices
+	js, _ := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
+	appServices := dendriteCfg.Derived.ApplicationServices
 
-	pgClient := pushgateway.NewHTTPClient(cfg.PushGatewayDisableTLSValidation)
+	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
 
 	db, err := storage.NewUserDatabase(
-		base.ProcessContext.Context(),
-		base.ConnectionManager,
-		&cfg.AccountDatabase,
-		cfg.Matrix.ServerName,
-		cfg.BCryptCost,
-		cfg.OpenIDTokenLifetimeMS,
+		processContext.Context(),
+		cm,
+		&dendriteCfg.UserAPI.AccountDatabase,
+		dendriteCfg.Global.ServerName,
+		dendriteCfg.UserAPI.BCryptCost,
+		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
 		api.DefaultLoginTokenLifetime,
-		cfg.Matrix.ServerNotices.LocalPart,
+		dendriteCfg.UserAPI.Matrix.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(base.ConnectionManager, &base.Cfg.KeyServer.Database)
+	keyDB, err := storage.NewKeyDatabase(cm, &dendriteCfg.KeyServer.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}
@@ -71,11 +74,11 @@ func NewInternalAPI(
 		// it's handled by clientapi, and hence uses its topic. When user
 		// API handles it for all account data, we can remove it from
 		// here.
-		cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
-		cfg.Matrix.JetStream.Prefixed(jetstream.OutputNotificationData),
+		dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputClientData),
+		dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputNotificationData),
 	)
 	keyChangeProducer := &producers.KeyChange{
-		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		JetStream: js,
 		DB:        keyDB,
 	}
@@ -85,15 +88,15 @@ func NewInternalAPI(
 		KeyDatabase:          keyDB,
 		SyncProducer:         syncProducer,
 		KeyChangeProducer:    keyChangeProducer,
-		Config:               cfg,
+		Config:               &dendriteCfg.UserAPI,
 		AppServices:          appServices,
 		RSAPI:                rsAPI,
-		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
+		DisableTLSValidation: dendriteCfg.UserAPI.PushGatewayDisableTLSValidation,
 		PgClient:             pgClient,
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, keyDB, userAPI, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(processContext, keyDB, userAPI, keyChangeProducer, fedClient, 8, rsAPI, dendriteCfg.Global.ServerName) // 8 workers TODO: configurable
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err := updater.CleanUp(); err != nil {
@@ -107,28 +110,28 @@ func NewInternalAPI(
 	}()
 
 	dlConsumer := consumers.NewDeviceListUpdateConsumer(
-		base.ProcessContext, cfg, js, updater,
+		processContext, &dendriteCfg.UserAPI, js, updater,
 	)
 	if err := dlConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
 	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
-		base.ProcessContext, cfg, js, userAPI,
+		processContext, &dendriteCfg.UserAPI, js, userAPI,
 	)
 	if err := sigConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		base.ProcessContext, cfg, js, db, syncProducer, pgClient,
+		processContext, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
 	)
 	if err := receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	eventConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, db, pgClient, rsAPI, syncProducer,
+		processContext, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
 	)
 	if err := eventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
@@ -137,15 +140,15 @@ func NewInternalAPI(
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
 		logrus.Infof("Cleaning old notifications")
-		if err := db.DeleteOldNotifications(base.Context()); err != nil {
+		if err := db.DeleteOldNotifications(processContext.Context()); err != nil {
 			logrus.WithError(err).Error("Failed to clean old notifications")
 		}
 		time.AfterFunc(time.Hour, cleanOldNotifs)
 	}
 	time.AfterFunc(time.Minute, cleanOldNotifs)
 
-	if base.Cfg.Global.ReportStats.Enabled {
-		go util.StartPhoneHomeCollector(time.Now(), base.Cfg, db)
+	if dendriteCfg.Global.ReportStats.Enabled {
+		go util.StartPhoneHomeCollector(time.Now(), dendriteCfg, db)
 	}
 
 	return userAPI

@@ -189,7 +189,7 @@ func startup() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, federation)
 
 	asQuery := appservice.NewInternalAPI(
 		base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI,

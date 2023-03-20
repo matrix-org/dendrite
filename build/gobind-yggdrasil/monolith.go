@@ -168,7 +168,7 @@ func (m *DendriteMonolith) Start() {
 		base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
-	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)

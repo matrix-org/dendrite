@@ -162,7 +162,7 @@ func main() {
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 
-	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
