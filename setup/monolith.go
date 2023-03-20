@@ -67,7 +67,7 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, natsInstance *jet
 	federationapi.AddPublicRoutes(
 		base, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
 	)
-	mediaapi.AddPublicRoutes(base, m.UserAPI, m.Client)
+	mediaapi.AddPublicRoutes(base.Routers.Media, base.ConnectionManager, base.Cfg, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(base, natsInstance, m.UserAPI, m.RoomserverAPI, caches)
 
 	if m.RelayAPI != nil {
