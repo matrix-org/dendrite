@@ -162,7 +162,7 @@ func (m *DendriteMonolith) Start() {
 
 	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+	rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 
 	fsAPI := federationapi.NewInternalAPI(
 		base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,

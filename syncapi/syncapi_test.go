@@ -426,7 +426,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 		// Use the actual internal roomserver API
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches)
 
@@ -726,7 +726,7 @@ func TestGetMembership(t *testing.T) {
 
 		// Use an actual roomserver for this
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches)
@@ -1015,7 +1015,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 	// Use an actual roomserver for this
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+	rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 	rsAPI.SetFederationAPI(nil, nil)
 
 	AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches)

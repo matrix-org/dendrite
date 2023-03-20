@@ -43,7 +43,7 @@ type RoomserverInternalAPI struct {
 	ProcessContext         *process.ProcessContext
 	Base                   *base.BaseDendrite
 	DB                     storage.Database
-	Cfg                    *config.RoomServer
+	Cfg                    *config.Dendrite
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
@@ -56,43 +56,44 @@ type RoomserverInternalAPI struct {
 	InputRoomEventTopic    string // JetStream topic for new input room events
 	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []gomatrixserverlib.ServerName
+	enableMetrics          bool
 }
 
 func NewRoomserverAPI(
-	base *base.BaseDendrite, roomserverDB storage.Database,
-	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches,
+	processContext *process.ProcessContext, dendriteCfg *config.Dendrite, roomserverDB storage.Database,
+	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []gomatrixserverlib.ServerName
-	for _, kp := range base.Cfg.FederationAPI.KeyPerspectives {
+	for _, kp := range dendriteCfg.FederationAPI.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
 	serverACLs := acls.NewServerACLs(roomserverDB)
 	producer := &producers.RoomEventProducer{
-		Topic:     string(base.Cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent)),
+		Topic:     string(dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent)),
 		JetStream: js,
 		ACLs:      serverACLs,
 	}
 	a := &RoomserverInternalAPI{
-		ProcessContext:         base.ProcessContext,
+		ProcessContext:         processContext,
 		DB:                     roomserverDB,
-		Base:                   base,
-		Cfg:                    &base.Cfg.RoomServer,
+		Cfg:                    dendriteCfg,
 		Cache:                  caches,
-		ServerName:             base.Cfg.Global.ServerName,
+		ServerName:             dendriteCfg.Global.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
-		InputRoomEventTopic:    base.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent),
+		InputRoomEventTopic:    dendriteCfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent),
 		OutputProducer:         producer,
 		JetStream:              js,
 		NATSClient:             nc,
-		Durable:                base.Cfg.Global.JetStream.Durable("RoomserverInputConsumer"),
+		Durable:                dendriteCfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
 			DB:                roomserverDB,
 			Cache:             caches,
-			IsLocalServerName: base.Cfg.Global.IsLocalServerName,
+			IsLocalServerName: dendriteCfg.Global.IsLocalServerName,
 			ServerACLs:        serverACLs,
 		},
+		enableMetrics: enableMetrics,
 		// perform-er structs get initialised when we have a federation sender to use
 	}
 	return a
@@ -105,15 +106,14 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(r.ServerName)
+	identity, err := r.Cfg.Global.SigningIdentityFor(r.ServerName)
 	if err != nil {
 		logrus.Panic(err)
 	}
 
 	r.Inputer = &input.Inputer{
-		Cfg:                 &r.Base.Cfg.RoomServer,
-		Base:                r.Base,
-		ProcessContext:      r.Base.ProcessContext,
+		Cfg:                 &r.Cfg.RoomServer,
+		ProcessContext:      r.ProcessContext,
 		DB:                  r.DB,
 		InputRoomEventTopic: r.InputRoomEventTopic,
 		OutputProducer:      r.OutputProducer,
@@ -129,12 +129,12 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
-		Cfg:     r.Cfg,
+		Cfg:     &r.Cfg.RoomServer,
 		FSAPI:   r.fsAPI,
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
-		Cfg:     r.Cfg,
+		Cfg:     &r.Cfg.RoomServer,
 		DB:      r.DB,
 		FSAPI:   r.fsAPI,
 		RSAPI:   r,
@@ -143,7 +143,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	}
 	r.Peeker = &perform.Peeker{
 		ServerName: r.ServerName,
-		Cfg:        r.Cfg,
+		Cfg:        &r.Cfg.RoomServer,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
@@ -154,12 +154,12 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	}
 	r.Unpeeker = &perform.Unpeeker{
 		ServerName: r.ServerName,
-		Cfg:        r.Cfg,
+		Cfg:        &r.Cfg.RoomServer,
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
 	}
 	r.Leaver = &perform.Leaver{
-		Cfg:     r.Cfg,
+		Cfg:     &r.Cfg.RoomServer,
 		DB:      r.DB,
 		FSAPI:   r.fsAPI,
 		Inputer: r.Inputer,
@@ -168,7 +168,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB: r.DB,
 	}
 	r.Backfiller = &perform.Backfiller{
-		IsLocalServerName: r.Cfg.Matrix.IsLocalServerName,
+		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
 		DB:                r.DB,
 		FSAPI:             r.fsAPI,
 		KeyRing:           r.KeyRing,
@@ -181,12 +181,12 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB: r.DB,
 	}
 	r.Upgrader = &perform.Upgrader{
-		Cfg:    r.Cfg,
+		Cfg:    &r.Cfg.RoomServer,
 		URSAPI: r,
 	}
 	r.Admin = &perform.Admin{
 		DB:      r.DB,
-		Cfg:     r.Cfg,
+		Cfg:     &r.Cfg.RoomServer,
 		Inputer: r.Inputer,
 		Queryer: r.Queryer,
 		Leaver:  r.Leaver,

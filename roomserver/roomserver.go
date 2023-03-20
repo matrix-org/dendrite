@@ -16,31 +16,34 @@ package roomserver
 
 import (
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup/base"
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API.
 func NewInternalAPI(
-	base *base.BaseDendrite,
+	processContext *process.ProcessContext,
+	cfg *config.Dendrite,
+	cm sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	caches caching.RoomServerCaches,
+	enableMetrics bool,
 ) api.RoomserverInternalAPI {
-	cfg := &base.Cfg.RoomServer
-
-	roomserverDB, err := storage.Open(base.ProcessContext.Context(), base.ConnectionManager, &cfg.Database, caches)
+	roomserverDB, err := storage.Open(processContext.Context(), cm, &cfg.RoomServer.Database, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	js, nc := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nc := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
 
 	return internal.NewRoomserverAPI(
-		base, roomserverDB, js, nc, caches,
+		processContext, cfg, roomserverDB, js, nc, caches, enableMetrics,
 	)
 }

@@ -40,7 +40,7 @@ func TestAdminResetPassword(t *testing.T) {
 		})
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		// Needed for changing the password/login
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
@@ -156,7 +156,7 @@ func TestPurgeRoom(t *testing.T) {
 		defer baseClose()
 
 		fedClient := base.CreateFederationClient()
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers

@@ -47,7 +47,7 @@ func TestUsers(t *testing.T) {
 		defer close()
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 
@@ -187,7 +187,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 		// Create the room
@@ -240,7 +240,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		fedClient := base.CreateFederationClient()
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers

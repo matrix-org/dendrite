@@ -137,7 +137,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 
 	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
 	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(p.BaseDendrite, &natsInstance, caches)
+	rsAPI := roomserver.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, caches, p.BaseDendrite.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
 		p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)

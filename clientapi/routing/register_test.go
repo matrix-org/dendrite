@@ -411,7 +411,7 @@ func Test_register(t *testing.T) {
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		for _, tc := range testCases {
@@ -584,7 +584,7 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 		deviceName, deviceID := "deviceName", "deviceID"
 		expectedDisplayName := "DisplayName"
@@ -624,7 +624,7 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		sharedSecret := "dendritetest"
 		base.Cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		expectedDisplayName := "rabbit"
