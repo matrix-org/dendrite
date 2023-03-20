@@ -192,7 +192,7 @@ func startup() {
 	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
 	asQuery := appservice.NewInternalAPI(
-		base, &natsInstance, userAPI, rsAPI,
+		base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)

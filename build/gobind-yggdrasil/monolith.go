@@ -170,7 +170,7 @@ func (m *DendriteMonolith) Start() {
 
 	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.

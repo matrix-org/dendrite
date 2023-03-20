@@ -85,7 +85,7 @@ func main() {
 
 	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this

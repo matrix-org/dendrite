@@ -144,7 +144,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 
 	userAPI := userapi.NewInternalAPI(p.BaseDendrite, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(p.BaseDendrite, &natsInstance, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, &natsInstance, userAPI, rsAPI)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 

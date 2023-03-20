@@ -164,7 +164,7 @@ func main() {
 
 	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
 		base, &natsInstance, federation, rsAPI, caches, keyRing, true,

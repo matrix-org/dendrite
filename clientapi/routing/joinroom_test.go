@@ -33,7 +33,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
-		asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
+		asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
 
 		// Create the users in the userapi
