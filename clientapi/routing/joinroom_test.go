@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -26,14 +28,16 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
+		cfg, dbClose := testrig.CreateConfig(t, dbType)
+		defer dbClose()
 
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		processCtx := process.NewProcessContext()
+		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
-		userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, nil)
-		asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
 
 		// Create the users in the userapi
@@ -65,7 +69,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			RoomAliasName: "alias",
 			Invite:        []string{bob.ID},
 			GuestCanJoin:  false,
-		}, aliceDev, &base.Cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
+		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crResp, ok := resp.JSON.(createRoomResponse)
 		if !ok {
 			t.Fatalf("response is not a createRoomResponse: %+v", resp)
@@ -80,7 +84,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			Preset:       presetPublicChat,
 			Invite:       []string{charlie.ID},
 			GuestCanJoin: true,
-		}, aliceDev, &base.Cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
+		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crRespWithGuestAccess, ok := resp.JSON.(createRoomResponse)
 		if !ok {
 			t.Fatalf("response is not a createRoomResponse: %+v", resp)

@@ -115,7 +115,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 	}
 
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	natsInstance := jetstream.NATSInstance{}
 	defer close()
 
@@ -222,7 +222,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	// m.room.history_visibility
 	msgs := toNATSMsgs(t, base, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	AddPublicRoutes(base.ProcessContext, base.Routers, base.Cfg, base.ConnectionManager, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, base.EnableMetrics)
 	for i, msg := range msgs {
 		testrig.MustPublishMsgs(t, jsctx, msg)
@@ -308,7 +308,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 
 	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	AddPublicRoutes(base.ProcessContext, base.Routers, base.Cfg, base.ConnectionManager, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, base.EnableMetrics)
 	w := httptest.NewRecorder()
 	base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -425,7 +425,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 		// Use the actual internal roomserver API
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		AddPublicRoutes(base.ProcessContext, base.Routers, base.Cfg, base.ConnectionManager, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, base.EnableMetrics)
@@ -725,7 +725,7 @@ func TestGetMembership(t *testing.T) {
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 		// Use an actual roomserver for this
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 
@@ -796,7 +796,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 
 	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	AddPublicRoutes(base.ProcessContext, base.Routers, base.Cfg, base.ConnectionManager, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, base.EnableMetrics)
 
 	producer := producers.SyncAPIProducer{
@@ -1013,7 +1013,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 	defer baseClose()
 
 	// Use an actual roomserver for this
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 	rsAPI.SetFederationAPI(nil, nil)

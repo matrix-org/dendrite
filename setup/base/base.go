@@ -145,17 +145,7 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 	// If we're in monolith mode, we'll set up a global pool of database
 	// connections. A component is welcome to use this pool if they don't
 	// have a separate database config of their own.
-	cm := sqlutil.NewConnectionManager()
-	if cfg.Global.DatabaseOptions.ConnectionString != "" {
-		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
-			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
-		}
-		_, _, err := cm.Connection(&cfg.Global.DatabaseOptions)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to set up global database connections")
-		}
-		logrus.Debug("Using global database connection pool")
-	}
+	cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.

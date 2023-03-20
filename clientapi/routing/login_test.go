@@ -7,12 +7,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -30,22 +34,24 @@ func TestLogin(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
-		base.Cfg.ClientAPI.RateLimiting.Enabled = false
+		cfg, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+		cfg.ClientAPI.RateLimiting.Enabled = false
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
-		base.Cfg.Global.VirtualHosts = append(base.Cfg.Global.VirtualHosts, &config.VirtualHost{
+		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
 		})
-
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
+		processCtx := process.NewProcessContext()
+		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		routers := httputil.NewRouters()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		Setup(base.Routers, base.Cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, base.EnableMetrics)
+		Setup(routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, caching.DisableMetrics)
 
 		// Create password
 		password := util.RandomString(8)
@@ -118,7 +124,7 @@ func TestLogin(t *testing.T) {
 					"password": password,
 				}))
 				rec := httptest.NewRecorder()
-				base.Routers.Client.ServeHTTP(rec, req)
+				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("failed to login: %s", rec.Body.String())
 				}

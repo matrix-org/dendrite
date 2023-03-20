@@ -164,7 +164,7 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	natsInstance := jetstream.NATSInstance{}
 	base.Cfg.FederationAPI.PreferDirectFetch = true
 	base.Cfg.FederationAPI.KeyPerspectives = nil

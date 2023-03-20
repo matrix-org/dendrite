@@ -364,7 +364,7 @@ func mustCreateKeyserverDB(t *testing.T, dbType test.DBType) (storage.KeyDatabas
 	t.Helper()
 
 	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
 	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)})
 	if err != nil {
 		t.Fatal(err)

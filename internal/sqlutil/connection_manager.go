@@ -22,12 +22,15 @@ import (
 )
 
 type Connections struct {
-	db     *sql.DB
-	writer Writer
+	db           *sql.DB
+	writer       Writer
+	globalConfig config.DatabaseOptions
 }
 
-func NewConnectionManager() Connections {
-	return Connections{}
+func NewConnectionManager(globalConfig config.DatabaseOptions) Connections {
+	return Connections{
+		globalConfig: globalConfig,
+	}
 }
 
 func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB, Writer, error) {
@@ -35,8 +38,12 @@ func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB,
 	if dbProperties.ConnectionString.IsSQLite() {
 		writer = NewExclusiveWriter()
 	}
+	var err error
+	if dbProperties.ConnectionString == "" {
+		// if no connectionString was provided, try the global one
+		dbProperties = &c.globalConfig
+	}
 	if dbProperties.ConnectionString != "" || c.db == nil {
-		var err error
 		// Open a new database connection using the supplied config.
 		c.db, err = Open(dbProperties, writer)
 		if err != nil {

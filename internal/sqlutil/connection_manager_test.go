@@ -13,7 +13,7 @@ func TestConnectionManager(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		conStr, close := test.PrepareDBConnectionString(t, dbType)
 		t.Cleanup(close)
-		cm := sqlutil.NewConnectionManager()
+		cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
 
 		dbProps := &config.DatabaseOptions{ConnectionString: config.DataSource(string(conStr))}
 		db, writer, err := cm.Connection(dbProps)
@@ -47,7 +47,7 @@ func TestConnectionManager(t *testing.T) {
 		}
 
 		// test invalid connection string configured
-		cm = sqlutil.NewConnectionManager()
+		cm = sqlutil.NewConnectionManager(config.DatabaseOptions{})
 		_, _, err = cm.Connection(&config.DatabaseOptions{ConnectionString: "http://"})
 		if err == nil {
 			t.Fatal("expected an error but got none")

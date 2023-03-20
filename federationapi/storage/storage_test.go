@@ -20,7 +20,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
 	ctx := context.Background()
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, caches, func(server gomatrixserverlib.ServerName) bool { return server == "localhost" })

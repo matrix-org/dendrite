@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
@@ -35,7 +36,7 @@ import (
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		defer close()
 
 		relayAPI := relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, true, caches)
@@ -109,7 +110,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 
 		relayAPI := relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
@@ -159,7 +160,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 
 		relayAPI := relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, false, caches)
 		assert.NotNil(t, relayAPI)

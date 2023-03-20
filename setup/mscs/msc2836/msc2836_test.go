@@ -555,7 +555,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
 	base := &base.BaseDendrite{
 		Cfg:               cfg,
 		Routers:           httputil.NewRouters(),

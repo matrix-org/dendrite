@@ -33,7 +33,7 @@ import (
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
 	t.Helper()
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 	db, err := storage.Open(base.ProcessContext.Context(), base.ConnectionManager, &base.Cfg.RoomServer.Database, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
@@ -45,7 +45,7 @@ func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		// SetFederationAPI starts the room event input consumer
@@ -185,7 +185,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 		base, _, close := mustCreateDatabase(t, dbType)
 		defer close()
 
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		// SetFederationAPI starts the room event input consumer
@@ -239,7 +239,7 @@ func TestPurgeRoom(t *testing.T) {
 		defer jetstream.DeleteAllStreams(jsCtx, &base.Cfg.Global.JetStream)
 
 		fedClient := base.CreateFederationClient()
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
 		userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, nil)
 

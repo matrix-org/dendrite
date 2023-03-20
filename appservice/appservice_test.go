@@ -9,13 +9,16 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 
@@ -106,11 +109,11 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, closeBase := testrig.CreateBaseDendrite(t, dbType)
-		defer closeBase()
+		cfg, closeDb := testrig.CreateConfig(t, dbType)
+		defer closeDb()
 
 		// Create a dummy application service
-		base.Cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
 			{
 				ID:              "someID",
 				URL:             srv.URL,
@@ -125,12 +128,14 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			},
 		}
 
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		ctx := process.NewProcessContext()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
-		usrAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, nil)
-		asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, usrAPI, rsAPI)
+		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil)
+		asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
 
 		runCases(t, asAPI)
 	})

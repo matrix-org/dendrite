@@ -74,7 +74,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	if opts.serverName != "" {
 		sName = gomatrixserverlib.ServerName(opts.serverName)
 	}
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
 	ctx := context.Background()
 	accountDB, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),

@@ -49,7 +49,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		Kind:  api.KindOutlier, // don't panic if we generate an output event
 		Event: event.Headered(gomatrixserverlib.RoomVersionV6),
 	}
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(config.DatabaseOptions{})
 	db, err := storage.Open(
 		context.Background(), cm,
 		&config.DatabaseOptions{
