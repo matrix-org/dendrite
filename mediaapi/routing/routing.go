@@ -35,7 +35,7 @@ import (
 // configResponse is the response to GET /_matrix/media/r0/config
 // https://matrix.org/docs/spec/client_server/latest#get-matrix-media-r0-config
 type configResponse struct {
-	UploadSize *config.FileSizeBytes `json:"m.upload.size"`
+	UploadSize *config.FileSizeBytes `json:"m.upload.size,omitempty"`
 }
 
 // Setup registers the media API HTTP handlers
