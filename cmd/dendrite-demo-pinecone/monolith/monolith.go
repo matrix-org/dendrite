@@ -163,7 +163,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		Config:                 &p.BaseDendrite.Cfg.FederationAPI,
 		UserAPI:                userAPI,
 	}
-	relayAPI := relayapi.NewRelayInternalAPI(p.BaseDendrite, federation, rsAPI, keyRing, producer, enableRelaying, caches)
+	relayAPI := relayapi.NewRelayInternalAPI(p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, federation, rsAPI, keyRing, producer, enableRelaying, caches)
 	logrus.Infof("Relaying enabled: %v", relayAPI.RelayingEnabled())
 
 	p.dendrite = setup.Monolith{

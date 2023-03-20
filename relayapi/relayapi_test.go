@@ -38,7 +38,7 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 		defer close()
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true, caches)
+		relayAPI := relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 	})
 }
@@ -54,7 +54,7 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 		defer close()
 
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true, nil)
+			relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, true, nil)
 		})
 	})
 }
@@ -65,7 +65,7 @@ func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 		defer close()
 
 		assert.Panics(t, func() {
-			relayapi.AddPublicRoutes(base, nil, nil)
+			relayapi.AddPublicRoutes(base.Routers, base.Cfg, nil, nil)
 		})
 	})
 }
@@ -111,12 +111,12 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		defer close()
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true, caches)
+		relayAPI := relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
+		relayapi.AddPublicRoutes(base.Routers, base.Cfg, keyRing, relayAPI)
 
 		testCases := []struct {
 			name     string
@@ -161,12 +161,12 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 		defer close()
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, false, caches)
+		relayAPI := relayapi.NewRelayInternalAPI(base.Cfg, base.ConnectionManager, nil, nil, nil, nil, false, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
+		relayapi.AddPublicRoutes(base.Routers, base.Cfg, keyRing, relayAPI)
 
 		testCases := []struct {
 			name     string

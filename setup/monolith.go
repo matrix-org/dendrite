@@ -71,6 +71,6 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, natsInstance *jet
 	syncapi.AddPublicRoutes(base, natsInstance, m.UserAPI, m.RoomserverAPI, caches)
 
 	if m.RelayAPI != nil {
-		relayapi.AddPublicRoutes(base, m.KeyRing, m.RelayAPI)
+		relayapi.AddPublicRoutes(base.Routers, base.Cfg, m.KeyRing, m.RelayAPI)
 	}
 }
