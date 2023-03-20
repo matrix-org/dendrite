@@ -16,7 +16,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -34,15 +33,15 @@ func TestLogin(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, closeDB := testrig.CreateConfig(t, dbType)
-		defer closeDB()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
 		})
-		processCtx := process.NewProcessContext()
+
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 		routers := httputil.NewRouters()
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)

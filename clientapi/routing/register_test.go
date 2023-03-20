@@ -35,7 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
@@ -408,12 +407,12 @@ func Test_register(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, dbClose := testrig.CreateConfig(t, dbType)
-		defer dbClose()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		processCtx := process.NewProcessContext()
+
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
@@ -582,11 +581,10 @@ func Test_register(t *testing.T) {
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, baseClose := testrig.CreateConfig(t, dbType)
-		defer baseClose()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 		cfg.Global.ServerName = "server"
 
-		processCtx := process.NewProcessContext()
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
@@ -623,13 +621,13 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, closeDb := testrig.CreateConfig(t, dbType)
-		defer closeDb()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		cfg.Global.ServerName = "server"
 		sharedSecret := "dendritetest"
 		cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
-		processCtx := process.NewProcessContext()
+
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)

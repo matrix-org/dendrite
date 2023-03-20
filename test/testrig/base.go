@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/nats-io/nats.go"
 )
@@ -99,7 +100,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 	return nil, nil
 }
 
-func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, func()) {
+func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.ProcessContext, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(config.DefaultOpts{
 		Generate:       false,
@@ -107,6 +108,7 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, func()) {
 	})
 	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
+	ctx := process.NewProcessContext()
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
@@ -133,7 +135,11 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, func()) {
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		return &cfg, closeDb
+		return &cfg, ctx, func() {
+			closeDb()
+			ctx.ShutdownDendrite()
+			ctx.WaitForShutdown()
+		}
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
 			Generate:       true,
@@ -156,11 +162,14 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, func()) {
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
 		cfg.RelayAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "relayapi.db"))
 
-		return &cfg, func() {}
+		return &cfg, ctx, func() {
+			ctx.ShutdownDendrite()
+			ctx.WaitForShutdown()
+		}
 	default:
 		t.Fatalf("unknown db type: %v", dbType)
 	}
-	return &config.Dendrite{}, func() {}
+	return &config.Dendrite{}, nil, func() {}
 }
 
 func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nats.Conn) {

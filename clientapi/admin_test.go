@@ -16,7 +16,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -35,16 +34,14 @@ func TestAdminResetPassword(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, closeDB := testrig.CreateConfig(t, dbType)
-		defer closeDB()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
 		})
-		t.Logf("XXX: %#v", cfg.Global.VirtualHosts)
 
-		processCtx := process.NewProcessContext()
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
@@ -158,11 +155,11 @@ func TestPurgeRoom(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, closeDB := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		defer closeDB()
-		processCtx := process.NewProcessContext()
+		defer close()
+
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)

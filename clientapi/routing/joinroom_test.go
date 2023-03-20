@@ -10,7 +10,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -28,10 +27,9 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, dbClose := testrig.CreateConfig(t, dbType)
-		defer dbClose()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 
-		processCtx := process.NewProcessContext()
 		cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}

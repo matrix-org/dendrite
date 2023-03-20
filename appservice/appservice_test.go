@@ -18,7 +18,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 
@@ -109,8 +108,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, closeDb := testrig.CreateConfig(t, dbType)
-		defer closeDb()
+		cfg, ctx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 
 		// Create a dummy application service
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
@@ -128,7 +127,10 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			},
 		}
 
-		ctx := process.NewProcessContext()
+		t.Cleanup(func() {
+			ctx.ShutdownDendrite()
+			ctx.WaitForShutdown()
+		})
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}

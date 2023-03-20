@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -126,7 +125,6 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 	if c.ServerName == serverName {
 		return true
 	}
-	logrus.Infof("XXX: %#v", c.VirtualHosts)
 	for _, v := range c.VirtualHosts {
 		if v.ServerName == serverName {
 			return true
