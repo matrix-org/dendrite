@@ -60,9 +60,9 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, natsInstance *jet
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		base, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		base.ProcessContext, base.Routers, base.Cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
-		m.ExtPublicRoomsProvider,
+		m.ExtPublicRoomsProvider, base.EnableMetrics,
 	)
 	federationapi.AddPublicRoutes(
 		base, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,

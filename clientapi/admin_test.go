@@ -44,7 +44,7 @@ func TestAdminResetPassword(t *testing.T) {
 		// Needed for changing the password/login
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
+		AddPublicRoutes(base.ProcessContext, base.Routers, base.Cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, base.EnableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
@@ -170,7 +170,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
+		AddPublicRoutes(base.ProcessContext, base.Routers, base.Cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, base.EnableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{

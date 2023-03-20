@@ -45,7 +45,7 @@ func TestLogin(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		Setup(base, &base.Cfg.ClientAPI, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, &base.Cfg.MSCs, nil)
+		Setup(base.Routers, base.Cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, base.EnableMetrics)
 
 		// Create password
 		password := util.RandomString(8)
