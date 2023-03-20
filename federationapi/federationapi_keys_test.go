@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
@@ -65,7 +66,7 @@ func TestMain(m *testing.M) {
 
 			// Create a new cache but don't enable prometheus!
 			s.cache = caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
-
+			natsInstance := jetstream.NATSInstance{}
 			// Create a temporary directory for JetStream.
 			d, err := os.MkdirTemp("./", "jetstream*")
 			if err != nil {
@@ -110,7 +111,7 @@ func TestMain(m *testing.M) {
 
 			// Finally, build the server key APIs.
 			sbase := base.NewBaseDendrite(cfg, base.DisableMetrics)
-			s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, nil, true)
+			s.api = NewInternalAPI(sbase, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 
 		// Now that we have built our server key APIs, start the

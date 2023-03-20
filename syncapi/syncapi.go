@@ -40,13 +40,14 @@ import (
 // component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
+	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
 	caches caching.LazyLoadCache,
 ) {
 	cfg := &base.Cfg.SyncAPI
 
-	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(base.Context(), base.ConnectionManager, &cfg.Database)
 	if err != nil {

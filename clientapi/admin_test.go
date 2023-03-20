@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -32,18 +33,18 @@ func TestAdminResetPassword(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
 		defer baseClose()
-
+		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		base.Cfg.Global.VirtualHosts = append(base.Cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
 		})
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		// Needed for changing the password/login
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
+		AddPublicRoutes(base, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
@@ -151,15 +152,16 @@ func TestPurgeRoom(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
 		defer baseClose()
 
 		fedClient := base.CreateFederationClient()
-		rsAPI := roomserver.NewInternalAPI(base, caches)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, caches)
-		federationapi.NewInternalAPI(base, fedClient, rsAPI, caches, nil, true)
+		syncapi.AddPublicRoutes(base, &natsInstance, userAPI, rsAPI, caches)
+		federationapi.NewInternalAPI(base, &natsInstance, fedClient, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room
@@ -168,7 +170,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
+		AddPublicRoutes(base, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{

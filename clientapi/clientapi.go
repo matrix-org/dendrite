@@ -32,6 +32,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
+	natsInstance *jetstream.NATSInstance,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
@@ -43,7 +44,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.ClientAPI
 	mscCfg := &base.Cfg.MSCs
-	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,

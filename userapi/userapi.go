@@ -36,11 +36,12 @@ import (
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
+	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
 ) *internal.UserInternalAPI {
 	cfg := &base.Cfg.UserAPI
-	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	appServices := base.Cfg.Derived.ApplicationServices
 
 	pgClient := pushgateway.NewHTTPClient(cfg.PushGatewayDisableTLSValidation)

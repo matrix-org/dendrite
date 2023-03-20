@@ -116,12 +116,13 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 
 	base, close := testrig.CreateBaseDendrite(t, dbType)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	natsInstance := jetstream.NATSInstance{}
 	defer close()
 
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	msgs := toNATSMsgs(t, base, room.Events()...)
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches)
+	AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches)
 	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
@@ -209,8 +210,9 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 
 	base, close := testrig.CreateBaseDendrite(t, dbType)
 	defer close()
+	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	// order is:
 	// m.room.create
@@ -221,7 +223,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	msgs := toNATSMsgs(t, base, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches)
+	AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches)
 	for i, msg := range msgs {
 		testrig.MustPublishMsgs(t, jsctx, msg)
 		time.Sleep(100 * time.Millisecond)
@@ -302,11 +304,12 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 	base.Cfg.Global.Presence.EnableOutbound = true
 	base.Cfg.Global.Presence.EnableInbound = true
 	defer close()
+	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches)
+	AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches)
 	w := httptest.NewRecorder()
 	base.Routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 		"access_token": alice.AccessToken,
@@ -416,15 +419,16 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
+		natsInstance := jetstream.NATSInstance{}
 
-		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 		// Use the actual internal roomserver API
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		rsAPI.SetFederationAPI(nil, nil)
-		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches)
+		AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches)
 
 		for _, tc := range testCases {
 			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
@@ -716,16 +720,16 @@ func TestGetMembership(t *testing.T) {
 
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
-
-		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		natsInstance := jetstream.NATSInstance{}
+		jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 		// Use an actual roomserver for this
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		rsAPI.SetFederationAPI(nil, nil)
 
-		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches)
+		AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -788,11 +792,12 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 
 	base, baseClose := testrig.CreateBaseDendrite(t, dbType)
 	defer baseClose()
+	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches)
+	AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches)
 
 	producer := producers.SyncAPIProducer{
 		TopicSendToDeviceEvent: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
@@ -1009,10 +1014,11 @@ func testContext(t *testing.T, dbType test.DBType) {
 
 	// Use an actual roomserver for this
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-	rsAPI := roomserver.NewInternalAPI(base, caches)
+	natsInstance := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 	rsAPI.SetFederationAPI(nil, nil)
 
-	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches)
+	AddPublicRoutes(base, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches)
 
 	room := test.NewRoom(t, user)
 
@@ -1025,7 +1031,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 		t.Fatalf("failed to send events: %v", err)
 	}
 
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 	syncUntil(t, base, alice.AccessToken, false, func(syncBody string) bool {
@@ -1171,6 +1177,7 @@ func syncUntil(t *testing.T,
 	skip bool,
 	checkFunc func(syncBody string) bool,
 ) {
+	t.Helper()
 	if checkFunc == nil {
 		t.Fatalf("No checkFunc defined")
 	}

@@ -136,21 +136,22 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 	keyRing := serverKeyAPI.KeyRing()
 
 	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
-	rsAPI := roomserver.NewInternalAPI(p.BaseDendrite, caches)
+	natsInstance := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(p.BaseDendrite, &natsInstance, caches)
 	fsAPI := federationapi.NewInternalAPI(
-		p.BaseDendrite, federation, rsAPI, caches, keyRing, true,
+		p.BaseDendrite, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
-	userAPI := userapi.NewInternalAPI(p.BaseDendrite, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(p.BaseDendrite, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(p.BaseDendrite, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(p.BaseDendrite, &natsInstance, userAPI, rsAPI)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(p.Router, p.Sessions, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(p.Router, p.Sessions, fsAPI, federation)
 
-	js, _ := p.BaseDendrite.NATS.Prepare(p.BaseDendrite.ProcessContext, &p.BaseDendrite.Cfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(p.BaseDendrite.ProcessContext, &p.BaseDendrite.Cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -179,7 +180,7 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
-	p.dendrite.AddAllPublicRoutes(p.BaseDendrite, caches)
+	p.dendrite.AddAllPublicRoutes(p.BaseDendrite, &natsInstance, caches)
 
 	p.setupHttpServers(userProvider, enableWebsockets)
 }

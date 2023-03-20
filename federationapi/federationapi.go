@@ -41,6 +41,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
+	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.FederationUserAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
@@ -50,7 +51,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.FederationAPI
 	mscCfg := &base.Cfg.MSCs
-	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -86,6 +87,7 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
+	natsInstance *jetstream.NATSInstance,
 	federation api.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *caching.Caches,
@@ -108,7 +110,7 @@ func NewInternalAPI(
 		cfg.FederationMaxRetries+1,
 		cfg.P2PFederationRetriesUntilAssumedOffline+1)
 
-	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nats := natsInstance.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	signingInfo := base.Cfg.Global.SigningIdentities()
 

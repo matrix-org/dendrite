@@ -26,6 +26,7 @@ import (
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -48,10 +49,11 @@ func TestHandleSend(t *testing.T) {
 		defer close()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
+		natsInstance := jetstream.NATSInstance{}
 		base.Routers.Federation = fedMux
 		base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
 		base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
-		fedapi := fedAPI.NewInternalAPI(base, nil, nil, nil, nil, true)
+		fedapi := fedAPI.NewInternalAPI(base, &natsInstance, nil, nil, nil, nil, true)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
 		r, ok := fedapi.(*fedInternal.FederationInternalAPI)

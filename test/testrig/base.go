@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/nats-io/nats.go"
 )
@@ -110,6 +111,7 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 	cfg.SyncAPI.Fulltext.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
 	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
-	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
+	natsInstance := jetstream.NATSInstance{}
+	js, jc := natsInstance.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
 }

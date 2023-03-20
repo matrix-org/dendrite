@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
@@ -160,15 +161,16 @@ func (m *DendriteMonolith) Start() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-	rsAPI := roomserver.NewInternalAPI(base, caches)
+	natsInstance := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, caches, keyRing, true,
+		base, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
-	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
@@ -189,7 +191,7 @@ func (m *DendriteMonolith) Start() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base, caches)
+	monolith.AddAllPublicRoutes(base, &natsInstance, caches)
 
 	httpRouter := mux.NewRouter()
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)

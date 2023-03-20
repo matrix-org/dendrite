@@ -28,6 +28,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -53,21 +54,21 @@ type Monolith struct {
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
-func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, caches *caching.Caches) {
+func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, natsInstance *jetstream.NATSInstance, caches *caching.Caches) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
 	if userDirectoryProvider == nil {
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		base, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		base, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
 		m.ExtPublicRoomsProvider,
 	)
 	federationapi.AddPublicRoutes(
-		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
+		base, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
 	)
 	mediaapi.AddPublicRoutes(base, m.UserAPI, m.Client)
-	syncapi.AddPublicRoutes(base, m.UserAPI, m.RoomserverAPI, caches)
+	syncapi.AddPublicRoutes(base, natsInstance, m.UserAPI, m.RoomserverAPI, caches)
 
 	if m.RelayAPI != nil {
 		relayapi.AddPublicRoutes(base, m.KeyRing, m.RelayAPI)

@@ -18,6 +18,7 @@ import (
 	"flag"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -74,17 +75,17 @@ func main() {
 	federation := base.CreateFederationClient()
 
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
-
-	rsAPI := roomserver.NewInternalAPI(base, caches)
+	natsInstance := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, caches, nil, false,
+		base, &natsInstance, federation, rsAPI, caches, nil, false,
 	)
 
 	keyRing := fsAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
@@ -106,7 +107,7 @@ func main() {
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
 	}
-	monolith.AddAllPublicRoutes(base, caches)
+	monolith.AddAllPublicRoutes(base, &natsInstance, caches)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {
 		if err := mscs.Enable(base, &monolith, caches); err != nil {

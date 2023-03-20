@@ -73,6 +73,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	}
 	// reuse existing connections
 	if s.nc != nil {
+		logrus.Infof("XXX: reusing connection")
 		return s.js, s.nc
 	}
 	nc, err := natsclient.Connect("", natsclient.InProcessServer(s))

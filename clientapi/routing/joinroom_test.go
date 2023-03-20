@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -29,9 +30,10 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		defer baseClose()
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
-		asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+		natsInstance := jetstream.NATSInstance{}
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
+		asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
 
 		// Create the users in the userapi

@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/gorilla/mux"
@@ -158,14 +159,15 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
-	rsAPI := roomserver.NewInternalAPI(base, caches)
+	natsInstance := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 
-	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, caches, keyRing, true,
+		base, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
@@ -184,7 +186,7 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base, caches)
+	monolith.AddAllPublicRoutes(base, &natsInstance, caches)
 	if err := mscs.Enable(base, &monolith, caches); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")
 	}

@@ -35,7 +35,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
@@ -65,7 +64,6 @@ type BaseDendrite struct {
 	*process.ProcessContext
 	tracerCloser      io.Closer
 	Routers           httputil.Routers
-	NATS              *jetstream.NATSInstance
 	Cfg               *config.Dendrite
 	DNSCache          *gomatrixserverlib.DNSCache
 	ConnectionManager sqlutil.Connections
@@ -177,7 +175,6 @@ func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *Base
 		Cfg:               cfg,
 		DNSCache:          dnsCache,
 		Routers:           httputil.NewRouters(),
-		NATS:              &jetstream.NATSInstance{},
 		ConnectionManager: cm,
 		EnableMetrics:     enableMetrics,
 	}

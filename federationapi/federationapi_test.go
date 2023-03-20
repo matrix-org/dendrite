@@ -165,10 +165,11 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+	natsInstance := jetstream.NATSInstance{}
 	base.Cfg.FederationAPI.PreferDirectFetch = true
 	base.Cfg.FederationAPI.KeyPerspectives = nil
 	defer close()
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 	serverA := gomatrixserverlib.ServerName("server.a")
@@ -214,7 +215,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(base, fc, rsapi, caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(base, &natsInstance, fc, rsapi, caches, nil, false)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{
@@ -277,9 +278,10 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.JetStream.InMemory = true
 	b := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	keyRing := &test.NopJSONVerifier{}
+	natsInstance := jetstream.NATSInstance{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(b, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil)
+	federationapi.AddPublicRoutes(b, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil)
 	baseURL, cancel := test.ListenAndServe(t, b.Routers.Federation, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))

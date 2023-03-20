@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -32,15 +33,16 @@ func TestLogin(t *testing.T) {
 		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
 		defer baseClose()
 		base.Cfg.ClientAPI.RateLimiting.Enabled = false
+		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		base.Cfg.Global.VirtualHosts = append(base.Cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
 		})
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
 		Setup(base, &base.Cfg.ClientAPI, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, &base.Cfg.MSCs, nil)

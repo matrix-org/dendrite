@@ -46,7 +46,8 @@ func TestUsers(t *testing.T) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		natsInstance := jetstream.NATSInstance{}
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 
@@ -55,7 +56,7 @@ func TestUsers(t *testing.T) {
 		})
 
 		t.Run("kick users", func(t *testing.T) {
-			usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+			usrAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 			rsAPI.SetUserAPI(usrAPI)
 			testKickUsers(t, rsAPI, usrAPI)
 		})
@@ -185,7 +186,8 @@ func Test_QueryLeftUsers(t *testing.T) {
 		defer close()
 
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		natsInstance := jetstream.NATSInstance{}
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 		// Create the room
@@ -230,19 +232,20 @@ func TestPurgeRoom(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, db, close := mustCreateDatabase(t, dbType)
+		natsInstance := jetstream.NATSInstance{}
 		defer close()
 
-		jsCtx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		jsCtx, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsCtx, &base.Cfg.Global.JetStream)
 
 		fedClient := base.CreateFederationClient()
 		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
-		rsAPI := roomserver.NewInternalAPI(base, caches)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
+		userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, caches)
-		federationapi.NewInternalAPI(base, fedClient, rsAPI, caches, nil, true)
+		syncapi.AddPublicRoutes(base, &natsInstance, userAPI, rsAPI, caches)
+		federationapi.NewInternalAPI(base, &natsInstance, fedClient, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room

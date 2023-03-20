@@ -35,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -179,22 +180,23 @@ func startup() {
 	}
 	base := base.NewBaseDendrite(cfg)
 	defer base.Close() // nolint: errcheck
-
-	rsAPI := roomserver.NewInternalAPI(base)
+	natsInstance := jetstream.NATSInstance{}
+	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 
 	federation := conn.CreateFederationClient(base, pSessions)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)
 
 	asQuery := appservice.NewInternalAPI(
-		base, userAPI, rsAPI,
+		base, &natsInstance, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
-	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, caches, keyRing, true)
+	fedSenderAPI := federationapi.NewInternalAPI(base, &natsInstance, federation, rsAPI, caches, keyRing, true)
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 
 	monolith := setup.Monolith{
@@ -210,7 +212,7 @@ func startup() {
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}
-	monolith.AddAllPublicRoutes(base, caches)
+	monolith.AddAllPublicRoutes(base, &natsInstance, caches)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)

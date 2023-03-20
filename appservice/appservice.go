@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -38,6 +39,7 @@ import (
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
+	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
@@ -78,7 +80,7 @@ func NewInternalAPI(
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, &base.Cfg.AppServiceAPI,
 		client, js, rsAPI,
