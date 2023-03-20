@@ -111,7 +111,7 @@ func TestMain(m *testing.M) {
 
 			// Finally, build the server key APIs.
 			sbase := base.NewBaseDendrite(cfg, base.DisableMetrics)
-			s.api = NewInternalAPI(sbase, &natsInstance, s.fedclient, nil, s.cache, nil, true)
+			s.api = NewInternalAPI(sbase.ProcessContext, sbase.Cfg, sbase.ConnectionManager, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 
 		// Now that we have built our server key APIs, start the

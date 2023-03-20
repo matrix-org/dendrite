@@ -53,14 +53,14 @@ func TestHandleSend(t *testing.T) {
 		base.Routers.Federation = fedMux
 		base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
 		base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
-		fedapi := fedAPI.NewInternalAPI(base, &natsInstance, nil, nil, nil, nil, true)
+		fedapi := fedAPI.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, nil, nil, nil, nil, true)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
 		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
 		if !ok {
 			panic("This is a programming error.")
 		}
-		routing.Setup(base, nil, r, keyRing, nil, nil, &base.Cfg.MSCs, nil, nil)
+		routing.Setup(base.Routers, base.Cfg, nil, r, keyRing, nil, nil, &base.Cfg.MSCs, nil, nil, base.EnableMetrics)
 
 		handler := fedMux.Get(routing.SendRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)

@@ -215,7 +215,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(base, &natsInstance, fc, rsapi, caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, fc, rsapi, caches, nil, false)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{
@@ -281,7 +281,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	natsInstance := jetstream.NATSInstance{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(b, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil)
+	federationapi.AddPublicRoutes(b.ProcessContext, b.Routers, b.Cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, false)
 	baseURL, cancel := test.ListenAndServe(t, b.Routers.Federation, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))

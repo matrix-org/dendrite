@@ -161,7 +161,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		// this starts the JetStream consumers
 		syncapi.AddPublicRoutes(base, &natsInstance, userAPI, rsAPI, caches)
-		federationapi.NewInternalAPI(base, &natsInstance, fedClient, rsAPI, caches, nil, true)
+		federationapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, fedClient, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room

@@ -165,7 +165,7 @@ func (m *DendriteMonolith) Start() {
 	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, &natsInstance, federation, rsAPI, caches, keyRing, true,
+		base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
 	userAPI := userapi.NewInternalAPI(base, &natsInstance, rsAPI, federation)

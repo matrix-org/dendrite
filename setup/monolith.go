@@ -65,7 +65,7 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, natsInstance *jet
 		m.ExtPublicRoomsProvider, base.EnableMetrics,
 	)
 	federationapi.AddPublicRoutes(
-		base, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
+		base.ProcessContext, base.Routers, base.Cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil, base.EnableMetrics,
 	)
 	mediaapi.AddPublicRoutes(base.Routers.Media, base.ConnectionManager, base.Cfg, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(base, natsInstance, m.UserAPI, m.RoomserverAPI, caches)

@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -55,7 +54,8 @@ const (
 // applied:
 // nolint: gocyclo
 func Setup(
-	base *base.BaseDendrite,
+	routers httputil.Routers,
+	dendriteCfg *config.Dendrite,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI *fedInternal.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
@@ -63,14 +63,14 @@ func Setup(
 	userAPI userapi.FederationUserAPI,
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
-	producer *producers.SyncAPIProducer,
+	producer *producers.SyncAPIProducer, enableMetrics bool,
 ) {
-	fedMux := base.Routers.Federation
-	keyMux := base.Routers.Keys
-	wkMux := base.Routers.WellKnown
-	cfg := &base.Cfg.FederationAPI
+	fedMux := routers.Federation
+	keyMux := routers.Keys
+	wkMux := routers.WellKnown
+	cfg := &dendriteCfg.FederationAPI
 
-	if base.EnableMetrics {
+	if enableMetrics {
 		prometheus.MustRegister(
 			internal.PDUCountTotal, internal.EDUCountTotal,
 		)

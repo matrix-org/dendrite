@@ -196,7 +196,7 @@ func startup() {
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
 	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
-	fedSenderAPI := federationapi.NewInternalAPI(base, &natsInstance, federation, rsAPI, caches, keyRing, true)
+	fedSenderAPI := federationapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true)
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 
 	monolith := setup.Monolith{

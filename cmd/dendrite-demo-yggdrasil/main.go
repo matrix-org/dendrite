@@ -167,7 +167,7 @@ func main() {
 	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		base, &natsInstance, federation, rsAPI, caches, keyRing, true,
+		base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)

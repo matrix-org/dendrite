@@ -58,13 +58,13 @@ func TestHandleQueryDirectory(t *testing.T) {
 		fedClient := fakeFedClient{}
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		fedapi := fedAPI.NewInternalAPI(base, &natsInstance, &fedClient, nil, nil, keyRing, true)
+		fedapi := fedAPI.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, &fedClient, nil, nil, keyRing, true)
 		userapi := fakeUserAPI{}
 		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
 		if !ok {
 			panic("This is a programming error.")
 		}
-		routing.Setup(base, nil, r, keyRing, &fedClient, &userapi, &base.Cfg.MSCs, nil, nil)
+		routing.Setup(base.Routers, base.Cfg, nil, r, keyRing, &fedClient, &userapi, &base.Cfg.MSCs, nil, nil, base.EnableMetrics)
 
 		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)

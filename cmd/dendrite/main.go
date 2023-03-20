@@ -78,7 +78,7 @@ func main() {
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(base, &natsInstance, caches)
 	fsAPI := federationapi.NewInternalAPI(
-		base, &natsInstance, federation, rsAPI, caches, nil, false,
+		base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, nil, false,
 	)
 
 	keyRing := fsAPI.KeyRing()
