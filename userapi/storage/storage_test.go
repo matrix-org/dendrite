@@ -576,8 +576,9 @@ func Test_Notification(t *testing.T) {
 }
 
 func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewKeyDatabase(base.ConnectionManager, &base.Cfg.KeyServer.Database)
+	cfg, _, close := testrig.CreateConfig(t, dbType)
+	cm := sqlutil.NewConnectionManager(cfg.Global.DatabaseOptions)
+	db, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}
