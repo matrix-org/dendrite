@@ -18,7 +18,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -41,7 +40,6 @@ type RoomserverInternalAPI struct {
 	*perform.Upgrader
 	*perform.Admin
 	ProcessContext         *process.ProcessContext
-	Base                   *base.BaseDendrite
 	DB                     storage.Database
 	Cfg                    *config.Dendrite
 	Cache                  caching.RoomServerCaches
