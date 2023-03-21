@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -79,6 +80,7 @@ type P2PMonolith struct {
 	listener           net.Listener
 	httpListenAddr     string
 	stopHandlingEvents chan bool
+	startUpLock        sync.Mutex
 }
 
 func GenerateDefaultConfig(sk ed25519.PrivateKey, storageDir string, cacheDir string, dbPrefix string) *config.Dendrite {
@@ -296,6 +298,8 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 }
 
 func (p *P2PMonolith) startHTTPServers() {
+	p.startUpLock.Lock()
+	defer p.startUpLock.Unlock()
 	go func() {
 		// Build both ends of a HTTP multiplex.
 		p.httpServer = &http.Server{
