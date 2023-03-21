@@ -57,6 +57,8 @@ func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB,
 			if c.processContext == nil {
 				return
 			}
+			// If we have a ProcessContext, start a component and wait for
+			// Dendrite to shut down to cleanly close the database connection.
 			c.processContext.ComponentStarted()
 			<-c.processContext.WaitForShutdown()
 			_ = c.db.Close()
