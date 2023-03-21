@@ -27,8 +27,11 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/monolith"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 
@@ -87,9 +90,13 @@ func main() {
 		}
 	}
 
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+
 	enableMetrics := true
 	enableWebsockets := true
-	p2pMonolith.SetupDendrite(cfg, *instancePort, *instanceRelayingEnabled, enableMetrics, enableWebsockets)
+	p2pMonolith.SetupDendrite(processCtx, cfg, cm, routers, *instancePort, *instanceRelayingEnabled, enableMetrics, enableWebsockets)
 	p2pMonolith.StartMonolith()
 	p2pMonolith.WaitForShutdown()
 

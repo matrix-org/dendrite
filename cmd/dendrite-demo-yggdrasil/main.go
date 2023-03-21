@@ -27,8 +27,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/gorilla/mux"
@@ -43,7 +46,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/base"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/test"
@@ -144,37 +147,83 @@ func main() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
-	base := base.NewBaseDendrite(cfg)
-	base.ConfigureAdminEndpoints()
-	defer base.Close() // nolint: errcheck
+	configErrors := &config.ConfigErrors{}
+	cfg.Verify(configErrors)
+	if len(*configErrors) > 0 {
+		for _, err := range *configErrors {
+			logrus.Errorf("Configuration error: %s", err)
+		}
+		logrus.Fatalf("Failed to start due to configuration errors")
+	}
+
+	internal.SetupStdLogging()
+	internal.SetupHookLogging(cfg.Logging)
+	internal.SetupPprof()
+
+	logrus.Infof("Dendrite version %s", internal.VersionString())
+
+	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
+		logrus.Warn("Open registration is enabled")
+	}
+
+	closer, err := cfg.SetupTracing()
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to start opentracing")
+	}
+	defer closer.Close()
+
+	if cfg.Global.Sentry.Enabled {
+		logrus.Info("Setting up Sentry for debugging...")
+		err = sentry.Init(sentry.ClientOptions{
+			Dsn:              cfg.Global.Sentry.DSN,
+			Environment:      cfg.Global.Sentry.Environment,
+			Debug:            true,
+			ServerName:       string(cfg.Global.ServerName),
+			Release:          "dendrite@" + internal.VersionString(),
+			AttachStacktrace: true,
+		})
+		if err != nil {
+			logrus.WithError(err).Panic("failed to start Sentry")
+		}
+	}
+
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+
+	basepkg.ConfigureAdminEndpoints(processCtx, routers)
+	defer func() {
+		processCtx.ShutdownDendrite()
+		processCtx.WaitForShutdown()
+	}() // nolint: errcheck
 
 	ygg, err := yggconn.Setup(sk, *instanceName, ".", *instancePeer, *instanceListen)
 	if err != nil {
 		panic(err)
 	}
 
-	federation := ygg.CreateFederationClient(base)
+	federation := ygg.CreateFederationClient(cfg)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
+	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.EnableMetrics)
 	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 
-	userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
+		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	monolith := setup.Monolith{
-		Config:    base.Cfg,
-		Client:    ygg.CreateClient(base),
+		Config:    cfg,
+		Client:    ygg.CreateClient(),
 		FedClient: federation,
 		KeyRing:   keyRing,
 
@@ -186,21 +235,21 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base, &natsInstance, caches)
-	if err := mscs.Enable(base, &monolith, caches); err != nil {
+	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
+	if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")
 	}
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)
-	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
-	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.Routers.DendriteAdmin)
-	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.Routers.SynapseAdmin)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(routers.Client)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(routers.Media)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(routers.DendriteAdmin)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(routers.SynapseAdmin)
 	embed.Embed(httpRouter, *instancePort, "Yggdrasil Demo")
 
 	yggRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.Routers.Federation)
-	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(routers.Federation)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(routers.Media)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
@@ -234,5 +283,5 @@ func main() {
 	}()
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	base.WaitForShutdown()
+	basepkg.WaitForShutdown(processCtx)
 }

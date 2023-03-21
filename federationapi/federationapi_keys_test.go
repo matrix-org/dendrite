@@ -12,8 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
@@ -110,8 +111,9 @@ func TestMain(m *testing.M) {
 			)
 
 			// Finally, build the server key APIs.
-			sbase := base.NewBaseDendrite(cfg, base.DisableMetrics)
-			s.api = NewInternalAPI(sbase.ProcessContext, sbase.Cfg, sbase.ConnectionManager, &natsInstance, s.fedclient, nil, s.cache, nil, true)
+			processCtx := process.NewProcessContext()
+			cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+			s.api = NewInternalAPI(processCtx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 
 		// Now that we have built our server key APIs, start the

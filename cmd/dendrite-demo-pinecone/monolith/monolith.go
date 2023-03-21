@@ -39,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi"
 	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -46,6 +47,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -61,13 +63,13 @@ import (
 const SessionProtocol = "matrix"
 
 type P2PMonolith struct {
-	BaseDendrite   *base.BaseDendrite
 	Sessions       *pineconeSessions.Sessions
 	Multicast      *pineconeMulticast.Multicast
 	ConnManager    *pineconeConnections.ConnectionManager
 	Router         *pineconeRouter.Router
 	EventChannel   chan pineconeEvents.Event
 	RelayRetriever relay.RelayServerRetriever
+	ProcessCtx     *process.ProcessContext
 
 	dendrite           setup.Monolith
 	port               int
@@ -121,54 +123,52 @@ func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 	p.ConnManager = pineconeConnections.NewConnectionManager(p.Router, nil)
 }
 
-func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
-	if enableMetrics {
-		p.BaseDendrite = base.NewBaseDendrite(cfg)
-	} else {
-		p.BaseDendrite = base.NewBaseDendrite(cfg, base.DisableMetrics)
-	}
-	p.port = port
-	p.BaseDendrite.ConfigureAdminEndpoints()
+func (p *P2PMonolith) SetupDendrite(
+	processCtx *process.ProcessContext, cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers,
+	port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
 
-	federation := conn.CreateFederationClient(p.BaseDendrite, p.Sessions)
+	p.port = port
+	base.ConfigureAdminEndpoints(processCtx, routers)
+
+	federation := conn.CreateFederationClient(cfg, p.Sessions)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
 	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
 	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, caches, p.BaseDendrite.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, enableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true,
+		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
 
-	userAPI := userapi.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
 
-	asAPI := appservice.NewInternalAPI(p.BaseDendrite.ProcessContext, p.BaseDendrite.Cfg, &natsInstance, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(p.Router, p.Sessions, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(p.Router, p.Sessions, fsAPI, federation)
 
-	js, _ := natsInstance.Prepare(p.BaseDendrite.ProcessContext, &p.BaseDendrite.Cfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
-		TopicReceiptEvent:      p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		TopicDeviceListUpdate:  p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		TopicSigningKeyUpdate:  p.BaseDendrite.Cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
-		Config:                 &p.BaseDendrite.Cfg.FederationAPI,
+		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		Config:                 &cfg.FederationAPI,
 		UserAPI:                userAPI,
 	}
-	relayAPI := relayapi.NewRelayInternalAPI(p.BaseDendrite.Cfg, p.BaseDendrite.ConnectionManager, federation, rsAPI, keyRing, producer, enableRelaying, caches)
+	relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, federation, rsAPI, keyRing, producer, enableRelaying, caches)
 	logrus.Infof("Relaying enabled: %v", relayAPI.RelayingEnabled())
 
 	p.dendrite = setup.Monolith{
-		Config:    p.BaseDendrite.Cfg,
-		Client:    conn.CreateClient(p.BaseDendrite, p.Sessions),
+		Config:    cfg,
+		Client:    conn.CreateClient(p.Sessions),
 		FedClient: federation,
 		KeyRing:   keyRing,
 
@@ -180,9 +180,10 @@ func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelayi
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
-	p.dendrite.AddAllPublicRoutes(p.BaseDendrite, &natsInstance, caches)
+	p.ProcessCtx = processCtx
+	p.dendrite.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, enableMetrics)
 
-	p.setupHttpServers(userProvider, enableWebsockets)
+	p.setupHttpServers(userProvider, routers, enableWebsockets)
 }
 
 func (p *P2PMonolith) GetFederationAPI() federationAPI.FederationInternalAPI {
@@ -204,13 +205,13 @@ func (p *P2PMonolith) StartMonolith() {
 
 func (p *P2PMonolith) Stop() {
 	logrus.Info("Stopping monolith")
-	_ = p.BaseDendrite.Close()
+	p.ProcessCtx.ShutdownDendrite()
 	p.WaitForShutdown()
 	logrus.Info("Stopped monolith")
 }
 
 func (p *P2PMonolith) WaitForShutdown() {
-	p.BaseDendrite.WaitForShutdown()
+	p.ProcessCtx.WaitForShutdown()
 	p.closeAllResources()
 }
 
@@ -247,12 +248,12 @@ func (p *P2PMonolith) Addr() string {
 	return p.httpListenAddr
 }
 
-func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider, enableWebsockets bool) {
+func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider, routers httputil.Routers, enableWebsockets bool) {
 	p.httpMux = mux.NewRouter().SkipClean(true).UseEncodedPath()
-	p.httpMux.PathPrefix(httputil.PublicClientPathPrefix).Handler(p.BaseDendrite.Routers.Client)
-	p.httpMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.Routers.Media)
-	p.httpMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(p.BaseDendrite.Routers.DendriteAdmin)
-	p.httpMux.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(p.BaseDendrite.Routers.SynapseAdmin)
+	p.httpMux.PathPrefix(httputil.PublicClientPathPrefix).Handler(routers.Client)
+	p.httpMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(routers.Media)
+	p.httpMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(routers.DendriteAdmin)
+	p.httpMux.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(routers.SynapseAdmin)
 
 	if enableWebsockets {
 		wsUpgrader := websocket.Upgrader{
@@ -285,8 +286,8 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 
 	p.pineconeMux = mux.NewRouter().SkipClean(true).UseEncodedPath()
 	p.pineconeMux.PathPrefix(users.PublicURL).HandlerFunc(userProvider.FederatedUserProfiles)
-	p.pineconeMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(p.BaseDendrite.Routers.Federation)
-	p.pineconeMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(p.BaseDendrite.Routers.Media)
+	p.pineconeMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(routers.Federation)
+	p.pineconeMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(routers.Media)
 
 	pHTTP := p.Sessions.Protocol(SessionProtocol).HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, p.pineconeMux)
@@ -370,7 +371,7 @@ func (p *P2PMonolith) startEventHandler() {
 						ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
 					}
 					res := &federationAPI.PerformWakeupServersResponse{}
-					if err := p.dendrite.FederationAPI.PerformWakeupServers(p.BaseDendrite.Context(), req, res); err != nil {
+					if err := p.dendrite.FederationAPI.PerformWakeupServers(p.ProcessCtx.Context(), req, res); err != nil {
 						eLog.WithError(err).Error("Failed to wakeup destination", e.PeerID)
 					}
 				}

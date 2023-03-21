@@ -31,11 +31,12 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -159,9 +160,8 @@ func startup() {
 	pManager.AddPeer("wss://pinecone.matrix.org/public")
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+	cfg.Defaults(config.DefaultOpts{Generate: true, SingleDatabase: false})
 	cfg.UserAPI.AccountDatabase.ConnectionString = "file:/idb/dendritejs_account.db"
-	cfg.AppServiceAPI.Database.ConnectionString = "file:/idb/dendritejs_appservice.db"
 	cfg.FederationAPI.Database.ConnectionString = "file:/idb/dendritejs_fedsender.db"
 	cfg.MediaAPI.Database.ConnectionString = "file:/idb/dendritejs_mediaapi.db"
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
@@ -178,30 +178,30 @@ func startup() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := base.NewBaseDendrite(cfg)
-	defer base.Close() // nolint: errcheck
 	natsInstance := jetstream.NATSInstance{}
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
 	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.EnableMetrics)
-	rsAPI := roomserver.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, caches, base.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 
-	federation := conn.CreateFederationClient(base, pSessions)
+	federation := conn.CreateFederationClient(cfg, pSessions)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
 
 	asQuery := appservice.NewInternalAPI(
-		base.ProcessContext, base.Cfg, &natsInstance, userAPI, rsAPI,
+		processCtx, cfg, &natsInstance, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.EnableMetrics)
-	fedSenderAPI := federationapi.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, federation, rsAPI, caches, keyRing, true)
+	fedSenderAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true)
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 
 	monolith := setup.Monolith{
-		Config:    base.Cfg,
-		Client:    conn.CreateClient(base, pSessions),
+		Config:    cfg,
+		Client:    conn.CreateClient(pSessions),
 		FedClient: federation,
 		KeyRing:   keyRing,
 
@@ -212,15 +212,15 @@ func startup() {
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}
-	monolith.AddAllPublicRoutes(base, &natsInstance, caches)
+	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Routers.Client)
-	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Routers.Media)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(routers.Client)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(routers.Media)
 
 	p2pRouter := pSessions.Protocol("matrix").HTTP().Mux()
-	p2pRouter.Handle(httputil.PublicFederationPathPrefix, base.Routers.Federation)
-	p2pRouter.Handle(httputil.PublicMediaPathPrefix, base.Routers.Media)
+	p2pRouter.Handle(httputil.PublicFederationPathPrefix, routers.Federation)
+	p2pRouter.Handle(httputil.PublicMediaPathPrefix, routers.Media)
 
 	// Expose the matrix APIs via fetch - for local traffic
 	go func() {

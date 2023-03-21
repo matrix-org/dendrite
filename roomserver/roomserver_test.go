@@ -230,7 +230,9 @@ func TestPurgeRoom(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
-
+		if err != nil {
+			t.Fatal(err)
+		}
 		jsCtx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsCtx, &cfg.Global.JetStream)
 
@@ -243,13 +245,13 @@ func TestPurgeRoom(t *testing.T) {
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
 		// some dummy entries to validate after purging
 		publishResp := &api.PerformPublishResponse{}
-		if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
 			t.Fatal(err)
 		}
 		if publishResp.Error != nil {

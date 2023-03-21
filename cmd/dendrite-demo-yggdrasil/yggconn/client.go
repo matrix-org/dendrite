@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -17,9 +17,7 @@ func (y *yggroundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return y.inner.RoundTrip(req)
 }
 
-func (n *Node) CreateClient(
-	base *base.BaseDendrite,
-) *gomatrixserverlib.Client {
+func (n *Node) CreateClient() *gomatrixserverlib.Client {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
@@ -39,7 +37,7 @@ func (n *Node) CreateClient(
 }
 
 func (n *Node) CreateFederationClient(
-	base *base.BaseDendrite,
+	cfg *config.Dendrite,
 ) *gomatrixserverlib.FederationClient {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
@@ -55,7 +53,7 @@ func (n *Node) CreateFederationClient(
 		},
 	)
 	return gomatrixserverlib.NewFederationClient(
-		base.Cfg.Global.SigningIdentities(),
+		cfg.Global.SigningIdentities(),
 		gomatrixserverlib.WithTransport(tr),
 	)
 }
