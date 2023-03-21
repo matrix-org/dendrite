@@ -80,7 +80,7 @@ type P2PMonolith struct {
 	listener           net.Listener
 	httpListenAddr     string
 	stopHandlingEvents chan bool
-	startUpLock        sync.Mutex
+	httpServerMu       sync.Mutex
 }
 
 func GenerateDefaultConfig(sk ed25519.PrivateKey, storageDir string, cacheDir string, dbPrefix string) *config.Dendrite {
@@ -219,8 +219,10 @@ func (p *P2PMonolith) WaitForShutdown() {
 
 func (p *P2PMonolith) closeAllResources() {
 	logrus.Info("Closing monolith resources")
+	p.httpServerMu.Lock()
 	if p.httpServer != nil {
 		_ = p.httpServer.Shutdown(context.Background())
+		p.httpServerMu.Unlock()
 	}
 
 	select {
@@ -298,9 +300,8 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 }
 
 func (p *P2PMonolith) startHTTPServers() {
-	p.startUpLock.Lock()
-	defer p.startUpLock.Unlock()
 	go func() {
+		p.httpServerMu.Lock()
 		// Build both ends of a HTTP multiplex.
 		p.httpServer = &http.Server{
 			Addr:         ":0",
@@ -313,7 +314,7 @@ func (p *P2PMonolith) startHTTPServers() {
 			},
 			Handler: p.pineconeMux,
 		}
-
+		p.httpServerMu.Unlock()
 		pubkey := p.Router.PublicKey()
 		pubkeyString := hex.EncodeToString(pubkey[:])
 		logrus.Info("Listening on ", pubkeyString)
