@@ -114,7 +114,7 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
-	defer closer.Close()
+	defer closer.Close() // nolint: errcheck
 
 	// setup sentry
 	if cfg.Global.Sentry.Enabled {

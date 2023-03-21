@@ -62,6 +62,7 @@ var (
 	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
 )
 
+// nolint: gocyclo
 func main() {
 	flag.Parse()
 	internal.SetupPprof()
@@ -170,7 +171,7 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
-	defer closer.Close()
+	defer closer.Close() // nolint: errcheck
 
 	if cfg.Global.Sentry.Enabled {
 		logrus.Info("Setting up Sentry for debugging...")
