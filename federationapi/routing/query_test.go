@@ -28,7 +28,9 @@ import (
 	fedclient "github.com/matrix-org/dendrite/federationapi/api"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/routing"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -47,24 +49,26 @@ func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixs
 
 func TestHandleQueryDirectory(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		routers := httputil.NewRouters()
 		defer close()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
 		natsInstance := jetstream.NATSInstance{}
-		base.Routers.Federation = fedMux
-		base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
-		base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
+		routers.Federation = fedMux
+		cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
+		cfg.FederationAPI.Matrix.Metrics.Enabled = false
 		fedClient := fakeFedClient{}
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		fedapi := fedAPI.NewInternalAPI(base.ProcessContext, base.Cfg, base.ConnectionManager, &natsInstance, &fedClient, nil, nil, keyRing, true)
+		fedapi := fedAPI.NewInternalAPI(processCtx, cfg, cm, &natsInstance, &fedClient, nil, nil, keyRing, true)
 		userapi := fakeUserAPI{}
 		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
 		if !ok {
 			panic("This is a programming error.")
 		}
-		routing.Setup(base.Routers, base.Cfg, nil, r, keyRing, &fedClient, &userapi, &base.Cfg.MSCs, nil, nil, base.EnableMetrics)
+		routing.Setup(routers, cfg, nil, r, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, nil, caching.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
