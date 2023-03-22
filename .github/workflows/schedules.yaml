@@ -89,7 +89,7 @@ jobs:
       - name: Collect coverage
         run: |
           go tool covdata textfmt -i=$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -) -o sytest.cov
-          grep -Ev 'relayapi|setup/mscs|api_trace' complement.cov > final.cov
+          grep -Ev 'relayapi|setup/mscs|api_trace' sytest.cov > final.cov
           go tool covdata func -i=$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -)
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
