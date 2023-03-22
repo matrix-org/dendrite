@@ -69,7 +69,7 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
-            /logs/covdatafiles/**
+            /logs/**/covdatafiles/**
 
   sytest-coverage:
     timeout-minutes: 5
