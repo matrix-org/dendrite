@@ -65,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
+          name: Sytest Logs - ${{ job.status }} - (Dendrite ${{ join(matrix.*, ' ') }})
           path: |
             /logs/results.tap
             /logs/**/*.log*
@@ -76,7 +76,7 @@ jobs:
     name: "Sytest Coverage"
     runs-on: ubuntu-latest
     needs: sytest # only run once Sytest is done
-    if: ${{ false }}
+    if: ${{ always() }}
     steps:
       - uses: actions/checkout@v3
       - name: Install Go
@@ -88,9 +88,9 @@ jobs:
         uses: actions/download-artifact@v3
       - name: Collect coverage
         run: |
-          go tool covdata textfmt -i=$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -) -o sytest.cov
+          go tool covdata textfmt -i="$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o sytest.cov
           grep -Ev 'relayapi|setup/mscs|api_trace' sytest.cov > final.cov
-          go tool covdata func -i=$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -)
+          go tool covdata func -i="$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
@@ -188,7 +188,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Complement Logs - (Dendrite, ${{ join(matrix.*, ', ') }})
+          name: Complement Logs - (Dendrite ${{ join(matrix.*, ' ') }})
           path: |
             /tmp/Complement/logs/**
 
@@ -209,9 +209,9 @@ jobs:
         uses: actions/download-artifact@v3
       - name: Collect coverage
         run: |
-          go tool covdata textfmt -i=$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -) -o complement.cov
+          go tool covdata textfmt -i="$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o complement.cov
           grep -Ev 'relayapi|setup/mscs|api_trace' complement.cov > final.cov
-          go tool covdata func -i=$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -)
+          go tool covdata func -i="$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
