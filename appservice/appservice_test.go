@@ -228,8 +228,10 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, closeBase := testrig.CreateBaseDendrite(t, dbType)
-		defer closeBase()
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
 		// create a dummy AS url, handling the events
@@ -253,7 +255,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		defer srv.Close()
 
 		// Create a dummy application service
-		base.Cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
 			{
 				ID:              "someID",
 				URL:             srv.URL,
@@ -267,13 +269,13 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 			},
 		}
 
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(base, caches)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
-		usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, natsInstance, rsAPI, nil)
 		// start the consumer
-		appservice.NewInternalAPI(base, usrAPI, rsAPI)
+		appservice.NewInternalAPI(processCtx, cfg, natsInstance, usrAPI, rsAPI)
 
 		// Create the room
 		if err := rsapi.SendEvents(context.Background(), rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
