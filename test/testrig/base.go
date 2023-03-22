@@ -19,13 +19,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/nats-io/nats.go"
 )
 
-func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
+func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.ProcessContext, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(config.DefaultOpts{
 		Generate:       false,
@@ -33,6 +32,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 	})
 	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
+	ctx := process.NewProcessContext()
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
@@ -51,18 +51,18 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
-		connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+		connStr, closeDb := test.PrepareDBConnectionString(t, dbType)
 		cfg.Global.DatabaseOptions = config.DatabaseOptions{
 			ConnectionString:       config.DataSource(connStr),
 			MaxOpenConnections:     10,
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
-		return base, func() {
-			base.ShutdownDendrite()
-			base.WaitForShutdown()
-			close()
+		return &cfg, ctx, func() {
+			ctx.ShutdownDendrite()
+			ctx.WaitForShutdown()
+			closeDb()
 		}
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
@@ -86,30 +86,13 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
 		cfg.RelayAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "relayapi.db"))
 
-		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
-		return base, func() {
-			base.ShutdownDendrite()
-			base.WaitForShutdown()
+		return &cfg, ctx, func() {
+			ctx.ShutdownDendrite()
+			ctx.WaitForShutdown()
 			t.Cleanup(func() {}) // removes t.TempDir, where all database files are created
 		}
 	default:
 		t.Fatalf("unknown db type: %v", dbType)
 	}
-	return nil, nil
-}
-
-func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nats.Conn) {
-	if cfg == nil {
-		cfg = &config.Dendrite{}
-		cfg.Defaults(config.DefaultOpts{
-			Generate:       true,
-			SingleDatabase: false,
-		})
-	}
-	cfg.Global.JetStream.InMemory = true
-	cfg.SyncAPI.Fulltext.InMemory = true
-	cfg.FederationAPI.KeyPerspectives = nil
-	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
-	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
-	return base, js, jc
+	return &config.Dendrite{}, nil, func() {}
 }

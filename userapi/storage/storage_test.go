@@ -35,7 +35,7 @@ var (
 
 func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
@@ -576,8 +576,9 @@ func Test_Notification(t *testing.T) {
 }
 
 func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewKeyDatabase(base.ConnectionManager, &base.Cfg.KeyServer.Database)
+	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	db, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}

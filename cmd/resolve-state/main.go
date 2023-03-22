@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -40,7 +41,7 @@ func main() {
 		Level: "error",
 	})
 	cfg.ClientAPI.RegistrationDisabled = true
-	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
+
 	args := flag.Args()
 
 	fmt.Println("Room version", *roomVersion)
@@ -54,8 +55,10 @@ func main() {
 
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	roomserverDB, err := storage.Open(
-		base.ProcessContext.Context(), base.ConnectionManager, &cfg.RoomServer.Database,
+		processCtx.Context(), cm, &cfg.RoomServer.Database,
 		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
 	)
 	if err != nil {

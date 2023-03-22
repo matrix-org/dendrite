@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/nats-io/nats.go"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
@@ -20,9 +20,9 @@ func MustPublishMsgs(t *testing.T, jsctx nats.JetStreamContext, msgs ...*nats.Ms
 	}
 }
 
-func NewOutputEventMsg(t *testing.T, base *base.BaseDendrite, roomID string, update api.OutputEvent) *nats.Msg {
+func NewOutputEventMsg(t *testing.T, cfg *config.Dendrite, roomID string, update api.OutputEvent) *nats.Msg {
 	t.Helper()
-	msg := nats.NewMsg(base.Cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
+	msg := nats.NewMsg(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
 	msg.Header.Set(jetstream.RoomEventType, string(update.Type))
 	msg.Header.Set(jetstream.RoomID, roomID)
 	var err error

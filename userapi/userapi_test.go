@@ -68,34 +68,25 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	cfg, ctx, close := testrig.CreateConfig(t, dbType)
 	sName := serverName
 	if opts.serverName != "" {
 		sName = gomatrixserverlib.ServerName(opts.serverName)
 	}
-	cm := sqlutil.NewConnectionManager()
-	ctx := context.Background()
-	accountDB, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
-	}, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+
+	accountDB, err := storage.NewUserDatabase(ctx.Context(), cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
 
-	keyDB, err := storage.NewKeyDatabase(base.ConnectionManager, &config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
-	})
+	keyDB, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create key DB: %s", err)
 	}
 
-	cfg := &config.UserAPI{
-		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: sName,
-			},
-		},
+	cfg.Global.SigningIdentity = gomatrixserverlib.SigningIdentity{
+		ServerName: sName,
 	}
 
 	if publisher == nil {
@@ -107,12 +98,11 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	return &internal.UserInternalAPI{
 			DB:                accountDB,
 			KeyDatabase:       keyDB,
-			Config:            cfg,
+			Config:            &cfg.UserAPI,
 			SyncProducer:      syncProducer,
 			KeyChangeProducer: keyChangeProducer,
 		}, accountDB, func() {
 			close()
-			baseclose()
 		}
 }
 

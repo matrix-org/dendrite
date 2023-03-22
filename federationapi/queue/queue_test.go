@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
@@ -41,18 +42,19 @@ import (
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
 	if realDatabase {
 		// Real Database/s
-		b, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		caches := caching.NewRistrettoCache(b.Cfg.Global.Cache.EstimatedMaxSize, b.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
-		db, err := storage.NewDatabase(b.ProcessContext.Context(), b.ConnectionManager, &config.DatabaseOptions{
+		db, err := storage.NewDatabase(processCtx.Context(), cm, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
-		}, caches, b.Cfg.Global.IsLocalServerName)
+		}, caches, cfg.Global.IsLocalServerName)
 		if err != nil {
 			t.Fatalf("NewDatabase returned %s", err)
 		}
-		return db, b.ProcessContext, func() {
+		return db, processCtx, func() {
+			close()
 			dbClose()
-			baseClose()
 		}
 	} else {
 		// Fake Database

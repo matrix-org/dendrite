@@ -21,7 +21,7 @@ import (
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	cm := sqlutil.NewConnectionManager()
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
