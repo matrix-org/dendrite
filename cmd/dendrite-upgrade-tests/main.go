@@ -259,10 +259,20 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir 
 
 func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Version, err error) {
 	u := "https://api.github.com/repos/matrix-org/dendrite/tags"
-	res, err := httpClient.Get(u)
-	if err != nil {
-		return nil, err
+
+	var res *http.Response
+	for i := 0; i < 3; i++ {
+		res, err = httpClient.Get(u)
+		if err != nil {
+			return nil, err
+		}
+		if res.StatusCode == 200 {
+			break
+		}
+		log.Printf("Github API returned HTTP %d, retrying\n", res.StatusCode)
+		time.Sleep(time.Second * 5)
 	}
+
 	if res.StatusCode != 200 {
 		return nil, fmt.Errorf("%s returned HTTP %d", u, res.StatusCode)
 	}

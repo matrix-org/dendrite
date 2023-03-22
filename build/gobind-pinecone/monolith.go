@@ -30,6 +30,9 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/relay"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/pinecone/types"
@@ -187,7 +190,7 @@ func (m *DendriteMonolith) SetRelayServers(nodeID string, uris string) {
 		relay.UpdateNodeRelayServers(
 			gomatrixserverlib.ServerName(nodeKey),
 			relays,
-			m.p2pMonolith.BaseDendrite.Context(),
+			m.p2pMonolith.ProcessCtx.Context(),
 			m.p2pMonolith.GetFederationAPI(),
 		)
 	}
@@ -214,7 +217,7 @@ func (m *DendriteMonolith) GetRelayServers(nodeID string) string {
 	} else {
 		request := api.P2PQueryRelayServersRequest{Server: gomatrixserverlib.ServerName(nodeKey)}
 		response := api.P2PQueryRelayServersResponse{}
-		err := m.p2pMonolith.GetFederationAPI().P2PQueryRelayServers(m.p2pMonolith.BaseDendrite.Context(), &request, &response)
+		err := m.p2pMonolith.GetFederationAPI().P2PQueryRelayServers(m.p2pMonolith.ProcessCtx.Context(), &request, &response)
 		if err != nil {
 			logrus.Warnf("Failed obtaining list of this node's relay servers: %s", err.Error())
 			return ""
@@ -346,10 +349,14 @@ func (m *DendriteMonolith) Start() {
 	// This isn't actually fixed: https://github.com/blevesearch/zapx/pull/147
 	cfg.SyncAPI.Fulltext.Enabled = false
 
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+
 	enableRelaying := false
 	enableMetrics := false
 	enableWebsockets := false
-	m.p2pMonolith.SetupDendrite(cfg, 65432, enableRelaying, enableMetrics, enableWebsockets)
+	m.p2pMonolith.SetupDendrite(processCtx, cfg, cm, routers, 65432, enableRelaying, enableMetrics, enableWebsockets)
 	m.p2pMonolith.StartMonolith()
 }
 

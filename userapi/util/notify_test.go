@@ -77,7 +77,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		// Create DB and Dendrite base
 		connStr, close := test.PrepareDBConnectionString(t, dbType)
 		defer close()
-		cm := sqlutil.NewConnectionManager()
+		cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 		db, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
 		}, "test", bcrypt.MinCost, 0, 0, "")

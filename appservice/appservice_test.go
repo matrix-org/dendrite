@@ -14,9 +14,11 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -108,11 +110,11 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, closeBase := testrig.CreateBaseDendrite(t, dbType)
-		defer closeBase()
+		cfg, ctx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 
 		// Create a dummy application service
-		base.Cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
 			{
 				ID:              "someID",
 				URL:             srv.URL,
@@ -127,11 +129,17 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			},
 		}
 
-		caches := caching.NewRistrettoCache(base.Cfg.Global.Cache.EstimatedMaxSize, base.Cfg.Global.Cache.MaxAge, caching.DisableMetrics)
+		t.Cleanup(func() {
+			ctx.ShutdownDendrite()
+			ctx.WaitForShutdown()
+		})
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(base, caches)
-		usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
-		asAPI := appservice.NewInternalAPI(base, usrAPI, rsAPI)
+		natsInstance := jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil)
+		asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
 
 		runCases(t, asAPI)
 	})
