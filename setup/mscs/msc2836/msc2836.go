@@ -31,8 +31,9 @@ import (
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -99,10 +100,10 @@ func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationship
 
 // Enable this MSC
 func Enable(
-	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(base, &base.Cfg.MSCs.Database)
+	db, err := NewDatabase(cm, &cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}
@@ -125,14 +126,14 @@ func Enable(
 		}
 	})
 
-	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
+	routers.Client.Handle("/unstable/event_relationships",
 		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
+	routers.Federation.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
 		"msc2836_event_relationships", func(req *http.Request) util.JSONResponse {
 			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
-				req, time.Now(), base.Cfg.Global.ServerName, base.Cfg.Global.IsLocalServerName, keyRing,
+				req, time.Now(), cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 			)
 			if fedReq == nil {
 				return errResp

@@ -3,6 +3,6 @@
 
 package base
 
-func platformSanityChecks() {
+func PlatformSanityChecks() {
 	// Nothing to do yet.
 }

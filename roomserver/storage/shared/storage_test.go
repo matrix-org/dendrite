@@ -15,14 +15,12 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 )
 
 func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Database, func()) {
 	t.Helper()
 
 	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
-	base, _, _ := testrig.Base(nil)
 	dbOpts := &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)}
 
 	db, err := sqlutil.Open(dbOpts, sqlutil.NewExclusiveWriter())
@@ -61,8 +59,6 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 			Writer:          sqlutil.NewExclusiveWriter(),
 			Cache:           cache,
 		}, func() {
-			err := base.Close()
-			assert.NoError(t, err)
 			clearDB()
 			err = db.Close()
 			assert.NoError(t, err)

@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -18,8 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/internal"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -162,21 +163,24 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 }
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	base.Cfg.FederationAPI.PreferDirectFetch = true
-	base.Cfg.FederationAPI.KeyPerspectives = nil
+	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	natsInstance := jetstream.NATSInstance{}
+	cfg.FederationAPI.PreferDirectFetch = true
+	cfg.FederationAPI.KeyPerspectives = nil
 	defer close()
-	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 	serverA := gomatrixserverlib.ServerName("server.a")
 	serverAKeyID := gomatrixserverlib.KeyID("ed25519:servera")
 	serverAPrivKey := test.PrivateKeyA
 	creator := test.NewUser(t, test.WithSigningServer(serverA, serverAKeyID, serverAPrivKey))
 
-	myServer := base.Cfg.Global.ServerName
-	myServerKeyID := base.Cfg.Global.KeyID
-	myServerPrivKey := base.Cfg.Global.PrivateKey
+	myServer := cfg.Global.ServerName
+	myServerKeyID := cfg.Global.KeyID
+	myServerPrivKey := cfg.Global.PrivateKey
 	joiningUser := test.NewUser(t, test.WithSigningServer(myServer, myServerKeyID, myServerPrivKey))
 	fmt.Printf("creator: %v joining user: %v\n", creator.ID, joiningUser.ID)
 	room := test.NewRoom(t, creator)
@@ -212,7 +216,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(base, fc, rsapi, base.Caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, fc, rsapi, caches, nil, false)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{
@@ -245,7 +249,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	}
 
 	msg := &nats.Msg{
-		Subject: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		Subject: cfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		Header:  nats.Header{},
 		Data:    b,
 	}
@@ -263,30 +267,6 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 // Tests that event IDs with '/' in them (escaped as %2F) are correctly passed to the right handler and don't 404.
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
-	_, privKey, _ := ed25519.GenerateKey(nil)
-	cfg := &config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{
-		Generate:       true,
-		SingleDatabase: false,
-	})
-	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
-	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
-	cfg.Global.PrivateKey = privKey
-	cfg.Global.JetStream.InMemory = true
-	b := base.NewBaseDendrite(cfg, base.DisableMetrics)
-	keyRing := &test.NopJSONVerifier{}
-	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
-	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(b, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil)
-	baseURL, cancel := test.ListenAndServe(t, b.PublicFederationAPIMux, true)
-	defer cancel()
-	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
-
-	fedCli := gomatrixserverlib.NewFederationClient(
-		cfg.Global.SigningIdentities(),
-		gomatrixserverlib.WithSkipVerify(true),
-	)
-
 	testCases := []struct {
 		roomVer   gomatrixserverlib.RoomVersion
 		eventJSON string
@@ -314,6 +294,29 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 			roomVer:   gomatrixserverlib.RoomVersionV3,
 		},
 	}
+
+	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypeSQLite)
+	defer close()
+	routers := httputil.NewRouters()
+
+	_, privKey, _ := ed25519.GenerateKey(nil)
+	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
+	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
+	cfg.Global.PrivateKey = privKey
+	cfg.Global.JetStream.InMemory = true
+	keyRing := &test.NopJSONVerifier{}
+	natsInstance := jetstream.NATSInstance{}
+	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
+	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
+	federationapi.AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, caching.DisableMetrics)
+	baseURL, cancel := test.ListenAndServe(t, routers.Federation, true)
+	defer cancel()
+	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
+
+	fedCli := gomatrixserverlib.NewFederationClient(
+		cfg.Global.SigningIdentities(),
+		gomatrixserverlib.WithSkipVerify(true),
+	)
 
 	for _, tc := range testCases {
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(tc.eventJSON), false, tc.roomVer)

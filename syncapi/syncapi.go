@@ -17,12 +17,16 @@ package syncapi
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -38,45 +42,58 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
 // component.
 func AddPublicRoutes(
-	base *base.BaseDendrite,
+	processContext *process.ProcessContext,
+	routers httputil.Routers,
+	dendriteCfg *config.Dendrite,
+	cm sqlutil.Connections,
+	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
+	caches caching.LazyLoadCache,
+	enableMetrics bool,
 ) {
-	cfg := &base.Cfg.SyncAPI
+	js, natsClient := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
 
-	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
-
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
+	syncDB, err := storage.NewSyncServerDatasource(processContext.Context(), cm, &dendriteCfg.SyncAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, base.Caches, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
+	var fts *fulltext.Search
+	if dendriteCfg.SyncAPI.Fulltext.Enabled {
+		fts, err = fulltext.New(processContext.Context(), dendriteCfg.SyncAPI.Fulltext)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to create full text")
+		}
+		processContext.ComponentStarted()
+	}
+
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
-		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		JetStream: js,
 	}
 	presenceConsumer := consumers.NewPresenceConsumer(
-		base.ProcessContext, cfg, js, natsClient, syncDB,
+		processContext, &dendriteCfg.SyncAPI, js, natsClient, syncDB,
 		notifier, streams.PresenceStreamProvider,
 		userAPI,
 	)
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, rsAPI, streams, notifier, federationPresenceProducer, presenceConsumer, base.EnableMetrics)
+	requestPool := sync.NewRequestPool(syncDB, &dendriteCfg.SyncAPI, userAPI, rsAPI, streams, notifier, federationPresenceProducer, presenceConsumer, enableMetrics)
 
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		base.ProcessContext, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		processContext, &dendriteCfg.SyncAPI, dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		js, rsAPI, syncDB, notifier,
 		streams.DeviceListStreamProvider,
 	)
@@ -85,51 +102,51 @@ func AddPublicRoutes(
 	}
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, base.Fulltext,
+		processContext, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.PDUStreamProvider,
+		streams.InviteStreamProvider, rsAPI, fts,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		base.ProcessContext, cfg, js, natsClient, syncDB, notifier,
-		streams.AccountDataStreamProvider, base.Fulltext,
+		processContext, &dendriteCfg.SyncAPI, js, natsClient, syncDB, notifier,
+		streams.AccountDataStreamProvider, fts,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	notificationConsumer := consumers.NewOutputNotificationDataConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.NotificationDataStreamProvider,
+		processContext, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.NotificationDataStreamProvider,
 	)
 	if err = notificationConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start notification data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		base.ProcessContext, cfg, js, eduCache, notifier, streams.TypingStreamProvider,
+		processContext, &dendriteCfg.SyncAPI, js, eduCache, notifier, streams.TypingStreamProvider,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		base.ProcessContext, cfg, js, syncDB, userAPI, notifier, streams.SendToDeviceStreamProvider,
+		processContext, &dendriteCfg.SyncAPI, js, syncDB, userAPI, notifier, streams.SendToDeviceStreamProvider,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.ReceiptStreamProvider,
+		processContext, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.ReceiptStreamProvider,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches, base.Fulltext,
+		routers.Client, requestPool, syncDB, userAPI,
+		rsAPI, &dendriteCfg.SyncAPI, caches, fts,
 	)
 }

@@ -15,12 +15,13 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -554,20 +555,18 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}
-	base := &base.BaseDendrite{
-		Cfg:                    cfg,
-		PublicClientAPIMux:     mux.NewRouter().PathPrefix(httputil.PublicClientPathPrefix).Subrouter(),
-		PublicFederationAPIMux: mux.NewRouter().PathPrefix(httputil.PublicFederationPathPrefix).Subrouter(),
-	}
 
-	err := msc2836.Enable(base, rsAPI, nil, userAPI, nil)
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+	err := msc2836.Enable(cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {
 		t.Fatalf("failed to enable MSC2836: %s", err)
 	}
 	for _, ev := range events {
 		hooks.Run(hooks.KindNewEventPersisted, ev)
 	}
-	return base.PublicClientAPIMux
+	return routers.Client
 }
 
 type fledglingEvent struct {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/bcrypt"
@@ -15,7 +16,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	userUtil "github.com/matrix-org/dendrite/userapi/util"
@@ -77,9 +77,8 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		// Create DB and Dendrite base
 		connStr, close := test.PrepareDBConnectionString(t, dbType)
 		defer close()
-		base, _, _ := testrig.Base(nil)
-		defer base.Close()
-		db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+		cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+		db, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
 		}, "test", bcrypt.MinCost, 0, 0, "")
 		if err != nil {

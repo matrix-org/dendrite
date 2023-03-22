@@ -20,13 +20,12 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage/shared"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase opens a postgres database.
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+func NewDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err
 	}

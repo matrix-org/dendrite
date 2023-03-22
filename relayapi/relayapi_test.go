@@ -21,9 +21,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -33,37 +37,38 @@ import (
 
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		defer close()
-
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 	})
 }
 
 func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		if dbType == test.DBTypeSQLite {
-			base.Cfg.RelayAPI.Database.ConnectionString = "file:"
+			cfg.RelayAPI.Database.ConnectionString = "file:"
 		} else {
-			base.Cfg.RelayAPI.Database.ConnectionString = "test"
+			cfg.RelayAPI.Database.ConnectionString = "test"
 		}
 		defer close()
-
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
+			relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, nil)
 		})
 	})
 }
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, _, close := testrig.CreateConfig(t, dbType)
 		defer close()
-
+		routers := httputil.NewRouters()
 		assert.Panics(t, func() {
-			relayapi.AddPublicRoutes(base, nil, nil)
+			relayapi.AddPublicRoutes(routers, cfg, nil, nil)
 		})
 	})
 }
@@ -105,15 +110,19 @@ func createSendRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, txnI
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
+		routers := httputil.NewRouters()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
+		relayapi.AddPublicRoutes(routers, cfg, keyRing, relayAPI)
 
 		testCases := []struct {
 			name     string
@@ -122,29 +131,29 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		}{
 			{
 				name:     "relay_txn invalid user id",
-				req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "user:local"),
+				req:      createGetRelayTxnHTTPRequest(cfg.Global.ServerName, "user:local"),
 				wantCode: 400,
 			},
 			{
 				name:     "relay_txn valid user id",
-				req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "@user:local"),
+				req:      createGetRelayTxnHTTPRequest(cfg.Global.ServerName, "@user:local"),
 				wantCode: 200,
 			},
 			{
 				name:     "send_relay invalid user id",
-				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "user:local"),
+				req:      createSendRelayTxnHTTPRequest(cfg.Global.ServerName, "123", "user:local"),
 				wantCode: 400,
 			},
 			{
 				name:     "send_relay valid user id",
-				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
+				req:      createSendRelayTxnHTTPRequest(cfg.Global.ServerName, "123", "@user:local"),
 				wantCode: 200,
 			},
 		}
 
 		for _, tc := range testCases {
 			w := httptest.NewRecorder()
-			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
 				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
@@ -154,15 +163,19 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 func TestDisableRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
+		routers := httputil.NewRouters()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, false)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, false, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
+		relayapi.AddPublicRoutes(routers, cfg, keyRing, relayAPI)
 
 		testCases := []struct {
 			name     string
@@ -171,19 +184,19 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 		}{
 			{
 				name:     "relay_txn valid user id",
-				req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "@user:local"),
+				req:      createGetRelayTxnHTTPRequest(cfg.Global.ServerName, "@user:local"),
 				wantCode: 404,
 			},
 			{
 				name:     "send_relay valid user id",
-				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
+				req:      createSendRelayTxnHTTPRequest(cfg.Global.ServerName, "123", "@user:local"),
 				wantCode: 404,
 			},
 		}
 
 		for _, tc := range testCases {
 			w := httptest.NewRecorder()
-			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
 				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}

@@ -16,24 +16,26 @@ package relayapi
 
 import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/relayapi/routing"
 	"github.com/matrix-org/dendrite/relayapi/storage"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
-	base *base.BaseDendrite,
+	routers httputil.Routers,
+	dendriteCfg *config.Dendrite,
 	keyRing gomatrixserverlib.JSONVerifier,
 	relayAPI api.RelayInternalAPI,
 ) {
-	fedCfg := &base.Cfg.FederationAPI
-
 	relay, ok := relayAPI.(*internal.RelayInternalAPI)
 	if !ok {
 		panic("relayapi.AddPublicRoutes called with a RelayInternalAPI impl which was not " +
@@ -41,24 +43,24 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
-		fedCfg,
+		routers.Federation,
+		&dendriteCfg.FederationAPI,
 		relay,
 		keyRing,
 	)
 }
 
 func NewRelayInternalAPI(
-	base *base.BaseDendrite,
+	dendriteCfg *config.Dendrite,
+	cm sqlutil.Connections,
 	fedClient *gomatrixserverlib.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
 	relayingEnabled bool,
+	caches caching.FederationCache,
 ) api.RelayInternalAPI {
-	cfg := &base.Cfg.RelayAPI
-
-	relayDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.IsLocalServerName)
+	relayDB, err := storage.NewDatabase(cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to relay db")
 	}
@@ -69,8 +71,8 @@ func NewRelayInternalAPI(
 		rsAPI,
 		keyRing,
 		producer,
-		base.Cfg.Global.Presence.EnableInbound,
-		base.Cfg.Global.ServerName,
+		dendriteCfg.Global.Presence.EnableInbound,
+		dendriteCfg.Global.ServerName,
 		relayingEnabled,
 	)
 }

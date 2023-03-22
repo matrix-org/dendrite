@@ -5,12 +5,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,19 +34,22 @@ func TestAdminResetPassword(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
-
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
-		base.Cfg.Global.VirtualHosts = append(base.Cfg.Global.VirtualHosts, &config.VirtualHost{
+		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
 		})
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		// Needed for changing the password/login
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
@@ -71,7 +79,7 @@ func TestAdminResetPassword(t *testing.T) {
 				"password": password,
 			}))
 			rec := httptest.NewRecorder()
-			base.PublicClientAPIMux.ServeHTTP(rec, req)
+			routers.Client.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to login: %s", rec.Body.String())
 			}
@@ -124,7 +132,7 @@ func TestAdminResetPassword(t *testing.T) {
 				}
 
 				rec := httptest.NewRecorder()
-				base.DendriteAdminMux.ServeHTTP(rec, req)
+				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
@@ -147,16 +155,19 @@ func TestPurgeRoom(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
 
-		fedClient := base.CreateFederationClient()
-		rsAPI := roomserver.NewInternalAPI(base)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI)
-		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
+		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
+		federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room
@@ -165,7 +176,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
@@ -193,7 +204,7 @@ func TestPurgeRoom(t *testing.T) {
 				"password": password,
 			}))
 			rec := httptest.NewRecorder()
-			base.PublicClientAPIMux.ServeHTTP(rec, req)
+			routers.Client.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to login: %s", rec.Body.String())
 			}
@@ -218,7 +229,7 @@ func TestPurgeRoom(t *testing.T) {
 				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 
 				rec := httptest.NewRecorder()
-				base.DendriteAdminMux.ServeHTTP(rec, req)
+				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())

@@ -15,9 +15,11 @@
 package mediaapi
 
 import (
+	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -25,19 +27,18 @@ import (
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
-	base *base.BaseDendrite,
+	mediaRouter *mux.Router,
+	cm sqlutil.Connections,
+	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
 	client *gomatrixserverlib.Client,
 ) {
-	cfg := &base.Cfg.MediaAPI
-	rateCfg := &base.Cfg.ClientAPI.RateLimiting
-
-	mediaDB, err := storage.NewMediaAPIDatasource(base, &cfg.Database)
+	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}
 
 	routing.Setup(
-		base.PublicMediaAPIMux, cfg, rateCfg, mediaDB, userAPI, client,
+		mediaRouter, cfg, mediaDB, userAPI, client,
 	)
 }
