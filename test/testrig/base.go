@@ -51,6 +51,7 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
+		cfg.SyncAPI.Fulltext.InMemory = true
 
 		connStr, closeDb := test.PrepareDBConnectionString(t, dbType)
 		cfg.Global.DatabaseOptions = config.DatabaseOptions{
@@ -70,7 +71,7 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 			SingleDatabase: false,
 		})
 		cfg.Global.ServerName = "test"
-
+		cfg.SyncAPI.Fulltext.InMemory = true
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)

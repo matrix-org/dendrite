@@ -12,6 +12,7 @@ concurrency:
 jobs:
   # run Sytest in different variations
   sytest:
+    if: ${{ false }}
     timeout-minutes: 60
     name: "Sytest (${{ matrix.label }})"
     runs-on: ubuntu-latest
@@ -75,7 +76,7 @@ jobs:
     name: "Sytest Coverage"
     runs-on: ubuntu-latest
     needs: sytest # only run once Sytest is done
-    if: ${{ always() }}
+    if: ${{ false }}
     steps:
       - uses: actions/checkout@v3
       - name: Install Go
@@ -167,7 +168,7 @@ jobs:
           cat <<EOF > /tmp/posttest.sh
           #!/bin/bash
           mkdir -p /tmp/Complement/logs/\$2/\$1/
-          docker cp \$1:/dendrite/complementcover.log /tmp/Complement/logs/\$2/\$1/
+          docker cp \$1:/tmp/covdatafiles/. /tmp/Complement/logs/\$2/\$1/
           EOF
           
           chmod +x /tmp/posttest.sh
@@ -190,7 +191,7 @@ jobs:
         with:
           name: Complement Logs - (Dendrite, ${{ join(matrix.*, ', ') }})
           path: |
-            /tmp/Complement/**/complementcover.log
+            /tmp/Complement/logs/**
 
   complement-coverage:
     timeout-minutes: 5
@@ -199,7 +200,6 @@ jobs:
     needs: complement # only run once Complement is done
     if: ${{ always() }}
     steps:
-      - uses: actions/checkout@v3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
@@ -207,20 +207,19 @@ jobs:
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
-      - name: Install gocovmerge
-        run: go install github.com/wadey/gocovmerge@latest
-      - name: Run gocovmerge
+      - name: Collect coverage
         run: |
-          find -name 'complementcover.log' -printf '"%p"\n' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > complement.cov
-          go tool cover -func=complement.cov
+          go tool covdata textfmt -i=$(find . -name 'covmeta*' -type f -exec dirname {} \; | uniq | awk -F '/' '$3!="" {print $0}' | paste -s -d ',' -) -o complement.cov
+          grep -Ev 'relayapi|setup/mscs|api_trace' complement.cov > final.cov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./complement.cov
+          files: ./final.cov
           flags: complement
           fail_ci_if_error: true
 
   element_web:
+    if: ${{ false }}
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:

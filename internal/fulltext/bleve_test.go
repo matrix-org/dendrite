@@ -38,7 +38,7 @@ func mustOpenIndex(t *testing.T, tempDir string) (*fulltext.Search, *process.Pro
 		cfg.InMemory = false
 	}
 	ctx := process.NewProcessContext()
-	fts, err := fulltext.New(ctx.Context(), cfg)
+	fts, err := fulltext.New(ctx, cfg)
 	if err != nil {
 		t.Fatal("failed to open fulltext index:", err)
 	}

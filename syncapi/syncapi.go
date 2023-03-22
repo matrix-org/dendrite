@@ -69,11 +69,10 @@ func AddPublicRoutes(
 
 	var fts *fulltext.Search
 	if dendriteCfg.SyncAPI.Fulltext.Enabled {
-		fts, err = fulltext.New(processContext.Context(), dendriteCfg.SyncAPI.Fulltext)
+		fts, err = fulltext.New(processContext, dendriteCfg.SyncAPI.Fulltext)
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to create full text")
 		}
-		processContext.ComponentStarted()
 	}
 
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{

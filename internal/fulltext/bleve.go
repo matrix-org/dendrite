@@ -18,10 +18,11 @@
 package fulltext
 
 import (
-	"context"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/matrix-org/dendrite/setup/process"
+
 	// side effect imports to allow all possible languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/cjk"
@@ -84,17 +85,18 @@ func (i *IndexElement) SetContentType(v string) {
 }
 
 // New opens a new/existing fulltext index
-func New(ctx context.Context, cfg config.Fulltext) (fts *Search, err error) {
+func New(processCtx *process.ProcessContext, cfg config.Fulltext) (fts *Search, err error) {
 	fts = &Search{}
 	fts.FulltextIndex, err = openIndex(cfg)
 	if err != nil {
 		return nil, err
 	}
 	go func() {
-		// Wait for the context (should be from process.ProcessContext) to be
-		// done, indicating that Dendrite is shutting down.
-		<-ctx.Done()
+		processCtx.ComponentStarted()
+		// Wait for the processContext to be done, indicating that Dendrite is shutting down.
+		<-processCtx.WaitForShutdown()
 		_ = fts.Close()
+		processCtx.ComponentFinished()
 	}()
 	return fts, nil
 }
