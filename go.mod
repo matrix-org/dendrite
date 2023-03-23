@@ -30,7 +30,6 @@ require (
 	github.com/nats-io/nats.go v1.24.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
