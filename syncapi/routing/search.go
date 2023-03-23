@@ -123,8 +123,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: SearchResponse{
-				SearchCategories: SearchCategories{
-					RoomEvents: RoomEvents{
+				SearchCategories: SearchCategoriesResponse{
+					RoomEvents: RoomEventsResponse{
 						Count:     int(result.Total),
 						NextBatch: nil,
 					},
@@ -158,7 +158,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	}
 
 	groups := make(map[string]RoomResult)
-	knownUsersProfiles := make(map[string]ProfileInfo)
+	knownUsersProfiles := make(map[string]ProfileInfoResponse)
 
 	// Sort the events by depth, as the returned values aren't ordered
 	if orderByTime {
@@ -180,7 +180,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			return jsonerror.InternalServerError()
 		}
 
-		profileInfos := make(map[string]ProfileInfo)
+		profileInfos := make(map[string]ProfileInfoResponse)
 		for _, ev := range append(eventsBefore, eventsAfter...) {
 			profile, ok := knownUsersProfiles[event.Sender()]
 			if !ok {
@@ -192,7 +192,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				if stateEvent == nil {
 					continue
 				}
-				profile = ProfileInfo{
+				profile = ProfileInfoResponse{
 					AvatarURL:   gjson.GetBytes(stateEvent.Content(), "avatar_url").Str,
 					DisplayName: gjson.GetBytes(stateEvent.Content(), "displayname").Str,
 				}
@@ -237,8 +237,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	}
 
 	res := SearchResponse{
-		SearchCategories: SearchCategories{
-			RoomEvents: RoomEvents{
+		SearchCategories: SearchCategoriesResponse{
+			RoomEvents: RoomEventsResponse{
 				Count:      int(result.Total),
 				Groups:     Groups{RoomID: groups},
 				Results:    results,
@@ -286,30 +286,40 @@ func contextEvents(
 	return eventsBefore, eventsAfter, err
 }
 
+type EventContext struct {
+	AfterLimit     int  `json:"after_limit,omitempty"`
+	BeforeLimit    int  `json:"before_limit,omitempty"`
+	IncludeProfile bool `json:"include_profile,omitempty"`
+}
+
+type GroupBy struct {
+	Key string `json:"key"`
+}
+
+type Groupings struct {
+	GroupBy []GroupBy `json:"group_by"`
+}
+
+type RoomEvents struct {
+	EventContext EventContext                      `json:"event_context"`
+	Filter       gomatrixserverlib.RoomEventFilter `json:"filter"`
+	Groupings    Groupings                         `json:"groupings"`
+	IncludeState bool                              `json:"include_state"`
+	Keys         []string                          `json:"keys"`
+	OrderBy      string                            `json:"order_by"`
+	SearchTerm   string                            `json:"search_term"`
+}
+
+type SearchCategories struct {
+	RoomEvents RoomEvents `json:"room_events"`
+}
+
 type SearchRequest struct {
-	SearchCategories struct {
-		RoomEvents struct {
-			EventContext struct {
-				AfterLimit     int  `json:"after_limit,omitempty"`
-				BeforeLimit    int  `json:"before_limit,omitempty"`
-				IncludeProfile bool `json:"include_profile,omitempty"`
-			} `json:"event_context"`
-			Filter    gomatrixserverlib.RoomEventFilter `json:"filter"`
-			Groupings struct {
-				GroupBy []struct {
-					Key string `json:"key"`
-				} `json:"group_by"`
-			} `json:"groupings"`
-			IncludeState bool     `json:"include_state"`
-			Keys         []string `json:"keys"`
-			OrderBy      string   `json:"order_by"`
-			SearchTerm   string   `json:"search_term"`
-		} `json:"room_events"`
-	} `json:"search_categories"`
+	SearchCategories SearchCategories `json:"search_categories"`
 }
 
 type SearchResponse struct {
-	SearchCategories SearchCategories `json:"search_categories"`
+	SearchCategories SearchCategoriesResponse `json:"search_categories"`
 }
 type RoomResult struct {
 	NextBatch *string  `json:"next_batch,omitempty"`
@@ -332,15 +342,15 @@ type SearchContextResponse struct {
 	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after"`
 	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before"`
 	Start        string                          `json:"start"`
-	ProfileInfo  map[string]ProfileInfo          `json:"profile_info"`
+	ProfileInfo  map[string]ProfileInfoResponse  `json:"profile_info"`
 }
 
-type ProfileInfo struct {
+type ProfileInfoResponse struct {
 	AvatarURL   string `json:"avatar_url"`
 	DisplayName string `json:"display_name"`
 }
 
-type RoomEvents struct {
+type RoomEventsResponse struct {
 	Count      int                                        `json:"count"`
 	Groups     Groups                                     `json:"groups"`
 	Highlights []string                                   `json:"highlights"`
@@ -348,6 +358,6 @@ type RoomEvents struct {
 	Results    []Result                                   `json:"results"`
 	State      map[string][]gomatrixserverlib.ClientEvent `json:"state,omitempty"`
 }
-type SearchCategories struct {
-	RoomEvents RoomEvents `json:"room_events"`
+type SearchCategoriesResponse struct {
+	RoomEvents RoomEventsResponse `json:"room_events"`
 }
