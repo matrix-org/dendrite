@@ -88,19 +88,12 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.insertSendToDeviceMessageStmt, err = db.Prepare(insertSendToDeviceMessageSQL); err != nil {
-		return nil, err
-	}
-	if s.selectSendToDeviceMessagesStmt, err = db.Prepare(selectSendToDeviceMessagesSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteSendToDeviceMessagesStmt, err = db.Prepare(deleteSendToDeviceMessagesSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxSendToDeviceIDStmt, err = db.Prepare(selectMaxSendToDeviceIDSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertSendToDeviceMessageStmt, insertSendToDeviceMessageSQL},
+		{&s.selectSendToDeviceMessagesStmt, selectSendToDeviceMessagesSQL},
+		{&s.deleteSendToDeviceMessagesStmt, deleteSendToDeviceMessagesSQL},
+		{&s.selectMaxSendToDeviceIDStmt, selectMaxSendToDeviceIDSQL},
+	}.Prepare(db)
 }
 
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(

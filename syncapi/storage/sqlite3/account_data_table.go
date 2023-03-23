@@ -66,16 +66,11 @@ func NewSqliteAccountDataTable(db *sql.DB, streamID *StreamIDStatements) (tables
 	if err != nil {
 		return nil, err
 	}
-	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxAccountDataIDStmt, err = db.Prepare(selectMaxAccountDataIDSQL); err != nil {
-		return nil, err
-	}
-	if s.selectAccountDataInRangeStmt, err = db.Prepare(selectAccountDataInRangeSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertAccountDataStmt, insertAccountDataSQL},
+		{&s.selectMaxAccountDataIDStmt, selectMaxAccountDataIDSQL},
+		{&s.selectAccountDataInRangeStmt, selectAccountDataInRangeSQL},
+	}.Prepare(db)
 }
 
 func (s *accountDataStatements) InsertAccountData(

@@ -90,22 +90,14 @@ func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error)
 	if err != nil {
 		return
 	}
-	if s.insertJoinedHostsStmt, err = db.Prepare(insertJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.deleteJoinedHostsStmt, err = db.Prepare(deleteJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.deleteJoinedHostsForRoomStmt, err = s.db.Prepare(deleteJoinedHostsForRoomSQL); err != nil {
-		return
-	}
-	if s.selectJoinedHostsStmt, err = db.Prepare(selectJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.selectAllJoinedHostsStmt, err = db.Prepare(selectAllJoinedHostsSQL); err != nil {
-		return
-	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertJoinedHostsStmt, insertJoinedHostsSQL},
+		{&s.deleteJoinedHostsStmt, deleteJoinedHostsSQL},
+		{&s.deleteJoinedHostsForRoomStmt, deleteJoinedHostsForRoomSQL},
+		{&s.selectJoinedHostsStmt, selectJoinedHostsSQL},
+		{&s.selectAllJoinedHostsStmt, selectAllJoinedHostsSQL},
+	}.Prepare(db)
 }
 
 func (s *joinedHostsStatements) InsertJoinedHosts(

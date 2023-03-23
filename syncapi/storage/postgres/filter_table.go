@@ -61,16 +61,11 @@ func NewPostgresFilterTable(db *sql.DB) (tables.Filter, error) {
 		return nil, err
 	}
 	s := &filterStatements{}
-	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
-		return nil, err
-	}
-	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
-		return nil, err
-	}
-	if s.insertFilterStmt, err = db.Prepare(insertFilterSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.selectFilterStmt, selectFilterSQL},
+		{&s.selectFilterIDByContentStmt, selectFilterIDByContentSQL},
+		{&s.insertFilterStmt, insertFilterSQL},
+	}.Prepare(db)
 }
 
 func (s *filterStatements) SelectFilter(

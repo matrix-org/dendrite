@@ -60,19 +60,12 @@ func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
 		return
 	}
 
-	if s.insertBlacklistStmt, err = db.Prepare(insertBlacklistSQL); err != nil {
-		return
-	}
-	if s.selectBlacklistStmt, err = db.Prepare(selectBlacklistSQL); err != nil {
-		return
-	}
-	if s.deleteBlacklistStmt, err = db.Prepare(deleteBlacklistSQL); err != nil {
-		return
-	}
-	if s.deleteAllBlacklistStmt, err = db.Prepare(deleteAllBlacklistSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertBlacklistStmt, insertBlacklistSQL},
+		{&s.selectBlacklistStmt, selectBlacklistSQL},
+		{&s.deleteBlacklistStmt, deleteBlacklistSQL},
+		{&s.deleteAllBlacklistStmt, deleteAllBlacklistSQL},
+	}.Prepare(db)
 }
 
 func (s *blacklistStatements) InsertBlacklist(
