@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -243,7 +242,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				Groups:     Groups{RoomID: groups},
 				Results:    results,
 				NextBatch:  nextBatchResult,
-				Highlights: strings.Split(searchReq.SearchCategories.RoomEvents.SearchTerm, " "),
+				Highlights: fts.GetHighlights(result),
 				State:      stateForRooms,
 			},
 		},

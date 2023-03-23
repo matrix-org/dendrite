@@ -53,7 +53,7 @@ func TestSearch(t *testing.T) {
 			device:    &aliceDevice,
 		},
 		{
-			name:   "searchTerm specified",
+			name:   "searchTerm specified, found at the beginning",
 			wantOK: true,
 			searchReq: SearchRequest{
 				SearchCategories: SearchCategories{RoomEvents: RoomEvents{SearchTerm: "hello"}},
@@ -61,6 +61,26 @@ func TestSearch(t *testing.T) {
 			device:            &aliceDevice,
 			wantResponseCount: 1,
 		},
+		{
+			name:   "searchTerm specified, found at the end",
+			wantOK: true,
+			searchReq: SearchRequest{
+				SearchCategories: SearchCategories{RoomEvents: RoomEvents{SearchTerm: "world3"}},
+			},
+			device:            &aliceDevice,
+			wantResponseCount: 1,
+		},
+		/* the following would need matchQuery.SetFuzziness(1) in bleve.go
+		{
+			name:   "searchTerm fuzzy search",
+			wantOK: true,
+			searchReq: SearchRequest{
+				SearchCategories: SearchCategories{RoomEvents: RoomEvents{SearchTerm: "hell"}}, // this still should find hello world
+			},
+			device:            &aliceDevice,
+			wantResponseCount: 1,
+		},
+		*/
 		{
 			name:   "searchTerm specified but no result",
 			wantOK: true,
