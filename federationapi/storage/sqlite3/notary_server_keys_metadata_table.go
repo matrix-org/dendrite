@@ -92,19 +92,12 @@ func NewSQLiteNotaryServerKeysMetadataTable(db *sql.DB) (s *notaryServerKeysMeta
 		return
 	}
 
-	if s.upsertServerKeysStmt, err = db.Prepare(upsertServerKeysSQL); err != nil {
-		return
-	}
-	if s.selectNotaryKeyResponsesStmt, err = db.Prepare(selectNotaryKeyResponsesSQL); err != nil {
-		return
-	}
-	if s.selectNotaryKeyMetadataStmt, err = db.Prepare(selectNotaryKeyMetadataSQL); err != nil {
-		return
-	}
-	if s.deleteUnusedServerKeysJSONStmt, err = db.Prepare(deleteUnusedServerKeysJSONSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.upsertServerKeysStmt, upsertServerKeysSQL},
+		{&s.selectNotaryKeyResponsesStmt, selectNotaryKeyResponsesSQL},
+		{&s.selectNotaryKeyMetadataStmt, selectNotaryKeyMetadataSQL},
+		{&s.deleteUnusedServerKeysJSONStmt, deleteUnusedServerKeysJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *notaryServerKeysMetadataStatements) UpsertKey(
