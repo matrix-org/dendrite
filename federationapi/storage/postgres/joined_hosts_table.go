@@ -90,9 +90,6 @@ func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err erro
 	if err != nil {
 		return
 	}
-	if s.insertJoinedHostsStmt, err = s.db.Prepare(insertJoinedHostsSQL); err != nil {
-		return
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertJoinedHostsStmt, insertJoinedHostsSQL},
 		{&s.deleteJoinedHostsStmt, deleteJoinedHostsSQL},
