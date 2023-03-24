@@ -31,6 +31,7 @@ type FederationAPI struct {
 	// open for reuse for future requests. Connections will be closed quicker
 	// but we may spend more time on TLS handshakes instead.
 	DisableHTTPKeepalives bool `yaml:"disable_http_keepalives"`
+	Proxy Proxy `yaml:"proxy_outbound"`
 
 	// Perspective keyservers, to use as a backup when direct key fetch
 	// requests don't succeed
@@ -65,6 +66,8 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 			c.Database.ConnectionString = "file:federationapi.db"
 		}
 	}
+
+	c.Proxy.Defaults()
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors) {

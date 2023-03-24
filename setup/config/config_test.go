@@ -103,6 +103,11 @@ client_api:
 federation_api:
   database:
     connection_string: file:federationapi.db
+  proxy_outbound:
+    enabled: false
+    protocol: http
+    host: localhost
+    port: 8080
 key_server:
   database:
     connection_string: file:keyserver.db
