@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"net/url"
 	"runtime"
 	"syscall"
 	"time"
@@ -57,8 +58,12 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 		db:         statsDB,
 		isMonolith: true,
 		client: &http.Client{
-			Timeout:   time.Second * 30,
-			Transport: http.DefaultTransport,
+			Timeout: time.Second * 30,
+			Transport: &http.Transport{
+				Proxy: func(req *http.Request) (*url.URL, error) {
+					return cfg.UserAPI.Proxy.GetApplicableProxy(req, &cfg.Global.Proxy)
+				},
+			},
 		},
 	}
 

@@ -34,12 +34,17 @@ type AppServiceAPI struct {
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
 	ConfigFiles []string `yaml:"config_files"`
+
+	// Proxy for outbound requests
+	Proxy Proxy `yaml:"proxy_outbound"`
 }
 
 func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
+	c.Proxy.Defaults()
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors) {
+	c.Proxy.Verify(configErrs)
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application

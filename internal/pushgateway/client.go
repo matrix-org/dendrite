@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 type httpClient struct {
@@ -17,15 +19,17 @@ type httpClient struct {
 }
 
 // NewHTTPClient creates a new Push Gateway client.
-func NewHTTPClient(disableTLSValidation bool) Client {
+func NewHTTPClient(cfg *config.Dendrite) Client {
 	hc := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			DisableKeepAlives: true,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: disableTLSValidation,
+				InsecureSkipVerify: cfg.UserAPI.PushGatewayDisableTLSValidation,
 			},
-			Proxy: http.ProxyFromEnvironment,
+			Proxy: func(req *http.Request) (*url.URL, error) {
+				return cfg.UserAPI.Proxy.GetApplicableProxy(req, &cfg.Global.Proxy)
+			},
 		},
 	}
 	return &httpClient{hc: hc}

@@ -21,6 +21,8 @@ type UserAPI struct {
 	// Users who register on this homeserver will automatically
 	// be joined to the rooms listed under this option.
 	AutoJoinRooms []string `yaml:"auto_join_rooms"`
+	// Proxy for outbound requests
+	Proxy Proxy `yaml:"proxy_outbound"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
@@ -33,6 +35,7 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 			c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 		}
 	}
+	c.Proxy.Defaults()
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors) {
@@ -40,4 +43,5 @@ func (c *UserAPI) Verify(configErrs *ConfigErrors) {
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	}
+	c.Proxy.Verify(configErrs)
 }

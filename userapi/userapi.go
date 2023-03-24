@@ -47,7 +47,7 @@ func NewInternalAPI(
 	js, _ := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
 	appServices := dendriteCfg.Derived.ApplicationServices
 
-	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
+	pgClient := pushgateway.NewHTTPClient(dendriteCfg)
 
 	db, err := storage.NewUserDatabase(
 		processContext.Context(),

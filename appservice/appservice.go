@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -51,7 +52,9 @@ func NewInternalAPI(
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: cfg.AppServiceAPI.DisableTLSValidation,
 			},
-			Proxy: http.ProxyFromEnvironment,
+			Proxy: func(req *http.Request) (*url.URL, error) {
+				return cfg.AppServiceAPI.Proxy.GetApplicableProxy(req, &cfg.Global.Proxy)
+			},
 		},
 	}
 	// Create appserivce query API with an HTTP client that will be used for all

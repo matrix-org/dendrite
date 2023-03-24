@@ -3,6 +3,10 @@ package config
 import (
 	"fmt"
 	"math/rand"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +82,9 @@ type Global struct {
 
 	// Configuration for the caches.
 	Cache Cache `yaml:"cache"`
+
+	// Proxy for outbound requests
+	Proxy Proxy `yaml:"proxy_outbound"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -102,6 +109,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
 	c.Cache.Defaults()
+	c.Proxy.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors) {
@@ -119,6 +127,7 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 	c.ServerNotices.Verify(configErrs)
 	c.ReportStats.Verify(configErrs)
 	c.Cache.Verify(configErrs)
+	c.Proxy.Verify(configErrs)
 }
 
 func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool {
@@ -436,4 +445,71 @@ func (d *DataUnit) UnmarshalText(text []byte) error {
 	}
 	*d = DataUnit(v * magnitude)
 	return nil
+}
+
+// The config for setting a proxy to use for server->server requests
+type Proxy struct {
+	// Is the proxy enabled?
+	Enabled bool `yaml:"enabled"`
+	// The protocol for the proxy (http / https / socks5)
+	Protocol string `yaml:"protocol"`
+	// The host where the proxy is listening
+	Host string `yaml:"host"`
+	// The port on which the proxy is listening
+	Port uint16 `yaml:"port"`
+	// A list of destination addresses/networks not intended to be proxied
+	ExcludeAddresses []string `yaml:exclude_addresses`
+}
+
+func (c *Proxy) Defaults() {
+	c.Enabled = false
+	c.Protocol = "http"
+	c.Host = "localhost"
+	c.Port = 8080
+}
+
+func (c *Proxy) Verify(configErrs *ConfigErrors) {
+}
+
+func (c *Proxy) RequestAddressIsExcluded(req *http.Request) bool {
+	for _, s := range c.ExcludeAddresses {
+		var exclude *net.IPNet
+
+		if strings.Contains(s, "/") {
+			_, exclude, _ = net.ParseCIDR(s)
+		} else {
+			_, exclude, _ = net.ParseCIDR(fmt.Sprintf("%s/32", s))
+		}
+		_, remote_net, _ := net.ParseCIDR(fmt.Sprintf("%s/32", s))
+
+		if exclude.Contains(remote_net.IP) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Proxy) ConfigIsDefault() bool {
+	if c.Enabled == false && c.Protocol == "http" && c.Port == 8080 {
+		return true
+	}
+	return false
+}
+
+func (c *Proxy) GetApplicableProxy(req *http.Request, parent *Proxy) (*url.URL, error) {
+	if parent.RequestAddressIsExcluded(req) || c.RequestAddressIsExcluded(req) {
+		return req.URL, nil
+	}
+	if os.Getenv("HTTP_PROXY") != "" || os.Getenv("HTTPS_PROXY") != "" {
+		return http.ProxyFromEnvironment(req)
+	} else if parent.Enabled && c.ConfigIsDefault() {
+		// Proxy defined in Global section
+		return url.Parse(fmt.Sprintf("%s://%s:%s", parent.Protocol, parent.Host, parent.Port))
+	} else if !c.ConfigIsDefault() {
+		// Proxy defined in this section
+		return url.Parse(fmt.Sprintf("%s://%s:%s", c.Protocol, c.Host, c.Port))
+	} else {
+		// No proxy
+		return nil, nil
+	}
 }

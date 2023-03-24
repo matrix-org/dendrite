@@ -79,6 +79,12 @@ global:
     room_name: "Server Alerts"	
   jetstream:
     addresses: ["test"]
+  proxy_outbound:
+    enabled: false
+    protocol: http
+    host: localhost
+    port: 8080
+    exclude_addresses: []
 app_service_api:
   database:
     connection_string: file:appservice.db
@@ -86,6 +92,12 @@ app_service_api:
     max_idle_conns: 2
     conn_max_lifetime: -1
   config_files: []
+  proxy_outbound:
+    enabled: false
+    protocol: http
+    host: localhost
+    port: 8080
+    exclude_addresses: []
 client_api:
   registration_disabled: true
   registration_shared_secret: ""
@@ -103,11 +115,6 @@ client_api:
 federation_api:
   database:
     connection_string: file:federationapi.db
-  proxy_outbound:
-    enabled: false
-    protocol: http
-    host: localhost
-    port: 8080
 key_server:
   database:
     connection_string: file:keyserver.db
@@ -170,6 +177,12 @@ user_api:
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
+  proxy_outbound:
+    enabled: false
+    protocol: http
+    host: localhost
+    port: 8080
+    exclude_addresses: []
 relay_api:
   database:
     connection_string: file:relayapi.db
