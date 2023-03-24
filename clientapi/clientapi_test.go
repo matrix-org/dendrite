@@ -181,14 +181,9 @@ func TestDeleteDevice(t *testing.T) {
 		}
 		secondDeviceID := devRes.Device.ID
 
+		// initiate UIA for the second device
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+accessTokens[alice].deviceID, strings.NewReader("<"))
-		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
-		routers.Client.ServeHTTP(rec, req)
-
-		// initiate UIA
-		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+accessTokens[alice].deviceID, strings.NewReader(""))
+		req := httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+secondDeviceID, strings.NewReader(""))
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnauthorized {
@@ -216,7 +211,7 @@ func TestDeleteDevice(t *testing.T) {
 		// do the same request again, this time with our UIA, but for a different device ID, this should fail
 		rec = httptest.NewRecorder()
 
-		req = httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+secondDeviceID, &reqBody)
+		req = httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+accessTokens[alice].deviceID, &reqBody)
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusForbidden {
@@ -225,11 +220,25 @@ func TestDeleteDevice(t *testing.T) {
 
 		// do the same request again, this time with our UIA, but for the correct device ID, this should be fine
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+accessTokens[alice].deviceID, &reqBody2)
+		req = httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/devices/"+secondDeviceID, &reqBody2)
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		// verify devices are deleted
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices", strings.NewReader(""))
+		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+		routers.Client.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		for _, device := range gjson.GetBytes(rec.Body.Bytes(), "devices.#.device_id").Array() {
+			if device.Str == secondDeviceID {
+				t.Fatalf("expected device %s to be deleted, but wasn't", secondDeviceID)
+			}
 		}
 	})
 }
@@ -311,6 +320,22 @@ func TestDeleteDevices(t *testing.T) {
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		// verify devices are deleted
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices", strings.NewReader(""))
+		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+		routers.Client.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		for _, device := range gjson.GetBytes(rec.Body.Bytes(), "devices.#.device_id").Array() {
+			for _, deletedDevice := range devices[5:] {
+				if device.Str == deletedDevice {
+					t.Fatalf("expected device %s to be deleted, but wasn't", deletedDevice)
+				}
+			}
 		}
 	})
 }
