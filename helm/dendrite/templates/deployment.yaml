@@ -57,7 +57,7 @@ spec:
         {{- if $.Values.dendrite_config.global.profiling.enabled }}
         env:
           - name: PPROFLISTEN
-            value: "localhost:{{- $.Values.global.profiling.port -}}"
+            value: "localhost:{{- $.Values.dendrite_config.global.profiling.port -}}"
         {{- end }}
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}
