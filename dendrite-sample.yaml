@@ -273,9 +273,6 @@ media_api:
       height: 480
       method: scale
 
-# Configuration for the Relay API.
-relay_api:
-
 # Configuration for enabling experimental MSCs on this homeserver.
 mscs:
   mscs:
