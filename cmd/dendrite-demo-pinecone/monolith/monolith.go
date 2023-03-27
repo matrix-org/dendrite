@@ -213,7 +213,7 @@ func (p *P2PMonolith) Stop() {
 }
 
 func (p *P2PMonolith) WaitForShutdown() {
-	p.ProcessCtx.WaitForShutdown()
+	base.WaitForShutdown(p.ProcessCtx)
 	p.closeAllResources()
 }
 
