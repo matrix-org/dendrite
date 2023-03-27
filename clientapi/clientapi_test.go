@@ -54,7 +54,7 @@ func TestSetDisplayname(t *testing.T) {
 			wantDisplayName: changeDisplayName,
 		},
 		{
-			name:            "existing user is now allowed to change own if name is empty",
+			name:            "existing user is not allowed to change own name if name is empty",
 			user:            bob,
 			wantOK:          false,
 			wantDisplayName: "",
@@ -160,13 +160,13 @@ func TestSetAvatarURL(t *testing.T) {
 			user: notLocalUser,
 		},
 		{
-			name:       "existing user is allowed to change own name",
+			name:       "existing user is allowed to change own avatar",
 			user:       alice,
 			wantOK:     true,
 			avatar_url: changeDisplayName,
 		},
 		{
-			name:       "existing user is now allowed to change own if name is empty",
+			name:       "existing user is not allowed to change own avatar if avatar is empty",
 			user:       bob,
 			wantOK:     false,
 			avatar_url: "",
