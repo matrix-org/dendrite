@@ -32,7 +32,7 @@ UPDATE userapi_accounts SET account_type = 3 WHERE localpart = '$localpart';
 
 Where `$localpart` is the username only (e.g. `alice`).
 
-## GET `/_dendrite/admin/evacuateRoom/{roomID}`
+## POST `/_dendrite/admin/evacuateRoom/{roomID}`
 
 This endpoint will instruct Dendrite to part all local users from the given `roomID`
 in the URL. It may take some time to complete. A JSON body will be returned containing
@@ -41,7 +41,7 @@ the user IDs of all affected users.
 If the room has an alias set (e.g. is published), the room's ID will not be visible in the URL, but it can
 be found as the room's "internal ID" in Element Web (Settings -> Advanced)
 
-## GET `/_dendrite/admin/evacuateUser/{userID}`
+## POST `/_dendrite/admin/evacuateUser/{userID}`
 
 This endpoint will instruct Dendrite to part the given local `userID` in the URL from
 all rooms which they are currently joined. A JSON body will be returned containing

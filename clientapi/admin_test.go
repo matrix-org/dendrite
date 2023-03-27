@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
@@ -57,34 +59,7 @@ func TestAdminResetPassword(t *testing.T) {
 			bob:        "",
 			vhUser:     "",
 		}
-		for u := range accessTokens {
-			localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
-			userRes := &uapi.PerformAccountCreationResponse{}
-			password := util.RandomString(8)
-			if err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
-				AccountType: u.AccountType,
-				Localpart:   localpart,
-				ServerName:  serverName,
-				Password:    password,
-			}, userRes); err != nil {
-				t.Errorf("failed to create account: %s", err)
-			}
-
-			req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
-				"type": authtypes.LoginTypePassword,
-				"identifier": map[string]interface{}{
-					"type": "m.id.user",
-					"user": u.ID,
-				},
-				"password": password,
-			}))
-			rec := httptest.NewRecorder()
-			routers.Client.ServeHTTP(rec, req)
-			if rec.Code != http.StatusOK {
-				t.Fatalf("failed to login: %s", rec.Body.String())
-			}
-			accessTokens[u] = gjson.GetBytes(rec.Body.Bytes(), "access_token").String()
-		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
 		testCases := []struct {
 			name           string
@@ -182,34 +157,7 @@ func TestPurgeRoom(t *testing.T) {
 		accessTokens := map[*test.User]string{
 			aliceAdmin: "",
 		}
-		for u := range accessTokens {
-			localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
-			userRes := &uapi.PerformAccountCreationResponse{}
-			password := util.RandomString(8)
-			if err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
-				AccountType: u.AccountType,
-				Localpart:   localpart,
-				ServerName:  serverName,
-				Password:    password,
-			}, userRes); err != nil {
-				t.Errorf("failed to create account: %s", err)
-			}
-
-			req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
-				"type": authtypes.LoginTypePassword,
-				"identifier": map[string]interface{}{
-					"type": "m.id.user",
-					"user": u.ID,
-				},
-				"password": password,
-			}))
-			rec := httptest.NewRecorder()
-			routers.Client.ServeHTTP(rec, req)
-			if rec.Code != http.StatusOK {
-				t.Fatalf("failed to login: %s", rec.Body.String())
-			}
-			accessTokens[u] = gjson.GetBytes(rec.Body.Bytes(), "access_token").String()
-		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
 		testCases := []struct {
 			name   string
@@ -238,4 +186,270 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 	})
+}
+
+func TestAdminEvacuateRoom(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, aliceAdmin)
+
+	// Join Bob
+	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// this starts the JetStream consumers
+		fsAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
+		rsAPI.SetFederationAPI(fsAPI, nil)
+
+		// Create the room
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		testCases := []struct {
+			name         string
+			roomID       string
+			wantOK       bool
+			wantAffected []string
+		}{
+			{name: "Can evacuate existing room", wantOK: true, roomID: room.ID, wantAffected: []string{aliceAdmin.ID, bob.ID}},
+			{name: "Can not evacuate non-existent room", wantOK: false, roomID: "!doesnotexist:localhost", wantAffected: []string{}},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/evacuateRoom/"+tc.roomID)
+
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+
+				affectedArr := gjson.GetBytes(rec.Body.Bytes(), "affected").Array()
+				affected := make([]string, 0, len(affectedArr))
+				for _, x := range affectedArr {
+					affected = append(affected, x.Str)
+				}
+				if !reflect.DeepEqual(affected, tc.wantAffected) {
+					t.Fatalf("expected affected %#v, but got %#v", tc.wantAffected, affected)
+				}
+			})
+		}
+	})
+}
+
+func TestAdminEvacuateUser(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, aliceAdmin)
+	room2 := test.NewRoom(t, aliceAdmin)
+
+	// Join Bob
+	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+	room2.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// this starts the JetStream consumers
+		fsAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, basepkg.CreateFederationClient(cfg, nil), rsAPI, caches, nil, true)
+		rsAPI.SetFederationAPI(fsAPI, nil)
+
+		// Create the room
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room2.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		testCases := []struct {
+			name              string
+			userID            string
+			wantOK            bool
+			wantAffectedRooms []string
+		}{
+			{name: "Can evacuate existing user", wantOK: true, userID: bob.ID, wantAffectedRooms: []string{room.ID, room2.ID}},
+			{name: "invalid userID is rejected", wantOK: false, userID: "!notauserid:test", wantAffectedRooms: []string{}},
+			{name: "Can not evacuate user from different server", wantOK: false, userID: "@doesnotexist:localhost", wantAffectedRooms: []string{}},
+			{name: "Can not evacuate non-existent user", wantOK: false, userID: "@doesnotexist:test", wantAffectedRooms: []string{}},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/evacuateUser/"+tc.userID)
+
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+
+				affectedArr := gjson.GetBytes(rec.Body.Bytes(), "affected").Array()
+				affected := make([]string, 0, len(affectedArr))
+				for _, x := range affectedArr {
+					affected = append(affected, x.Str)
+				}
+				if !reflect.DeepEqual(affected, tc.wantAffectedRooms) {
+					t.Fatalf("expected affected %#v, but got %#v", tc.wantAffectedRooms, affected)
+				}
+
+			})
+		}
+		// Wait for the FS API to have consumed every message
+		js, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		timeout := time.After(time.Second)
+		for {
+			select {
+			case <-timeout:
+				t.Fatalf("FS API didn't process all events in time")
+			default:
+			}
+			info, err := js.ConsumerInfo(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent), cfg.Global.JetStream.Durable("FederationAPIRoomServerConsumer")+"Pull")
+			if err != nil {
+				time.Sleep(time.Millisecond * 10)
+				continue
+			}
+			if info.NumPending == 0 && info.NumAckPending == 0 {
+				break
+			}
+		}
+	})
+}
+
+func TestAdminMarkAsStale(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		testCases := []struct {
+			name   string
+			userID string
+			wantOK bool
+		}{
+			{name: "local user is not allowed", userID: aliceAdmin.ID},
+			{name: "invalid userID", userID: "!notvalid:test"},
+			{name: "remote user is allowed", userID: "@alice:localhost", wantOK: true},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/refreshDevices/"+tc.userID)
+
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func createAccessTokens(t *testing.T, accessTokens map[*test.User]string, userAPI uapi.UserInternalAPI, ctx context.Context, routers httputil.Routers) {
+	t.Helper()
+	for u := range accessTokens {
+		localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
+		userRes := &uapi.PerformAccountCreationResponse{}
+		password := util.RandomString(8)
+		if err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
+			AccountType: u.AccountType,
+			Localpart:   localpart,
+			ServerName:  serverName,
+			Password:    password,
+		}, userRes); err != nil {
+			t.Errorf("failed to create account: %s", err)
+		}
+
+		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
+			"type": authtypes.LoginTypePassword,
+			"identifier": map[string]interface{}{
+				"type": "m.id.user",
+				"user": u.ID,
+			},
+			"password": password,
+		}))
+		rec := httptest.NewRecorder()
+		routers.Client.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("failed to login: %s", rec.Body.String())
+		}
+		accessTokens[u] = gjson.GetBytes(rec.Body.Bytes(), "access_token").String()
+	}
 }

@@ -227,6 +227,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 			}
 			return nil
 		}
+		res.Affected = append(res.Affected, roomID)
 		if len(outputEvents) == 0 {
 			continue
 		}
@@ -237,8 +238,6 @@ func (r *Admin) PerformAdminEvacuateUser(
 			}
 			return nil
 		}
-
-		res.Affected = append(res.Affected, roomID)
 	}
 	return nil
 }
