@@ -18,6 +18,7 @@
 package fulltext
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
@@ -60,6 +61,7 @@ type Indexer interface {
 	Index(elements ...IndexElement) error
 	Delete(eventID string) error
 	Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (*bleve.SearchResult, error)
+	GetHighlights(result *bleve.SearchResult) []string
 	Close() error
 }
 
@@ -124,6 +126,47 @@ func (f *Search) Delete(eventID string) error {
 	return f.FulltextIndex.Delete(eventID)
 }
 
+var highlightMatcher = regexp.MustCompile("<mark>(.*?)</mark>")
+
+// GetHighlights extracts the highlights from a SearchResult.
+func (f *Search) GetHighlights(result *bleve.SearchResult) []string {
+	if result == nil {
+		return []string{}
+	}
+
+	seenMatches := make(map[string]struct{})
+
+	for _, hit := range result.Hits {
+		if hit.Fragments == nil {
+			continue
+		}
+		fragments, ok := hit.Fragments["Content"]
+		if !ok {
+			continue
+		}
+		for _, x := range fragments {
+			substringMatches := highlightMatcher.FindAllStringSubmatch(x, -1)
+			for _, matches := range substringMatches {
+				for i := range matches {
+					if i == 0 { // skip first match, this is the complete substring match
+						continue
+					}
+					if _, ok := seenMatches[matches[i]]; ok {
+						continue
+					}
+					seenMatches[matches[i]] = struct{}{}
+				}
+			}
+		}
+	}
+
+	res := make([]string, 0, len(seenMatches))
+	for m := range seenMatches {
+		res = append(res, m)
+	}
+	return res
+}
+
 // Search searches the index given a search term, roomIDs and keys.
 func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (*bleve.SearchResult, error) {
 	qry := bleve.NewConjunctionQuery()
@@ -162,6 +205,10 @@ func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, or
 	if orderByStreamPos {
 		s.SortBy([]string{"-StreamPosition"})
 	}
+
+	// Highlight some words
+	s.Highlight = bleve.NewHighlight()
+	s.Highlight.Fields = []string{"Content"}
 
 	return f.FulltextIndex.Search(s)
 }
