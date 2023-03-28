@@ -356,20 +356,21 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		// Create a dummy application service
-		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
-			{
-				ID:              "someID",
-				URL:             srv.URL,
-				ASToken:         "",
-				HSToken:         "",
-				SenderLocalpart: "senderLocalPart",
-				NamespaceMap: map[string][]config.ApplicationServiceNamespace{
-					"users":   {{RegexpObject: regexp.MustCompile(bob.ID)}},
-					"aliases": {{RegexpObject: regexp.MustCompile(room.ID)}},
-				},
+		as := &config.ApplicationService{
+			ID:              "someID",
+			URL:             srv.URL,
+			ASToken:         "",
+			HSToken:         "",
+			SenderLocalpart: "senderLocalPart",
+			NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+				"users":   {{RegexpObject: regexp.MustCompile(bob.ID)}},
+				"aliases": {{RegexpObject: regexp.MustCompile(room.ID)}},
 			},
 		}
+		as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
+
+		// Create a dummy application service
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs
