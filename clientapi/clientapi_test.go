@@ -257,6 +257,12 @@ func TestMembership(t *testing.T) {
 				wantOK:  true,
 				asUser:  bob,
 			},
+			{
+				name:    "Bob can forget the room again",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "forget"), strings.NewReader("")),
+				wantOK:  true,
+				asUser:  bob,
+			},
 			// END must run in sequence
 		}
 
