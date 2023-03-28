@@ -81,12 +81,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		ctx, targetUserID, reason, profileAPI, device, membership,
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
-	if err == eventutil.ErrRoomNoExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(err.Error()),
-		}
-	} else if err != nil {
+	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
 		return jsonerror.InternalServerError()
 	}
@@ -263,12 +258,7 @@ func sendInvite(
 		ctx, userID, reason, profileAPI, device, gomatrixserverlib.Invite,
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
-	if err == eventutil.ErrRoomNoExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(err.Error()),
-		}, err
-	} else if err != nil {
+	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
 		return jsonerror.InternalServerError(), err
 	}
@@ -496,14 +486,14 @@ func getPowerlevels(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, 
 	if plEvent == nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You don't have permission to kick this user, no power_levels event in this room."),
+			JSON: jsonerror.Forbidden("You don't have permission to perform this action, no power_levels event in this room."),
 		}
 	}
 	pl, err := plEvent.PowerLevels()
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You don't have permission to kick this user, the power_levels event for this room is malformed so auth checks cannot be performed."),
+			JSON: jsonerror.Forbidden("You don't have permission to perform this action, the power_levels event for this room is malformed so auth checks cannot be performed."),
 		}
 	}
 	return pl, nil

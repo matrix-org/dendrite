@@ -110,6 +110,7 @@ func TestMembership(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
 		defer close()
 		natsInstance := jetstream.NATSInstance{}
 
@@ -120,6 +121,7 @@ func TestMembership(t *testing.T) {
 		rsAPI.SetFederationAPI(nil, nil)
 		// Needed to create accounts
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		rsAPI.SetUserAPI(userAPI)
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
@@ -187,9 +189,17 @@ func TestMembership(t *testing.T) {
 				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", "!doesnotexist", "forget"), strings.NewReader("")),
 				asUser:  bob,
 			},
+			{
+				name:    "Alice can not ban Bob in non-existent room", // fails because "not joined"
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", "!doesnotexist:test", "ban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+			},
+			{
+				name:    "Alice can not kick Bob in non-existent room", // fails because "not joined"
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", "!doesnotexist:test", "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+			},
 			// the following must run in sequence, as they build up on each other
 			{
-				name:    "Alice invite Bob",
+				name:    "Alice invites Bob",
 				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "invite"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
 				wantOK:  true,
 			},
@@ -217,6 +227,12 @@ func TestMembership(t *testing.T) {
 				asUser:  bob,
 			},
 			{
+				name:    "Bob can not ban Alice",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "ban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, alice.ID))),
+				wantOK:  false, // powerlevel too low
+				asUser:  bob,
+			},
+			{
 				name:    "Alice can kick Bob",
 				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
 				wantOK:  true,
@@ -230,6 +246,11 @@ func TestMembership(t *testing.T) {
 				name:    "Alice can not kick Bob again",
 				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
 				wantOK:  false, // can not kick banned/left user
+			},
+			{
+				name:    "Bob can not unban himself", // mostly because of not being a member of the room
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "unban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				asUser:  bob,
 			},
 			{
 				name:    "Alice can not invite Bob again",
@@ -250,6 +271,12 @@ func TestMembership(t *testing.T) {
 				name:    "Alice can invite Bob again",
 				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "invite"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
 				wantOK:  true,
+			},
+			{
+				name:    "Bob can reject the invite by leaving",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "leave"), strings.NewReader("")),
+				wantOK:  true,
+				asUser:  bob,
 			},
 			{
 				name:    "Bob can forget the room",
