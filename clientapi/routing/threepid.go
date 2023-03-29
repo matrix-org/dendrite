@@ -33,7 +33,7 @@ type reqTokenResponse struct {
 	SID string `json:"sid"`
 }
 
-type threePIDsResponse struct {
+type ThreePIDsResponse struct {
 	ThreePIDs []authtypes.ThreePID `json:"threepids"`
 }
 
@@ -41,7 +41,7 @@ type threePIDsResponse struct {
 //
 //	POST /account/3pid/email/requestToken
 //	POST /register/email/requestToken
-func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *config.ClientAPI) util.JSONResponse {
+func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *config.ClientAPI, client *gomatrixserverlib.Client) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -72,7 +72,7 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 		}
 	}
 
-	resp.SID, err = threepid.CreateSession(req.Context(), body, cfg)
+	resp.SID, err = threepid.CreateSession(req.Context(), body, cfg, client)
 	if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -92,7 +92,7 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
 	req *http.Request, threePIDAPI api.ClientUserAPI, device *api.Device,
-	cfg *config.ClientAPI,
+	cfg *config.ClientAPI, client *gomatrixserverlib.Client,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -100,7 +100,7 @@ func CheckAndSave3PIDAssociation(
 	}
 
 	// Check if the association has been validated
-	verified, address, medium, err := threepid.CheckAssociation(req.Context(), body.Creds, cfg)
+	verified, address, medium, err := threepid.CheckAssociation(req.Context(), body.Creds, cfg, client)
 	if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -123,13 +123,8 @@ func CheckAndSave3PIDAssociation(
 
 	if body.Bind {
 		// Publish the association on the identity server if requested
-		err = threepid.PublishAssociation(body.Creds, device.UserID, cfg)
-		if err == threepid.ErrNotTrusted {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.NotTrusted(body.Creds.IDServer),
-			}
-		} else if err != nil {
+		err = threepid.PublishAssociation(req.Context(), body.Creds, device.UserID, cfg, client)
+		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("threepid.PublishAssociation failed")
 			return jsonerror.InternalServerError()
 		}
@@ -180,7 +175,7 @@ func GetAssociated3PIDs(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: threePIDsResponse{res.ThreePIDs},
+		JSON: ThreePIDsResponse{res.ThreePIDs},
 	}
 }
 
@@ -191,7 +186,10 @@ func Forget3PID(req *http.Request, threepidAPI api.ClientUserAPI) util.JSONRespo
 		return *reqErr
 	}
 
-	if err := threepidAPI.PerformForgetThreePID(req.Context(), &api.PerformForgetThreePIDRequest{}, &struct{}{}); err != nil {
+	if err := threepidAPI.PerformForgetThreePID(req.Context(), &api.PerformForgetThreePIDRequest{
+		ThreePID: body.Address,
+		Medium:   body.Medium,
+	}, &struct{}{}); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.PerformForgetThreePID failed")
 		return jsonerror.InternalServerError()
 	}
