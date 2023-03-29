@@ -240,15 +240,6 @@ type QueryStateAndAuthChainResponse struct {
 	IsRejected bool `json:"is_rejected"`
 }
 
-// QueryRoomVersionCapabilitiesRequest asks for the default room version
-type QueryRoomVersionCapabilitiesRequest struct{}
-
-// QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
-type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
-	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
-}
-
 // QueryRoomVersionForRoomRequest asks for the room version for a given room.
 type QueryRoomVersionForRoomRequest struct {
 	RoomID string `json:"room_id"`
