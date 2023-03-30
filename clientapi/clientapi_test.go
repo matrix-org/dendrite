@@ -37,42 +37,39 @@ func TestGetPutDevices(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		testCases := []struct {
-			name         string
-			requestUser  *test.User
-			deviceUser   *test.User
-			request      *http.Request
-			withDeviceID bool
-			wantOK       bool
-			validateFunc func(t *testing.T, device userDevice, routers httputil.Routers)
+			name           string
+			requestUser    *test.User
+			deviceUser     *test.User
+			request        *http.Request
+			wantStatusCode int
+			validateFunc   func(t *testing.T, device userDevice, routers httputil.Routers)
 		}{
 			{
-				name:        "can get all devices",
-				requestUser: alice,
-				request:     httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices", strings.NewReader("")),
-				wantOK:      true,
+				name:           "can get all devices",
+				requestUser:    alice,
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
 			},
 			{
-				name:         "can get specific own device",
-				requestUser:  alice,
-				deviceUser:   alice,
-				request:      httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices/", strings.NewReader("")),
-				withDeviceID: true,
-				wantOK:       true,
+				name:           "can get specific own device",
+				requestUser:    alice,
+				deviceUser:     alice,
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices/", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
 			},
 			{
-				name:         "can not get device for different user",
-				requestUser:  alice,
-				deviceUser:   bob,
-				request:      httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices/", strings.NewReader("")),
-				withDeviceID: true,
+				name:           "can not get device for different user",
+				requestUser:    alice,
+				deviceUser:     bob,
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices/", strings.NewReader("")),
+				wantStatusCode: http.StatusNotFound,
 			},
 			{
-				name:         "can update own device",
-				requestUser:  alice,
-				deviceUser:   alice,
-				request:      httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/devices/", strings.NewReader(`{"display_name":"my new displayname"}`)),
-				withDeviceID: true,
-				wantOK:       true,
+				name:           "can update own device",
+				requestUser:    alice,
+				deviceUser:     alice,
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/devices/", strings.NewReader(`{"display_name":"my new displayname"}`)),
+				wantStatusCode: http.StatusOK,
 				validateFunc: func(t *testing.T, device userDevice, routers httputil.Routers) {
 					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/devices/"+device.deviceID, strings.NewReader(""))
 					req.Header.Set("Authorization", "Bearer "+device.accessToken)
@@ -89,11 +86,11 @@ func TestGetPutDevices(t *testing.T) {
 			},
 			{
 				// this should return "device does not exist"
-				name:         "can not update device for different user",
-				requestUser:  alice,
-				deviceUser:   bob,
-				request:      httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/devices/", strings.NewReader(`{"display_name":"my new displayname"}`)),
-				withDeviceID: true,
+				name:           "can not update device for different user",
+				requestUser:    alice,
+				deviceUser:     bob,
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/devices/", strings.NewReader(`{"display_name":"my new displayname"}`)),
+				wantStatusCode: http.StatusNotFound,
 			},
 		}
 
@@ -119,16 +116,16 @@ func TestGetPutDevices(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				dev := accessTokens[tc.requestUser]
-				if tc.withDeviceID {
+				if tc.deviceUser != nil {
 					tc.request = httptest.NewRequest(tc.request.Method, tc.request.RequestURI+accessTokens[tc.deviceUser].deviceID, tc.request.Body)
 				}
 				tc.request.Header.Set("Authorization", "Bearer "+dev.accessToken)
 				rec := httptest.NewRecorder()
 				routers.Client.ServeHTTP(rec, tc.request)
-				if tc.wantOK && rec.Code != 200 {
+				if rec.Code != tc.wantStatusCode {
 					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
-				if !tc.wantOK && rec.Code != 200 {
+				if tc.wantStatusCode != http.StatusOK && rec.Code != http.StatusOK {
 					return
 				}
 				if tc.validateFunc != nil {
