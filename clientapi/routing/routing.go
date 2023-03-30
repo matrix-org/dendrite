@@ -27,6 +27,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -83,6 +84,8 @@ func Setup(
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
 	}
+
+	sf := singleflight.Group{}
 
 	if cfg.Matrix.WellKnownClientName != "" {
 		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
@@ -275,9 +278,13 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return JoinRoomByIDOrAlias(
-				req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
-			)
+			resp, _, _ := sf.Do(vars["roomIDOrAlias"]+device.UserID, func() (any, error) {
+				return JoinRoomByIDOrAlias(
+					req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
+				), nil
+			})
+			sf.Forget(vars["roomIDOrAlias"] + device.UserID)
+			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -311,9 +318,13 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return JoinRoomByIDOrAlias(
-				req, device, rsAPI, userAPI, vars["roomID"],
-			)
+			resp, _, _ := sf.Do(vars["roomID"]+device.UserID, func() (any, error) {
+				return JoinRoomByIDOrAlias(
+					req, device, rsAPI, userAPI, vars["roomID"],
+				), nil
+			})
+			sf.Forget(vars["roomID"] + device.UserID)
+			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/leave",
