@@ -1,6 +1,6 @@
 apiVersion: v2
 name: dendrite
-version: "0.12.0"
+version: "0.12.1"
 appVersion: "0.12.0"
 description: Dendrite Matrix Homeserver
 type: application
