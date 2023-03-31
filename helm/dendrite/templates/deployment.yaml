@@ -17,11 +17,7 @@ spec:
       labels:
         {{- include "dendrite.selectorLabels" . | nindent 8 }}
       annotations:
-        confighash-global: secret-{{ .Values.global | toYaml | sha256sum | trunc 32 }}
-        confighash-clientapi: clientapi-{{ .Values.clientapi | toYaml | sha256sum | trunc 32 }}
-        confighash-federationapi: federationapi-{{ .Values.federationapi | toYaml | sha256sum | trunc 32 }}
-        confighash-mediaapi: mediaapi-{{ .Values.mediaapi | toYaml | sha256sum | trunc 32 }}
-        confighash-syncapi: syncapi-{{ .Values.syncapi | toYaml | sha256sum | trunc 32 }}
+        confighash: secret-{{ .Values.dendrite_config | toYaml | sha256sum | trunc 32 }}
     spec:
       volumes:
       - name: {{ include "dendrite.fullname" . }}-conf-vol
@@ -57,7 +53,7 @@ spec:
         {{- if $.Values.dendrite_config.global.profiling.enabled }}
         env:
           - name: PPROFLISTEN
-            value: "localhost:{{- $.Values.global.profiling.port -}}"
+            value: "localhost:{{- $.Values.dendrite_config.global.profiling.port -}}"
         {{- end }}
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}
