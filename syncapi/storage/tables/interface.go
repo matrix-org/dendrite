@@ -67,8 +67,6 @@ type Events interface {
 	// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude from sync.
 	// Returns up to `limit` events. Returns `limited=true` if there are more events in this range but we hit the `limit`.
 	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomIDs []string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error)
-	// SelectEarlyEvents returns the earliest events in the given room.
-	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter) ([]types.StreamEvent, error)
 	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string, filter *gomatrixserverlib.RoomEventFilter, preserveOrder bool) ([]types.StreamEvent, error)
 	UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error
 	// DeleteEventsForRoom removes all event information for a room. This should only be done when removing the room entirely.

@@ -135,15 +135,6 @@ FROM room_ids,
               ) AS x
 `
 
-const selectEarlyEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
-	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
-	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
-	" ORDER BY id ASC LIMIT $8"
-
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
@@ -205,7 +196,6 @@ type outputRoomEventsStatements struct {
 	selectMaxEventIDStmt           *sql.Stmt
 	selectRecentEventsStmt         *sql.Stmt
 	selectRecentEventsForSyncStmt  *sql.Stmt
-	selectEarlyEventsStmt          *sql.Stmt
 	selectStateInRangeFilteredStmt *sql.Stmt
 	selectStateInRangeStmt         *sql.Stmt
 	updateEventJSONStmt            *sql.Stmt
@@ -261,7 +251,6 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectMaxEventIDStmt, selectMaxEventIDSQL},
 		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
 		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
-		{&s.selectEarlyEventsStmt, selectEarlyEventsSQL},
 		{&s.selectStateInRangeFilteredStmt, selectStateInRangeFilteredSQL},
 		{&s.selectStateInRangeStmt, selectStateInRangeSQL},
 		{&s.updateEventJSONStmt, updateEventJSONSQL},
@@ -527,39 +516,6 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		}
 	}
 	return result, rows.Err()
-}
-
-// selectEarlyEvents returns the earliest events in the given room, starting
-// from a given position, up to a maximum of 'limit'.
-func (s *outputRoomEventsStatements) SelectEarlyEvents(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
-) ([]types.StreamEvent, error) {
-	senders, notSenders := getSendersRoomEventFilter(eventFilter)
-	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(
-		ctx, roomID, r.Low(), r.High(),
-		pq.StringArray(senders),
-		pq.StringArray(notSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
-		eventFilter.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
-	if err != nil {
-		return nil, err
-	}
-	// The events need to be returned from oldest to latest, which isn't
-	// necessarily the way the SQL query returns them, so a sort is necessary to
-	// ensure the events are in the right order in the slice.
-	sort.SliceStable(events, func(i int, j int) bool {
-		return events[i].StreamPosition < events[j].StreamPosition
-	})
-	return events, nil
 }
 
 // selectEvents returns the events for the given event IDs. If an event is
