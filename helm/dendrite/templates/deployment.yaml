@@ -19,6 +19,13 @@ spec:
       annotations:
         confighash: secret-{{ .Values.dendrite_config | toYaml | sha256sum | trunc 32 }}
     spec:
+      strategy:
+        type: {{ $.Values.strategy.type }}
+        {{- if eq $.Values.strategy.type "RollingUpdate" }}
+        rollingUpdate:
+          maxSurge: {{ $.Values.strategy.rollingUpdate.maxSurge }}
+          maxUnavailable: {{ $.Values.strategy.rollingUpdate.maxUnavailable }}
+        {{- end }}
       volumes:
       - name: {{ include "dendrite.fullname" . }}-conf-vol
         secret:
