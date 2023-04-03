@@ -18,7 +18,6 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/gorilla/mux"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -198,18 +197,13 @@ func Setup(
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		var serverNotificationSender *userapi.Device
-		var err error
-		notificationSenderOnce := &sync.Once{}
+		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				notificationSenderOnce.Do(func() {
-					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-					if err != nil {
-						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-					}
-				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
@@ -231,12 +225,6 @@ func Setup(
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				notificationSenderOnce.Do(func() {
-					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-					if err != nil {
-						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-					}
-				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
@@ -1115,7 +1103,7 @@ func Setup(
 
 	v3mux.Handle("/delete_devices",
 		httputil.MakeAuthAPI("delete_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return DeleteDevices(req, userAPI, device)
+			return DeleteDevices(req, userInteractiveAuth, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

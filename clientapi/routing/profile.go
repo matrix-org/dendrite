@@ -36,14 +36,14 @@ import (
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == eventutil.ErrProfileNoExists {
+		if err == appserviceAPI.ErrProfileNotExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -56,7 +56,7 @@ func GetProfile(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: eventutil.ProfileResponse{
+		JSON: eventutil.UserProfile{
 			AvatarURL:   profile.AvatarURL,
 			DisplayName: profile.DisplayName,
 		},
@@ -65,34 +65,28 @@ func GetProfile(
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
-	if err != nil {
-		if err == eventutil.ErrProfileNoExists {
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-			}
-		}
-
-		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
-		return jsonerror.InternalServerError()
+	profile := GetProfile(req, profileAPI, cfg, userID, asAPI, federation)
+	p, ok := profile.JSON.(eventutil.UserProfile)
+	// not a profile response, so most likely an error, return that
+	if !ok {
+		return profile
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: eventutil.AvatarURL{
-			AvatarURL: profile.AvatarURL,
+		JSON: eventutil.UserProfile{
+			AvatarURL: p.AvatarURL,
 		},
 	}
 }
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, profileAPI userapi.ClientUserAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI,
 	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -102,7 +96,7 @@ func SetAvatarURL(
 		}
 	}
 
-	var r eventutil.AvatarURL
+	var r eventutil.UserProfile
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -134,24 +128,20 @@ func SetAvatarURL(
 		}
 	}
 
-	setRes := &userapi.PerformSetAvatarURLResponse{}
-	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
-		Localpart:  localpart,
-		ServerName: domain,
-		AvatarURL:  r.AvatarURL,
-	}, setRes); err != nil {
+	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return jsonerror.InternalServerError()
 	}
 	// No need to build new membership events, since nothing changed
-	if !setRes.Changed {
+	if !changed {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, setRes.Profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
 	if err != nil {
 		return response
 	}
@@ -164,34 +154,28 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
-	if err != nil {
-		if err == eventutil.ErrProfileNoExists {
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-			}
-		}
-
-		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
-		return jsonerror.InternalServerError()
+	profile := GetProfile(req, profileAPI, cfg, userID, asAPI, federation)
+	p, ok := profile.JSON.(eventutil.UserProfile)
+	// not a profile response, so most likely an error, return that
+	if !ok {
+		return profile
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: eventutil.DisplayName{
-			DisplayName: profile.DisplayName,
+		JSON: eventutil.UserProfile{
+			DisplayName: p.DisplayName,
 		},
 	}
 }
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, profileAPI userapi.ClientUserAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI,
 	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -201,7 +185,7 @@ func SetDisplayName(
 		}
 	}
 
-	var r eventutil.DisplayName
+	var r eventutil.UserProfile
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -233,25 +217,20 @@ func SetDisplayName(
 		}
 	}
 
-	profileRes := &userapi.PerformUpdateDisplayNameResponse{}
-	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
-		Localpart:   localpart,
-		ServerName:  domain,
-		DisplayName: r.DisplayName,
-	}, profileRes)
+	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return jsonerror.InternalServerError()
 	}
 	// No need to build new membership events, since nothing changed
-	if !profileRes.Changed {
+	if !changed {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, profileRes.Profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
 	if err != nil {
 		return response
 	}
@@ -308,9 +287,9 @@ func updateProfile(
 // getProfile gets the full profile of a user by querying the database or a
 // remote homeserver.
 // Returns an error when something goes wrong or specifically
-// eventutil.ErrProfileNoExists when the profile doesn't exist.
+// eventutil.ErrProfileNotExists when the profile doesn't exist.
 func getProfile(
-	ctx context.Context, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	ctx context.Context, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -325,7 +304,7 @@ func getProfile(
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
-					return nil, eventutil.ErrProfileNoExists
+					return nil, appserviceAPI.ErrProfileNotExists
 				}
 			}
 

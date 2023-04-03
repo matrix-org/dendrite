@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -146,12 +147,6 @@ func UpdateDeviceByID(
 			JSON: jsonerror.Forbidden("device does not exist"),
 		}
 	}
-	if performRes.Forbidden {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("device not owned by current user"),
-		}
-	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -189,7 +184,7 @@ func DeleteDeviceById(
 		if dev != deviceID {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("session & device mismatch"),
+				JSON: jsonerror.Forbidden("session and device mismatch"),
 			}
 		}
 	}
@@ -242,16 +237,37 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
+	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
-	payload := devicesDeleteJSON{}
 
-	if resErr := httputil.UnmarshalJSONRequest(req, &payload); resErr != nil {
-		return *resErr
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+		}
+	}
+	defer req.Body.Close() // nolint:errcheck
+
+	// initiate UIA
+	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
+	if errRes != nil {
+		return *errRes
 	}
 
-	defer req.Body.Close() // nolint: errcheck
+	if login.Username() != device.UserID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("unable to delete devices for other user"),
+		}
+	}
+
+	payload := devicesDeleteJSON{}
+	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
+		return jsonerror.InternalServerError()
+	}
 
 	var res api.PerformDeviceDeletionResponse
 	if err := userAPI.PerformDeviceDeletion(ctx, &api.PerformDeviceDeletionRequest{

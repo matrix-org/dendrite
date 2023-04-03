@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	fedAPI "github.com/matrix-org/dendrite/federationapi"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
@@ -43,8 +44,8 @@ type fakeUserAPI struct {
 	userAPI.FederationUserAPI
 }
 
-func (u *fakeUserAPI) QueryProfile(ctx context.Context, req *userAPI.QueryProfileRequest, res *userAPI.QueryProfileResponse) error {
-	return nil
+func (u *fakeUserAPI) QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error) {
+	return &authtypes.Profile{}, nil
 }
 
 func TestHandleQueryProfile(t *testing.T) {

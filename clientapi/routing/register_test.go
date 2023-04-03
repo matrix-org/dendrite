@@ -611,11 +611,9 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		req := api.QueryProfileRequest{UserID: "@user:server"}
-		var res api.QueryProfileResponse
-		err := userAPI.QueryProfile(processCtx.Context(), &req, &res)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@user:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, res.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }
 
@@ -662,10 +660,8 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		)
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		profilReq := api.QueryProfileRequest{UserID: "@alice:server"}
-		var profileRes api.QueryProfileResponse
-		err = userAPI.QueryProfile(processCtx.Context(), &profilReq, &profileRes)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@alice:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, profileRes.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }
