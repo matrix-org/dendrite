@@ -35,7 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
 type Queryer struct {
@@ -694,25 +693,7 @@ func GetAuthChain(
 	return authEvents, nil
 }
 
-// QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
-func (r *Queryer) QueryRoomVersionCapabilities(
-	ctx context.Context,
-	request *api.QueryRoomVersionCapabilitiesRequest,
-	response *api.QueryRoomVersionCapabilitiesResponse,
-) error {
-	response.DefaultRoomVersion = version.DefaultRoomVersion()
-	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
-	for v, desc := range version.SupportedRoomVersions() {
-		if desc.Stable {
-			response.AvailableRoomVersions[v] = "stable"
-		} else {
-			response.AvailableRoomVersions[v] = "unstable"
-		}
-	}
-	return nil
-}
-
-// QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
+// QueryRoomVersionForRoom implements api.RoomserverInternalAPI
 func (r *Queryer) QueryRoomVersionForRoom(
 	ctx context.Context,
 	request *api.QueryRoomVersionForRoomRequest,

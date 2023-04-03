@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/setup/base"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -849,6 +850,8 @@ func Setup(
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
+	threePIDClient := base.CreateClient(dendriteCfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
+
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetAssociated3PIDs(req, userAPI, device)
@@ -857,11 +860,11 @@ func Setup(
 
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return CheckAndSave3PIDAssociation(req, userAPI, device, cfg)
+			return CheckAndSave3PIDAssociation(req, userAPI, device, cfg, threePIDClient)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	unstableMux.Handle("/account/3pid/delete",
+	v3mux.Handle("/account/3pid/delete",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return Forget3PID(req, userAPI)
 		}),
@@ -869,7 +872,7 @@ func Setup(
 
 	v3mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
 		httputil.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
-			return RequestEmailToken(req, userAPI, cfg)
+			return RequestEmailToken(req, userAPI, cfg, threePIDClient)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -1182,7 +1185,7 @@ func Setup(
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
-			return GetCapabilities(req, rsAPI)
+			return GetCapabilities()
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
