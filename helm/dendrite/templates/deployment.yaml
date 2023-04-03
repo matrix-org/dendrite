@@ -23,6 +23,13 @@ spec:
         confighash-mediaapi: mediaapi-{{ .Values.mediaapi | toYaml | sha256sum | trunc 32 }}
         confighash-syncapi: syncapi-{{ .Values.syncapi | toYaml | sha256sum | trunc 32 }}
     spec:
+      strategy:
+        type: {{ $.Values.strategy.type }}
+        {{- if eq $.Values.strategy.type "RollingUpdate" }}
+        rollingUpdate:
+          maxSurge: {{ $.Values.strategy.rollingUpdate.maxSurge }}
+          maxUnavailable: {{ $.Values.strategy.rollingUpdate.maxUnavailable }}
+        {{- end }}
       volumes:
       - name: {{ include "dendrite.fullname" . }}-conf-vol
         secret:
