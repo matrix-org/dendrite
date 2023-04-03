@@ -43,6 +43,30 @@ persistence:
     # -- PVC Storage Request for the search volume
     capacity: "1Gi"
 
+# Add additional volumes to the Dendrite Pod
+extraVolumes: []
+# ex.
+# - name: extra-config
+#   secret:
+#     secretName: extra-config
+
+
+# Configure additional mount points volumes in the Dendrite Pod
+extraVolumeMounts: []
+# ex.
+# - mountPath: /etc/dendrite/extra-config
+#   name: extra-config
+
+strategy:
+  # -- Strategy to use for rolling updates (e.g. Recreate, RollingUpdate)
+  # If you are using ReadWriteOnce volumes, you should probably use Recreate
+  type: RollingUpdate
+  rollingUpdate:
+    # -- Maximum number of pods that can be unavailable during the update process
+    maxUnavailable: 25%
+    # -- Maximum number of pods that can be scheduled above the desired number of pods
+    maxSurge: 25%
+
 dendrite_config:
   version: 2
   global:

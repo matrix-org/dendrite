@@ -140,12 +140,6 @@ func (s *OutputRoomEventConsumer) onMessage(
 				}
 			}
 
-		case api.OutputTypeNewInviteEvent:
-			if output.NewInviteEvent == nil || !s.appserviceIsInterestedInEvent(ctx, output.NewInviteEvent.Event, state.ApplicationService) {
-				continue
-			}
-			events = append(events, output.NewInviteEvent.Event)
-
 		default:
 			continue
 		}
