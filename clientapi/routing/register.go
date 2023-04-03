@@ -888,13 +888,7 @@ func completeRegistration(
 	}
 
 	if displayName != "" {
-		nameReq := userapi.PerformUpdateDisplayNameRequest{
-			Localpart:   username,
-			ServerName:  serverName,
-			DisplayName: displayName,
-		}
-		var nameRes userapi.PerformUpdateDisplayNameResponse
-		err = userAPI.SetDisplayName(ctx, &nameReq, &nameRes)
+		_, _, err = userAPI.SetDisplayName(ctx, username, serverName, displayName)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,

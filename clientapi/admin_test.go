@@ -261,6 +261,25 @@ func TestAdminEvacuateRoom(t *testing.T) {
 				}
 			})
 		}
+
+		// Wait for the FS API to have consumed every message
+		js, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		timeout := time.After(time.Second)
+		for {
+			select {
+			case <-timeout:
+				t.Fatalf("FS API didn't process all events in time")
+			default:
+			}
+			info, err := js.ConsumerInfo(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent), cfg.Global.JetStream.Durable("FederationAPIRoomServerConsumer")+"Pull")
+			if err != nil {
+				time.Sleep(time.Millisecond * 10)
+				continue
+			}
+			if info.NumPending == 0 && info.NumAckPending == 0 {
+				break
+			}
+		}
 	})
 }
 

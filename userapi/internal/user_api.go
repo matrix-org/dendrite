@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"time"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -418,25 +420,26 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	return nil
 }
 
-func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfileRequest, res *api.QueryProfileResponse) error {
-	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+var (
+	ErrIsRemoteServer = errors.New("cannot query profile of remote users")
+)
+
+func (a *UserInternalAPI) QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error) {
+	local, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !a.Config.Matrix.IsLocalServerName(domain) {
-		return fmt.Errorf("cannot query profile of remote users (server name %s)", domain)
+		return nil, ErrIsRemoteServer
 	}
 	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil
+			return nil, appserviceAPI.ErrProfileNotExists
 		}
-		return err
+		return nil, err
 	}
-	res.UserExists = true
-	res.AvatarURL = prof.AvatarURL
-	res.DisplayName = prof.DisplayName
-	return nil
+	return prof, nil
 }
 
 func (a *UserInternalAPI) QuerySearchProfiles(ctx context.Context, req *api.QuerySearchProfilesRequest, res *api.QuerySearchProfilesResponse) error {
@@ -901,11 +904,8 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 	return nil
 }
 
-func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
-	profile, changed, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.ServerName, req.AvatarURL)
-	res.Profile = profile
-	res.Changed = changed
-	return err
+func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, avatarURL string) (*authtypes.Profile, bool, error) {
+	return a.DB.SetAvatarURL(ctx, localpart, serverName, avatarURL)
 }
 
 func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, req *api.QueryNumericLocalpartRequest, res *api.QueryNumericLocalpartResponse) error {
@@ -939,11 +939,8 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 	}
 }
 
-func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, res *api.PerformUpdateDisplayNameResponse) error {
-	profile, changed, err := a.DB.SetDisplayName(ctx, req.Localpart, req.ServerName, req.DisplayName)
-	res.Profile = profile
-	res.Changed = changed
-	return err
+func (a *UserInternalAPI) SetDisplayName(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, displayName string) (*authtypes.Profile, bool, error) {
+	return a.DB.SetDisplayName(ctx, localpart, serverName, displayName)
 }
 
 func (a *UserInternalAPI) QueryLocalpartForThreePID(ctx context.Context, req *api.QueryLocalpartForThreePIDRequest, res *api.QueryLocalpartForThreePIDResponse) error {
