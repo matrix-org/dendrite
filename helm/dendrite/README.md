@@ -1,6 +1,7 @@
+
 # dendrite
 
-![Version: 0.12.0](https://img.shields.io/badge/Version-0.12.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.12.0](https://img.shields.io/badge/AppVersion-0.12.0-informational?style=flat-square)
+![Version: 0.12.1](https://img.shields.io/badge/Version-0.12.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.12.0](https://img.shields.io/badge/AppVersion-0.12.0-informational?style=flat-square)
 Dendrite Matrix Homeserver
 
 Status: **NOT PRODUCTION READY**
@@ -157,10 +158,15 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 ## Monitoring
 
-[![Grafana Dashboard](https://grafana.com/api/dashboards/13916/images/9894/image)](https://grafana.com/grafana/dashboards/13916-dendrite/)
+![Grafana Dashboard](grafana_dashboards/dendrite-rev2.png)
 
 * Works well with [Prometheus Operator](https://prometheus-operator.dev/) ([Helmchart](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)) and their setup of [Grafana](https://grafana.com/grafana/), by enabling the following values:
 ```yaml
+dendrite_config:
+  global:
+    metrics:
+      enabled: true
+
 prometheus:
   servicemonitor:
     enabled: true
@@ -175,4 +181,3 @@ grafana:
     enabled: true # will deploy default dashboards
 ```
 PS: The label `release=kube-prometheus-stack` is setup with the helmchart of the Prometheus Operator. For Grafana Dashboards it may be necessary to enable scanning in the correct namespaces (or ALL), enabled by `sidecar.dashboards.searchNamespace` in [Helmchart of grafana](https://artifacthub.io/packages/helm/grafana/grafana) (which is part of PrometheusOperator, so `grafana.sidecar.dashboards.searchNamespace`)
-
