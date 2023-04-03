@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	api2 "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -111,33 +113,26 @@ func TestQueryProfile(t *testing.T) {
 	aliceDisplayName := "Alice"
 
 	testCases := []struct {
-		req     api.QueryProfileRequest
-		wantRes api.QueryProfileResponse
+		userID  string
+		wantRes *authtypes.Profile
 		wantErr error
 	}{
 		{
-			req: api.QueryProfileRequest{
-				UserID: fmt.Sprintf("@alice:%s", serverName),
-			},
-			wantRes: api.QueryProfileResponse{
-				UserExists:  true,
-				AvatarURL:   aliceAvatarURL,
+			userID: fmt.Sprintf("@alice:%s", serverName),
+			wantRes: &authtypes.Profile{
+				Localpart:   "alice",
 				DisplayName: aliceDisplayName,
+				AvatarURL:   aliceAvatarURL,
+				ServerName:  string(serverName),
 			},
 		},
 		{
-			req: api.QueryProfileRequest{
-				UserID: fmt.Sprintf("@bob:%s", serverName),
-			},
-			wantRes: api.QueryProfileResponse{
-				UserExists: false,
-			},
+			userID:  fmt.Sprintf("@bob:%s", serverName),
+			wantErr: api2.ErrProfileNotExists,
 		},
 		{
-			req: api.QueryProfileRequest{
-				UserID: "@alice:wrongdomain.com",
-			},
-			wantErr: fmt.Errorf("wrong domain"),
+			userID:  "@alice:wrongdomain.com",
+			wantErr: api2.ErrProfileNotExists,
 		},
 	}
 
@@ -147,14 +142,14 @@ func TestQueryProfile(t *testing.T) {
 			mode = "HTTP"
 		}
 		for _, tc := range testCases {
-			var gotRes api.QueryProfileResponse
-			gotErr := testAPI.QueryProfile(context.TODO(), &tc.req, &gotRes)
+
+			profile, gotErr := testAPI.QueryProfile(context.TODO(), tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
 				t.Errorf("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
 				continue
 			}
-			if !reflect.DeepEqual(tc.wantRes, gotRes) {
-				t.Errorf("QueryProfile %s response got %+v want %+v", mode, gotRes, tc.wantRes)
+			if !reflect.DeepEqual(tc.wantRes, profile) {
+				t.Errorf("QueryProfile %s response got %+v want %+v", mode, profile, tc.wantRes)
 			}
 		}
 	}

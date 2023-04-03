@@ -50,10 +50,7 @@ func GetProfile(
 		}
 	}
 
-	var profileRes userapi.QueryProfileResponse
-	err = userAPI.QueryProfile(httpReq.Context(), &userapi.QueryProfileRequest{
-		UserID: userID,
-	}, &profileRes)
+	profile, err := userAPI.QueryProfile(httpReq.Context(), userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryProfile failed")
 		return jsonerror.InternalServerError()
@@ -65,21 +62,21 @@ func GetProfile(
 	if field != "" {
 		switch field {
 		case "displayname":
-			res = eventutil.DisplayName{
-				DisplayName: profileRes.DisplayName,
+			res = eventutil.UserProfile{
+				DisplayName: profile.DisplayName,
 			}
 		case "avatar_url":
-			res = eventutil.AvatarURL{
-				AvatarURL: profileRes.AvatarURL,
+			res = eventutil.UserProfile{
+				AvatarURL: profile.AvatarURL,
 			}
 		default:
 			code = http.StatusBadRequest
 			res = jsonerror.InvalidArgumentValue("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
 		}
 	} else {
-		res = eventutil.ProfileResponse{
-			AvatarURL:   profileRes.AvatarURL,
-			DisplayName: profileRes.DisplayName,
+		res = eventutil.UserProfile{
+			AvatarURL:   profile.AvatarURL,
+			DisplayName: profile.DisplayName,
 		}
 	}
 
