@@ -43,7 +43,7 @@ persistence:
     # -- PVC Storage Request for the search volume
     capacity: "1Gi"
 
-# Add additional volumes to the Dendrite Pod
+# -- Add additional volumes to the Dendrite Pod
 extraVolumes: []
 # ex.
 # - name: extra-config
@@ -51,7 +51,7 @@ extraVolumes: []
 #     secretName: extra-config
 
 
-# Configure additional mount points volumes in the Dendrite Pod
+# -- Configure additional mount points volumes in the Dendrite Pod
 extraVolumeMounts: []
 # ex.
 # - mountPath: /etc/dendrite/extra-config
