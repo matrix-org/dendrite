@@ -94,7 +94,16 @@ type ApplicationService struct {
 }
 
 func (a *ApplicationService) CreateHTTPClient(insecureSkipVerify bool) {
-	client := &http.Client{Timeout: time.Second * 30}
+	client := &http.Client{
+		Timeout: time.Second * 30,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: insecureSkipVerify,
+			},
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
 	if strings.HasPrefix(a.URL, UnixSocketPrefix) {
 		a.isUnixSocket = true
 		a.unixSocket = "http://unix"
@@ -102,14 +111,6 @@ func (a *ApplicationService) CreateHTTPClient(insecureSkipVerify bool) {
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return net.Dial("unix", strings.TrimPrefix(a.URL, UnixSocketPrefix))
 			},
-		}
-	} else {
-		client.Transport = &http.Transport{
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecureSkipVerify,
-			},
-			Proxy: http.ProxyFromEnvironment,
 		}
 	}
 	a.HTTPClient = client
