@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -345,7 +346,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
 		for _, event := range events {
-			clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+			clientEvent := synctypes.ToClientEvent(event.Event, synctypes.FormatAll)
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
 		}
 		return nil
@@ -365,7 +366,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	response.HasBeenInRoom = true
-	response.JoinEvents = []gomatrixserverlib.ClientEvent{}
+	response.JoinEvents = []synctypes.ClientEvent{}
 
 	var events []types.Event
 	var stateEntries []types.StateEntry
@@ -394,7 +395,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	for _, event := range events {
-		clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+		clientEvent := synctypes.ToClientEvent(event.Event, synctypes.FormatAll)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
 

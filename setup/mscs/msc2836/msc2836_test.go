@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/hooks"
@@ -462,7 +463,7 @@ func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wan
 	}
 }
 
-func assertUnsignedChildren(t *testing.T, ev gomatrixserverlib.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
+func assertUnsignedChildren(t *testing.T, ev synctypes.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
 	t.Helper()
 	unsigned := struct {
 		Children map[string]int `json:"children"`

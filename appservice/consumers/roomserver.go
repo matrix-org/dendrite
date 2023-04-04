@@ -32,9 +32,16 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// ApplicationServiceTransaction is the transaction that is sent off to an
+// application service.
+type ApplicationServiceTransaction struct {
+	Events []synctypes.ClientEvent `json:"events"`
+}
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
@@ -171,8 +178,8 @@ func (s *OutputRoomEventConsumer) sendEvents(
 ) error {
 	// Create the transaction body.
 	transaction, err := json.Marshal(
-		gomatrixserverlib.ApplicationServiceTransaction{
-			Events: gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll),
+		ApplicationServiceTransaction{
+			Events: synctypes.HeaderedToClientEvents(events, synctypes.FormatAll),
 		},
 	)
 	if err != nil {

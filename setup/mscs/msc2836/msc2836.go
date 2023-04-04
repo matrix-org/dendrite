@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -78,9 +79,9 @@ func (r *EventRelationshipRequest) Defaults() {
 }
 
 type EventRelationshipResponse struct {
-	Events    []gomatrixserverlib.ClientEvent `json:"events"`
-	NextBatch string                          `json:"next_batch"`
-	Limited   bool                            `json:"limited"`
+	Events    []synctypes.ClientEvent `json:"events"`
+	NextBatch string                  `json:"next_batch"`
+	Limited   bool                    `json:"limited"`
 }
 
 type MSC2836EventRelationshipsResponse struct {
@@ -91,7 +92,7 @@ type MSC2836EventRelationshipsResponse struct {
 
 func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events:    gomatrixserverlib.ToClientEvents(res.ParsedEvents, gomatrixserverlib.FormatAll),
+		Events:    synctypes.ToClientEvents(res.ParsedEvents, synctypes.FormatAll),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,
 	}

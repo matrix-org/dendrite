@@ -25,6 +25,7 @@ import (
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -130,7 +131,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			return from
 		}
 
-		req.Response.Presence.Events = append(req.Response.Presence.Events, gomatrixserverlib.ClientEvent{
+		req.Response.Presence.Events = append(req.Response.Presence.Events, synctypes.ClientEvent{
 			Content: content,
 			Sender:  presence.UserID,
 			Type:    gomatrixserverlib.MPresence,
@@ -202,7 +203,7 @@ func joinedRooms(res *types.Response, userID string) []string {
 	return roomIDs
 }
 
-func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID string) bool {
+func membershipEventPresent(events []synctypes.ClientEvent, userID string) bool {
 	for _, ev := range events {
 		// it's enough to know that we have our member event here, don't need to check membership content
 		// as it's implied by being in the respective section of the sync response.

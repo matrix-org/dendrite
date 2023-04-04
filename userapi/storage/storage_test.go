@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -526,7 +527,7 @@ func Test_Notification(t *testing.T) {
 				Actions: []*pushrules.Action{
 					{},
 				},
-				Event: gomatrixserverlib.ClientEvent{
+				Event: synctypes.ClientEvent{
 					Content: gomatrixserverlib.RawJSON("{}"),
 				},
 				Read:   false,

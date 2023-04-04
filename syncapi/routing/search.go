@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -166,7 +167,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		})
 	}
 
-	stateForRooms := make(map[string][]gomatrixserverlib.ClientEvent)
+	stateForRooms := make(map[string][]synctypes.ClientEvent)
 	for _, event := range evs {
 		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
@@ -204,12 +205,12 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			Context: SearchContextResponse{
 				Start:        startToken.String(),
 				End:          endToken.String(),
-				EventsAfter:  gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatSync),
-				EventsBefore: gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatSync),
+				EventsAfter:  synctypes.HeaderedToClientEvents(eventsAfter, synctypes.FormatSync),
+				EventsBefore: synctypes.HeaderedToClientEvents(eventsBefore, synctypes.FormatSync),
 				ProfileInfo:  profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll),
+			Result: synctypes.HeaderedToClientEvent(event, synctypes.FormatAll),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
@@ -221,7 +222,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				logrus.WithError(err).Error("unable to get current state")
 				return jsonerror.InternalServerError()
 			}
-			stateForRooms[event.RoomID()] = gomatrixserverlib.HeaderedToClientEvents(state, gomatrixserverlib.FormatSync)
+			stateForRooms[event.RoomID()] = synctypes.HeaderedToClientEvents(state, synctypes.FormatSync)
 		}
 	}
 
@@ -331,17 +332,17 @@ type Groups struct {
 }
 
 type Result struct {
-	Context SearchContextResponse         `json:"context"`
-	Rank    float64                       `json:"rank"`
-	Result  gomatrixserverlib.ClientEvent `json:"result"`
+	Context SearchContextResponse `json:"context"`
+	Rank    float64               `json:"rank"`
+	Result  synctypes.ClientEvent `json:"result"`
 }
 
 type SearchContextResponse struct {
-	End          string                          `json:"end"`
-	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after"`
-	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before"`
-	Start        string                          `json:"start"`
-	ProfileInfo  map[string]ProfileInfoResponse  `json:"profile_info"`
+	End          string                         `json:"end"`
+	EventsAfter  []synctypes.ClientEvent        `json:"events_after"`
+	EventsBefore []synctypes.ClientEvent        `json:"events_before"`
+	Start        string                         `json:"start"`
+	ProfileInfo  map[string]ProfileInfoResponse `json:"profile_info"`
 }
 
 type ProfileInfoResponse struct {
@@ -350,12 +351,12 @@ type ProfileInfoResponse struct {
 }
 
 type RoomEventsResponse struct {
-	Count      int                                        `json:"count"`
-	Groups     Groups                                     `json:"groups"`
-	Highlights []string                                   `json:"highlights"`
-	NextBatch  *string                                    `json:"next_batch,omitempty"`
-	Results    []Result                                   `json:"results"`
-	State      map[string][]gomatrixserverlib.ClientEvent `json:"state,omitempty"`
+	Count      int                                `json:"count"`
+	Groups     Groups                             `json:"groups"`
+	Highlights []string                           `json:"highlights"`
+	NextBatch  *string                            `json:"next_batch,omitempty"`
+	Results    []Result                           `json:"results"`
+	State      map[string][]synctypes.ClientEvent `json:"state,omitempty"`
 }
 type SearchCategoriesResponse struct {
 	RoomEvents RoomEventsResponse `json:"room_events"`
