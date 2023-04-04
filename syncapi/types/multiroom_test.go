@@ -13,8 +13,8 @@ func TestMarshallMultiRoom(t *testing.T) {
 		MultiRoom{
 			"@3:example.com": map[string]MultiRoomData{
 				"location": {
-					Content:   MultiRoomContent(`{"foo":"bar"}`),
-					Timestamp: 123,
+					Content:        MultiRoomContent(`{"foo":"bar"}`),
+					OriginServerTs: 123,
 				}}})
 	is.NoErr(err)
 	is.Equal(m, []byte(`{"@3:example.com":{"location":{"content":{"foo":"bar"},"timestamp":123}}}`))
