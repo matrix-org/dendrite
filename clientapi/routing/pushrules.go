@@ -31,7 +31,7 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 }
 
 func GetAllPushRules(ctx context.Context, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRulesJSON failed")
 	}
@@ -42,7 +42,7 @@ func GetAllPushRules(ctx context.Context, device *userapi.Device, userAPI userap
 }
 
 func GetPushRulesByScope(ctx context.Context, scope string, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRulesJSON failed")
 	}
@@ -57,7 +57,7 @@ func GetPushRulesByScope(ctx context.Context, scope string, device *userapi.Devi
 }
 
 func GetPushRulesByKind(ctx context.Context, scope, kind string, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRules failed")
 	}
@@ -66,7 +66,8 @@ func GetPushRulesByKind(ctx context.Context, scope, kind string, device *userapi
 		return errorResponse(ctx, jsonerror.InvalidArgumentValue("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
-	if rulesPtr == nil {
+	// Even if rulesPtr is not nil, there may not be any rules for this kind
+	if rulesPtr == nil || (rulesPtr != nil && len(*rulesPtr) == 0) {
 		return errorResponse(ctx, jsonerror.InvalidArgumentValue("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	return util.JSONResponse{
@@ -76,7 +77,7 @@ func GetPushRulesByKind(ctx context.Context, scope, kind string, device *userapi
 }
 
 func GetPushRuleByRuleID(ctx context.Context, scope, kind, ruleID string, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRules failed")
 	}
@@ -101,7 +102,10 @@ func GetPushRuleByRuleID(ctx context.Context, scope, kind, ruleID string, device
 func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, beforeRuleID string, body io.Reader, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	var newRule pushrules.Rule
 	if err := json.NewDecoder(body).Decode(&newRule); err != nil {
-		return errorResponse(ctx, err, "JSON Decode failed")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
 	}
 	newRule.RuleID = ruleID
 
@@ -110,7 +114,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		return errorResponse(ctx, jsonerror.InvalidArgumentValue(errs[0].Error()), "rule sanity check failed: %v", errs)
 	}
 
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRules failed")
 	}
@@ -120,6 +124,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	if rulesPtr == nil {
+		// while this should be impossible (ValidateRule would already return an error), better keep it around
 		return errorResponse(ctx, jsonerror.InvalidArgumentValue("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	i := pushRuleIndexByID(*rulesPtr, ruleID)
@@ -144,7 +149,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		}
 
 		// Add new rule.
-		i, err := findPushRuleInsertionIndex(*rulesPtr, afterRuleID, beforeRuleID)
+		i, err = findPushRuleInsertionIndex(*rulesPtr, afterRuleID, beforeRuleID)
 		if err != nil {
 			return errorResponse(ctx, err, "findPushRuleInsertionIndex failed")
 		}
@@ -153,7 +158,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		util.GetLogger(ctx).WithField("after", afterRuleID).WithField("before", beforeRuleID).Infof("Added new push rule at %d", i)
 	}
 
-	if err := putPushRules(ctx, device.UserID, ruleSets, userAPI); err != nil {
+	if err = userAPI.PerformPushRulesPut(ctx, device.UserID, ruleSets); err != nil {
 		return errorResponse(ctx, err, "putPushRules failed")
 	}
 
@@ -161,7 +166,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 }
 
 func DeletePushRuleByRuleID(ctx context.Context, scope, kind, ruleID string, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRules failed")
 	}
@@ -180,7 +185,7 @@ func DeletePushRuleByRuleID(ctx context.Context, scope, kind, ruleID string, dev
 
 	*rulesPtr = append((*rulesPtr)[:i], (*rulesPtr)[i+1:]...)
 
-	if err := putPushRules(ctx, device.UserID, ruleSets, userAPI); err != nil {
+	if err = userAPI.PerformPushRulesPut(ctx, device.UserID, ruleSets); err != nil {
 		return errorResponse(ctx, err, "putPushRules failed")
 	}
 
@@ -192,7 +197,7 @@ func GetPushRuleAttrByRuleID(ctx context.Context, scope, kind, ruleID, attr stri
 	if err != nil {
 		return errorResponse(ctx, err, "pushRuleAttrGetter failed")
 	}
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRules failed")
 	}
@@ -238,7 +243,7 @@ func PutPushRuleAttrByRuleID(ctx context.Context, scope, kind, ruleID, attr stri
 		return errorResponse(ctx, err, "pushRuleAttrSetter failed")
 	}
 
-	ruleSets, err := queryPushRules(ctx, device.UserID, userAPI)
+	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
 		return errorResponse(ctx, err, "queryPushRules failed")
 	}
@@ -258,34 +263,12 @@ func PutPushRuleAttrByRuleID(ctx context.Context, scope, kind, ruleID, attr stri
 	if !reflect.DeepEqual(attrGet((*rulesPtr)[i]), attrGet(&newPartialRule)) {
 		attrSet((*rulesPtr)[i], &newPartialRule)
 
-		if err := putPushRules(ctx, device.UserID, ruleSets, userAPI); err != nil {
+		if err = userAPI.PerformPushRulesPut(ctx, device.UserID, ruleSets); err != nil {
 			return errorResponse(ctx, err, "putPushRules failed")
 		}
 	}
 
 	return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
-}
-
-func queryPushRules(ctx context.Context, userID string, userAPI userapi.ClientUserAPI) (*pushrules.AccountRuleSets, error) {
-	var res userapi.QueryPushRulesResponse
-	if err := userAPI.QueryPushRules(ctx, &userapi.QueryPushRulesRequest{UserID: userID}, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.QueryPushRules failed")
-		return nil, err
-	}
-	return res.RuleSets, nil
-}
-
-func putPushRules(ctx context.Context, userID string, ruleSets *pushrules.AccountRuleSets, userAPI userapi.ClientUserAPI) error {
-	req := userapi.PerformPushRulesPutRequest{
-		UserID:   userID,
-		RuleSets: ruleSets,
-	}
-	var res struct{}
-	if err := userAPI.PerformPushRulesPut(ctx, &req, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformPushRulesPut failed")
-		return err
-	}
-	return nil
 }
 
 func pushRuleSetByScope(ruleSets *pushrules.AccountRuleSets, scope pushrules.Scope) *pushrules.RuleSet {

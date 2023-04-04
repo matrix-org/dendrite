@@ -26,6 +26,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -872,36 +873,28 @@ func (a *UserInternalAPI) QueryPushers(ctx context.Context, req *api.QueryPusher
 
 func (a *UserInternalAPI) PerformPushRulesPut(
 	ctx context.Context,
-	req *api.PerformPushRulesPutRequest,
-	_ *struct{},
+	userID string,
+	ruleSets *pushrules.AccountRuleSets,
 ) error {
-	bs, err := json.Marshal(&req.RuleSets)
+	bs, err := json.Marshal(ruleSets)
 	if err != nil {
 		return err
 	}
 	userReq := api.InputAccountDataRequest{
-		UserID:      req.UserID,
+		UserID:      userID,
 		DataType:    pushRulesAccountDataType,
 		AccountData: json.RawMessage(bs),
 	}
 	var userRes api.InputAccountDataResponse // empty
-	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
-		return err
-	}
-	return nil
+	return a.InputAccountData(ctx, &userReq, &userRes)
 }
 
-func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
-	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+func (a *UserInternalAPI) QueryPushRules(ctx context.Context, userID string) (*pushrules.AccountRuleSets, error) {
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
+		return nil, fmt.Errorf("failed to split user ID %q for push rules", userID)
 	}
-	pushRules, err := a.DB.QueryPushRules(ctx, localpart, domain)
-	if err != nil {
-		return fmt.Errorf("failed to query push rules: %w", err)
-	}
-	res.RuleSets = pushRules
-	return nil
+	return a.DB.QueryPushRules(ctx, localpart, domain)
 }
 
 func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, avatarURL string) (*authtypes.Profile, bool, error) {

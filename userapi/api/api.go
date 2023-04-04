@@ -88,7 +88,7 @@ type ClientUserAPI interface {
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
-	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
+	QueryPushRules(ctx context.Context, userID string) (*pushrules.AccountRuleSets, error)
 	QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
@@ -97,7 +97,7 @@ type ClientUserAPI interface {
 	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
 	PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *struct{}) error
 	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
-	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
+	PerformPushRulesPut(ctx context.Context, userID string, ruleSets *pushrules.AccountRuleSets) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
@@ -552,19 +552,6 @@ const (
 	EmailKind PusherKind = "email"
 	HTTPKind  PusherKind = "http"
 )
-
-type PerformPushRulesPutRequest struct {
-	UserID   string                     `json:"user_id"`
-	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
-}
-
-type QueryPushRulesRequest struct {
-	UserID string `json:"user_id"`
-}
-
-type QueryPushRulesResponse struct {
-	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
-}
 
 type QueryNotificationsRequest struct {
 	Localpart  string                       `json:"localpart"`   // Required.
