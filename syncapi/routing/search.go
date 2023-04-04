@@ -146,7 +146,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	// Filter on m.room.message, as otherwise we also get events like m.reaction
 	// which "breaks" displaying results in Element Web.
 	types := []string{"m.room.message"}
-	roomFilter := &gomatrixserverlib.RoomEventFilter{
+	roomFilter := &synctypes.RoomEventFilter{
 		Rooms: &rooms,
 		Types: &types,
 	}
@@ -216,7 +216,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
 		groups[event.RoomID()] = roomGroup
 		if _, ok := stateForRooms[event.RoomID()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
-			stateFilter := gomatrixserverlib.DefaultStateFilter()
+			stateFilter := synctypes.DefaultStateFilter()
 			state, err := snapshot.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
 			if err != nil {
 				logrus.WithError(err).Error("unable to get current state")
@@ -263,7 +263,7 @@ func contextEvents(
 	ctx context.Context,
 	snapshot storage.DatabaseTransaction,
 	event *gomatrixserverlib.HeaderedEvent,
-	roomFilter *gomatrixserverlib.RoomEventFilter,
+	roomFilter *synctypes.RoomEventFilter,
 	searchReq SearchRequest,
 ) ([]*gomatrixserverlib.HeaderedEvent, []*gomatrixserverlib.HeaderedEvent, error) {
 	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID(), event.EventID())
@@ -301,13 +301,13 @@ type Groupings struct {
 }
 
 type RoomEvents struct {
-	EventContext EventContext                      `json:"event_context"`
-	Filter       gomatrixserverlib.RoomEventFilter `json:"filter"`
-	Groupings    Groupings                         `json:"groupings"`
-	IncludeState bool                              `json:"include_state"`
-	Keys         []string                          `json:"keys"`
-	OrderBy      string                            `json:"order_by"`
-	SearchTerm   string                            `json:"search_term"`
+	EventContext EventContext              `json:"event_context"`
+	Filter       synctypes.RoomEventFilter `json:"filter"`
+	Groupings    Groupings                 `json:"groupings"`
+	IncludeState bool                      `json:"include_state"`
+	Keys         []string                  `json:"keys"`
+	OrderBy      string                    `json:"order_by"`
+	SearchTerm   string                    `json:"search_term"`
 }
 
 type SearchCategories struct {

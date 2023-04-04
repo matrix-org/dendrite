@@ -51,7 +51,7 @@ type messagesReq struct {
 	device           *userapi.Device
 	wasToProvided    bool
 	backwardOrdering bool
-	filter           *gomatrixserverlib.RoomEventFilter
+	filter           *synctypes.RoomEventFilter
 }
 
 type messagesResp struct {

@@ -66,7 +66,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
-	presences, err := snapshot.PresenceAfter(ctx, from, gomatrixserverlib.EventFilter{Limit: 1000})
+	presences, err := snapshot.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
 		return from

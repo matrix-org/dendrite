@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -73,7 +74,7 @@ func NewSqliteFilterTable(db *sql.DB) (tables.Filter, error) {
 }
 
 func (s *filterStatements) SelectFilter(
-	ctx context.Context, txn *sql.Tx, target *gomatrixserverlib.Filter, localpart string, filterID string,
+	ctx context.Context, txn *sql.Tx, target *synctypes.Filter, localpart string, filterID string,
 ) error {
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
@@ -90,7 +91,7 @@ func (s *filterStatements) SelectFilter(
 }
 
 func (s *filterStatements) InsertFilter(
-	ctx context.Context, txn *sql.Tx, filter *gomatrixserverlib.Filter, localpart string,
+	ctx context.Context, txn *sql.Tx, filter *synctypes.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
 

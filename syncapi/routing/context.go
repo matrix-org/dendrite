@@ -95,7 +95,7 @@ func Context(
 		}
 	}
 
-	stateFilter := gomatrixserverlib.StateFilter{
+	stateFilter := synctypes.StateFilter{
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,
@@ -281,7 +281,7 @@ func applyLazyLoadMembers(
 	}
 
 	// Query missing membership events
-	filter := gomatrixserverlib.DefaultStateFilter()
+	filter := synctypes.DefaultStateFilter()
 	filter.Senders = &wantUsers
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := snapshot.GetStateEventsForRoom(ctx, roomID, &filter)
@@ -297,9 +297,9 @@ func applyLazyLoadMembers(
 	return memberships, nil
 }
 
-func parseRoomEventFilter(req *http.Request) (*gomatrixserverlib.RoomEventFilter, error) {
+func parseRoomEventFilter(req *http.Request) (*synctypes.RoomEventFilter, error) {
 	// Default room filter
-	filter := &gomatrixserverlib.RoomEventFilter{Limit: 10}
+	filter := &synctypes.RoomEventFilter{Limit: 10}
 
 	l := req.URL.Query().Get("limit")
 	f := req.URL.Query().Get("filter")
