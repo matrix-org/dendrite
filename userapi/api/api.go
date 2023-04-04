@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -580,12 +581,12 @@ type QueryNotificationsResponse struct {
 }
 
 type Notification struct {
-	Actions    []*pushrules.Action           `json:"actions"`     // Required.
-	Event      gomatrixserverlib.ClientEvent `json:"event"`       // Required.
-	ProfileTag string                        `json:"profile_tag"` // Required by Sytest, but actually optional.
-	Read       bool                          `json:"read"`        // Required.
-	RoomID     string                        `json:"room_id"`     // Required.
-	TS         gomatrixserverlib.Timestamp   `json:"ts"`          // Required.
+	Actions    []*pushrules.Action         `json:"actions"`     // Required.
+	Event      synctypes.ClientEvent       `json:"event"`       // Required.
+	ProfileTag string                      `json:"profile_tag"` // Required by Sytest, but actually optional.
+	Read       bool                        `json:"read"`        // Required.
+	RoomID     string                      `json:"room_id"`     // Required.
+	TS         gomatrixserverlib.Timestamp `json:"ts"`          // Required.
 }
 
 type QueryNumericLocalpartRequest struct {

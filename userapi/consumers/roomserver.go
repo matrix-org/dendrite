@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
@@ -298,7 +299,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 
 	switch {
 	case event.Type() == gomatrixserverlib.MRoomMember:
-		cevent := gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll)
+		cevent := synctypes.HeaderedToClientEvent(event, synctypes.FormatAll)
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
@@ -358,7 +359,7 @@ type localMembership struct {
 	Domain    gomatrixserverlib.ServerName
 }
 
-func newLocalMembership(event *gomatrixserverlib.ClientEvent) (*localMembership, error) {
+func newLocalMembership(event *synctypes.ClientEvent) (*localMembership, error) {
 	if event.StateKey == nil {
 		return nil, fmt.Errorf("missing state_key")
 	}
@@ -531,7 +532,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatSync),
+		Event: synctypes.HeaderedToClientEvent(event, synctypes.FormatSync),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it

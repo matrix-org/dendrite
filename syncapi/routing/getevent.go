@@ -17,7 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -97,6 +97,6 @@ func GetEvent(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.HeaderedToClientEvent(events[0], gomatrixserverlib.FormatAll),
+		JSON: synctypes.HeaderedToClientEvent(events[0], synctypes.FormatAll),
 	}
 }

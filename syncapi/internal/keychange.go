@@ -26,6 +26,7 @@ import (
 
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
@@ -278,7 +279,7 @@ func leftRooms(res *types.Response) []string {
 	return roomIDs
 }
 
-func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID string) bool {
+func membershipEventPresent(events []synctypes.ClientEvent, userID string) bool {
 	for _, ev := range events {
 		// it's enough to know that we have our member event here, don't need to check membership content
 		// as it's implied by being in the respective section of the sync response.
