@@ -19,7 +19,7 @@ import (
 )
 
 // Filter is used by clients to specify how the server should filter responses to e.g. sync requests
-// Specified by: https://matrix.org/docs/spec/client_server/r0.5.0.html#filtering
+// Specified by: https://spec.matrix.org/v1.6/client-server-api/#filtering
 type Filter struct {
 	EventFields []string    `json:"event_fields,omitempty"`
 	EventFormat string      `json:"event_format,omitempty"`
@@ -50,29 +50,32 @@ type RoomFilter struct {
 
 // StateFilter is used to define filtering rules for state events
 type StateFilter struct {
-	NotSenders              *[]string `json:"not_senders,omitempty"`
-	NotTypes                *[]string `json:"not_types,omitempty"`
-	Senders                 *[]string `json:"senders,omitempty"`
-	Types                   *[]string `json:"types,omitempty"`
-	LazyLoadMembers         bool      `json:"lazy_load_members,omitempty"`
-	IncludeRedundantMembers bool      `json:"include_redundant_members,omitempty"`
-	NotRooms                *[]string `json:"not_rooms,omitempty"`
-	Rooms                   *[]string `json:"rooms,omitempty"`
-	ContainsURL             *bool     `json:"contains_url,omitempty"`
+	NotSenders                *[]string `json:"not_senders,omitempty"`
+	NotTypes                  *[]string `json:"not_types,omitempty"`
+	Senders                   *[]string `json:"senders,omitempty"`
+	Types                     *[]string `json:"types,omitempty"`
+	LazyLoadMembers           bool      `json:"lazy_load_members,omitempty"`
+	IncludeRedundantMembers   bool      `json:"include_redundant_members,omitempty"`
+	NotRooms                  *[]string `json:"not_rooms,omitempty"`
+	Rooms                     *[]string `json:"rooms,omitempty"`
+	Limit                     int       `json:"limit,omitempty"`
+	UnreadThreadNotifications bool      `json:"unread_thread_notifications,omitempty"`
+	ContainsURL               *bool     `json:"contains_url,omitempty"`
 }
 
 // RoomEventFilter is used to define filtering rules for events in rooms
 type RoomEventFilter struct {
-	Limit                   int       `json:"limit,omitempty"`
-	NotSenders              *[]string `json:"not_senders,omitempty"`
-	NotTypes                *[]string `json:"not_types,omitempty"`
-	Senders                 *[]string `json:"senders,omitempty"`
-	Types                   *[]string `json:"types,omitempty"`
-	LazyLoadMembers         bool      `json:"lazy_load_members,omitempty"`
-	IncludeRedundantMembers bool      `json:"include_redundant_members,omitempty"`
-	NotRooms                *[]string `json:"not_rooms,omitempty"`
-	Rooms                   *[]string `json:"rooms,omitempty"`
-	ContainsURL             *bool     `json:"contains_url,omitempty"`
+	Limit                     int       `json:"limit,omitempty"`
+	NotSenders                *[]string `json:"not_senders,omitempty"`
+	NotTypes                  *[]string `json:"not_types,omitempty"`
+	Senders                   *[]string `json:"senders,omitempty"`
+	Types                     *[]string `json:"types,omitempty"`
+	LazyLoadMembers           bool      `json:"lazy_load_members,omitempty"`
+	IncludeRedundantMembers   bool      `json:"include_redundant_members,omitempty"`
+	NotRooms                  *[]string `json:"not_rooms,omitempty"`
+	Rooms                     *[]string `json:"rooms,omitempty"`
+	UnreadThreadNotifications bool      `json:"unread_thread_notifications,omitempty"`
+	ContainsURL               *bool     `json:"contains_url,omitempty"`
 }
 
 // Validate checks if the filter contains valid property values
@@ -107,7 +110,8 @@ func DefaultFilter() Filter {
 // provided in the request
 func DefaultEventFilter() EventFilter {
 	return EventFilter{
-		Limit:      20,
+		// parity with synapse: https://github.com/matrix-org/synapse/blob/v1.80.0/synapse/api/filtering.py#L336
+		Limit:      10,
 		NotSenders: nil,
 		NotTypes:   nil,
 		Senders:    nil,
@@ -135,7 +139,8 @@ func DefaultStateFilter() StateFilter {
 // filter is provided in the request
 func DefaultRoomEventFilter() RoomEventFilter {
 	return RoomEventFilter{
-		Limit:       20,
+		// parity with synapse: https://github.com/matrix-org/synapse/blob/v1.80.0/synapse/api/filtering.py#L336
+		Limit:       10,
 		NotSenders:  nil,
 		NotTypes:    nil,
 		Senders:     nil,
