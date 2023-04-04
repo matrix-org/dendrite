@@ -17,5 +17,5 @@ func TestMarshallMultiRoom(t *testing.T) {
 					OriginServerTs: 123,
 				}}})
 	is.NoErr(err)
-	is.Equal(m, []byte(`{"@3:example.com":{"location":{"content":{"foo":"bar"},"timestamp":123}}}`))
+	is.Equal(m, []byte(`{"@3:example.com":{"location":{"content":{"foo":"bar"},"origin_server_ts":123}}}`))
 }
