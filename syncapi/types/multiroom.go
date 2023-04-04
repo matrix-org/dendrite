@@ -5,8 +5,8 @@ type MultiRoom map[string]map[string]MultiRoomData
 type MultiRoomContent []byte
 
 type MultiRoomData struct {
-	Content   MultiRoomContent `json:"content"`
-	Timestamp int64            `json:"timestamp"`
+	Content        MultiRoomContent `json:"content"`
+	OriginServerTs int64            `json:"origin_server_ts"`
 }
 
 func (d MultiRoomContent) MarshalJSON() ([]byte, error) {

@@ -816,8 +816,8 @@ func (d *DatabaseTransaction) SelectMultiRoomData(ctx context.Context, r *types.
 			mr[row.UserId] = make(map[string]types.MultiRoomData)
 		}
 		mr[row.UserId][row.Type] = types.MultiRoomData{
-			Content:   row.Data,
-			Timestamp: row.Timestamp,
+			Content:        row.Data,
+			OriginServerTs: row.Timestamp,
 		}
 	}
 	return mr, nil
