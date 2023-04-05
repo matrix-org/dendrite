@@ -29,6 +29,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -135,10 +136,10 @@ func (t *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.fn(req)
 }
 
-func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrixserverlib.FederationClient {
+func newFedClient(tripper func(*http.Request) (*http.Response, error)) *fclient.FederationClient {
 	_, pkey, _ := ed25519.GenerateKey(nil)
-	fedClient := gomatrixserverlib.NewFederationClient(
-		[]*gomatrixserverlib.SigningIdentity{
+	fedClient := fclient.NewFederationClient(
+		[]*fclient.SigningIdentity{
 			{
 				ServerName: gomatrixserverlib.ServerName("example.test"),
 				KeyID:      gomatrixserverlib.KeyID("ed25519:test"),
@@ -146,8 +147,8 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrix
 			},
 		},
 	)
-	fedClient.Client = *gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(&roundTripper{tripper}),
+	fedClient.Client = *fclient.NewClient(
+		fclient.WithTransport(&roundTripper{tripper}),
 	)
 	return fedClient
 }

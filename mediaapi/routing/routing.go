@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -48,7 +49,7 @@ func Setup(
 	cfg *config.Dendrite,
 	db storage.Database,
 	userAPI userapi.MediaUserAPI,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 ) {
 	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
 
@@ -103,7 +104,7 @@ func makeDownloadAPI(
 	cfg *config.MediaAPI,
 	rateLimits *httputil.RateLimits,
 	db storage.Database,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {

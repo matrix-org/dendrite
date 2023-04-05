@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -50,7 +51,7 @@ func RoomAliasToID(
 		}
 	}
 
-	var resp gomatrixserverlib.RespDirectory
+	var resp fclient.RespDirectory
 
 	if domain == cfg.Matrix.ServerName {
 		queryReq := &roomserverAPI.GetRoomIDForAliasRequest{
@@ -71,7 +72,7 @@ func RoomAliasToID(
 				return jsonerror.InternalServerError()
 			}
 
-			resp = gomatrixserverlib.RespDirectory{
+			resp = fclient.RespDirectory{
 				RoomID:  queryRes.RoomID,
 				Servers: serverQueryRes.ServerNames,
 			}

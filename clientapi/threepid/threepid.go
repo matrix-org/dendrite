@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // EmailAssociationRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-register-email-requesttoken
@@ -58,7 +58,7 @@ type SID struct {
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func CreateSession(
-	ctx context.Context, req EmailAssociationRequest, cfg *config.ClientAPI, client *gomatrixserverlib.Client,
+	ctx context.Context, req EmailAssociationRequest, cfg *config.ClientAPI, client *fclient.Client,
 ) (string, error) {
 	if err := isTrusted(req.IDServer, cfg); err != nil {
 		return "", err
@@ -112,7 +112,7 @@ type GetValidatedResponse struct {
 // response, or if the identity server responded with a non-OK status.
 func CheckAssociation(
 	ctx context.Context, creds Credentials, cfg *config.ClientAPI,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 ) (bool, string, string, error) {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return false, "", "", err
@@ -146,7 +146,7 @@ func CheckAssociation(
 // identifier and a Matrix ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func PublishAssociation(ctx context.Context, creds Credentials, userID string, cfg *config.ClientAPI, client *gomatrixserverlib.Client) error {
+func PublishAssociation(ctx context.Context, creds Credentials, userID string, cfg *config.ClientAPI, client *fclient.Client) error {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return err
 	}

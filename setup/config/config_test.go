@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -275,7 +276,7 @@ func Test_SigningIdentityFor(t *testing.T) {
 		name         string
 		virtualHosts []*VirtualHost
 		serverName   gomatrixserverlib.ServerName
-		want         *gomatrixserverlib.SigningIdentity
+		want         *fclient.SigningIdentity
 		wantErr      bool
 	}{
 		{
@@ -290,23 +291,23 @@ func Test_SigningIdentityFor(t *testing.T) {
 		{
 			name:       "found identity",
 			serverName: gomatrixserverlib.ServerName("main"),
-			want:       &gomatrixserverlib.SigningIdentity{ServerName: "main"},
+			want:       &fclient.SigningIdentity{ServerName: "main"},
 		},
 		{
 			name:       "identity found on virtual hosts",
 			serverName: gomatrixserverlib.ServerName("vh2"),
 			virtualHosts: []*VirtualHost{
-				{SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"}},
-				{SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh2"}},
+				{SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"}},
+				{SigningIdentity: fclient.SigningIdentity{ServerName: "vh2"}},
 			},
-			want: &gomatrixserverlib.SigningIdentity{ServerName: "vh2"},
+			want: &fclient.SigningIdentity{ServerName: "vh2"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Global{
 				VirtualHosts: tt.virtualHosts,
-				SigningIdentity: gomatrixserverlib.SigningIdentity{
+				SigningIdentity: fclient.SigningIdentity{
 					ServerName: "main",
 				},
 			}

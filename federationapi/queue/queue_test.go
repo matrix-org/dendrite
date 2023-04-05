@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
 
@@ -80,24 +81,24 @@ type stubFederationClient struct {
 	txRelayCount         atomic.Uint32
 }
 
-func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error) {
+func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res fclient.RespSend, err error) {
 	var result error
 	if !f.shouldTxSucceed {
 		result = fmt.Errorf("transaction failed")
 	}
 
 	f.txCount.Add(1)
-	return gomatrixserverlib.RespSend{}, result
+	return fclient.RespSend{}, result
 }
 
-func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error) {
+func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res fclient.EmptyResp, err error) {
 	var result error
 	if !f.shouldTxRelaySucceed {
 		result = fmt.Errorf("relay transaction failed")
 	}
 
 	f.txRelayCount.Add(1)
-	return gomatrixserverlib.EmptyResp{}, result
+	return fclient.EmptyResp{}, result
 }
 
 func mustCreatePDU(t *testing.T) *gomatrixserverlib.HeaderedEvent {
@@ -127,7 +128,7 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 	rs := &stubFederationRoomServerAPI{}
 
 	stats := statistics.NewStatistics(db, failuresUntilBlacklist, failuresUntilAssumedOffline)
-	signingInfo := []*gomatrixserverlib.SigningIdentity{
+	signingInfo := []*fclient.SigningIdentity{
 		{
 			KeyID:      "ed21019:auto",
 			PrivateKey: test.PrivateKeyA,

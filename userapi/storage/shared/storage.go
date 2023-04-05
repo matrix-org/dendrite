@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -1026,17 +1027,17 @@ func (d *KeyDatabase) DeleteDeviceKeys(ctx context.Context, userID string, devic
 }
 
 // CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
-func (d *KeyDatabase) CrossSigningKeysForUser(ctx context.Context, userID string) (map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey, error) {
+func (d *KeyDatabase) CrossSigningKeysForUser(ctx context.Context, userID string) (map[fclient.CrossSigningKeyPurpose]fclient.CrossSigningKey, error) {
 	keyMap, err := d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
 	if err != nil {
 		return nil, fmt.Errorf("d.CrossSigningKeysTable.SelectCrossSigningKeysForUser: %w", err)
 	}
-	results := map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey{}
+	results := map[fclient.CrossSigningKeyPurpose]fclient.CrossSigningKey{}
 	for purpose, key := range keyMap {
 		keyID := gomatrixserverlib.KeyID("ed25519:" + key.Encode())
-		result := gomatrixserverlib.CrossSigningKey{
+		result := fclient.CrossSigningKey{
 			UserID: userID,
-			Usage:  []gomatrixserverlib.CrossSigningKeyPurpose{purpose},
+			Usage:  []fclient.CrossSigningKeyPurpose{purpose},
 			Keys: map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{
 				keyID: key,
 			},

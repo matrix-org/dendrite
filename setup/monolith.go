@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Monolith represents an instantiation of all dependencies required to build
@@ -41,8 +42,8 @@ import (
 type Monolith struct {
 	Config    *config.Dendrite
 	KeyRing   *gomatrixserverlib.KeyRing
-	Client    *gomatrixserverlib.Client
-	FedClient *gomatrixserverlib.FederationClient
+	Client    *fclient.Client
+	FedClient *fclient.FederationClient
 
 	AppserviceAPI appserviceAPI.AppServiceInternalAPI
 	FederationAPI federationAPI.FederationInternalAPI

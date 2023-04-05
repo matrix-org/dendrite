@@ -26,6 +26,7 @@ import (
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 )
 
@@ -53,7 +54,7 @@ func AddPublicRoutes(
 func NewRelayInternalAPI(
 	dendriteCfg *config.Dendrite,
 	cm sqlutil.Connections,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient *fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,

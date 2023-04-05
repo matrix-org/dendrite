@@ -25,12 +25,13 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 )
 
 func createQuery(
 	userID gomatrixserverlib.UserID,
-	prevEntry gomatrixserverlib.RelayEntry,
+	prevEntry fclient.RelayEntry,
 ) gomatrixserverlib.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
 	path := federationPathPrefixV1 + "/relay_txn/" + userID.Raw()
@@ -60,11 +61,11 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "", true,
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
+	request := createQuery(*userID, fclient.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
+	jsonResponse := response.JSON.(fclient.RespGetRelayTransaction)
 	assert.Equal(t, false, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
@@ -93,7 +94,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "", true,
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
+	request := createQuery(*userID, fclient.RelayEntry{EntryID: -1})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusInternalServerError, response.Code)
 }
@@ -126,20 +127,20 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "", true,
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
+	request := createQuery(*userID, fclient.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
+	jsonResponse := response.JSON.(fclient.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
 	// And once more to clear the queue
-	request = createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID})
+	request = createQuery(*userID, fclient.RelayEntry{EntryID: jsonResponse.EntryID})
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
+	jsonResponse = response.JSON.(fclient.RespGetRelayTransaction)
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
@@ -189,28 +190,28 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "", true,
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
+	request := createQuery(*userID, fclient.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
+	jsonResponse := response.JSON.(fclient.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
-	request = createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID})
+	request = createQuery(*userID, fclient.RelayEntry{EntryID: jsonResponse.EntryID})
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
+	jsonResponse = response.JSON.(fclient.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction2, jsonResponse.Transaction)
 
 	// And once more to clear the queue
-	request = createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID})
+	request = createQuery(*userID, fclient.RelayEntry{EntryID: jsonResponse.EntryID})
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
+	jsonResponse = response.JSON.(fclient.RespGetRelayTransaction)
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
