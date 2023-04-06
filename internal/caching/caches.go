@@ -17,6 +17,7 @@ package caching
 import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Caches contains a set of references to caches. They may be
@@ -34,7 +35,7 @@ type Caches struct {
 	RoomServerEventTypes    Cache[types.EventTypeNID, string]                      // eventType NID -> eventType
 	FederationPDUs          Cache[int64, *gomatrixserverlib.HeaderedEvent]         // queue NID -> PDU
 	FederationEDUs          Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
-	SpaceSummaryRooms       Cache[string, gomatrixserverlib.MSC2946SpacesResponse] // room ID -> space response
+	SpaceSummaryRooms       Cache[string, fclient.MSC2946SpacesResponse]           // room ID -> space response
 	LazyLoading             Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
 }
 

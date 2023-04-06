@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,15 +38,15 @@ type testFedClient struct {
 func (f *testFedClient) P2PGetTransactionFromRelay(
 	ctx context.Context,
 	u gomatrixserverlib.UserID,
-	prev gomatrixserverlib.RelayEntry,
+	prev fclient.RelayEntry,
 	relayServer gomatrixserverlib.ServerName,
-) (res gomatrixserverlib.RespGetRelayTransaction, err error) {
+) (res fclient.RespGetRelayTransaction, err error) {
 	f.queryCount++
 	if f.shouldFail {
 		return res, fmt.Errorf("Error")
 	}
 
-	res = gomatrixserverlib.RespGetRelayTransaction{
+	res = fclient.RespGetRelayTransaction{
 		Transaction: gomatrixserverlib.Transaction{},
 		EntryID:     0,
 	}

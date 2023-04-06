@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,7 +80,7 @@ func createGetRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, userI
 	pk := sk.Public().(ed25519.PublicKey)
 	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	req := gomatrixserverlib.NewFederationRequest("GET", origin, serverName, "/_matrix/federation/v1/relay_txn/"+userID)
-	content := gomatrixserverlib.RelayEntry{EntryID: 0}
+	content := fclient.RelayEntry{EntryID: 0}
 	req.SetContent(content)
 	req.Sign(origin, gomatrixserverlib.KeyID(keyID), sk)
 	httpreq, _ := req.HTTPRequest()

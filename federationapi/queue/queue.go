@@ -22,6 +22,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -45,7 +46,7 @@ type OutgoingQueues struct {
 	origin      gomatrixserverlib.ServerName
 	client      fedapi.FederationClient
 	statistics  *statistics.Statistics
-	signing     map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
+	signing     map[gomatrixserverlib.ServerName]*fclient.SigningIdentity
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
@@ -90,7 +91,7 @@ func NewOutgoingQueues(
 	client fedapi.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
-	signing []*gomatrixserverlib.SigningIdentity,
+	signing []*fclient.SigningIdentity,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
@@ -100,7 +101,7 @@ func NewOutgoingQueues(
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
-		signing:    map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity{},
+		signing:    map[gomatrixserverlib.ServerName]*fclient.SigningIdentity{},
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
 	for _, identity := range signing {

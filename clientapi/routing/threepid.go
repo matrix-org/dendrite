@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,7 +42,7 @@ type ThreePIDsResponse struct {
 //
 //	POST /account/3pid/email/requestToken
 //	POST /register/email/requestToken
-func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *config.ClientAPI, client *gomatrixserverlib.Client) util.JSONResponse {
+func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *config.ClientAPI, client *fclient.Client) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -92,7 +93,7 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
 	req *http.Request, threePIDAPI api.ClientUserAPI, device *api.Device,
-	cfg *config.ClientAPI, client *gomatrixserverlib.Client,
+	cfg *config.ClientAPI, client *fclient.Client,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Functions here are "proxying" calls to the gomatrixserverlib federation
@@ -13,56 +14,56 @@ import (
 func (a *FederationInternalAPI) GetEventAuth(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName,
 	roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string,
-) (res gomatrixserverlib.RespEventAuth, err error) {
+) (res fclient.RespEventAuth, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.GetEventAuth(ctx, origin, s, roomVersion, roomID, eventID)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespEventAuth{}, err
+		return fclient.RespEventAuth{}, err
 	}
-	return ires.(gomatrixserverlib.RespEventAuth), nil
+	return ires.(fclient.RespEventAuth), nil
 }
 
 func (a *FederationInternalAPI) GetUserDevices(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, userID string,
-) (gomatrixserverlib.RespUserDevices, error) {
+) (fclient.RespUserDevices, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.GetUserDevices(ctx, origin, s, userID)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespUserDevices{}, err
+		return fclient.RespUserDevices{}, err
 	}
-	return ires.(gomatrixserverlib.RespUserDevices), nil
+	return ires.(fclient.RespUserDevices), nil
 }
 
 func (a *FederationInternalAPI) ClaimKeys(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string,
-) (gomatrixserverlib.RespClaimKeys, error) {
+) (fclient.RespClaimKeys, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.ClaimKeys(ctx, origin, s, oneTimeKeys)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespClaimKeys{}, err
+		return fclient.RespClaimKeys{}, err
 	}
-	return ires.(gomatrixserverlib.RespClaimKeys), nil
+	return ires.(fclient.RespClaimKeys), nil
 }
 
 func (a *FederationInternalAPI) QueryKeys(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string,
-) (gomatrixserverlib.RespQueryKeys, error) {
+) (fclient.RespQueryKeys, error) {
 	ires, err := a.doRequestIfNotBackingOffOrBlacklisted(s, func() (interface{}, error) {
 		return a.federation.QueryKeys(ctx, origin, s, keys)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespQueryKeys{}, err
+		return fclient.RespQueryKeys{}, err
 	}
-	return ires.(gomatrixserverlib.RespQueryKeys), nil
+	return ires.(fclient.RespQueryKeys), nil
 }
 
 func (a *FederationInternalAPI) Backfill(
@@ -81,45 +82,46 @@ func (a *FederationInternalAPI) Backfill(
 
 func (a *FederationInternalAPI) LookupState(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
-) (res gomatrixserverlib.RespState, err error) {
+) (res gomatrixserverlib.StateResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.LookupState(ctx, origin, s, roomID, eventID, roomVersion)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespState{}, err
+		return &fclient.RespState{}, err
 	}
-	return ires.(gomatrixserverlib.RespState), nil
+	r := ires.(fclient.RespState)
+	return &r, nil
 }
 
 func (a *FederationInternalAPI) LookupStateIDs(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, eventID string,
-) (res gomatrixserverlib.RespStateIDs, err error) {
+) (res gomatrixserverlib.StateIDResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.LookupStateIDs(ctx, origin, s, roomID, eventID)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespStateIDs{}, err
+		return fclient.RespStateIDs{}, err
 	}
-	return ires.(gomatrixserverlib.RespStateIDs), nil
+	return ires.(fclient.RespStateIDs), nil
 }
 
 func (a *FederationInternalAPI) LookupMissingEvents(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string,
-	missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
-) (res gomatrixserverlib.RespMissingEvents, err error) {
+	missing fclient.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
+) (res fclient.RespMissingEvents, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.LookupMissingEvents(ctx, origin, s, roomID, missing, roomVersion)
 	})
 	if err != nil {
-		return gomatrixserverlib.RespMissingEvents{}, err
+		return fclient.RespMissingEvents{}, err
 	}
-	return ires.(gomatrixserverlib.RespMissingEvents), nil
+	return ires.(fclient.RespMissingEvents), nil
 }
 
 func (a *FederationInternalAPI) GetEvent(
@@ -151,9 +153,9 @@ func (a *FederationInternalAPI) LookupServerKeys(
 }
 
 func (a *FederationInternalAPI) MSC2836EventRelationships(
-	ctx context.Context, origin, s gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, r fclient.MSC2836EventRelationshipsRequest,
 	roomVersion gomatrixserverlib.RoomVersion,
-) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error) {
+) (res fclient.MSC2836EventRelationshipsResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
@@ -162,12 +164,12 @@ func (a *FederationInternalAPI) MSC2836EventRelationships(
 	if err != nil {
 		return res, err
 	}
-	return ires.(gomatrixserverlib.MSC2836EventRelationshipsResponse), nil
+	return ires.(fclient.MSC2836EventRelationshipsResponse), nil
 }
 
 func (a *FederationInternalAPI) MSC2946Spaces(
 	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, suggestedOnly bool,
-) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
+) (res fclient.MSC2946SpacesResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
@@ -176,5 +178,5 @@ func (a *FederationInternalAPI) MSC2946Spaces(
 	if err != nil {
 		return res, err
 	}
-	return ires.(gomatrixserverlib.MSC2946SpacesResponse), nil
+	return ires.(fclient.MSC2946SpacesResponse), nil
 }

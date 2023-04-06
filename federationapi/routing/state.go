@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -40,7 +41,7 @@ func GetState(
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: &gomatrixserverlib.RespState{
+	return util.JSONResponse{Code: http.StatusOK, JSON: &fclient.RespState{
 		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
 		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
 	}}
@@ -66,7 +67,7 @@ func GetStateIDs(
 	stateEventIDs := getIDsFromEvent(stateEvents)
 	authEventIDs := getIDsFromEvent(authEvents)
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.RespStateIDs{
+	return util.JSONResponse{Code: http.StatusOK, JSON: fclient.RespStateIDs{
 		StateEventIDs: stateEventIDs,
 		AuthEventIDs:  authEventIDs,
 	},

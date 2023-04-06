@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 )
 
@@ -46,7 +47,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 ) error {
 	// Providing a default RelayEntry (EntryID = 0) is done to ask the relay if there are any
 	// transactions available for this node.
-	prevEntry := gomatrixserverlib.RelayEntry{}
+	prevEntry := fclient.RelayEntry{}
 	asyncResponse, err := r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 	if err != nil {
 		logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
@@ -54,12 +55,12 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	}
 	r.processTransaction(&asyncResponse.Transaction)
 
-	prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
+	prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
 		// There are still more entries available for this node from the relay.
 		logrus.Infof("Retrieving next entry from relay, previous: %v", prevEntry)
 		asyncResponse, err = r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
-		prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
+		prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 		if err != nil {
 			logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
@@ -97,7 +98,7 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 func (r *RelayInternalAPI) QueryTransactions(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
-	previousEntry gomatrixserverlib.RelayEntry,
+	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
 	logrus.Infof("QueryTransactions for %s", userID.Raw())
 	if previousEntry.EntryID > 0 {

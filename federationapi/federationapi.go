@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
@@ -48,7 +49,7 @@ func AddPublicRoutes(
 	dendriteConfig *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.FederationUserAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation *fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fedAPI federationAPI.FederationInternalAPI,

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
@@ -79,7 +80,7 @@ type Inputer struct {
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
 	ServerName          gomatrixserverlib.ServerName
-	SigningIdentity     *gomatrixserverlib.SigningIdentity
+	SigningIdentity     *fclient.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs

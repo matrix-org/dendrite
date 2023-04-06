@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -38,7 +39,7 @@ type PineconeUserProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
 	userAPI   userapi.QuerySearchProfilesAPI
-	fedClient *gomatrixserverlib.FederationClient
+	fedClient *fclient.FederationClient
 }
 
 const PublicURL = "/_matrix/p2p/profiles"
@@ -47,7 +48,7 @@ func NewPineconeUserProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
 	userAPI userapi.QuerySearchProfilesAPI,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient *fclient.FederationClient,
 ) *PineconeUserProvider {
 	p := &PineconeUserProvider{
 		r:         r,
@@ -94,7 +95,7 @@ func (p *PineconeUserProvider) QuerySearchProfiles(ctx context.Context, req *use
 // Returns a list of user profiles.
 func bulkFetchUserDirectoriesFromServers(
 	ctx context.Context, req *userapi.QuerySearchProfilesRequest,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient *fclient.FederationClient,
 	homeservers map[gomatrixserverlib.ServerName]struct{},
 ) (profiles []authtypes.Profile) {
 	jsonBody, err := json.Marshal(req)

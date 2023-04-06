@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -433,7 +434,7 @@ func SendJoin(
 	// https://matrix.org/docs/spec/server_server/latest#put-matrix-federation-v1-send-join-roomid-eventid
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespSendJoin{
+		JSON: fclient.RespSendJoin{
 			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
