@@ -18,6 +18,7 @@ import (
 	"math"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 const (
@@ -29,22 +30,22 @@ const (
 
 // KeyTypePurposeToInt maps a purpose to an integer, which is used in the
 // database to reduce the amount of space taken up by this column.
-var KeyTypePurposeToInt = map[gomatrixserverlib.CrossSigningKeyPurpose]int16{
-	gomatrixserverlib.CrossSigningKeyPurposeMaster:      1,
-	gomatrixserverlib.CrossSigningKeyPurposeSelfSigning: 2,
-	gomatrixserverlib.CrossSigningKeyPurposeUserSigning: 3,
+var KeyTypePurposeToInt = map[fclient.CrossSigningKeyPurpose]int16{
+	fclient.CrossSigningKeyPurposeMaster:      1,
+	fclient.CrossSigningKeyPurposeSelfSigning: 2,
+	fclient.CrossSigningKeyPurposeUserSigning: 3,
 }
 
 // KeyTypeIntToPurpose maps an integer to a purpose, which is used in the
 // database to reduce the amount of space taken up by this column.
-var KeyTypeIntToPurpose = map[int16]gomatrixserverlib.CrossSigningKeyPurpose{
-	1: gomatrixserverlib.CrossSigningKeyPurposeMaster,
-	2: gomatrixserverlib.CrossSigningKeyPurposeSelfSigning,
-	3: gomatrixserverlib.CrossSigningKeyPurposeUserSigning,
+var KeyTypeIntToPurpose = map[int16]fclient.CrossSigningKeyPurpose{
+	1: fclient.CrossSigningKeyPurposeMaster,
+	2: fclient.CrossSigningKeyPurposeSelfSigning,
+	3: fclient.CrossSigningKeyPurposeUserSigning,
 }
 
 // Map of purpose -> public key
-type CrossSigningKeyMap map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.Base64Bytes
+type CrossSigningKeyMap map[fclient.CrossSigningKeyPurpose]gomatrixserverlib.Base64Bytes
 
 // Map of user ID -> key ID -> signature
 type CrossSigningSigMap map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes

@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -719,9 +720,9 @@ type OutputCrossSigningKeyUpdate struct {
 }
 
 type CrossSigningKeyUpdate struct {
-	MasterKey      *gomatrixserverlib.CrossSigningKey `json:"master_key,omitempty"`
-	SelfSigningKey *gomatrixserverlib.CrossSigningKey `json:"self_signing_key,omitempty"`
-	UserID         string                             `json:"user_id"`
+	MasterKey      *fclient.CrossSigningKey `json:"master_key,omitempty"`
+	SelfSigningKey *fclient.CrossSigningKey `json:"self_signing_key,omitempty"`
+	UserID         string                   `json:"user_id"`
 }
 
 // DeviceKeysEqual returns true if the device keys updates contain the
@@ -854,7 +855,7 @@ type PerformClaimKeysResponse struct {
 }
 
 type PerformUploadDeviceKeysRequest struct {
-	gomatrixserverlib.CrossSigningKeys
+	fclient.CrossSigningKeys
 	// The user that uploaded the key, should be populated by the clientapi.
 	UserID string
 }
@@ -864,7 +865,7 @@ type PerformUploadDeviceKeysResponse struct {
 }
 
 type PerformUploadDeviceSignaturesRequest struct {
-	Signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice
+	Signatures map[string]map[gomatrixserverlib.KeyID]fclient.CrossSigningForKeyOrDevice
 	// The user that uploaded the sig, should be populated by the clientapi.
 	UserID string
 }
@@ -888,9 +889,9 @@ type QueryKeysResponse struct {
 	// Map of user_id to device_id to device_key
 	DeviceKeys map[string]map[string]json.RawMessage
 	// Maps of user_id to cross signing key
-	MasterKeys      map[string]gomatrixserverlib.CrossSigningKey
-	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
-	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	MasterKeys      map[string]fclient.CrossSigningKey
+	SelfSigningKeys map[string]fclient.CrossSigningKey
+	UserSigningKeys map[string]fclient.CrossSigningKey
 	// Set if there was a fatal error processing this query
 	Error *KeyError
 }
@@ -945,11 +946,11 @@ type QuerySignaturesResponse struct {
 	// A map of target user ID -> target key/device ID -> origin user ID -> origin key/device ID -> signatures
 	Signatures map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap
 	// A map of target user ID -> cross-signing master key
-	MasterKeys map[string]gomatrixserverlib.CrossSigningKey
+	MasterKeys map[string]fclient.CrossSigningKey
 	// A map of target user ID -> cross-signing self-signing key
-	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	SelfSigningKeys map[string]fclient.CrossSigningKey
 	// A map of target user ID -> cross-signing user-signing key
-	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	UserSigningKeys map[string]fclient.CrossSigningKey
 	// The request error, if any
 	Error *KeyError
 }

@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -45,7 +46,7 @@ func (r *roomDirectoryResponse) fillServers(servers []gomatrixserverlib.ServerNa
 func DirectoryRoom(
 	req *http.Request,
 	roomAlias string,
-	federation *gomatrixserverlib.FederationClient,
+	federation *fclient.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	fedSenderAPI federationAPI.ClientFederationAPI,

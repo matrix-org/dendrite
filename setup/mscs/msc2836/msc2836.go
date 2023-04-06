@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -85,7 +86,7 @@ type EventRelationshipResponse struct {
 }
 
 type MSC2836EventRelationshipsResponse struct {
-	gomatrixserverlib.MSC2836EventRelationshipsResponse
+	fclient.MSC2836EventRelationshipsResponse
 	ParsedEvents    []*gomatrixserverlib.Event
 	ParsedAuthChain []*gomatrixserverlib.Event
 }
@@ -399,7 +400,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 		serversToQuery := rc.getServersForEventID(parentID)
 		var result *MSC2836EventRelationshipsResponse
 		for _, srv := range serversToQuery {
-			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 				EventID:     parentID,
 				Direction:   "down",
 				Limit:       100,
@@ -486,7 +487,7 @@ func walkThread(
 
 // MSC2836EventRelationships performs an /event_relationships request to a remote server
 func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
-	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
 		DepthFirst:  rc.req.DepthFirst,
 		Direction:   rc.req.Direction,
@@ -653,7 +654,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 			messageEvents = append(messageEvents, ev)
 		}
 	}
-	respState := gomatrixserverlib.RespState{
+	respState := fclient.RespState{
 		AuthEvents:  res.AuthChain,
 		StateEvents: stateEvents,
 	}

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -508,12 +509,12 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		}
 		uploadRes := &api.PerformUploadDeviceKeysResponse{}
 		if res.MasterKey != nil {
-			if err = sanityCheckKey(*res.MasterKey, userID, gomatrixserverlib.CrossSigningKeyPurposeMaster); err == nil {
+			if err = sanityCheckKey(*res.MasterKey, userID, fclient.CrossSigningKeyPurposeMaster); err == nil {
 				uploadReq.MasterKey = *res.MasterKey
 			}
 		}
 		if res.SelfSigningKey != nil {
-			if err = sanityCheckKey(*res.SelfSigningKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
+			if err = sanityCheckKey(*res.SelfSigningKey, userID, fclient.CrossSigningKeyPurposeSelfSigning); err == nil {
 				uploadReq.SelfSigningKey = *res.SelfSigningKey
 			}
 		}
@@ -527,7 +528,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 	return defaultWaitTime, nil
 }
 
-func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevices) error {
+func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error {
 	ctx := context.Background() // we've got the keys, don't time out when persisting them to the database.
 	keys := make([]api.DeviceMessage, len(res.Devices))
 	existingKeys := make([]api.DeviceMessage, len(res.Devices))

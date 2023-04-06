@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -48,9 +49,9 @@ func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.FederationRoomser
 
 func publicRooms(
 	ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.FederationRoomserverAPI,
-) (*gomatrixserverlib.RespPublicRooms, error) {
+) (*fclient.RespPublicRooms, error) {
 
-	var response gomatrixserverlib.RespPublicRooms
+	var response fclient.RespPublicRooms
 	var limit int16
 	var offset int64
 	limit = request.Limit
@@ -122,7 +123,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 }
 
 // due to lots of switches
-func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.FederationRoomserverAPI) ([]gomatrixserverlib.PublicRoom, error) {
+func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.FederationRoomserverAPI) ([]fclient.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
 	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
@@ -144,10 +145,10 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		util.GetLogger(ctx).WithError(err).Error("QueryBulkStateContent failed")
 		return nil, err
 	}
-	chunk := make([]gomatrixserverlib.PublicRoom, len(roomIDs))
+	chunk := make([]fclient.PublicRoom, len(roomIDs))
 	i := 0
 	for roomID, data := range stateRes.Rooms {
-		pub := gomatrixserverlib.PublicRoom{
+		pub := fclient.PublicRoom{
 			RoomID: roomID,
 		}
 		joinCount := 0

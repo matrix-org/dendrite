@@ -25,6 +25,7 @@ import (
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -218,12 +219,12 @@ func processInvite(
 	if isInviteV2 {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent.JSON()},
+			JSON: fclient.RespInviteV2{Event: signedEvent.JSON()},
 		}
 	} else {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: gomatrixserverlib.RespInvite{Event: signedEvent.JSON()},
+			JSON: fclient.RespInvite{Event: signedEvent.JSON()},
 		}
 	}
 }

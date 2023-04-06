@@ -28,6 +28,7 @@ import (
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -97,7 +98,7 @@ func NewTxnReq(
 	return t
 }
 
-func (t *TxnReq) ProcessTransaction(ctx context.Context) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
+func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *util.JSONResponse) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -107,7 +108,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		}
 	}()
 
-	results := make(map[string]gomatrixserverlib.PDUResult)
+	results := make(map[string]fclient.PDUResult)
 	roomVersions := make(map[string]gomatrixserverlib.RoomVersion)
 	getRoomVersion := func(roomID string) gomatrixserverlib.RoomVersion {
 		if v, ok := roomVersions[roomID]; ok {
@@ -157,14 +158,14 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			continue
 		}
 		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID(), t.Origin) {
-			results[event.EventID()] = gomatrixserverlib.PDUResult{
+			results[event.EventID()] = fclient.PDUResult{
 				Error: "Forbidden by server ACLs",
 			}
 			continue
 		}
 		if err = event.VerifyEventSignatures(ctx, t.keys); err != nil {
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
-			results[event.EventID()] = gomatrixserverlib.PDUResult{
+			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
 			continue
@@ -187,18 +188,18 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			true,
 		); err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
-			results[event.EventID()] = gomatrixserverlib.PDUResult{
+			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
 			continue
 		}
 
-		results[event.EventID()] = gomatrixserverlib.PDUResult{}
+		results[event.EventID()] = fclient.PDUResult{}
 		PDUCountTotal.WithLabelValues("success").Inc()
 	}
 
 	wg.Wait()
-	return &gomatrixserverlib.RespSend{PDUs: results}, nil
+	return &fclient.RespSend{PDUs: results}, nil
 }
 
 // nolint:gocyclo

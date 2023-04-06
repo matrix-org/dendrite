@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 var requestFrom = flag.String("from", "", "the server name that the request should originate from")
@@ -49,8 +50,8 @@ func main() {
 	}
 
 	serverName := gomatrixserverlib.ServerName(*requestFrom)
-	client := gomatrixserverlib.NewFederationClient(
-		[]*gomatrixserverlib.SigningIdentity{
+	client := fclient.NewFederationClient(
+		[]*fclient.SigningIdentity{
 			{
 				ServerName: serverName,
 				KeyID:      gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),

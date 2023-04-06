@@ -9,6 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -47,7 +48,7 @@ func (d *fakeAccountDatabase) QueryAccountByPassword(ctx context.Context, req *a
 func setup() *UserInteractive {
 	cfg := &config.ClientAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: serverName,
 			},
 		},
