@@ -641,31 +641,19 @@ func (t *missingStateReq) lookupMissingStateViaState(
 	if err != nil {
 		return nil, err
 	}
-	s := fclient.RespState{
+
+	// Check that the returned state is valid.
+	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(ctx, &fclient.RespState{
 		StateEvents: state.GetStateEvents(),
 		AuthEvents:  state.GetAuthEvents(),
-	}
-	// Check that the returned state is valid.
-	authEvents, stateEvents, err := s.Check(ctx, roomVersion, t.keys, nil)
+	}, roomVersion, t.keys, nil)
 	if err != nil {
 		return nil, err
 	}
-	parsedState := &parsedRespState{
+	return &parsedRespState{
 		AuthEvents:  authEvents,
 		StateEvents: stateEvents,
-	}
-	// Cache the results of this state lookup and deduplicate anything we already
-	// have in the cache, freeing up memory.
-	// We load these as trusted as we called state.Check before which loaded them as untrusted.
-	for i, evJSON := range s.AuthEvents {
-		ev, _ := gomatrixserverlib.NewEventFromTrustedJSON(evJSON, false, roomVersion)
-		parsedState.AuthEvents[i] = t.cacheAndReturn(ev)
-	}
-	for i, evJSON := range s.StateEvents {
-		ev, _ := gomatrixserverlib.NewEventFromTrustedJSON(evJSON, false, roomVersion)
-		parsedState.StateEvents[i] = t.cacheAndReturn(ev)
-	}
-	return parsedState, nil
+	}, nil
 }
 
 func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
