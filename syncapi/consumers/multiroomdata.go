@@ -95,7 +95,7 @@ func (s *OutputMultiRoomDataConsumer) onMessage(ctx context.Context, msgs []*nat
 
 	rooms, err := s.db.SelectMultiRoomVisibilityRooms(ctx, mrd.SelectMultiRoomVisibilityRoomsParams{
 		UserID:   userID,
-		ExpireTs: time.Now().Unix(),
+		ExpireTs: time.Now().UnixMilli(),
 	})
 	if err != nil {
 		sentry.CaptureException(err)

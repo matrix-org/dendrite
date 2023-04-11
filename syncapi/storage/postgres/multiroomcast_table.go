@@ -51,7 +51,7 @@ func (s *multiRoomStatements) SelectMultiRoomData(ctx context.Context, r *types.
 	for rows.Next() {
 		r := types.MultiRoomDataRow{}
 		err = rows.Scan(&r.UserId, &r.Type, &r.Data, &t)
-		r.Timestamp = t.Unix()
+		r.Timestamp = t.UnixMilli()
 		if err != nil {
 			return nil, fmt.Errorf("rows scan: %w", err)
 		}

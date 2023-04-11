@@ -56,7 +56,7 @@ func AddPublicRoutes(
 	go func() {
 		var affected int64
 		for {
-			affected, err = mrq.DeleteMultiRoomVisibilityByExpireTS(context.Background(), time.Now().Unix())
+			affected, err = mrq.DeleteMultiRoomVisibilityByExpireTS(context.Background(), time.Now().UnixMilli())
 			if err != nil {
 				logrus.WithError(err).Error("failed to expire multiroom visibility")
 			}
