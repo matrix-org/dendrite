@@ -655,7 +655,7 @@ func (d *Database) UpdateMultiRoomVisibility(ctx context.Context, event *gomatri
 			UserID:   event.Sender(),
 			Type:     event.Type(),
 			RoomID:   event.RoomID(),
-			ExpireTs: int64(mrdEv.ExpireTs),
+			ExpireTs: mrdEv.ExpireTs,
 		})
 		if err != nil {
 			return fmt.Errorf("insert multiroom visibility failed: %w", err)
