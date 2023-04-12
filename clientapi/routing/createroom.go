@@ -448,7 +448,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, userDomain, &authEvents, cfg, evTime, roomVersion)
+		ev, err = builder.BuildEvent(userDomain, &authEvents, evTime, roomVersion, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()
@@ -598,32 +598,4 @@ func createRoom(
 		Code: 200,
 		JSON: response,
 	}
-}
-
-// buildEvent fills out auth_events for the builder then builds the event
-func buildEvent(
-	builder *gomatrixserverlib.EventBuilder,
-	serverName gomatrixserverlib.ServerName,
-	provider gomatrixserverlib.AuthEventProvider,
-	cfg *config.ClientAPI,
-	evTime time.Time,
-	roomVersion gomatrixserverlib.RoomVersion,
-) (*gomatrixserverlib.Event, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
-	if err != nil {
-		return nil, err
-	}
-	refs, err := eventsNeeded.AuthEventReferences(provider)
-	if err != nil {
-		return nil, err
-	}
-	builder.AuthEvents = refs
-	event, err := builder.Build(
-		evTime, serverName, cfg.Matrix.KeyID,
-		cfg.Matrix.PrivateKey, roomVersion,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
-	}
-	return event, nil
 }

@@ -526,7 +526,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var event *gomatrixserverlib.Event
-		event, err = r.buildEvent(&builder, userDomain, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion))
+		event, err = builder.BuildEvent(userDomain, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion), r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
 		if err != nil {
 			return &api.PerformError{
 				Msg: fmt.Sprintf("Failed to build new %q event: %s", builder.Type, err),
@@ -706,30 +706,4 @@ func (r *Upgrader) sendHeaderedEvent(
 	}
 
 	return nil
-}
-
-func (r *Upgrader) buildEvent(
-	builder *gomatrixserverlib.EventBuilder,
-	serverName gomatrixserverlib.ServerName,
-	provider gomatrixserverlib.AuthEventProvider,
-	evTime time.Time,
-	roomVersion gomatrixserverlib.RoomVersion,
-) (*gomatrixserverlib.Event, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
-	if err != nil {
-		return nil, err
-	}
-	refs, err := eventsNeeded.AuthEventReferences(provider)
-	if err != nil {
-		return nil, err
-	}
-	builder.AuthEvents = refs
-	event, err := builder.Build(
-		evTime, serverName, r.Cfg.Matrix.KeyID,
-		r.Cfg.Matrix.PrivateKey, roomVersion,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return event, nil
 }
