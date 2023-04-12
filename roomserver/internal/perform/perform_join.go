@@ -35,7 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -305,7 +304,13 @@ func (r *Joiner) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, userDomain, &eb)
+
+	var buildRes rsAPI.QueryLatestEventsAndStateResponse
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(userDomain)
+	if err != nil {
+		return "", "", fmt.Errorf("error joining local room: %q", err)
+	}
+	event, err := eventutil.QueryAndBuildEvent(ctx, &eb, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err {
 	case nil:
@@ -429,47 +434,4 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 		}
 	}
 	return res.AuthorisedVia, nil
-}
-
-func buildEvent(
-	ctx context.Context, db storage.Database, cfg *config.Global,
-	senderDomain gomatrixserverlib.ServerName,
-	builder *gomatrixserverlib.EventBuilder,
-) (*gomatrixserverlib.HeaderedEvent, *rsAPI.QueryLatestEventsAndStateResponse, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
-	}
-
-	if len(eventsNeeded.Tuples()) == 0 {
-		return nil, nil, errors.New("expecting state tuples for event builder, got none")
-	}
-
-	var queryRes rsAPI.QueryLatestEventsAndStateResponse
-	err = helpers.QueryLatestEventsAndState(ctx, db, &rsAPI.QueryLatestEventsAndStateRequest{
-		RoomID:       builder.RoomID,
-		StateToFetch: eventsNeeded.Tuples(),
-	}, &queryRes)
-	if err != nil {
-		switch err.(type) {
-		case types.MissingStateError:
-			// We know something about the room but the state seems to be
-			// insufficient to actually build a new event, so in effect we
-			// had might as well treat the room as if it doesn't exist.
-			return nil, nil, eventutil.ErrRoomNoExists
-		default:
-			return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
-		}
-	}
-
-	identity, err := cfg.SigningIdentityFor(senderDomain)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ev, err := eventutil.BuildEvent(ctx, builder, cfg, identity, time.Now(), &eventsNeeded, &queryRes)
-	if err != nil {
-		return nil, nil, err
-	}
-	return ev, &queryRes, nil
 }

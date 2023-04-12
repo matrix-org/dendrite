@@ -160,6 +160,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Cfg:     &r.Cfg.RoomServer,
 		DB:      r.DB,
 		FSAPI:   r.fsAPI,
+		RSAPI:   r,
 		Inputer: r.Inputer,
 	}
 	r.Publisher = &perform.Publisher{
