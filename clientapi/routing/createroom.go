@@ -448,7 +448,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = builder.BuildEvent(userDomain, &authEvents, evTime, roomVersion, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+		ev, err = builder.AddAuthEventsAndBuild(userDomain, &authEvents, evTime, roomVersion, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()

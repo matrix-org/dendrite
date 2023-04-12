@@ -526,7 +526,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var event *gomatrixserverlib.Event
-		event, err = builder.BuildEvent(userDomain, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion), r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
+		event, err = builder.AddAuthEventsAndBuild(userDomain, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion), r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
 		if err != nil {
 			return &api.PerformError{
 				Msg: fmt.Sprintf("Failed to build new %q event: %s", builder.Type, err),
