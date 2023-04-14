@@ -3,16 +3,22 @@ package appservice_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -114,20 +120,20 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		defer close()
 
 		// Create a dummy application service
-		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
-			{
-				ID:              "someID",
-				URL:             srv.URL,
-				ASToken:         "",
-				HSToken:         "",
-				SenderLocalpart: "senderLocalPart",
-				NamespaceMap: map[string][]config.ApplicationServiceNamespace{
-					"users":   {{RegexpObject: regexp.MustCompile("as-.*")}},
-					"aliases": {{RegexpObject: regexp.MustCompile("asroom-.*")}},
-				},
-				Protocols: []string{existingProtocol},
+		as := &config.ApplicationService{
+			ID:              "someID",
+			URL:             srv.URL,
+			ASToken:         "",
+			HSToken:         "",
+			SenderLocalpart: "senderLocalPart",
+			NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+				"users":   {{RegexpObject: regexp.MustCompile("as-.*")}},
+				"aliases": {{RegexpObject: regexp.MustCompile("asroom-.*")}},
 			},
+			Protocols: []string{existingProtocol},
 		}
+		as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
 		t.Cleanup(func() {
 			ctx.ShutdownDendrite()
@@ -143,6 +149,103 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		runCases(t, asAPI)
 	})
+}
+
+func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
+
+	// Set expected results
+	existingProtocol := "irc"
+	wantLocationResponse := []api.ASLocationResponse{{Protocol: existingProtocol, Fields: []byte("{}")}}
+	wantUserResponse := []api.ASUserResponse{{Protocol: existingProtocol, Fields: []byte("{}")}}
+	wantProtocolResponse := api.ASProtocolResponse{Instances: []api.ProtocolInstance{{Fields: []byte("{}")}}}
+
+	// create a dummy AS url, handling some cases
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "location"):
+			// Check if we've got an existing protocol, if so, return a proper response.
+			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
+				if err := json.NewEncoder(w).Encode(wantLocationResponse); err != nil {
+					t.Fatalf("failed to encode response: %s", err)
+				}
+				return
+			}
+			if err := json.NewEncoder(w).Encode([]api.ASLocationResponse{}); err != nil {
+				t.Fatalf("failed to encode response: %s", err)
+			}
+			return
+		case strings.Contains(r.URL.Path, "user"):
+			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
+				if err := json.NewEncoder(w).Encode(wantUserResponse); err != nil {
+					t.Fatalf("failed to encode response: %s", err)
+				}
+				return
+			}
+			if err := json.NewEncoder(w).Encode([]api.UserResponse{}); err != nil {
+				t.Fatalf("failed to encode response: %s", err)
+			}
+			return
+		case strings.Contains(r.URL.Path, "protocol"):
+			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
+				if err := json.NewEncoder(w).Encode(wantProtocolResponse); err != nil {
+					t.Fatalf("failed to encode response: %s", err)
+				}
+				return
+			}
+			if err := json.NewEncoder(w).Encode(nil); err != nil {
+				t.Fatalf("failed to encode response: %s", err)
+			}
+			return
+		default:
+			t.Logf("hit location: %s", r.URL.Path)
+		}
+	}))
+
+	tmpDir := t.TempDir()
+	socket := path.Join(tmpDir, "socket")
+	l, err := net.Listen("unix", socket)
+	assert.NoError(t, err)
+	_ = srv.Listener.Close()
+	srv.Listener = l
+	srv.Start()
+	defer srv.Close()
+
+	cfg, ctx, tearDown := testrig.CreateConfig(t, test.DBTypeSQLite)
+	defer tearDown()
+
+	// Create a dummy application service
+	as := &config.ApplicationService{
+		ID:              "someID",
+		URL:             fmt.Sprintf("unix://%s", socket),
+		ASToken:         "",
+		HSToken:         "",
+		SenderLocalpart: "senderLocalPart",
+		NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+			"users":   {{RegexpObject: regexp.MustCompile("as-.*")}},
+			"aliases": {{RegexpObject: regexp.MustCompile("asroom-.*")}},
+		},
+		Protocols: []string{existingProtocol},
+	}
+	as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
+	cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
+
+	t.Cleanup(func() {
+		ctx.ShutdownDendrite()
+		ctx.WaitForShutdown()
+	})
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	// Create required internal APIs
+	natsInstance := jetstream.NATSInstance{}
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
+
+	t.Run("UserIDExists", func(t *testing.T) {
+		testUserIDExists(t, asAPI, "@as-testing:test", true)
+		testUserIDExists(t, asAPI, "@as1-testing:test", false)
+	})
+
 }
 
 func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID string, wantExists bool) {
@@ -236,7 +339,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		evChan := make(chan struct{})
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var txn gomatrixserverlib.ApplicationServiceTransaction
+			var txn consumers.ApplicationServiceTransaction
 			err := json.NewDecoder(r.Body).Decode(&txn)
 			if err != nil {
 				t.Fatal(err)
@@ -254,20 +357,21 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		// Create a dummy application service
-		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
-			{
-				ID:              "someID",
-				URL:             srv.URL,
-				ASToken:         "",
-				HSToken:         "",
-				SenderLocalpart: "senderLocalPart",
-				NamespaceMap: map[string][]config.ApplicationServiceNamespace{
-					"users":   {{RegexpObject: regexp.MustCompile(bob.ID)}},
-					"aliases": {{RegexpObject: regexp.MustCompile(room.ID)}},
-				},
+		as := &config.ApplicationService{
+			ID:              "someID",
+			URL:             srv.URL,
+			ASToken:         "",
+			HSToken:         "",
+			SenderLocalpart: "senderLocalPart",
+			NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+				"users":   {{RegexpObject: regexp.MustCompile(bob.ID)}},
+				"aliases": {{RegexpObject: regexp.MustCompile(room.ID)}},
 			},
 		}
+		as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
+
+		// Create a dummy application service
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		// Create required internal APIs

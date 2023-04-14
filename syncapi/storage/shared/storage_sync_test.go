@@ -3,7 +3,7 @@ package shared
 import (
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 func Test_isStatefilterEmpty(t *testing.T) {
@@ -12,7 +12,7 @@ func Test_isStatefilterEmpty(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		filter *gomatrixserverlib.StateFilter
+		filter *synctypes.StateFilter
 		want   bool
 	}{
 		{
@@ -22,42 +22,42 @@ func Test_isStatefilterEmpty(t *testing.T) {
 		},
 		{
 			name:   "Empty filter is empty",
-			filter: &gomatrixserverlib.StateFilter{},
+			filter: &synctypes.StateFilter{},
 			want:   true,
 		},
 		{
 			name: "NotTypes is set",
-			filter: &gomatrixserverlib.StateFilter{
+			filter: &synctypes.StateFilter{
 				NotTypes: &filterSet,
 			},
 		},
 		{
 			name: "Types is set",
-			filter: &gomatrixserverlib.StateFilter{
+			filter: &synctypes.StateFilter{
 				Types: &filterSet,
 			},
 		},
 		{
 			name: "Senders is set",
-			filter: &gomatrixserverlib.StateFilter{
+			filter: &synctypes.StateFilter{
 				Senders: &filterSet,
 			},
 		},
 		{
 			name: "NotSenders is set",
-			filter: &gomatrixserverlib.StateFilter{
+			filter: &synctypes.StateFilter{
 				NotSenders: &filterSet,
 			},
 		},
 		{
 			name: "NotRooms is set",
-			filter: &gomatrixserverlib.StateFilter{
+			filter: &synctypes.StateFilter{
 				NotRooms: &filterSet,
 			},
 		},
 		{
 			name: "ContainsURL is set",
-			filter: &gomatrixserverlib.StateFilter{
+			filter: &synctypes.StateFilter{
 				ContainsURL: &boolValue,
 			},
 		},

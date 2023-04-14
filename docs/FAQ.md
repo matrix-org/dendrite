@@ -18,7 +18,7 @@ Mostly, although there are still bugs and missing features. If you are a confide
 
 ## Is Dendrite feature-complete?
 
-No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](../README.md) at the root of the repository for more information.
+No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](https://github.com/matrix-org/dendrite/blob/main/README.md) at the root of the repository for more information.
 
 ## Why doesn't Dendrite have "x" yet?
 

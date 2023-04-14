@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -156,7 +157,7 @@ func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) 
 func (p *presenceStatements) GetPresenceAfter(
 	ctx context.Context, txn *sql.Tx,
 	after types.StreamPosition,
-	filter gomatrixserverlib.EventFilter,
+	filter synctypes.EventFilter,
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)

@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -473,7 +474,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				}
 				// We only care about the returned events at this point
 				var res struct {
-					Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+					Chunk []synctypes.ClientEvent `json:"chunk"`
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
 					t.Errorf("failed to decode response body: %s", err)
@@ -521,7 +522,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 	}
 }
 
-func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []gomatrixserverlib.ClientEvent) {
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []synctypes.ClientEvent) {
 	t.Helper()
 	if wantVisible {
 		for _, ev := range chunk {

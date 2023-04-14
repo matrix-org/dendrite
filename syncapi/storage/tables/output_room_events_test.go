@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -84,7 +85,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 			}
 			wantEventID := []string{urlEv.EventID()}
 			t := true
-			gotEvents, err = tab.SelectEvents(ctx, txn, wantEventID, &gomatrixserverlib.RoomEventFilter{Limit: 1, ContainsURL: &t}, true)
+			gotEvents, err = tab.SelectEvents(ctx, txn, wantEventID, &synctypes.RoomEventFilter{Limit: 1, ContainsURL: &t}, true)
 			if err != nil {
 				return fmt.Errorf("failed to SelectEvents: %s", err)
 			}

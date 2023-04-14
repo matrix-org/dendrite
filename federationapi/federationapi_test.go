@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/nats-io/nats.go"
 
 	"github.com/matrix-org/dendrite/federationapi"
@@ -104,7 +105,7 @@ func (f *fedClient) GetServerKeys(ctx context.Context, matrixServer gomatrixserv
 	return keys, nil
 }
 
-func (f *fedClient) MakeJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMakeJoin, err error) {
+func (f *fedClient) MakeJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res fclient.RespMakeJoin, err error) {
 	for _, r := range f.allowJoins {
 		if r.ID == roomID {
 			res.RoomVersion = r.Version
@@ -128,7 +129,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s gomatrixserverlib.Se
 	}
 	return
 }
-func (f *fedClient) SendJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res gomatrixserverlib.RespSendJoin, err error) {
+func (f *fedClient) SendJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res fclient.RespSendJoin, err error) {
 	f.fedClientMutex.Lock()
 	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
@@ -142,7 +143,7 @@ func (f *fedClient) SendJoin(ctx context.Context, origin, s gomatrixserverlib.Se
 	return
 }
 
-func (f *fedClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error) {
+func (f *fedClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res fclient.RespSend, err error) {
 	f.fedClientMutex.Lock()
 	defer f.fedClientMutex.Unlock()
 	for _, edu := range t.EDUs {
@@ -313,9 +314,9 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
 
-	fedCli := gomatrixserverlib.NewFederationClient(
+	fedCli := fclient.NewFederationClient(
 		cfg.Global.SigningIdentities(),
-		gomatrixserverlib.WithSkipVerify(true),
+		fclient.WithSkipVerify(true),
 	)
 
 	for _, tc := range testCases {

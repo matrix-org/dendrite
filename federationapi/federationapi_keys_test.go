@@ -16,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/routing"
@@ -24,12 +25,12 @@ import (
 )
 
 type server struct {
-	name      gomatrixserverlib.ServerName        // server name
-	validity  time.Duration                       // key validity duration from now
-	config    *config.FederationAPI               // skeleton config, from TestMain
-	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
-	cache     *caching.Caches                     // server-specific cache
-	api       api.FederationInternalAPI           // server-specific server key API
+	name      gomatrixserverlib.ServerName // server name
+	validity  time.Duration                // key validity duration from now
+	config    *config.FederationAPI        // skeleton config, from TestMain
+	fedclient *fclient.FederationClient    // uses MockRoundTripper
+	cache     *caching.Caches              // server-specific cache
+	api       api.FederationInternalAPI    // server-specific server key API
 }
 
 func (s *server) renew() {
@@ -105,9 +106,9 @@ func TestMain(m *testing.M) {
 			transport.RegisterProtocol("matrix", &MockRoundTripper{})
 
 			// Create the federation client.
-			s.fedclient = gomatrixserverlib.NewFederationClient(
+			s.fedclient = fclient.NewFederationClient(
 				s.config.Matrix.SigningIdentities(),
-				gomatrixserverlib.WithTransport(transport),
+				fclient.WithTransport(transport),
 			)
 
 			// Finally, build the server key APIs.

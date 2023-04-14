@@ -18,11 +18,12 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/setup/base"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,7 +56,7 @@ func Setup(
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation *fclient.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
@@ -198,18 +199,13 @@ func Setup(
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		var serverNotificationSender *userapi.Device
-		var err error
-		notificationSenderOnce := &sync.Once{}
+		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				notificationSenderOnce.Do(func() {
-					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-					if err != nil {
-						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-					}
-				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
@@ -231,12 +227,6 @@ func Setup(
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				notificationSenderOnce.Do(func() {
-					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-					if err != nil {
-						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-					}
-				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
@@ -861,6 +851,8 @@ func Setup(
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
+	threePIDClient := base.CreateClient(dendriteCfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
+
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetAssociated3PIDs(req, userAPI, device)
@@ -869,11 +861,11 @@ func Setup(
 
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return CheckAndSave3PIDAssociation(req, userAPI, device, cfg)
+			return CheckAndSave3PIDAssociation(req, userAPI, device, cfg, threePIDClient)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	unstableMux.Handle("/account/3pid/delete",
+	v3mux.Handle("/account/3pid/delete",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return Forget3PID(req, userAPI)
 		}),
@@ -881,7 +873,7 @@ func Setup(
 
 	v3mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
 		httputil.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
-			return RequestEmailToken(req, userAPI, cfg)
+			return RequestEmailToken(req, userAPI, cfg, threePIDClient)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -1194,7 +1186,7 @@ func Setup(
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
-			return GetCapabilities(req, rsAPI)
+			return GetCapabilities()
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 

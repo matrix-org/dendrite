@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -32,14 +33,14 @@ type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
 	fedSender api.FederationInternalAPI
-	fedClient *gomatrixserverlib.FederationClient
+	fedClient *fclient.FederationClient
 }
 
 func NewPineconeRoomProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
 	fedSender api.FederationInternalAPI,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient *fclient.FederationClient,
 ) *PineconeRoomProvider {
 	p := &PineconeRoomProvider{
 		r:         r,
@@ -50,7 +51,7 @@ func NewPineconeRoomProvider(
 	return p
 }
 
-func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
+func (p *PineconeRoomProvider) Rooms() []fclient.PublicRoom {
 	list := map[gomatrixserverlib.ServerName]struct{}{}
 	for k := range defaults.DefaultServerNames {
 		list[k] = struct{}{}
@@ -67,14 +68,14 @@ func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
-	ctx context.Context, fedClient *gomatrixserverlib.FederationClient,
+	ctx context.Context, fedClient *fclient.FederationClient,
 	origin gomatrixserverlib.ServerName,
 	homeservers map[gomatrixserverlib.ServerName]struct{},
-) (publicRooms []gomatrixserverlib.PublicRoom) {
+) (publicRooms []fclient.PublicRoom) {
 	limit := 200
 	// follow pipeline semantics, see https://blog.golang.org/pipelines for more info.
 	// goroutines send rooms to this channel
-	roomCh := make(chan gomatrixserverlib.PublicRoom, int(limit))
+	roomCh := make(chan fclient.PublicRoom, int(limit))
 	// signalling channel to tell goroutines to stop sending rooms and quit
 	done := make(chan bool)
 	// signalling to say when we can close the room channel

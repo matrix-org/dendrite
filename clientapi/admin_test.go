@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
@@ -40,7 +41,7 @@ func TestAdminResetPassword(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
+			SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"},
 		})
 
 		routers := httputil.NewRouters()
@@ -260,6 +261,25 @@ func TestAdminEvacuateRoom(t *testing.T) {
 					t.Fatalf("expected affected %#v, but got %#v", tc.wantAffected, affected)
 				}
 			})
+		}
+
+		// Wait for the FS API to have consumed every message
+		js, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		timeout := time.After(time.Second)
+		for {
+			select {
+			case <-timeout:
+				t.Fatalf("FS API didn't process all events in time")
+			default:
+			}
+			info, err := js.ConsumerInfo(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent), cfg.Global.JetStream.Durable("FederationAPIRoomServerConsumer")+"Pull")
+			if err != nil {
+				time.Sleep(time.Millisecond * 10)
+				continue
+			}
+			if info.NumPending == 0 && info.NumAckPending == 0 {
+				break
+			}
 		}
 	})
 }

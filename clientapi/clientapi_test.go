@@ -4,25 +4,37 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 )
 
 type userDevice struct {
@@ -370,4 +382,856 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			password:    password,
 		}
 	}
+}
+
+func TestSetDisplayname(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	notLocalUser := &test.User{ID: "@charlie:localhost", Localpart: "charlie"}
+	changeDisplayName := "my new display name"
+
+	testCases := []struct {
+		name            string
+		user            *test.User
+		wantOK          bool
+		changeReq       io.Reader
+		wantDisplayName string
+	}{
+		{
+			name: "invalid user",
+			user: &test.User{ID: "!notauser"},
+		},
+		{
+			name: "non-existent user",
+			user: &test.User{ID: "@doesnotexist:test"},
+		},
+		{
+			name: "non-local user is not allowed",
+			user: notLocalUser,
+		},
+		{
+			name:            "existing user is allowed to change own name",
+			user:            alice,
+			wantOK:          true,
+			wantDisplayName: changeDisplayName,
+		},
+		{
+			name:            "existing user is not allowed to change own name if name is empty",
+			user:            bob,
+			wantOK:          false,
+			wantDisplayName: "",
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, natsInstance, rsAPI, nil)
+		asPI := appservice.NewInternalAPI(processCtx, cfg, natsInstance, userAPI, rsAPI)
+
+		AddPublicRoutes(processCtx, routers, cfg, natsInstance, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+			bob:   {},
+		}
+
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				wantDisplayName := tc.user.Localpart
+				if tc.changeReq == nil {
+					tc.changeReq = strings.NewReader("")
+				}
+
+				// check profile after initial account creation
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID, strings.NewReader(""))
+				t.Logf("%s", req.URL.String())
+				routers.Client.ServeHTTP(rec, req)
+
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d", rec.Code)
+				}
+
+				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "displayname").Str; tc.wantOK && gotDisplayName != wantDisplayName {
+					t.Fatalf("expected displayname to be '%s', but got '%s'", wantDisplayName, gotDisplayName)
+				}
+
+				// now set the new display name
+				wantDisplayName = tc.wantDisplayName
+				tc.changeReq = strings.NewReader(fmt.Sprintf(`{"displayname":"%s"}`, tc.wantDisplayName))
+
+				rec = httptest.NewRecorder()
+				req = httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/profile/"+tc.user.ID+"/displayname", tc.changeReq)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
+
+				routers.Client.ServeHTTP(rec, req)
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+
+				// now only get the display name
+				rec = httptest.NewRecorder()
+				req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID+"/displayname", strings.NewReader(""))
+
+				routers.Client.ServeHTTP(rec, req)
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+
+				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "displayname").Str; tc.wantOK && gotDisplayName != wantDisplayName {
+					t.Fatalf("expected displayname to be '%s', but got '%s'", wantDisplayName, gotDisplayName)
+				}
+			})
+		}
+	})
+}
+
+func TestSetAvatarURL(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	notLocalUser := &test.User{ID: "@charlie:localhost", Localpart: "charlie"}
+	changeDisplayName := "mxc://newMXID"
+
+	testCases := []struct {
+		name       string
+		user       *test.User
+		wantOK     bool
+		changeReq  io.Reader
+		avatar_url string
+	}{
+		{
+			name: "invalid user",
+			user: &test.User{ID: "!notauser"},
+		},
+		{
+			name: "non-existent user",
+			user: &test.User{ID: "@doesnotexist:test"},
+		},
+		{
+			name: "non-local user is not allowed",
+			user: notLocalUser,
+		},
+		{
+			name:       "existing user is allowed to change own avatar",
+			user:       alice,
+			wantOK:     true,
+			avatar_url: changeDisplayName,
+		},
+		{
+			name:       "existing user is not allowed to change own avatar if avatar is empty",
+			user:       bob,
+			wantOK:     false,
+			avatar_url: "",
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, natsInstance, rsAPI, nil)
+		asPI := appservice.NewInternalAPI(processCtx, cfg, natsInstance, userAPI, rsAPI)
+
+		AddPublicRoutes(processCtx, routers, cfg, natsInstance, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+			bob:   {},
+		}
+
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				wantAvatarURL := ""
+				if tc.changeReq == nil {
+					tc.changeReq = strings.NewReader("")
+				}
+
+				// check profile after initial account creation
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID, strings.NewReader(""))
+				t.Logf("%s", req.URL.String())
+				routers.Client.ServeHTTP(rec, req)
+
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d", rec.Code)
+				}
+
+				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatar_url").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
+					t.Fatalf("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
+				}
+
+				// now set the new display name
+				wantAvatarURL = tc.avatar_url
+				tc.changeReq = strings.NewReader(fmt.Sprintf(`{"avatar_url":"%s"}`, tc.avatar_url))
+
+				rec = httptest.NewRecorder()
+				req = httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatar_url", tc.changeReq)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
+
+				routers.Client.ServeHTTP(rec, req)
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+
+				// now only get the display name
+				rec = httptest.NewRecorder()
+				req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatar_url", strings.NewReader(""))
+
+				routers.Client.ServeHTTP(rec, req)
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+
+				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatar_url").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
+					t.Fatalf("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
+				}
+			})
+		}
+	})
+}
+
+func TestTyping(t *testing.T) {
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		// Needed to create accounts
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		// Create the room
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatal(err)
+		}
+
+		testCases := []struct {
+			name          string
+			typingForUser string
+			roomID        string
+			requestBody   io.Reader
+			wantOK        bool
+		}{
+			{
+				name:          "can not set typing for different user",
+				typingForUser: "@notourself:test",
+				roomID:        room.ID,
+				requestBody:   strings.NewReader(""),
+			},
+			{
+				name:          "invalid request body",
+				typingForUser: alice.ID,
+				roomID:        room.ID,
+				requestBody:   strings.NewReader(""),
+			},
+			{
+				name:          "non-existent room",
+				typingForUser: alice.ID,
+				roomID:        "!doesnotexist:test",
+			},
+			{
+				name:          "invalid room ID",
+				typingForUser: alice.ID,
+				roomID:        "@notaroomid:test",
+			},
+			{
+				name:          "allowed to set own typing status",
+				typingForUser: alice.ID,
+				roomID:        room.ID,
+				requestBody:   strings.NewReader(`{"typing":true}`),
+				wantOK:        true,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/rooms/"+tc.roomID+"/typing/"+tc.typingForUser, tc.requestBody)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+				routers.Client.ServeHTTP(rec, req)
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func TestMembership(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		// Needed to create accounts
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		rsAPI.SetUserAPI(userAPI)
+		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+			bob:   {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		// Create the room
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatal(err)
+		}
+
+		invalidBodyRequest := func(roomID, membershipType string) *http.Request {
+			return httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", roomID, membershipType), strings.NewReader(""))
+		}
+
+		missingUserIDRequest := func(roomID, membershipType string) *http.Request {
+			return httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", roomID, membershipType), strings.NewReader("{}"))
+		}
+
+		testCases := []struct {
+			name    string
+			roomID  string
+			request *http.Request
+			wantOK  bool
+			asUser  *test.User
+		}{
+			{
+				name:    "ban - invalid request body",
+				request: invalidBodyRequest(room.ID, "ban"),
+			},
+			{
+				name:    "kick - invalid request body",
+				request: invalidBodyRequest(room.ID, "kick"),
+			},
+			{
+				name:    "unban - invalid request body",
+				request: invalidBodyRequest(room.ID, "unban"),
+			},
+			{
+				name:    "invite - invalid request body",
+				request: invalidBodyRequest(room.ID, "invite"),
+			},
+			{
+				name:    "ban - missing user_id body",
+				request: missingUserIDRequest(room.ID, "ban"),
+			},
+			{
+				name:    "kick - missing user_id body",
+				request: missingUserIDRequest(room.ID, "kick"),
+			},
+			{
+				name:    "unban - missing user_id body",
+				request: missingUserIDRequest(room.ID, "unban"),
+			},
+			{
+				name:    "invite - missing user_id body",
+				request: missingUserIDRequest(room.ID, "invite"),
+			},
+			{
+				name:    "Bob forgets invalid room",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", "!doesnotexist", "forget"), strings.NewReader("")),
+				asUser:  bob,
+			},
+			{
+				name:    "Alice can not ban Bob in non-existent room", // fails because "not joined"
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", "!doesnotexist:test", "ban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+			},
+			{
+				name:    "Alice can not kick Bob in non-existent room", // fails because "not joined"
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", "!doesnotexist:test", "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+			},
+			// the following must run in sequence, as they build up on each other
+			{
+				name:    "Alice invites Bob",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "invite"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  true,
+			},
+			{
+				name:    "Bob accepts invite",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "join"), strings.NewReader("")),
+				wantOK:  true,
+				asUser:  bob,
+			},
+			{
+				name:    "Alice verifies that Bob is joined", // returns an error if no membership event can be found
+				request: httptest.NewRequest(http.MethodGet, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s/m.room.member/%s", room.ID, "state", bob.ID), strings.NewReader("")),
+				wantOK:  true,
+			},
+			{
+				name:    "Bob forgets the room but is still a member",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "forget"), strings.NewReader("")),
+				wantOK:  false, // user is still in the room
+				asUser:  bob,
+			},
+			{
+				name:    "Bob can not kick Alice",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, alice.ID))),
+				wantOK:  false, // powerlevel too low
+				asUser:  bob,
+			},
+			{
+				name:    "Bob can not ban Alice",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "ban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, alice.ID))),
+				wantOK:  false, // powerlevel too low
+				asUser:  bob,
+			},
+			{
+				name:    "Alice can kick Bob",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  true,
+			},
+			{
+				name:    "Alice can ban Bob",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "ban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  true,
+			},
+			{
+				name:    "Alice can not kick Bob again",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "kick"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  false, // can not kick banned/left user
+			},
+			{
+				name:    "Bob can not unban himself", // mostly because of not being a member of the room
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "unban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				asUser:  bob,
+			},
+			{
+				name:    "Alice can not invite Bob again",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "invite"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  false, // user still banned
+			},
+			{
+				name:    "Alice can unban Bob",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "unban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  true,
+			},
+			{
+				name:    "Alice can not unban Bob again",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "unban"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  false,
+			},
+			{
+				name:    "Alice can invite Bob again",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "invite"), strings.NewReader(fmt.Sprintf(`{"user_id":"%s"}`, bob.ID))),
+				wantOK:  true,
+			},
+			{
+				name:    "Bob can reject the invite by leaving",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "leave"), strings.NewReader("")),
+				wantOK:  true,
+				asUser:  bob,
+			},
+			{
+				name:    "Bob can forget the room",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "forget"), strings.NewReader("")),
+				wantOK:  true,
+				asUser:  bob,
+			},
+			{
+				name:    "Bob can forget the room again",
+				request: httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/%s", room.ID, "forget"), strings.NewReader("")),
+				wantOK:  true,
+				asUser:  bob,
+			},
+			// END must run in sequence
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if tc.asUser == nil {
+					tc.asUser = alice
+				}
+				rec := httptest.NewRecorder()
+				tc.request.Header.Set("Authorization", "Bearer "+accessTokens[tc.asUser].accessToken)
+				routers.Client.ServeHTTP(rec, tc.request)
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+				if !tc.wantOK && rec.Code == http.StatusOK {
+					t.Fatalf("expected request to fail, but didn't: %s", rec.Body.String())
+				}
+				t.Logf("%s", rec.Body.String())
+			})
+		}
+	})
+}
+
+func TestCapabilities(t *testing.T) {
+	alice := test.NewUser(t)
+	ctx := context.Background()
+
+	// construct the expected result
+	versionsMap := map[gomatrixserverlib.RoomVersion]string{}
+	for v, desc := range version.SupportedRoomVersions() {
+		if desc.Stable {
+			versionsMap[v] = "stable"
+		} else {
+			versionsMap[v] = "unstable"
+		}
+	}
+
+	expectedMap := map[string]interface{}{
+		"capabilities": map[string]interface{}{
+			"m.change_password": map[string]bool{
+				"enabled": true,
+			},
+			"m.room_versions": map[string]interface{}{
+				"default":   version.DefaultRoomVersion(),
+				"available": versionsMap,
+			},
+		},
+	}
+
+	expectedBuf := &bytes.Buffer{}
+	err := json.NewEncoder(expectedBuf).Encode(expectedMap)
+	assert.NoError(t, err)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+		// Needed to create accounts
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		testCases := []struct {
+			name    string
+			request *http.Request
+		}{
+			{
+				name:    "can get capabilities",
+				request: httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/capabilities", strings.NewReader("")),
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				tc.request.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+				routers.Client.ServeHTTP(rec, tc.request)
+				assert.Equal(t, http.StatusOK, rec.Code)
+				assert.ObjectsAreEqual(expectedBuf.Bytes(), rec.Body.Bytes())
+			})
+		}
+	})
+}
+
+func TestTurnserver(t *testing.T) {
+	alice := test.NewUser(t)
+	ctx := context.Background()
+
+	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypeSQLite)
+	cfg.ClientAPI.RateLimiting.Enabled = false
+	defer close()
+	natsInstance := jetstream.NATSInstance{}
+
+	routers := httputil.NewRouters()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+	// Needed to create accounts
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, caching.DisableMetrics)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+	//rsAPI.SetUserAPI(userAPI)
+	// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+	AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+	// Create the users in the userapi and login
+	accessTokens := map[*test.User]userDevice{
+		alice: {},
+	}
+	createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+	testCases := []struct {
+		name              string
+		turnConfig        config.TURN
+		wantEmptyResponse bool
+	}{
+		{
+			name:              "no turn server configured",
+			wantEmptyResponse: true,
+		},
+		{
+			name:              "servers configured but not userLifeTime",
+			wantEmptyResponse: true,
+			turnConfig:        config.TURN{URIs: []string{""}},
+		},
+		{
+			name:              "missing sharedSecret/username/password",
+			wantEmptyResponse: true,
+			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m"},
+		},
+		{
+			name:       "with shared secret",
+			turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", SharedSecret: "iAmSecret"},
+		},
+		{
+			name:       "with username/password secret",
+			turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username", Password: "iAmSecret"},
+		},
+		{
+			name:              "only username set",
+			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
+			wantEmptyResponse: true,
+		},
+		{
+			name:              "only password set",
+			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
+			wantEmptyResponse: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/voip/turnServer", strings.NewReader(""))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+			cfg.ClientAPI.TURN = tc.turnConfig
+			routers.Client.ServeHTTP(rec, req)
+			assert.Equal(t, http.StatusOK, rec.Code)
+
+			if tc.wantEmptyResponse && rec.Body.String() != "{}" {
+				t.Fatalf("expected an empty response, but got %s", rec.Body.String())
+			}
+			if !tc.wantEmptyResponse {
+				assert.NotEqual(t, "{}", rec.Body.String())
+
+				resp := gomatrix.RespTurnServer{}
+				err := json.NewDecoder(rec.Body).Decode(&resp)
+				assert.NoError(t, err)
+
+				duration, _ := time.ParseDuration(tc.turnConfig.UserLifetime)
+				assert.Equal(t, tc.turnConfig.URIs, resp.URIs)
+				assert.Equal(t, int(duration.Seconds()), resp.TTL)
+				if tc.turnConfig.Username != "" && tc.turnConfig.Password != "" {
+					assert.Equal(t, tc.turnConfig.Username, resp.Username)
+					assert.Equal(t, tc.turnConfig.Password, resp.Password)
+				}
+			}
+		})
+	}
+}
+
+func Test3PID(t *testing.T) {
+	alice := test.NewUser(t)
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		cfg.FederationAPI.DisableTLSValidation = true // needed to be able to connect to our identityServer below
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+		// Needed to create accounts
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		identityServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.Contains(r.URL.String(), "getValidated3pid"):
+				resp := threepid.GetValidatedResponse{}
+				switch r.URL.Query().Get("client_secret") {
+				case "fail":
+					resp.ErrCode = "M_SESSION_NOT_VALIDATED"
+				case "fail2":
+					resp.ErrCode = "some other error"
+				case "fail3":
+					_, _ = w.Write([]byte("{invalidJson"))
+					return
+				case "success":
+					resp.Medium = "email"
+				case "success2":
+					resp.Medium = "email"
+					resp.Address = "somerandom@address.com"
+				}
+				_ = json.NewEncoder(w).Encode(resp)
+			case strings.Contains(r.URL.String(), "requestToken"):
+				resp := threepid.SID{SID: "randomSID"}
+				_ = json.NewEncoder(w).Encode(resp)
+			}
+		}))
+		defer identityServer.Close()
+
+		identityServerBase := strings.TrimPrefix(identityServer.URL, "https://")
+
+		testCases := []struct {
+			name             string
+			request          *http.Request
+			wantOK           bool
+			setTrustedServer bool
+			wantLen3PIDs     int
+		}{
+			{
+				name:    "can get associated threepid info",
+				request: httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/account/3pid", strings.NewReader("")),
+				wantOK:  true,
+			},
+			{
+				name:    "can not set threepid info with invalid JSON",
+				request: httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader("")),
+			},
+			{
+				name:    "can not set threepid info with untrusted server",
+				request: httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader("{}")),
+			},
+			{
+				name:             "can check threepid info with trusted server, but unverified",
+				request:          httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader(fmt.Sprintf(`{"three_pid_creds":{"id_server":"%s","client_secret":"fail"}}`, identityServerBase))),
+				setTrustedServer: true,
+				wantOK:           false,
+			},
+			{
+				name:             "can check threepid info with trusted server, but fails for some other reason",
+				request:          httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader(fmt.Sprintf(`{"three_pid_creds":{"id_server":"%s","client_secret":"fail2"}}`, identityServerBase))),
+				setTrustedServer: true,
+				wantOK:           false,
+			},
+			{
+				name:             "can check threepid info with trusted server, but fails because of invalid json",
+				request:          httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader(fmt.Sprintf(`{"three_pid_creds":{"id_server":"%s","client_secret":"fail3"}}`, identityServerBase))),
+				setTrustedServer: true,
+				wantOK:           false,
+			},
+			{
+				name:             "can save threepid info with trusted server",
+				request:          httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader(fmt.Sprintf(`{"three_pid_creds":{"id_server":"%s","client_secret":"success"}}`, identityServerBase))),
+				setTrustedServer: true,
+				wantOK:           true,
+			},
+			{
+				name:             "can save threepid info with trusted server using bind=true",
+				request:          httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid", strings.NewReader(fmt.Sprintf(`{"three_pid_creds":{"id_server":"%s","client_secret":"success2"},"bind":true}`, identityServerBase))),
+				setTrustedServer: true,
+				wantOK:           true,
+			},
+			{
+				name:         "can get associated threepid info again",
+				request:      httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/account/3pid", strings.NewReader("")),
+				wantOK:       true,
+				wantLen3PIDs: 2,
+			},
+			{
+				name:    "can delete associated threepid info",
+				request: httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid/delete", strings.NewReader(`{"medium":"email","address":"somerandom@address.com"}`)),
+				wantOK:  true,
+			},
+			{
+				name:         "can get associated threepid after deleting association",
+				request:      httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/account/3pid", strings.NewReader("")),
+				wantOK:       true,
+				wantLen3PIDs: 1,
+			},
+			{
+				name:    "can not request emailToken with invalid request body",
+				request: httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid/email/requestToken", strings.NewReader("")),
+			},
+			{
+				name:    "can not request emailToken for in use address",
+				request: httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid/email/requestToken", strings.NewReader(fmt.Sprintf(`{"client_secret":"somesecret","email":"","send_attempt":1,"id_server":"%s"}`, identityServerBase))),
+			},
+			{
+				name:    "can request emailToken",
+				request: httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/account/3pid/email/requestToken", strings.NewReader(fmt.Sprintf(`{"client_secret":"somesecret","email":"somerandom@address.com","send_attempt":1,"id_server":"%s"}`, identityServerBase))),
+				wantOK:  true,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+
+				if tc.setTrustedServer {
+					cfg.Global.TrustedIDServers = []string{identityServerBase}
+				}
+
+				rec := httptest.NewRecorder()
+				tc.request.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+				routers.Client.ServeHTTP(rec, tc.request)
+				t.Logf("Response: %s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+				}
+				if !tc.wantOK && rec.Code == http.StatusOK {
+					t.Fatalf("expected request to fail, but didn't: %s", rec.Body.String())
+				}
+				if tc.wantLen3PIDs > 0 {
+					var resp routing.ThreePIDsResponse
+					if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+						t.Fatal(err)
+					}
+					if len(resp.ThreePIDs) != tc.wantLen3PIDs {
+						t.Fatalf("expected %d threepids, got %d", tc.wantLen3PIDs, len(resp.ThreePIDs))
+					}
+				}
+			})
+		}
+	})
 }

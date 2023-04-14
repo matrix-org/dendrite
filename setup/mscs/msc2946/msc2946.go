@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -48,8 +49,8 @@ const (
 )
 
 type MSC2946ClientResponse struct {
-	Rooms     []gomatrixserverlib.MSC2946Room `json:"rooms"`
-	NextBatch string                          `json:"next_batch,omitempty"`
+	Rooms     []fclient.MSC2946Room `json:"rooms"`
+	NextBatch string                `json:"next_batch,omitempty"`
 }
 
 // Enable this MSC
@@ -222,7 +223,7 @@ func (w *walker) walk() util.JSONResponse {
 		}
 	}
 
-	var discoveredRooms []gomatrixserverlib.MSC2946Room
+	var discoveredRooms []fclient.MSC2946Room
 
 	var cache *paginationInfo
 	if w.paginationToken != "" {
@@ -275,7 +276,7 @@ func (w *walker) walk() util.JSONResponse {
 		}
 
 		// Collect rooms/events to send back (either locally or fetched via federation)
-		var discoveredChildEvents []gomatrixserverlib.MSC2946StrippedEvent
+		var discoveredChildEvents []fclient.MSC2946StrippedEvent
 
 		// If we know about this room and the caller is authorised (joined/world_readable) then pull
 		// events locally
@@ -306,7 +307,7 @@ func (w *walker) walk() util.JSONResponse {
 
 			pubRoom := w.publicRoomsChunk(rv.roomID)
 
-			discoveredRooms = append(discoveredRooms, gomatrixserverlib.MSC2946Room{
+			discoveredRooms = append(discoveredRooms, fclient.MSC2946Room{
 				PublicRoom:    *pubRoom,
 				RoomType:      roomType,
 				ChildrenState: events,
@@ -379,7 +380,7 @@ func (w *walker) walk() util.JSONResponse {
 	}
 	return util.JSONResponse{
 		Code: 200,
-		JSON: gomatrixserverlib.MSC2946SpacesResponse{
+		JSON: fclient.MSC2946SpacesResponse{
 			Room:     discoveredRooms[0],
 			Children: discoveredRooms[1:],
 		},
@@ -402,7 +403,7 @@ func (w *walker) stateEvent(roomID, evType, stateKey string) *gomatrixserverlib.
 	return queryRes.StateEvents[tuple]
 }
 
-func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
+func (w *walker) publicRoomsChunk(roomID string) *fclient.PublicRoom {
 	pubRooms, err := roomserver.PopulatePublicRooms(w.ctx, []string{roomID}, w.rsAPI)
 	if err != nil {
 		util.GetLogger(w.ctx).WithError(err).Error("failed to PopulatePublicRooms")
@@ -416,7 +417,7 @@ func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
 
 // federatedRoomInfo returns more of the spaces graph from another server. Returns nil if this was
 // unsuccessful.
-func (w *walker) federatedRoomInfo(roomID string, vias []string) *gomatrixserverlib.MSC2946SpacesResponse {
+func (w *walker) federatedRoomInfo(roomID string, vias []string) *fclient.MSC2946SpacesResponse {
 	// only do federated requests for client requests
 	if w.caller == nil {
 		return nil
@@ -440,12 +441,12 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) *gomatrixserver
 		}
 		// ensure nil slices are empty as we send this to the client sometimes
 		if res.Room.ChildrenState == nil {
-			res.Room.ChildrenState = []gomatrixserverlib.MSC2946StrippedEvent{}
+			res.Room.ChildrenState = []fclient.MSC2946StrippedEvent{}
 		}
 		for i := 0; i < len(res.Children); i++ {
 			child := res.Children[i]
 			if child.ChildrenState == nil {
-				child.ChildrenState = []gomatrixserverlib.MSC2946StrippedEvent{}
+				child.ChildrenState = []fclient.MSC2946StrippedEvent{}
 			}
 			res.Children[i] = child
 		}
@@ -653,7 +654,7 @@ func (w *walker) restrictedJoinRuleAllowedRooms(joinRuleEv *gomatrixserverlib.He
 }
 
 // references returns all child references pointing to or from this room.
-func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946StrippedEvent, error) {
+func (w *walker) childReferences(roomID string) ([]fclient.MSC2946StrippedEvent, error) {
 	createTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomCreate,
 		StateKey:  "",
@@ -678,12 +679,12 @@ func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946Stri
 		// escape the `.`s so gjson doesn't think it's nested
 		roomType := gjson.GetBytes(res.StateEvents[createTuple].Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 		if roomType != ConstCreateEventContentValueSpace {
-			return []gomatrixserverlib.MSC2946StrippedEvent{}, nil
+			return []fclient.MSC2946StrippedEvent{}, nil
 		}
 	}
 	delete(res.StateEvents, createTuple)
 
-	el := make([]gomatrixserverlib.MSC2946StrippedEvent, 0, len(res.StateEvents))
+	el := make([]fclient.MSC2946StrippedEvent, 0, len(res.StateEvents))
 	for _, ev := range res.StateEvents {
 		content := gjson.ParseBytes(ev.Content())
 		// only return events that have a `via` key as per MSC1772
@@ -720,11 +721,11 @@ func (s set) isSet(val string) bool {
 	return ok
 }
 
-func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEvent {
+func stripped(ev *gomatrixserverlib.Event) *fclient.MSC2946StrippedEvent {
 	if ev.StateKey() == nil {
 		return nil
 	}
-	return &gomatrixserverlib.MSC2946StrippedEvent{
+	return &fclient.MSC2946StrippedEvent{
 		Type:           ev.Type(),
 		StateKey:       *ev.StateKey(),
 		Content:        ev.Content(),

@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -86,7 +87,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 			jr = types.NewJoinResponse()
 		}
 
-		ev := gomatrixserverlib.ClientEvent{
+		ev := synctypes.ClientEvent{
 			Type: gomatrixserverlib.MReceipt,
 		}
 		content := make(map[string]ReceiptMRead)
