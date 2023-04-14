@@ -654,11 +654,11 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 			messageEvents = append(messageEvents, ev)
 		}
 	}
-	respState := fclient.RespState{
+	respState := &fclient.RespState{
 		AuthEvents:  res.AuthChain,
 		StateEvents: stateEvents,
 	}
-	eventsInOrder := respState.Events(rc.roomVersion)
+	eventsInOrder := gomatrixserverlib.LineariseStateResponse(rc.roomVersion, respState)
 	// everything gets sent as an outlier because auth chain events may be disjoint from the DAG
 	// as may the threaded events.
 	var ires []roomserver.InputRoomEvent
