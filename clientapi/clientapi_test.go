@@ -8,10 +8,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -1231,6 +1233,399 @@ func Test3PID(t *testing.T) {
 						t.Fatalf("expected %d threepids, got %d", tc.wantLen3PIDs, len(resp.ThreePIDs))
 					}
 				}
+			})
+		}
+	})
+}
+
+func TestPushRules(t *testing.T) {
+	alice := test.NewUser(t)
+
+	// create the default push rules, used when validating responses
+	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
+	pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, serverName)
+	defaultRules, err := json.Marshal(pushRuleSets)
+	assert.NoError(t, err)
+
+	ruleID1 := "myrule"
+	ruleID2 := "myrule2"
+	ruleID3 := "myrule3"
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		testCases := []struct {
+			name           string
+			request        *http.Request
+			wantStatusCode int
+			validateFunc   func(t *testing.T, respBody *bytes.Buffer) // used when updating rules, otherwise wantStatusCode should be enough
+			queryAttr      map[string]string
+		}{
+			{
+				name:           "can not get rules without trailing slash",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can get default rules",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					assert.Equal(t, defaultRules, respBody.Bytes())
+				},
+			},
+			{
+				name:           "can get rules by scope",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					assert.Equal(t, gjson.GetBytes(defaultRules, "global").Raw, respBody.String())
+				},
+			},
+			{
+				name:           "can not get invalid rules by scope",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/doesnotexist/", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get rules for invalid scope and kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/doesnotexist/invalid/", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get rules for invalid kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/invalid/", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can get rules by scope and kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					assert.Equal(t, gjson.GetBytes(defaultRules, "global.override").Raw, respBody.String())
+				},
+			},
+			{
+				name:           "can get rules by scope and content kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/content/", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					assert.Equal(t, gjson.GetBytes(defaultRules, "global.content").Raw, respBody.String())
+				},
+			},
+			{
+				name:           "can not get rules by scope and room kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/room/", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get rules by scope and sender kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/sender/", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can get rules by scope and underride kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/underride/", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					assert.Equal(t, gjson.GetBytes(defaultRules, "global.underride").Raw, respBody.String())
+				},
+			},
+			{
+				name:           "can not get rules by scope, kind and ID for invalid scope",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/doesnotexist/doesnotexist/.m.rule.master", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get rules by scope, kind and ID for invalid kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/doesnotexist/.m.rule.master", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can get rules by scope, kind and ID",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.master", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+			},
+			{
+				name:           "can not get rules by scope, kind and ID for invalid ID",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.doesnotexist", strings.NewReader("")),
+				wantStatusCode: http.StatusNotFound,
+			},
+			{
+				name:           "can not get status for invalid attribute",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/invalid", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get status for invalid kind",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/invalid/.m.rule.master/enabled", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get enabled status for invalid scope",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/invalid/override/.m.rule.master/enabled", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not get enabled status for invalid rule",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/doesnotexist/enabled", strings.NewReader("")),
+				wantStatusCode: http.StatusNotFound,
+			},
+			{
+				name:           "can get enabled rules by scope, kind and ID",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/enabled", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					assert.False(t, gjson.GetBytes(respBody.Bytes(), "enabled").Bool(), "expected master rule to be disabled")
+				},
+			},
+			{
+				name:           "can get actions scope, kind and ID",
+				request:        httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/actions", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					actions := gjson.GetBytes(respBody.Bytes(), "actions").Array()
+					// only a basic check
+					assert.Equal(t, 1, len(actions))
+				},
+			},
+			{
+				name:           "can not set enabled status with invalid JSON",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/enabled", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not set attribute for invalid attribute",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/doesnotexist", strings.NewReader("{}")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not set attribute for invalid scope",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/invalid/override/.m.rule.master/enabled", strings.NewReader("{}")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not set attribute for invalid kind",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/invalid/.m.rule.master/enabled", strings.NewReader("{}")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not set attribute for invalid rule",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/override/invalid/enabled", strings.NewReader("{}")),
+				wantStatusCode: http.StatusNotFound,
+			},
+			{
+				name:           "can set enabled status with valid JSON",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/enabled", strings.NewReader(`{"enabled":true}`)),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/enabled", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					assert.True(t, gjson.GetBytes(rec.Body.Bytes(), "enabled").Bool(), "expected master rule to be enabled: %s", rec.Body.String())
+				},
+			},
+			{
+				name:           "can set actions with valid JSON",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/actions", strings.NewReader(`{"actions":["dont_notify","notify"]}`)),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/override/.m.rule.master/actions", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					assert.Equal(t, 2, len(gjson.GetBytes(rec.Body.Bytes(), "actions").Array()), "expected 2 actions %s", rec.Body.String())
+				},
+			},
+			{
+				name:           "can not create new push rule with invalid JSON",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not create new push rule with invalid rule content",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule", strings.NewReader("{}")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not create new push rule with invalid scope",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/invalid/content/myrule", strings.NewReader(`{"actions":["notify"],"pattern":"world"}`)),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can create new push rule with valid rule content",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule", strings.NewReader(`{"actions":["notify"],"pattern":"world"}`)),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/content/myrule/actions", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					assert.Equal(t, 1, len(gjson.GetBytes(rec.Body.Bytes(), "actions").Array()), "expected 1 action %s", rec.Body.String())
+				},
+			},
+			{
+				name:           "can not create new push starting with a dot",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/.myrule", strings.NewReader(`{"actions":["notify"],"pattern":"world"}`)),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:    "can create new push rule after existing",
+				request: httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule2", strings.NewReader(`{"actions":["notify"],"pattern":"world"}`)),
+				queryAttr: map[string]string{
+					"after": ruleID1,
+				},
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/content/", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					rules := gjson.ParseBytes(rec.Body.Bytes())
+					for i, rule := range rules.Array() {
+						if rule.Get("rule_id").Str == ruleID1 && i != 0 {
+							t.Fatalf("expected '%s' to be the first, but wasn't", ruleID1)
+						}
+						if rule.Get("rule_id").Str == ruleID2 && i != 1 {
+							t.Fatalf("expected '%s' to be the second, but wasn't", ruleID2)
+						}
+					}
+				},
+			},
+			{
+				name:    "can create new push rule before existing",
+				request: httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule3", strings.NewReader(`{"actions":["notify"],"pattern":"world"}`)),
+				queryAttr: map[string]string{
+					"before": ruleID1,
+				},
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/content/", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					rules := gjson.ParseBytes(rec.Body.Bytes())
+					for i, rule := range rules.Array() {
+						if rule.Get("rule_id").Str == ruleID3 && i != 0 {
+							t.Fatalf("expected '%s' to be the first, but wasn't", ruleID3)
+						}
+						if rule.Get("rule_id").Str == ruleID1 && i != 1 {
+							t.Fatalf("expected '%s' to be the second, but wasn't", ruleID1)
+						}
+						if rule.Get("rule_id").Str == ruleID2 && i != 2 {
+							t.Fatalf("expected '%s' to be the third, but wasn't", ruleID1)
+						}
+					}
+				},
+			},
+			{
+				name:           "can modify existing push rule",
+				request:        httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule2", strings.NewReader(`{"actions":["dont_notify"],"pattern":"world"}`)),
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/content/myrule2/actions", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					actions := gjson.GetBytes(rec.Body.Bytes(), "actions").Array()
+					// there should only be one action
+					assert.Equal(t, "dont_notify", actions[0].Str)
+				},
+			},
+			{
+				name:    "can move existing push rule to the front",
+				request: httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/pushrules/global/content/myrule2", strings.NewReader(`{"actions":["dont_notify"],"pattern":"world"}`)),
+				queryAttr: map[string]string{
+					"before": ruleID3,
+				},
+				wantStatusCode: http.StatusOK,
+				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
+					rec := httptest.NewRecorder()
+					req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/pushrules/global/content/", strings.NewReader(""))
+					req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+					routers.Client.ServeHTTP(rec, req)
+					assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					rules := gjson.ParseBytes(rec.Body.Bytes())
+					for i, rule := range rules.Array() {
+						if rule.Get("rule_id").Str == ruleID2 && i != 0 {
+							t.Fatalf("expected '%s' to be the first, but wasn't", ruleID2)
+						}
+						if rule.Get("rule_id").Str == ruleID3 && i != 1 {
+							t.Fatalf("expected '%s' to be the second, but wasn't", ruleID3)
+						}
+						if rule.Get("rule_id").Str == ruleID1 && i != 2 {
+							t.Fatalf("expected '%s' to be the third, but wasn't", ruleID1)
+						}
+					}
+				},
+			},
+			{
+				name:           "can not delete push rule with invalid scope",
+				request:        httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/pushrules/invalid/content/myrule2", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not delete push rule with invalid kind",
+				request:        httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/pushrules/global/invalid/myrule2", strings.NewReader("")),
+				wantStatusCode: http.StatusBadRequest,
+			},
+			{
+				name:           "can not delete push rule with non-existent rule",
+				request:        httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/pushrules/global/content/doesnotexist", strings.NewReader("")),
+				wantStatusCode: http.StatusNotFound,
+			},
+			{
+				name:           "can delete existing push rule",
+				request:        httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/pushrules/global/content/myrule2", strings.NewReader("")),
+				wantStatusCode: http.StatusOK,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+
+				if tc.queryAttr != nil {
+					params := url.Values{}
+					for k, v := range tc.queryAttr {
+						params.Set(k, v)
+					}
+
+					tc.request = httptest.NewRequest(tc.request.Method, tc.request.URL.String()+"?"+params.Encode(), tc.request.Body)
+				}
+
+				tc.request.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+				routers.Client.ServeHTTP(rec, tc.request)
+				assert.Equal(t, tc.wantStatusCode, rec.Code, rec.Body.String())
+				if tc.validateFunc != nil {
+					tc.validateFunc(t, rec.Body)
+				}
+				t.Logf("%s", rec.Body.String())
 			})
 		}
 	})

@@ -50,10 +50,10 @@ func SendEvents(
 func SendEventWithState(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
 	virtualHost gomatrixserverlib.ServerName, kind Kind,
-	state *fclient.RespState, event *gomatrixserverlib.HeaderedEvent,
+	state gomatrixserverlib.StateResponse, event *gomatrixserverlib.HeaderedEvent,
 	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
-	outliers := state.Events(event.RoomVersion)
+	outliers := gomatrixserverlib.LineariseStateResponse(event.RoomVersion, state)
 	ires := make([]InputRoomEvent, 0, len(outliers))
 	for _, outlier := range outliers {
 		if haveEventIDs[outlier.EventID()] {
@@ -66,7 +66,7 @@ func SendEventWithState(
 		})
 	}
 
-	stateEvents := state.StateEvents.UntrustedEvents(event.RoomVersion)
+	stateEvents := state.GetStateEvents().UntrustedEvents(event.RoomVersion)
 	stateEventIDs := make([]string, len(stateEvents))
 	for i := range stateEvents {
 		stateEventIDs[i] = stateEvents[i].EventID()
