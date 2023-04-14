@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -15,7 +16,7 @@ type SyncRequest struct {
 	Log           *logrus.Entry
 	Device        *userapi.Device
 	Response      *Response
-	Filter        gomatrixserverlib.Filter
+	Filter        synctypes.Filter
 	Since         StreamingToken
 	Timeout       time.Duration
 	WantFullState bool

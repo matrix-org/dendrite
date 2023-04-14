@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -49,7 +50,7 @@ func SendEvents(
 func SendEventWithState(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
 	virtualHost gomatrixserverlib.ServerName, kind Kind,
-	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
+	state *fclient.RespState, event *gomatrixserverlib.HeaderedEvent,
 	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
 	outliers := state.Events(event.RoomVersion)
@@ -159,7 +160,7 @@ func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, 
 // PopulatePublicRooms extracts PublicRoom information for all the provided room IDs. The IDs are not checked to see if they are visible in the
 // published room directory.
 // due to lots of switches
-func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkStateContentAPI) ([]gomatrixserverlib.PublicRoom, error) {
+func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkStateContentAPI) ([]fclient.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
 	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
@@ -181,10 +182,10 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 		util.GetLogger(ctx).WithError(err).Error("QueryBulkStateContent failed")
 		return nil, err
 	}
-	chunk := make([]gomatrixserverlib.PublicRoom, len(roomIDs))
+	chunk := make([]fclient.PublicRoom, len(roomIDs))
 	i := 0
 	for roomID, data := range stateRes.Rooms {
-		pub := gomatrixserverlib.PublicRoom{
+		pub := fclient.PublicRoom{
 			RoomID: roomID,
 		}
 		joinCount := 0

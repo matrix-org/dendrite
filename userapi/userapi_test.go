@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"golang.org/x/crypto/bcrypt"
@@ -87,7 +88,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 		t.Fatalf("failed to create key DB: %s", err)
 	}
 
-	cfg.Global.SigningIdentity = gomatrixserverlib.SigningIdentity{
+	cfg.Global.SigningIdentity = fclient.SigningIdentity{
 		ServerName: sName,
 	}
 

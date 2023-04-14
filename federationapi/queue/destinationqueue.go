@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 
@@ -50,7 +51,7 @@ type destinationQueue struct {
 	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
-	signing            map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
+	signing            map[gomatrixserverlib.ServerName]*fclient.SigningIdentity
 	rsAPI              api.FederationRoomserverAPI
 	client             fedapi.FederationClient         // federation client
 	origin             gomatrixserverlib.ServerName    // origin of requests

@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,7 +30,7 @@ import (
 )
 
 type stateEventInStateResp struct {
-	gomatrixserverlib.ClientEvent
+	synctypes.ClientEvent
 	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
 	ReplacesState string          `json:"replaces_state,omitempty"`
 }
@@ -122,7 +123,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		"state_at_event": !wantLatestState,
 	}).Info("Fetching all state")
 
-	stateEvents := []gomatrixserverlib.ClientEvent{}
+	stateEvents := []synctypes.ClientEvent{}
 	if wantLatestState {
 		// If we are happy to use the latest state, either because the user is
 		// still in the room, or because the room is world-readable, then just
@@ -131,7 +132,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
+				synctypes.HeaderedToClientEvent(ev, synctypes.FormatAll),
 			)
 		}
 	} else {
@@ -150,7 +151,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateAfterRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
+				synctypes.HeaderedToClientEvent(ev, synctypes.FormatAll),
 			)
 		}
 	}
@@ -309,7 +310,7 @@ func OnIncomingStateTypeRequest(
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll),
+		ClientEvent: synctypes.HeaderedToClientEvent(event, synctypes.FormatAll),
 	}
 
 	var res interface{}

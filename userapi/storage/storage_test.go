@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -356,12 +357,12 @@ func Test_OpenID(t *testing.T) {
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
 		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
 		assert.NoError(t, err, "unable to create OpenID token")
-		assert.Equal(t, expiresAtMS, expires)
+		assert.InDelta(t, expiresAtMS, expires, 2) // 2ms leeway
 
 		attributes, err := db.GetOpenIDTokenAttributes(ctx, token)
 		assert.NoError(t, err, "unable to get OpenID token attributes")
 		assert.Equal(t, alice.ID, attributes.UserID)
-		assert.Equal(t, expiresAtMS, attributes.ExpiresAtMS)
+		assert.InDelta(t, expiresAtMS, attributes.ExpiresAtMS, 2) // 2ms leeway
 	})
 }
 
@@ -526,7 +527,7 @@ func Test_Notification(t *testing.T) {
 				Actions: []*pushrules.Action{
 					{},
 				},
-				Event: gomatrixserverlib.ClientEvent{
+				Event: synctypes.ClientEvent{
 					Content: gomatrixserverlib.RawJSON("{}"),
 				},
 				Read:   false,

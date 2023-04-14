@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -96,7 +97,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -111,7 +112,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilterUnknown,
 						},
 					},
@@ -126,7 +127,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 						IncludeState: true,
@@ -143,7 +144,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -160,7 +161,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -176,7 +177,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},

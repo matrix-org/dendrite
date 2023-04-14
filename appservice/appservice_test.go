@@ -18,6 +18,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -338,7 +339,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		evChan := make(chan struct{})
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var txn gomatrixserverlib.ApplicationServiceTransaction
+			var txn consumers.ApplicationServiceTransaction
 			err := json.NewDecoder(r.Body).Decode(&txn)
 			if err != nil {
 				t.Fatal(err)
