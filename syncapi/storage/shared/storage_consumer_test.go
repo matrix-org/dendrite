@@ -7,10 +7,10 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func newSyncDB(t *testing.T, dbType test.DBType) (storage.Database, func()) {
@@ -32,7 +32,7 @@ func TestFilterTable(t *testing.T) {
 		defer closeDB()
 
 		// initially create a filter
-		filter := &gomatrixserverlib.Filter{}
+		filter := &synctypes.Filter{}
 		filterID, err := tab.PutFilter(context.Background(), "alice", filter)
 		if err != nil {
 			t.Fatal(err)
@@ -49,7 +49,7 @@ func TestFilterTable(t *testing.T) {
 		}
 
 		// query the filter again
-		targetFilter := &gomatrixserverlib.Filter{}
+		targetFilter := &synctypes.Filter{}
 		if err = tab.GetFilter(context.Background(), targetFilter, "alice", filterID); err != nil {
 			t.Fatal(err)
 		}
