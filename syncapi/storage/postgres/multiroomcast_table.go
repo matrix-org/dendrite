@@ -20,7 +20,7 @@ var schema string
 var selectMultiRoomCastSQL = `SELECT d.user_id, d.type, d.data, d.ts FROM syncapi_multiroom_data AS d
 JOIN syncapi_multiroom_visibility AS v
 ON d.user_id = v.user_id
-AND d.type = v.type
+AND concat(d.type, '.visibility') = v.type
 WHERE v.room_id = ANY($1)
 AND id > $2
 AND id <= $3`
