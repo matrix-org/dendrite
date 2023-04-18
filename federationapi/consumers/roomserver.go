@@ -208,9 +208,9 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	}
 
 	// If we added new hosts, inform them about our known presence events for this room
-	if s.cfg.Matrix.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == gomatrixserverlib.MRoomMember && ore.Event.StateKey() != nil {
+	if s.cfg.Matrix.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == spec.MRoomMember && ore.Event.StateKey() != nil {
 		membership, _ := ore.Event.Membership()
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			s.sendPresence(ore.Event.RoomID(), addsJoinedHosts)
 		}
 	}
@@ -302,7 +302,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 	}
 
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MPresence,
+		Type:   spec.MPresence,
 		Origin: string(s.cfg.Matrix.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
@@ -399,7 +399,7 @@ func JoinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, 
 		if err != nil {
 			return nil, err
 		}
-		if membership != gomatrixserverlib.Join {
+		if membership != spec.Join {
 			continue
 		}
 		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())

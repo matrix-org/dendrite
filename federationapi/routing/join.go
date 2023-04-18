@@ -125,7 +125,7 @@ func MakeJoin(
 		StateKey: &userID,
 	}
 	content := gomatrixserverlib.MemberContent{
-		Membership:    gomatrixserverlib.Join,
+		Membership:    spec.Join,
 		AuthorisedVia: authorisedVia,
 	}
 	if err = builder.SetContent(content); err != nil {
@@ -279,7 +279,7 @@ func SendJoin(
 			JSON: jsonerror.BadJSON("missing content.membership key"),
 		}
 	}
-	if membership != gomatrixserverlib.Join {
+	if membership != spec.Join {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("membership must be 'join'"),
@@ -350,8 +350,8 @@ func SendJoin(
 			continue
 		}
 		if membership, merr := se.Membership(); merr == nil {
-			alreadyJoined = (membership == gomatrixserverlib.Join)
-			isBanned = (membership == gomatrixserverlib.Ban)
+			alreadyJoined = (membership == spec.Join)
+			isBanned = (membership == spec.Ban)
 			break
 		}
 	}

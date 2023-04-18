@@ -27,6 +27,7 @@ import (
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -234,7 +235,7 @@ func createRoom(
 	createContent["room_version"] = roomVersion
 	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
-		JoinRule: gomatrixserverlib.Invite,
+		JoinRule: spec.Invite,
 	}
 	historyVisibilityContent := gomatrixserverlib.HistoryVisibilityContent{
 		HistoryVisibility: historyVisibilityShared,
@@ -254,40 +255,40 @@ func createRoom(
 
 	switch r.Preset {
 	case presetPrivateChat:
-		joinRuleContent.JoinRule = gomatrixserverlib.Invite
+		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 	case presetTrustedPrivateChat:
-		joinRuleContent.JoinRule = gomatrixserverlib.Invite
+		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 		for _, invitee := range r.Invite {
 			powerLevelContent.Users[invitee] = 100
 		}
 	case presetPublicChat:
-		joinRuleContent.JoinRule = gomatrixserverlib.Public
+		joinRuleContent.JoinRule = spec.Public
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 	}
 
 	createEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomCreate,
+		Type:    spec.MRoomCreate,
 		Content: createContent,
 	}
 	powerLevelEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomPowerLevels,
+		Type:    spec.MRoomPowerLevels,
 		Content: powerLevelContent,
 	}
 	joinRuleEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomJoinRules,
+		Type:    spec.MRoomJoinRules,
 		Content: joinRuleContent,
 	}
 	historyVisibilityEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomHistoryVisibility,
+		Type:    spec.MRoomHistoryVisibility,
 		Content: historyVisibilityContent,
 	}
 	membershipEvent := fledglingEvent{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		StateKey: userID,
 		Content: gomatrixserverlib.MemberContent{
-			Membership:  gomatrixserverlib.Join,
+			Membership:  spec.Join,
 			DisplayName: profile.DisplayName,
 			AvatarURL:   profile.AvatarURL,
 		},
@@ -300,7 +301,7 @@ func createRoom(
 
 	if r.Name != "" {
 		nameEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomName,
+			Type: spec.MRoomName,
 			Content: eventutil.NameContent{
 				Name: r.Name,
 			},
@@ -309,7 +310,7 @@ func createRoom(
 
 	if r.Topic != "" {
 		topicEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomTopic,
+			Type: spec.MRoomTopic,
 			Content: eventutil.TopicContent{
 				Topic: r.Topic,
 			},
@@ -318,7 +319,7 @@ func createRoom(
 
 	if r.GuestCanJoin {
 		guestAccessEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomGuestAccess,
+			Type: spec.MRoomGuestAccess,
 			Content: eventutil.GuestAccessContent{
 				GuestAccess: "can_join",
 			},
@@ -348,7 +349,7 @@ func createRoom(
 		}
 
 		aliasEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomCanonicalAlias,
+			Type: spec.MRoomCanonicalAlias,
 			Content: eventutil.CanonicalAlias{
 				Alias: roomAlias,
 			},
@@ -363,25 +364,25 @@ func createRoom(
 		}
 
 		switch r.InitialState[i].Type {
-		case gomatrixserverlib.MRoomCreate:
+		case spec.MRoomCreate:
 			continue
 
-		case gomatrixserverlib.MRoomPowerLevels:
+		case spec.MRoomPowerLevels:
 			powerLevelEvent = r.InitialState[i]
 
-		case gomatrixserverlib.MRoomJoinRules:
+		case spec.MRoomJoinRules:
 			joinRuleEvent = r.InitialState[i]
 
-		case gomatrixserverlib.MRoomHistoryVisibility:
+		case spec.MRoomHistoryVisibility:
 			historyVisibilityEvent = r.InitialState[i]
 
-		case gomatrixserverlib.MRoomGuestAccess:
+		case spec.MRoomGuestAccess:
 			guestAccessEvent = &r.InitialState[i]
 
-		case gomatrixserverlib.MRoomName:
+		case spec.MRoomName:
 			nameEvent = &r.InitialState[i]
 
-		case gomatrixserverlib.MRoomTopic:
+		case spec.MRoomTopic:
 			topicEvent = &r.InitialState[i]
 
 		default:
@@ -516,21 +517,21 @@ func createRoom(
 			// Chosen events from the spec:
 			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
 			switch event.Type() {
-			case gomatrixserverlib.MRoomCreate:
+			case spec.MRoomCreate:
 				fallthrough
-			case gomatrixserverlib.MRoomName:
+			case spec.MRoomName:
 				fallthrough
-			case gomatrixserverlib.MRoomAvatar:
+			case spec.MRoomAvatar:
 				fallthrough
-			case gomatrixserverlib.MRoomTopic:
+			case spec.MRoomTopic:
 				fallthrough
-			case gomatrixserverlib.MRoomCanonicalAlias:
+			case spec.MRoomCanonicalAlias:
 				fallthrough
-			case gomatrixserverlib.MRoomEncryption:
+			case spec.MRoomEncryption:
 				fallthrough
-			case gomatrixserverlib.MRoomMember:
+			case spec.MRoomMember:
 				fallthrough
-			case gomatrixserverlib.MRoomJoinRules:
+			case spec.MRoomJoinRules:
 				ev := event.Event
 				globalStrippedState = append(
 					globalStrippedState,
@@ -543,7 +544,7 @@ func createRoom(
 		for _, invitee := range r.Invite {
 			// Build the invite event.
 			inviteEvent, err := buildMembershipEvent(
-				ctx, invitee, "", profileAPI, device, gomatrixserverlib.Invite,
+				ctx, invitee, "", profileAPI, device, spec.Invite,
 				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
 			)
 			if err != nil {

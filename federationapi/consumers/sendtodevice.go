@@ -108,7 +108,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MDirectToDevice,
+		Type:   spec.MDirectToDevice,
 		Origin: string(originServerName),
 	}
 	tdm := gomatrixserverlib.ToDeviceMessage{

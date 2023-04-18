@@ -299,14 +299,14 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 	}
 
 	switch {
-	case event.Type() == gomatrixserverlib.MRoomMember:
+	case event.Type() == spec.MRoomMember:
 		cevent := synctypes.HeaderedToClientEvent(event, synctypes.FormatAll)
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
 			return fmt.Errorf("newLocalMembership: %w", err)
 		}
-		if member.Membership == gomatrixserverlib.Invite && member.Domain == s.cfg.Matrix.ServerName {
+		if member.Membership == spec.Invite && member.Domain == s.cfg.Matrix.ServerName {
 			// localRoomMembers only adds joined members. An invite
 			// should also be pushed to the target user.
 			members = append(members, member)
@@ -419,7 +419,7 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 			log.WithError(err).Errorf("Parsing MemberContent")
 			continue
 		}
-		if member.Membership != gomatrixserverlib.Join {
+		if member.Membership != spec.Join {
 			continue
 		}
 		if member.Domain != s.cfg.Matrix.ServerName {
@@ -437,7 +437,7 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 // m.room.canonical_alias is consulted. Returns an empty string if the
 // room has no name.
 func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) (string, error) {
-	if event.Type() == gomatrixserverlib.MRoomName {
+	if event.Type() == spec.MRoomName {
 		name, err := unmarshalRoomName(event)
 		if err != nil {
 			return "", err
@@ -462,7 +462,7 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixs
 		return unmarshalRoomName(eventS)
 	}
 
-	if event.Type() == gomatrixserverlib.MRoomCanonicalAlias {
+	if event.Type() == spec.MRoomCanonicalAlias {
 		alias, err := unmarshalCanonicalAlias(event)
 		if err != nil {
 			return "", err
@@ -481,8 +481,8 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixs
 }
 
 var (
-	canonicalAliasTuple = gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias}
-	roomNameTuple       = gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomName}
+	canonicalAliasTuple = gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCanonicalAlias}
+	roomNameTuple       = gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomName}
 )
 
 func unmarshalRoomName(event *gomatrixserverlib.HeaderedEvent) (string, error) {
@@ -685,7 +685,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 	req := &rsapi.QueryLatestEventsAndStateRequest{
 		RoomID: rse.roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
-			{EventType: gomatrixserverlib.MRoomPowerLevels},
+			{EventType: spec.MRoomPowerLevels},
 		},
 	}
 	var res rsapi.QueryLatestEventsAndStateResponse
@@ -693,7 +693,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 		return false, err
 	}
 	for _, ev := range res.StateEvents {
-		if ev.Type() != gomatrixserverlib.MRoomPowerLevels {
+		if ev.Type() != spec.MRoomPowerLevels {
 			continue
 		}
 

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -80,7 +79,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		membership, _, err := snapshot.SelectMembershipForUser(ctx, roomID, req.Device.UserID, math.MaxInt64)
 		// Skip if the user is an existing member of the room.
 		// Otherwise, the NewLeaveResponse will eject the user from the room unintentionally
-		if membership == gomatrixserverlib.Join ||
+		if membership == spec.Join ||
 			err != nil {
 			continue
 		}

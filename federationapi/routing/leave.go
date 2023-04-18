@@ -57,7 +57,7 @@ func MakeLeave(
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Leave})
+	err = builder.SetContent(map[string]interface{}{"membership": spec.Leave})
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
 		return jsonerror.InternalServerError()
@@ -97,7 +97,7 @@ func MakeLeave(
 		if !state.StateKeyEquals(userID) {
 			continue
 		}
-		if mem, merr := state.Membership(); merr == nil && mem == gomatrixserverlib.Leave {
+		if mem, merr := state.Membership(); merr == nil && mem == spec.Leave {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: map[string]interface{}{
@@ -215,7 +215,7 @@ func SendLeave(
 		RoomID: roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
 			{
-				EventType: gomatrixserverlib.MRoomMember,
+				EventType: spec.MRoomMember,
 				StateKey:  *event.StateKey(),
 			},
 		},
@@ -244,7 +244,7 @@ func SendLeave(
 	// We are/were joined/invited/banned or something. Check if
 	// we can no-op here.
 	if len(queryRes.StateEvents) == 1 {
-		if mem, merr := queryRes.StateEvents[0].Membership(); merr == nil && mem == gomatrixserverlib.Leave {
+		if mem, merr := queryRes.StateEvents[0].Membership(); merr == nil && mem == spec.Leave {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: struct{}{},
@@ -288,7 +288,7 @@ func SendLeave(
 			JSON: jsonerror.BadJSON("missing content.membership key"),
 		}
 	}
-	if mem != gomatrixserverlib.Leave {
+	if mem != spec.Leave {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The membership in the event content must be set to leave"),

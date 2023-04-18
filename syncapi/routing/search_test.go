@@ -16,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -216,7 +217,7 @@ func TestSearch(t *testing.T) {
 		for _, x := range room.Events() {
 			var stateEvents []*gomatrixserverlib.HeaderedEvent
 			var stateEventIDs []string
-			if x.Type() == gomatrixserverlib.MRoomMember {
+			if x.Type() == spec.MRoomMember {
 				stateEvents = append(stateEvents, x)
 				stateEventIDs = append(stateEventIDs, x.EventID())
 			}

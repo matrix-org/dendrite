@@ -14,7 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentRoomState, *sql.DB, func()) {
@@ -115,7 +115,7 @@ func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables
 			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
 		}
 		// same as above, but with existing NotTypes defined
-		notTypes := []string{gomatrixserverlib.MRoomMember}
+		notTypes := []string{spec.MRoomMember}
 		filter.NotTypes = &notTypes
 		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
 		if err != nil {

@@ -108,12 +108,12 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			}
 			return nil
 		}
-		memberContent.Membership = gomatrixserverlib.Leave
+		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
 			RoomID:     req.RoomID,
-			Type:       gomatrixserverlib.MRoomMember,
+			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
 			PrevEvents: prevEvents,
@@ -196,7 +196,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Join)
 	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -205,7 +205,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,

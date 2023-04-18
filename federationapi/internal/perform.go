@@ -177,7 +177,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
-	respMakeJoin.JoinEvent.Type = gomatrixserverlib.MRoomMember
+	respMakeJoin.JoinEvent.Type = spec.MRoomMember
 	respMakeJoin.JoinEvent.Sender = userID
 	respMakeJoin.JoinEvent.StateKey = &userID
 	respMakeJoin.JoinEvent.RoomID = roomID
@@ -186,7 +186,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		content = map[string]interface{}{}
 	}
 	_ = json.Unmarshal(respMakeJoin.JoinEvent.Content, &content)
-	content["membership"] = gomatrixserverlib.Join
+	content["membership"] = spec.Join
 	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
 		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
 	}
@@ -317,7 +317,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string) bool {
 	if membership, err := event.Membership(); err != nil {
 		return false
-	} else if membership != gomatrixserverlib.Join {
+	} else if membership != spec.Join {
 		return false
 	}
 	if event.RoomID() != roomID {
@@ -554,7 +554,7 @@ func (r *FederationInternalAPI) PerformLeave(
 
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
-		respMakeLeave.LeaveEvent.Type = gomatrixserverlib.MRoomMember
+		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
 		respMakeLeave.LeaveEvent.Sender = request.UserID
 		respMakeLeave.LeaveEvent.StateKey = &request.UserID
 		respMakeLeave.LeaveEvent.RoomID = request.RoomID
@@ -716,7 +716,7 @@ func (r *FederationInternalAPI) MarkServersAlive(destinations []spec.ServerName)
 func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {
 	// sanity check we have a create event and it has a known room version
 	for _, ev := range authChain {
-		if ev.Type() == gomatrixserverlib.MRoomCreate && ev.StateKeyEquals("") {
+		if ev.Type() == spec.MRoomCreate && ev.StateKeyEquals("") {
 			// make sure the room version is known
 			content := ev.Content()
 			verBody := struct {

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -122,9 +121,9 @@ func (s *OutputClientDataConsumer) Start() error {
 				switch ev.Type() {
 				case "m.room.message":
 					e.Content = gjson.GetBytes(ev.Content(), "body").String()
-				case gomatrixserverlib.MRoomName:
+				case spec.MRoomName:
 					e.Content = gjson.GetBytes(ev.Content(), "name").String()
-				case gomatrixserverlib.MRoomTopic:
+				case spec.MRoomTopic:
 					e.Content = gjson.GetBytes(ev.Content(), "topic").String()
 				default:
 					continue

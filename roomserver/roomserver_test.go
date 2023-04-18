@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -61,10 +62,10 @@ func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite and join Bob
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -102,7 +103,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat), test.GuestsCanJoin(true))
 
 	// Join with the guest user
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -134,7 +135,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 	}
 
 	// revoke guest access
-	revokeEvent := room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
+	revokeEvent := room.CreateAndInsert(t, alice, spec.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
 		t.Errorf("failed to send events: %v", err)
 	}
@@ -164,10 +165,10 @@ func Test_QueryLeftUsers(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite and join Bob
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -216,7 +217,7 @@ func TestPurgeRoom(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite Bob
-	inviteEvent := room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	inviteEvent := room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
 
@@ -443,7 +444,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -460,7 +461,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, bob, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -477,7 +478,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     bob.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -493,7 +494,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, bob, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     charlie.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -523,10 +524,10 @@ func TestRedaction(t *testing.T) {
 				var err error
 
 				room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, charlie, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(charlie.ID))
 
@@ -568,7 +569,7 @@ func TestRedaction(t *testing.T) {
 					if redactedEvent != nil {
 						assert.Equal(t, ev.Redacts(), redactedEvent.EventID())
 					}
-					if ev.Type() == gomatrixserverlib.MRoomRedaction {
+					if ev.Type() == spec.MRoomRedaction {
 						nids, err := db.EventNIDs(ctx, []string{ev.Redacts()})
 						assert.NoError(t, err)
 						evs, err := db.Events(ctx, roomInfo, []types.EventNID{nids[ev.Redacts()].EventNID})

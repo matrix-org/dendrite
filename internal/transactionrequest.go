@@ -155,7 +155,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
-		if event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("") {
+		if event.Type() == spec.MRoomCreate && event.StateKeyEquals("") {
 			continue
 		}
 		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID(), t.Origin) {
@@ -208,7 +208,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 	for _, e := range t.EDUs {
 		EDUCountTotal.Inc()
 		switch e.Type {
-		case gomatrixserverlib.MTyping:
+		case spec.MTyping:
 			// https://matrix.org/docs/spec/server_server/latest#typing-notifications
 			var typingPayload struct {
 				RoomID string `json:"room_id"`
@@ -229,7 +229,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to JetStream")
 			}
-		case gomatrixserverlib.MDirectToDevice:
+		case spec.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
 			var directPayload gomatrixserverlib.ToDeviceMessage
 			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
@@ -256,12 +256,12 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 					}
 				}
 			}
-		case gomatrixserverlib.MDeviceListUpdate:
+		case spec.MDeviceListUpdate:
 			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, t.Origin); err != nil {
 				sentry.CaptureException(err)
 				util.GetLogger(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
 			}
-		case gomatrixserverlib.MReceipt:
+		case spec.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := map[string]types.FederationReceiptMRead{}
 
@@ -297,7 +297,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				sentry.CaptureException(err)
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
-		case gomatrixserverlib.MPresence:
+		case spec.MPresence:
 			if t.inboundPresenceEnabled {
 				if err := t.processPresence(ctx, e); err != nil {
 					logrus.WithError(err).Errorf("Failed to process presence update")

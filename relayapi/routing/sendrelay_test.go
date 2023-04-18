@@ -163,7 +163,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 		Field: []gomatrixserverlib.EDU{},
 	}
 	for i := 0; i < 101; i++ {
-		content.Field = append(content.Field, gomatrixserverlib.EDU{Type: gomatrixserverlib.MTyping})
+		content.Field = append(content.Field, gomatrixserverlib.EDU{Type: spec.MTyping})
 	}
 	assert.Greater(t, len(content.Field), 100)
 

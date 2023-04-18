@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/tidwall/gjson"
 
@@ -612,10 +613,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -631,10 +632,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
 			},
@@ -650,7 +651,7 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
 			},
@@ -666,7 +667,7 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -706,10 +707,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -1141,7 +1142,7 @@ func TestUpdateRelations(t *testing.T) {
 		},
 		{
 			name:      "redactions are ignored",
-			eventType: gomatrixserverlib.MRoomRedaction,
+			eventType: spec.MRoomRedaction,
 			eventContent: map[string]interface{}{
 				"m.relates_to": map[string]interface{}{
 					"event_id": "$randomEventID",

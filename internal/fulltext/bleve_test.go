@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
@@ -77,7 +77,7 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 		Content:        "Roomname testing",
 		StreamPosition: streamPos,
 	}
-	e.SetContentType(gomatrixserverlib.MRoomName)
+	e.SetContentType(spec.MRoomName)
 	batchItems = append(batchItems, e)
 	e = fulltext.IndexElement{
 		EventID:        util.RandomString(16),
@@ -85,7 +85,7 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 		Content:        "Room topic fulltext",
 		StreamPosition: streamPos,
 	}
-	e.SetContentType(gomatrixserverlib.MRoomTopic)
+	e.SetContentType(spec.MRoomTopic)
 	batchItems = append(batchItems, e)
 	if err := fts.Index(batchItems...); err != nil {
 		t.Fatalf("failed to batch insert elements: %v", err)

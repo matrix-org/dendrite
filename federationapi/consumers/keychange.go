@@ -141,7 +141,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	}
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MDeviceListUpdate,
+		Type:   spec.MDeviceListUpdate,
 		Origin: string(originServerName),
 	}
 	event := gomatrixserverlib.DeviceListUpdateEvent{

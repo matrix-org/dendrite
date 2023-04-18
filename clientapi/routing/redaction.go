@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -77,7 +78,7 @@ func SendRedaction(
 	allowedToRedact := ev.Sender() == device.UserID
 	if !allowedToRedact {
 		plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
-			EventType: gomatrixserverlib.MRoomPowerLevels,
+			EventType: spec.MRoomPowerLevels,
 			StateKey:  "",
 		})
 		if plEvent == nil {
@@ -114,7 +115,7 @@ func SendRedaction(
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:  device.UserID,
 		RoomID:  roomID,
-		Type:    gomatrixserverlib.MRoomRedaction,
+		Type:    spec.MRoomRedaction,
 		Redacts: eventID,
 	}
 	err := builder.SetContent(r)

@@ -112,18 +112,18 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 		hisVis.HistoryVisibility = r.visibility
 	}
 
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomCreate, map[string]interface{}{
+	r.CreateAndInsert(t, r.creator, spec.MRoomCreate, map[string]interface{}{
 		"creator":      r.creator.ID,
 		"room_version": r.Version,
 	}, WithStateKey(""))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	r.CreateAndInsert(t, r.creator, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, WithStateKey(r.creator.ID))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomPowerLevels, plContent, WithStateKey(""))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomJoinRules, joinRule, WithStateKey(""))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomHistoryVisibility, hisVis, WithStateKey(""))
+	r.CreateAndInsert(t, r.creator, spec.MRoomPowerLevels, plContent, WithStateKey(""))
+	r.CreateAndInsert(t, r.creator, spec.MRoomJoinRules, joinRule, WithStateKey(""))
+	r.CreateAndInsert(t, r.creator, spec.MRoomHistoryVisibility, hisVis, WithStateKey(""))
 	if r.guestCanJoin {
-		r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomGuestAccess, map[string]string{
+		r.CreateAndInsert(t, r.creator, spec.MRoomGuestAccess, map[string]string{
 			"guest_access": "can_join",
 		}, WithStateKey(""))
 	}

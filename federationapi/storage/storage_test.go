@@ -35,7 +35,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 
 func TestExpireEDUs(t *testing.T) {
 	var expireEDUTypes = map[string]time.Duration{
-		gomatrixserverlib.MReceipt: 0,
+		spec.MReceipt: 0,
 	}
 
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func TestExpireEDUs(t *testing.T) {
 			receipt, err := db.StoreJSON(ctx, "{}")
 			assert.NoError(t, err)
 
-			err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, gomatrixserverlib.MReceipt, expireEDUTypes)
+			err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, spec.MReceipt, expireEDUTypes)
 			assert.NoError(t, err)
 		}
 		// add data without expiry
@@ -72,7 +72,7 @@ func TestExpireEDUs(t *testing.T) {
 		receipt, err = db.StoreJSON(ctx, "{}")
 		assert.NoError(t, err)
 
-		err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, gomatrixserverlib.MDirectToDevice, expireEDUTypes)
+		err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, spec.MDirectToDevice, expireEDUTypes)
 		assert.NoError(t, err)
 
 		err = db.DeleteExpiredEDUs(ctx)

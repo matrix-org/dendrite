@@ -205,7 +205,7 @@ func (r *Joiner) performJoinRoomByID(
 		}
 	}
 	eb := gomatrixserverlib.EventBuilder{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		Sender:   userID,
 		StateKey: &userID,
 		RoomID:   req.RoomIDOrAlias,
@@ -221,7 +221,7 @@ func (r *Joiner) performJoinRoomByID(
 	if req.Content == nil {
 		req.Content = map[string]interface{}{}
 	}
-	req.Content["membership"] = gomatrixserverlib.Join
+	req.Content["membership"] = spec.Join
 	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req); aerr != nil {
 		return "", "", aerr
 	} else if authorisedVia != "" {
@@ -275,7 +275,7 @@ func (r *Joiner) performJoinRoomByID(
 	if req.IsGuest {
 		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
 		guestAccess := "forbidden"
-		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
+		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
 		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
 			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}

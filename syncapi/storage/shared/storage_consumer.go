@@ -562,15 +562,15 @@ func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID s
 
 func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
 	return d.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
-		gomatrixserverlib.MRoomName,
-		gomatrixserverlib.MRoomTopic,
+		spec.MRoomName,
+		spec.MRoomTopic,
 		"m.room.message",
 	})
 }
 
 func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
 	// No need to unmarshal if the event is a redaction
-	if event.Type() == gomatrixserverlib.MRoomRedaction {
+	if event.Type() == spec.MRoomRedaction {
 		return nil
 	}
 	var content gomatrixserverlib.RelationContent

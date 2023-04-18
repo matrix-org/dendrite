@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -272,9 +273,9 @@ func buildInviteStrippedState(
 	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
 	for _, t := range []string{
-		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
-		gomatrixserverlib.MRoomJoinRules, gomatrixserverlib.MRoomAvatar,
-		gomatrixserverlib.MRoomEncryption, gomatrixserverlib.MRoomCreate,
+		spec.MRoomName, spec.MRoomCanonicalAlias,
+		spec.MRoomJoinRules, spec.MRoomAvatar,
+		spec.MRoomEncryption, spec.MRoomCreate,
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,

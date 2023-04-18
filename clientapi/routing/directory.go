@@ -254,7 +254,7 @@ func GetVisibility(
 
 	var v roomVisibility
 	if len(res.RoomIDs) == 1 {
-		v.Visibility = gomatrixserverlib.Public
+		v.Visibility = spec.Public
 	} else {
 		v.Visibility = "private"
 	}
@@ -279,7 +279,7 @@ func SetVisibility(
 	queryEventsReq := roomserverAPI.QueryLatestEventsAndStateRequest{
 		RoomID: roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
-			EventType: gomatrixserverlib.MRoomPowerLevels,
+			EventType: spec.MRoomPowerLevels,
 			StateKey:  "",
 		}},
 	}
@@ -292,7 +292,7 @@ func SetVisibility(
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
-	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+	if power.UserLevel(dev.UserID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),

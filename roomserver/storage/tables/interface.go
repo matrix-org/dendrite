@@ -200,17 +200,17 @@ func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 	content := ev.Content()
 	key := ""
 	switch ev.Type() {
-	case gomatrixserverlib.MRoomCreate:
+	case spec.MRoomCreate:
 		key = "creator"
-	case gomatrixserverlib.MRoomCanonicalAlias:
+	case spec.MRoomCanonicalAlias:
 		key = "alias"
-	case gomatrixserverlib.MRoomHistoryVisibility:
+	case spec.MRoomHistoryVisibility:
 		key = "history_visibility"
-	case gomatrixserverlib.MRoomJoinRules:
+	case spec.MRoomJoinRules:
 		key = "join_rule"
-	case gomatrixserverlib.MRoomMember:
+	case spec.MRoomMember:
 		key = "membership"
-	case gomatrixserverlib.MRoomName:
+	case spec.MRoomName:
 		key = "name"
 	case "m.room.avatar":
 		key = "url"

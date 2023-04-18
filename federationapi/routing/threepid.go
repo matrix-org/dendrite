@@ -266,7 +266,7 @@ func createInviteFrom3PIDInvite(
 	content := gomatrixserverlib.MemberContent{
 		AvatarURL:   profile.AvatarURL,
 		DisplayName: profile.DisplayName,
-		Membership:  gomatrixserverlib.Invite,
+		Membership:  spec.Invite,
 		ThirdPartyInvite: &gomatrixserverlib.MemberThirdPartyInvite{
 			Signed: inv.Signed,
 		},

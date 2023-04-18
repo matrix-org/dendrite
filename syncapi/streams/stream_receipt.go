@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -47,7 +46,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 ) types.StreamPosition {
 	var joinedRooms []string
 	for roomID, membership := range req.Rooms {
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			joinedRooms = append(joinedRooms, roomID)
 		}
 	}
@@ -89,7 +88,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 
 		ev := synctypes.ClientEvent{
-			Type: gomatrixserverlib.MReceipt,
+			Type: spec.MReceipt,
 		}
 		content := make(map[string]ReceiptMRead)
 		for _, receipt := range receipts {

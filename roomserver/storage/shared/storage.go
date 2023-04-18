@@ -906,7 +906,7 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 	var err error
 	var roomVersion gomatrixserverlib.RoomVersion
 	// Look for m.room.create events.
-	if event.Type() != gomatrixserverlib.MRoomCreate {
+	if event.Type() != spec.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
 	roomVersion = gomatrixserverlib.RoomVersionV1
@@ -950,7 +950,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 	)
 
 	wErr := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+		isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 		if isRedactionEvent {
 			// an event which redacts itself should be ignored
 			if event.EventID() == event.Redacts() {
@@ -1045,7 +1045,7 @@ func (d *EventDatabase) loadRedactionPair(
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
 	var err error
-	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+	isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 
 	var eventBeingRedacted string
 	if isRedactionEvent {

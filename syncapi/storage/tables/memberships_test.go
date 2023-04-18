@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -65,7 +66,7 @@ func TestMembershipsTable(t *testing.T) {
 		u := test.NewUser(t)
 		users = append(users, u.ID)
 
-		ev := room.CreateAndInsert(t, u, gomatrixserverlib.MRoomMember, map[string]interface{}{
+		ev := room.CreateAndInsert(t, u, spec.MRoomMember, map[string]interface{}{
 			"membership": "join",
 		}, test.WithStateKey(u.ID))
 		userEvents = append(userEvents, ev)
@@ -92,7 +93,7 @@ func TestMembershipsTable(t *testing.T) {
 func testMembershipCount(t *testing.T, ctx context.Context, table tables.Memberships, room *test.Room) {
 	t.Run("membership counts are correct", func(t *testing.T) {
 		// After 10 events, we should have 6 users (5 create related [incl. one member event], 5 member events = 6 users)
-		count, err := table.SelectMembershipCount(ctx, nil, room.ID, gomatrixserverlib.Join, 10)
+		count, err := table.SelectMembershipCount(ctx, nil, room.ID, spec.Join, 10)
 		if err != nil {
 			t.Fatalf("failed to get membership count: %s", err)
 		}
@@ -102,7 +103,7 @@ func testMembershipCount(t *testing.T, ctx context.Context, table tables.Members
 		}
 
 		// After 100 events, we should have all 11 users
-		count, err = table.SelectMembershipCount(ctx, nil, room.ID, gomatrixserverlib.Join, 100)
+		count, err = table.SelectMembershipCount(ctx, nil, room.ID, spec.Join, 100)
 		if err != nil {
 			t.Fatalf("failed to get membership count: %s", err)
 		}
@@ -126,12 +127,12 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		if pos != expectedPos {
 			t.Fatalf("expected pos to be %d, got %d", expectedPos, pos)
 		}
-		if membership != gomatrixserverlib.Join {
+		if membership != spec.Join {
 			t.Fatalf("expected membership to be join, got %s", membership)
 		}
 		// Create a new event which gets upserted and should not cause issues
-		ev := room.CreateAndInsert(t, user, gomatrixserverlib.MRoomMember, map[string]interface{}{
-			"membership": gomatrixserverlib.Join,
+		ev := room.CreateAndInsert(t, user, spec.MRoomMember, map[string]interface{}{
+			"membership": spec.Join,
 		}, test.WithStateKey(user.ID))
 		// Insert the same event again, but with different positions, which should get updated
 		if err = table.UpsertMembership(ctx, nil, ev, 2, 2); err != nil {
@@ -147,7 +148,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		if pos != expectedPos {
 			t.Fatalf("expected pos to be %d, got %d", expectedPos, pos)
 		}
-		if membership != gomatrixserverlib.Join {
+		if membership != spec.Join {
 			t.Fatalf("expected membership to be join, got %s", membership)
 		}
 
@@ -155,7 +156,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		if membership, _, err = table.SelectMembershipForUser(ctx, nil, room.ID, user.ID, 1); err != nil {
 			t.Fatalf("failed to select membership: %s", err)
 		}
-		if membership != gomatrixserverlib.Leave {
+		if membership != spec.Leave {
 			t.Fatalf("expected membership to be leave, got %s", membership)
 		}
 	})

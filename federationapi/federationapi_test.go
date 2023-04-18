@@ -148,7 +148,7 @@ func (f *fedClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Tra
 	f.fedClientMutex.Lock()
 	defer f.fedClientMutex.Unlock()
 	for _, edu := range t.EDUs {
-		if edu.Type == gomatrixserverlib.MDeviceListUpdate {
+		if edu.Type == spec.MDeviceListUpdate {
 			f.sentTxn = true
 		}
 	}

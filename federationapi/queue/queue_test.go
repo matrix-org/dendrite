@@ -114,7 +114,7 @@ func mustCreatePDU(t *testing.T) *gomatrixserverlib.HeaderedEvent {
 
 func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 	t.Helper()
-	return &gomatrixserverlib.EDU{Type: gomatrixserverlib.MTyping}
+	return &gomatrixserverlib.EDU{Type: spec.MTyping}
 }
 
 func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {

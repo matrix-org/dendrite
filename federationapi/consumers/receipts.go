@@ -134,7 +134,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 	}
 
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MReceipt,
+		Type:   spec.MReceipt,
 		Origin: string(receiptServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {

@@ -55,7 +55,7 @@ func UpdateToInviteMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
+				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetUserID:     *add.StateKey(),
 			},
@@ -94,7 +94,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	for i := range events {
 		gmslEvents[i] = events[i].Event
 	}
-	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, gomatrixserverlib.Join), nil
+	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, spec.Join), nil
 }
 
 func IsInvitePending(
@@ -195,7 +195,7 @@ func GetMembershipsAtState(
 			return nil, err
 		}
 
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			events = append(events, event)
 		}
 	}

@@ -280,7 +280,7 @@ func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e 
 	resolvedState := &parsedRespState{}
 	switch len(states) {
 	case 0:
-		extremityIsCreate := e.Type() == gomatrixserverlib.MRoomCreate && e.StateKeyEquals("")
+		extremityIsCreate := e.Type() == spec.MRoomCreate && e.StateKeyEquals("")
 		if !extremityIsCreate {
 			// There are no previous states and this isn't the beginning of the
 			// room - this is an error condition!
@@ -292,7 +292,7 @@ func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e 
 		// use it as-is. There's no point in resolving it again. Only trust a
 		// trustworthy state snapshot if it actually contains some state for all
 		// non-create events, otherwise we need to resolve what came from federation.
-		isCreate := e.Type() == gomatrixserverlib.MRoomCreate && e.StateKeyEquals("")
+		isCreate := e.Type() == spec.MRoomCreate && e.StateKeyEquals("")
 		if states[0].trustworthy && (isCreate || len(states[0].StateEvents) > 0) {
 			resolvedState = states[0].parsedRespState
 			break
@@ -598,7 +598,7 @@ Event:
 
 	// If we retrieved back to the beginning of the room then there's nothing else
 	// to do - we closed the gap.
-	if len(earliestNewEvent.PrevEventIDs()) == 0 && earliestNewEvent.Type() == gomatrixserverlib.MRoomCreate && earliestNewEvent.StateKeyEquals("") {
+	if len(earliestNewEvent.PrevEventIDs()) == 0 && earliestNewEvent.Type() == spec.MRoomCreate && earliestNewEvent.StateKeyEquals("") {
 		return newEvents, true, t.isPrevStateKnown(ctx, e), nil
 	}
 

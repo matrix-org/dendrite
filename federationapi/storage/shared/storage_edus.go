@@ -33,8 +33,8 @@ var defaultExpiry = time.Hour * 24
 // defaultExpireEDUTypes contains EDUs which can/should be expired after a given time
 // if the target server isn't reachable for some reason.
 var defaultExpireEDUTypes = map[string]time.Duration{
-	gomatrixserverlib.MTyping:   time.Minute,
-	gomatrixserverlib.MPresence: time.Minute * 10,
+	spec.MTyping:   time.Minute,
+	spec.MPresence: time.Minute * 10,
 }
 
 // AssociateEDUWithDestination creates an association that the
@@ -57,7 +57,7 @@ func (d *Database) AssociateEDUWithDestinations(
 	}
 	// We forcibly set m.direct_to_device and m.device_list_update events
 	// to 0, as we always want them to be delivered. (required for E2EE)
-	if eduType == gomatrixserverlib.MDirectToDevice || eduType == gomatrixserverlib.MDeviceListUpdate {
+	if eduType == spec.MDirectToDevice || eduType == spec.MDeviceListUpdate {
 		expiresAt = 0
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {

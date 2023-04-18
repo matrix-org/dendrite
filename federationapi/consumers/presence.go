@@ -143,7 +143,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MPresence,
+		Type:   spec.MPresence,
 		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {

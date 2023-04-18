@@ -124,7 +124,7 @@ func (r *Inputer) processRoomEvent(
 	if rerr != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", rerr)
 	}
-	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
@@ -477,7 +477,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// If guest_access changed and is not can_join, kick all guest users.
-	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
+	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
 		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
 			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
@@ -510,7 +510,7 @@ func (r *Inputer) processStateBefore(
 ) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
 	historyVisibility = gomatrixserverlib.HistoryVisibilityShared // Default to shared.
 	event := input.Event.Unwrap()
-	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	var stateBeforeEvent []*gomatrixserverlib.Event
 	switch {
 	case isCreateEvent:
@@ -547,7 +547,7 @@ func (r *Inputer) processStateBefore(
 		// output events.
 		tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
 		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
-			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			EventType: spec.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
 		stateBeforeReq := &api.QueryStateAfterEventsRequest{
@@ -580,7 +580,7 @@ func (r *Inputer) processStateBefore(
 	// Work out what the history visibility was at the time of the
 	// event.
 	for _, event := range stateBeforeEvent {
-		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
+		if event.Type() != spec.MRoomHistoryVisibility || !event.StateKeyEquals("") {
 			continue
 		}
 		if hisVis, err := event.HistoryVisibility(); err == nil {
@@ -843,12 +843,12 @@ func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event
 		if err = json.Unmarshal(memberEvent.Content(), &memberContent); err != nil {
 			return err
 		}
-		memberContent.Membership = gomatrixserverlib.Leave
+		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
 			RoomID:     event.RoomID(),
-			Type:       gomatrixserverlib.MRoomMember,
+			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
 			PrevEvents: prevEvents,
