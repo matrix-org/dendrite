@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
@@ -38,7 +39,7 @@ type queryKeysRequest struct {
 // QueryDeviceKeys returns device keys for users on this server.
 // https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-query
 func QueryDeviceKeys(
-	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
+	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer spec.ServerName,
 ) util.JSONResponse {
 	var qkr queryKeysRequest
 	err := json.Unmarshal(request.Content(), &qkr)
@@ -92,7 +93,7 @@ type claimOTKsRequest struct {
 // ClaimOneTimeKeys claims OTKs for users on this server.
 // https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-claim
 func ClaimOneTimeKeys(
-	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
+	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer spec.ServerName,
 ) util.JSONResponse {
 	var cor claimOTKsRequest
 	err := json.Unmarshal(request.Content(), &cor)
@@ -135,7 +136,7 @@ func ClaimOneTimeKeys(
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) util.JSONResponse {
+func LocalKeys(cfg *config.FederationAPI, serverName spec.ServerName) util.JSONResponse {
 	keys, err := localKeys(cfg, serverName)
 	if err != nil {
 		return util.MessageResponse(http.StatusNotFound, err.Error())
@@ -143,7 +144,7 @@ func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
-func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg *config.FederationAPI, serverName spec.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 	var identity *fclient.SigningIdentity
 	var err error
@@ -153,10 +154,10 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 		}
 		publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = cfg.Matrix.ServerName
-		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
+		keys.ValidUntilTS = spec.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 			cfg.Matrix.KeyID: {
-				Key: gomatrixserverlib.Base64Bytes(publicKey),
+				Key: spec.Base64Bytes(publicKey),
 			},
 		}
 		keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
@@ -174,10 +175,10 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 		}
 		publicKey := virtualHost.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = virtualHost.ServerName
-		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(virtualHost.KeyValidityPeriod))
+		keys.ValidUntilTS = spec.AsTimestamp(time.Now().Add(virtualHost.KeyValidityPeriod))
 		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 			virtualHost.KeyID: {
-				Key: gomatrixserverlib.Base64Bytes(publicKey),
+				Key: spec.Base64Bytes(publicKey),
 			},
 		}
 		// TODO: Virtual hosts probably want to be able to specify old signing
@@ -200,7 +201,7 @@ func NotaryKeys(
 	fsAPI federationAPI.FederationInternalAPI,
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
-	serverName := gomatrixserverlib.ServerName(httpReq.Host) // TODO: this is not ideal
+	serverName := spec.ServerName(httpReq.Host) // TODO: this is not ideal
 	if !cfg.Matrix.IsLocalServerName(serverName) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

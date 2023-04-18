@@ -22,6 +22,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -49,7 +50,7 @@ type OutputClientDataConsumer struct {
 	db           storage.Database
 	stream       streams.StreamProvider
 	notifier     *notifier.Notifier
-	serverName   gomatrixserverlib.ServerName
+	serverName   spec.ServerName
 	fts          fulltext.Indexer
 	cfg          *config.SyncAPI
 }

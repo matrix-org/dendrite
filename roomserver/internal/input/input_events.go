@@ -28,6 +28,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -73,7 +74,7 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
-	virtualHost gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
 	input *api.InputRoomEvent,
 ) error {
 	select {
@@ -180,7 +181,7 @@ func (r *Inputer) processRoomEvent(
 		// Sort all of the servers into a map so that we can randomise
 		// their order. Then make sure that the input origin and the
 		// event origin are first on the list.
-		servers := map[gomatrixserverlib.ServerName]struct{}{}
+		servers := map[spec.ServerName]struct{}{}
 		for _, server := range serverRes.ServerNames {
 			servers[server] = struct{}{}
 		}
@@ -602,11 +603,11 @@ func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
 	logger *logrus.Entry,
 	roomInfo *types.RoomInfo,
-	virtualHost gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
 	event *gomatrixserverlib.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
 	known map[string]*types.Event,
-	servers []gomatrixserverlib.ServerName,
+	servers []spec.ServerName,
 ) error {
 	trace, ctx := internal.StartRegion(ctx, "fetchAuthEvents")
 	defer trace.EndRegion()

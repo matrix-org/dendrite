@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -42,15 +43,15 @@ func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
 
 type missingStateReq struct {
 	log             *logrus.Entry
-	virtualHost     gomatrixserverlib.ServerName
-	origin          gomatrixserverlib.ServerName
+	virtualHost     spec.ServerName
+	origin          spec.ServerName
 	db              storage.RoomDatabase
 	roomInfo        *types.RoomInfo
 	inputer         *Inputer
 	keys            gomatrixserverlib.JSONVerifier
 	federation      fedapi.RoomserverFederationAPI
 	roomsMu         *internal.MutexByRoom
-	servers         []gomatrixserverlib.ServerName
+	servers         []spec.ServerName
 	hadEvents       map[string]bool
 	hadEventsMutex  sync.Mutex
 	haveEvents      map[string]*gomatrixserverlib.Event

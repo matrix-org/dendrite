@@ -38,6 +38,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -156,7 +157,7 @@ type reqCtx struct {
 
 	// federated request args
 	isFederatedRequest bool
-	serverName         gomatrixserverlib.ServerName
+	serverName         spec.ServerName
 	fsAPI              fs.FederationInternalAPI
 }
 
@@ -486,7 +487,7 @@ func walkThread(
 }
 
 // MSC2836EventRelationships performs an /event_relationships request to a remote server
-func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
+func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv spec.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
 	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
 		DepthFirst:  rc.req.DepthFirst,
@@ -545,7 +546,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) b
 	return queryMembershipRes.IsInRoom
 }
 
-func (rc *reqCtx) getServersForEventID(eventID string) []gomatrixserverlib.ServerName {
+func (rc *reqCtx) getServersForEventID(eventID string) []spec.ServerName {
 	if rc.req.RoomID == "" {
 		util.GetLogger(rc.ctx).WithField("event_id", eventID).Error(
 			"getServersForEventID: event exists in unknown room",
@@ -689,7 +690,7 @@ func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
 	if count == 0 {
 		return
 	}
-	err := ev.SetUnsignedField("children_hash", gomatrixserverlib.Base64Bytes(hash))
+	err := ev.SetUnsignedField("children_hash", spec.Base64Bytes(hash))
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
 	}

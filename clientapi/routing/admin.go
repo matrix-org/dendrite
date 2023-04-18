@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -262,7 +263,7 @@ func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.De
 		&roomserverAPI.PerformAdminDownloadStateRequest{
 			UserID:     device.UserID,
 			RoomID:     roomID,
-			ServerName: gomatrixserverlib.ServerName(serverName),
+			ServerName: spec.ServerName(serverName),
 		},
 		res,
 	); err != nil {

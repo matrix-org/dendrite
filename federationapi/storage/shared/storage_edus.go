@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // defaultExpiry for EDUs if not listed below
@@ -41,7 +42,7 @@ var defaultExpireEDUTypes = map[string]time.Duration{
 // to which servers.
 func (d *Database) AssociateEDUWithDestinations(
 	ctx context.Context,
-	destinations map[gomatrixserverlib.ServerName]struct{},
+	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
@@ -49,10 +50,10 @@ func (d *Database) AssociateEDUWithDestinations(
 	if expireEDUTypes == nil {
 		expireEDUTypes = defaultExpireEDUTypes
 	}
-	expiresAt := gomatrixserverlib.AsTimestamp(time.Now().Add(defaultExpiry))
+	expiresAt := spec.AsTimestamp(time.Now().Add(defaultExpiry))
 	if duration, ok := expireEDUTypes[eduType]; ok {
 		// Keep EDUs for at least x minutes before deleting them
-		expiresAt = gomatrixserverlib.AsTimestamp(time.Now().Add(duration))
+		expiresAt = spec.AsTimestamp(time.Now().Add(duration))
 	}
 	// We forcibly set m.direct_to_device and m.device_list_update events
 	// to 0, as we always want them to be delivered. (required for E2EE)
@@ -79,7 +80,7 @@ func (d *Database) AssociateEDUWithDestinations(
 // the next pending transaction, up to the limit specified.
 func (d *Database) GetPendingEDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
 ) (
 	edus map[*receipt.Receipt]*gomatrixserverlib.EDU,
@@ -126,7 +127,7 @@ func (d *Database) GetPendingEDUs(
 // transaction was sent successfully.
 func (d *Database) CleanEDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	receipts []*receipt.Receipt,
 ) error {
 	if len(receipts) == 0 {
@@ -169,7 +170,7 @@ func (d *Database) CleanEDUs(
 // waiting to be sent.
 func (d *Database) GetPendingEDUServerNames(
 	ctx context.Context,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	return d.FederationQueueEDUs.SelectQueueEDUServerNames(ctx, nil)
 }
 
@@ -177,7 +178,7 @@ func (d *Database) GetPendingEDUServerNames(
 func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 	var jsonNIDs []int64
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) (err error) {
-		expiredBefore := gomatrixserverlib.AsTimestamp(time.Now())
+		expiredBefore := spec.AsTimestamp(time.Now())
 		jsonNIDs, err = d.FederationQueueEDUs.SelectExpiredEDUs(ctx, txn, expiredBefore)
 		if err != nil {
 			return err

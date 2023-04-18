@@ -14,6 +14,7 @@ package auth
 
 import (
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // TODO: This logic should live in gomatrixserverlib
@@ -21,7 +22,7 @@ import (
 // IsServerAllowed returns true if the server is allowed to see events in the room
 // at this particular state. This function implements https://matrix.org/docs/spec/client_server/r0.6.0#id87
 func IsServerAllowed(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	serverCurrentlyInRoom bool,
 	authEvents []*gomatrixserverlib.Event,
 ) bool {
@@ -65,7 +66,7 @@ func HistoryVisibilityForRoom(authEvents []*gomatrixserverlib.Event) gomatrixser
 	return visibility
 }
 
-func IsAnyUserOnServerWithMembership(serverName gomatrixserverlib.ServerName, authEvents []*gomatrixserverlib.Event, wantMembership string) bool {
+func IsAnyUserOnServerWithMembership(serverName spec.ServerName, authEvents []*gomatrixserverlib.Event, wantMembership string) bool {
 	for _, ev := range authEvents {
 		if ev.Type() != gomatrixserverlib.MRoomMember {
 			continue

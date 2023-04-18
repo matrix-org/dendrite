@@ -37,6 +37,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -88,7 +89,7 @@ func federatedSpacesHandler(
 	ctx context.Context, fedReq *fclient.FederationRequest, roomID string,
 	cache caching.SpaceSummaryRoomsCache,
 	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
-	thisServer gomatrixserverlib.ServerName,
+	thisServer spec.ServerName,
 ) util.JSONResponse {
 	u, err := url.Parse(fedReq.RequestURI())
 	if err != nil {
@@ -122,7 +123,7 @@ func spacesHandler(
 	rsAPI roomserver.RoomserverInternalAPI,
 	fsAPI fs.FederationInternalAPI,
 	cache caching.SpaceSummaryRoomsCache,
-	thisServer gomatrixserverlib.ServerName,
+	thisServer spec.ServerName,
 ) func(*http.Request, *userapi.Device) util.JSONResponse {
 	// declared outside the returned handler so it persists between calls
 	// TODO: clear based on... time?
@@ -162,8 +163,8 @@ type paginationInfo struct {
 type walker struct {
 	rootRoomID      string
 	caller          *userapi.Device
-	serverName      gomatrixserverlib.ServerName
-	thisServer      gomatrixserverlib.ServerName
+	serverName      spec.ServerName
+	thisServer      spec.ServerName
 	rsAPI           roomserver.RoomserverInternalAPI
 	fsAPI           fs.FederationInternalAPI
 	ctx             context.Context
@@ -434,7 +435,7 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) *fclient.MSC294
 		if serverName == string(w.thisServer) {
 			continue
 		}
-		res, err := w.fsAPI.MSC2946Spaces(ctx, w.thisServer, gomatrixserverlib.ServerName(serverName), roomID, w.suggestedOnly)
+		res, err := w.fsAPI.MSC2946Spaces(ctx, w.thisServer, spec.ServerName(serverName), roomID, w.suggestedOnly)
 		if err != nil {
 			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call MSC2946Spaces on server %s", serverName)
 			continue

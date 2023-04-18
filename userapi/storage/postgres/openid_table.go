@@ -8,7 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -34,10 +34,10 @@ const selectOpenIDTokenSQL = "" +
 type openIDTokenStatements struct {
 	insertTokenStmt *sql.Stmt
 	selectTokenStmt *sql.Stmt
-	serverName      gomatrixserverlib.ServerName
+	serverName      spec.ServerName
 }
 
-func NewPostgresOpenIDTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.OpenIDTable, error) {
+func NewPostgresOpenIDTable(db *sql.DB, serverName spec.ServerName) (tables.OpenIDTable, error) {
 	s := &openIDTokenStatements{
 		serverName: serverName,
 	}
@@ -56,7 +56,7 @@ func NewPostgresOpenIDTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
 	txn *sql.Tx,
-	token, localpart string, serverName gomatrixserverlib.ServerName,
+	token, localpart string, serverName spec.ServerName,
 	expiresAtMS int64,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
@@ -72,7 +72,7 @@ func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 ) (*api.OpenIDTokenAttributes, error) {
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 	var localpart string
-	var serverName gomatrixserverlib.ServerName
+	var serverName spec.ServerName
 	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
 		&localpart, &serverName,
 		&openIDTokenAttrs.ExpiresAtMS,

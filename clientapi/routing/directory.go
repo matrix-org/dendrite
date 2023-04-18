@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -35,7 +36,7 @@ type roomDirectoryResponse struct {
 	Servers []string `json:"servers"`
 }
 
-func (r *roomDirectoryResponse) fillServers(servers []gomatrixserverlib.ServerName) {
+func (r *roomDirectoryResponse) fillServers(servers []spec.ServerName) {
 	r.Servers = make([]string, len(servers))
 	for i, s := range servers {
 		r.Servers[i] = string(s)

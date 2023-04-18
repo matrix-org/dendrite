@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // MembershipRequest represents the body of an incoming POST request
@@ -278,7 +279,7 @@ func queryIDServerPubKey(ctx context.Context, idServerName string, keyID string)
 	}
 
 	var pubKeyRes struct {
-		PublicKey gomatrixserverlib.Base64Bytes `json:"public_key"`
+		PublicKey spec.Base64Bytes `json:"public_key"`
 	}
 
 	if resp.StatusCode != http.StatusOK {

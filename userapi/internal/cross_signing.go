@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/curve25519"
 )
@@ -485,12 +486,12 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 				continue
 			}
 
-			appendSignature := func(originUserID string, originKeyID gomatrixserverlib.KeyID, signature gomatrixserverlib.Base64Bytes) {
+			appendSignature := func(originUserID string, originKeyID gomatrixserverlib.KeyID, signature spec.Base64Bytes) {
 				if key.Signatures == nil {
 					key.Signatures = types.CrossSigningSigMap{}
 				}
 				if _, ok := key.Signatures[originUserID]; !ok {
-					key.Signatures[originUserID] = make(map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes)
+					key.Signatures[originUserID] = make(map[gomatrixserverlib.KeyID]spec.Base64Bytes)
 				}
 				key.Signatures[originUserID][originKeyID] = signature
 			}
@@ -577,7 +578,7 @@ func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySig
 						res.Signatures[targetUserID][targetKeyID] = types.CrossSigningSigMap{}
 					}
 					if _, ok := res.Signatures[targetUserID][targetKeyID][sourceUserID]; !ok {
-						res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+						res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 					}
 					res.Signatures[targetUserID][targetKeyID][sourceUserID][sourceKeyID] = sourceSig
 				}

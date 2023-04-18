@@ -35,6 +35,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -86,7 +87,7 @@ func Setup(
 	}
 
 	localKeys := httputil.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return LocalKeys(cfg, gomatrixserverlib.ServerName(req.Host))
+		return LocalKeys(cfg, spec.ServerName(req.Host))
 	})
 
 	notaryKeys := httputil.MakeExternalAPI("notarykeys", func(req *http.Request) util.JSONResponse {
@@ -95,11 +96,11 @@ func Setup(
 			return util.ErrorResponse(err)
 		}
 		var pkReq *gomatrixserverlib.PublicKeyNotaryLookupRequest
-		serverName := gomatrixserverlib.ServerName(vars["serverName"])
+		serverName := spec.ServerName(vars["serverName"])
 		keyID := gomatrixserverlib.KeyID(vars["keyID"])
 		if serverName != "" && keyID != "" {
 			pkReq = &gomatrixserverlib.PublicKeyNotaryLookupRequest{
-				ServerKeys: map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyNotaryQueryCriteria{
+				ServerKeys: map[spec.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyNotaryQueryCriteria{
 					serverName: {
 						keyID: gomatrixserverlib.PublicKeyNotaryQueryCriteria{},
 					},
@@ -537,8 +538,8 @@ func ErrorIfLocalServerNotInRoom(
 
 // MakeFedAPI makes an http.Handler that checks matrix federation authentication.
 func MakeFedAPI(
-	metricsName string, serverName gomatrixserverlib.ServerName,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	metricsName string, serverName spec.ServerName,
+	isLocalServerName func(spec.ServerName) bool,
 	keyRing gomatrixserverlib.JSONVerifier,
 	wakeup *FederationWakeups,
 	f func(*http.Request, *fclient.FederationRequest, map[string]string) util.JSONResponse,
@@ -587,7 +588,7 @@ type FederationWakeups struct {
 	origins sync.Map
 }
 
-func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib.ServerName) {
+func (f *FederationWakeups) Wakeup(ctx context.Context, origin spec.ServerName) {
 	key, keyok := f.origins.Load(origin)
 	if keyok {
 		lastTime, ok := key.(time.Time)
@@ -595,6 +596,6 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 			return
 		}
 	}
-	f.FsAPI.MarkServersAlive([]gomatrixserverlib.ServerName{origin})
+	f.FsAPI.MarkServersAlive([]spec.ServerName{origin})
 	f.origins.Store(origin, time.Now())
 }

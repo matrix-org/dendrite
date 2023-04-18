@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -159,7 +160,7 @@ type QueryMembershipsForRoomResponse struct {
 type QueryServerJoinedToRoomRequest struct {
 	// Server name of the server to find. If not specified, we will
 	// default to checking if the local server is joined.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 	// ID of the room to see if we are still joined to
 	RoomID string `json:"room_id"`
 }
@@ -177,7 +178,7 @@ type QueryServerAllowedToSeeEventRequest struct {
 	// The event ID to look up invites in.
 	EventID string `json:"event_id"`
 	// The server interested in the event
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 // QueryServerAllowedToSeeEventResponse is a response to QueryServerAllowedToSeeEvent
@@ -195,7 +196,7 @@ type QueryMissingEventsRequest struct {
 	// Limit the number of events this query returns.
 	Limit int `json:"limit"`
 	// The server interested in the event
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 // QueryMissingEventsResponse is a response to QueryMissingEvents
@@ -340,8 +341,8 @@ type QueryKnownUsersResponse struct {
 }
 
 type QueryServerBannedFromRoomRequest struct {
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-	RoomID     string                       `json:"room_id"`
+	ServerName spec.ServerName `json:"server_name"`
+	RoomID     string          `json:"room_id"`
 }
 
 type QueryServerBannedFromRoomResponse struct {

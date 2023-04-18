@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -54,7 +55,7 @@ func Setup(
 				}
 			}
 
-			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
+			userID, err := spec.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
@@ -79,7 +80,7 @@ func Setup(
 				}
 			}
 
-			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
+			userID, err := spec.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
@@ -93,8 +94,8 @@ func Setup(
 
 // MakeRelayAPI makes an http.Handler that checks matrix relay authentication.
 func MakeRelayAPI(
-	metricsName string, serverName gomatrixserverlib.ServerName,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	metricsName string, serverName spec.ServerName,
+	isLocalServerName func(spec.ServerName) bool,
 	keyRing gomatrixserverlib.JSONVerifier,
 	f func(*http.Request, *fclient.FederationRequest, map[string]string) util.JSONResponse,
 ) http.Handler {

@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,8 +43,8 @@ func (r *RelayInternalAPI) RelayingEnabled() bool {
 // PerformRelayServerSync implements api.RelayInternalAPI
 func (r *RelayInternalAPI) PerformRelayServerSync(
 	ctx context.Context,
-	userID gomatrixserverlib.UserID,
-	relayServer gomatrixserverlib.ServerName,
+	userID spec.UserID,
+	relayServer spec.ServerName,
 ) error {
 	// Providing a default RelayEntry (EntryID = 0) is done to ask the relay if there are any
 	// transactions available for this node.
@@ -75,7 +76,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 func (r *RelayInternalAPI) PerformStoreTransaction(
 	ctx context.Context,
 	transaction gomatrixserverlib.Transaction,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 ) error {
 	logrus.Warnf("Storing transaction for %v", userID)
 	receipt, err := r.db.StoreTransaction(ctx, transaction)
@@ -85,7 +86,7 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 	}
 	err = r.db.AssociateTransactionWithDestinations(
 		ctx,
-		map[gomatrixserverlib.UserID]struct{}{
+		map[spec.UserID]struct{}{
 			userID: {},
 		},
 		transaction.TransactionID,
@@ -97,7 +98,7 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 // QueryTransactions implements api.RelayInternalAPI
 func (r *RelayInternalAPI) QueryTransactions(
 	ctx context.Context,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
 	logrus.Infof("QueryTransactions for %s", userID.Raw())

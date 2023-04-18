@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -34,7 +35,7 @@ func GetEvent(
 	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	eventID string,
-	origin gomatrixserverlib.ServerName,
+	origin spec.ServerName,
 ) util.JSONResponse {
 	err := allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
 	if err != nil {
@@ -49,7 +50,7 @@ func GetEvent(
 
 	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.Transaction{
 		Origin:         origin,
-		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		OriginServerTS: spec.AsTimestamp(time.Now()),
 		PDUs: []json.RawMessage{
 			event.JSON(),
 		},
@@ -60,7 +61,7 @@ func GetEvent(
 // otherwise it returns an error response which can be sent to the client.
 func allowedToSeeEvent(
 	ctx context.Context,
-	origin gomatrixserverlib.ServerName,
+	origin spec.ServerName,
 	rsAPI api.FederationRoomserverAPI,
 	eventID string,
 ) *util.JSONResponse {

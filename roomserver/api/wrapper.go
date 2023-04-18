@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -27,8 +28,8 @@ import (
 func SendEvents(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
 	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
-	virtualHost, origin gomatrixserverlib.ServerName,
-	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
+	virtualHost, origin spec.ServerName,
+	sendAsServer spec.ServerName, txnID *TransactionID,
 	async bool,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
@@ -49,9 +50,9 @@ func SendEvents(
 // marked as `true` in haveEventIDs.
 func SendEventWithState(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
-	virtualHost gomatrixserverlib.ServerName, kind Kind,
+	virtualHost spec.ServerName, kind Kind,
 	state gomatrixserverlib.StateResponse, event *gomatrixserverlib.HeaderedEvent,
-	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool, async bool,
+	origin spec.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
 	outliers := gomatrixserverlib.LineariseStateResponse(event.RoomVersion, state)
 	ires := make([]InputRoomEvent, 0, len(outliers))
@@ -93,7 +94,7 @@ func SendEventWithState(
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
-	virtualHost gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
 	ires []InputRoomEvent, async bool,
 ) error {
 	request := InputRoomEventsRequest{
@@ -144,7 +145,7 @@ func GetStateEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID string, tup
 }
 
 // IsServerBannedFromRoom returns whether the server is banned from a room by server ACLs.
-func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, roomID string, serverName gomatrixserverlib.ServerName) bool {
+func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, roomID string, serverName spec.ServerName) bool {
 	req := &QueryServerBannedFromRoomRequest{
 		ServerName: serverName,
 		RoomID:     roomID,

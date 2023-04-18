@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -227,7 +228,7 @@ func (r *Leaver) performFederatedRejectInvite(
 	leaveReq := fsAPI.PerformLeaveRequest{
 		RoomID:      req.RoomID,
 		UserID:      req.UserID,
-		ServerNames: []gomatrixserverlib.ServerName{domain},
+		ServerNames: []spec.ServerName{domain},
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
 	if err = r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {

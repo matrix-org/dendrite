@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -41,7 +42,7 @@ import (
 type Queryer struct {
 	DB                storage.Database
 	Cache             caching.RoomServerCaches
-	IsLocalServerName func(gomatrixserverlib.ServerName) bool
+	IsLocalServerName func(spec.ServerName) bool
 	ServerACLs        *acls.ServerACLs
 }
 
@@ -435,7 +436,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
 func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	eventID string,
 ) (allowed bool, err error) {
 	events, err := r.DB.EventNIDs(ctx, []string{eventID})

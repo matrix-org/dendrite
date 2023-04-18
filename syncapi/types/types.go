@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -606,11 +607,11 @@ type Peek struct {
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
 type OutputReceiptEvent struct {
-	UserID    string                      `json:"user_id"`
-	RoomID    string                      `json:"room_id"`
-	EventID   string                      `json:"event_id"`
-	Type      string                      `json:"type"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+	UserID    string         `json:"user_id"`
+	RoomID    string         `json:"room_id"`
+	EventID   string         `json:"event_id"`
+	Type      string         `json:"type"`
+	Timestamp spec.Timestamp `json:"timestamp"`
 }
 
 // OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.

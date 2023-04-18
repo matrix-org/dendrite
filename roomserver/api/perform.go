@@ -7,6 +7,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -77,18 +78,18 @@ const (
 )
 
 type PerformJoinRequest struct {
-	RoomIDOrAlias string                         `json:"room_id_or_alias"`
-	UserID        string                         `json:"user_id"`
-	IsGuest       bool                           `json:"is_guest"`
-	Content       map[string]interface{}         `json:"content"`
-	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
-	Unsigned      map[string]interface{}         `json:"unsigned"`
+	RoomIDOrAlias string                 `json:"room_id_or_alias"`
+	UserID        string                 `json:"user_id"`
+	IsGuest       bool                   `json:"is_guest"`
+	Content       map[string]interface{} `json:"content"`
+	ServerNames   []spec.ServerName      `json:"server_names"`
+	Unsigned      map[string]interface{} `json:"unsigned"`
 }
 
 type PerformJoinResponse struct {
 	// The room ID, populated on success.
 	RoomID    string `json:"room_id"`
-	JoinedVia gomatrixserverlib.ServerName
+	JoinedVia spec.ServerName
 	// If non-nil, the join request failed. Contains more information why it failed.
 	Error *PerformError
 }
@@ -116,10 +117,10 @@ type PerformInviteResponse struct {
 }
 
 type PerformPeekRequest struct {
-	RoomIDOrAlias string                         `json:"room_id_or_alias"`
-	UserID        string                         `json:"user_id"`
-	DeviceID      string                         `json:"device_id"`
-	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
+	RoomIDOrAlias string            `json:"room_id_or_alias"`
+	UserID        string            `json:"user_id"`
+	DeviceID      string            `json:"device_id"`
+	ServerNames   []spec.ServerName `json:"server_names"`
 }
 
 type PerformPeekResponse struct {
@@ -149,9 +150,9 @@ type PerformBackfillRequest struct {
 	// The maximum number of events to retrieve.
 	Limit int `json:"limit"`
 	// The server interested in the events.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 	// Which virtual host are we doing this for?
-	VirtualHost gomatrixserverlib.ServerName `json:"virtual_host"`
+	VirtualHost spec.ServerName `json:"virtual_host"`
 }
 
 // PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
@@ -184,11 +185,11 @@ type PerformPublishResponse struct {
 }
 
 type PerformInboundPeekRequest struct {
-	UserID          string                       `json:"user_id"`
-	RoomID          string                       `json:"room_id"`
-	PeekID          string                       `json:"peek_id"`
-	ServerName      gomatrixserverlib.ServerName `json:"server_name"`
-	RenewalInterval int64                        `json:"renewal_interval"`
+	UserID          string          `json:"user_id"`
+	RoomID          string          `json:"room_id"`
+	PeekID          string          `json:"peek_id"`
+	ServerName      spec.ServerName `json:"server_name"`
+	RenewalInterval int64           `json:"renewal_interval"`
 }
 
 type PerformInboundPeekResponse struct {
@@ -251,9 +252,9 @@ type PerformAdminPurgeRoomResponse struct {
 }
 
 type PerformAdminDownloadStateRequest struct {
-	RoomID     string                       `json:"room_id"`
-	UserID     string                       `json:"user_id"`
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	RoomID     string          `json:"room_id"`
+	UserID     string          `json:"user_id"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 type PerformAdminDownloadStateResponse struct {

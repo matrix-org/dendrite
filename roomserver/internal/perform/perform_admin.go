@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -361,7 +362,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Type:    "org.matrix.dendrite.state_download",
 		Sender:  req.UserID,
 		RoomID:  req.RoomID,
-		Content: gomatrixserverlib.RawJSON("{}"),
+		Content: spec.RawJSON("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)

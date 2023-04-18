@@ -27,11 +27,12 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
+	testOrigin = spec.ServerName("kaer.morhen")
 )
 
 func createTransaction() gomatrixserverlib.Transaction {
@@ -44,10 +45,10 @@ func createTransaction() gomatrixserverlib.Transaction {
 }
 
 func createFederationRequest(
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 	txnID gomatrixserverlib.TransactionID,
-	origin gomatrixserverlib.ServerName,
-	destination gomatrixserverlib.ServerName,
+	origin spec.ServerName,
+	destination spec.ServerName,
 	content interface{},
 ) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
@@ -66,7 +67,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	txn := createTransaction()
@@ -89,7 +90,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
@@ -118,7 +119,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
@@ -152,7 +153,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
@@ -186,7 +187,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	txn := createTransaction()

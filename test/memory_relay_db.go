@@ -21,13 +21,14 @@ import (
 	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type InMemoryRelayDatabase struct {
 	nid          int64
 	nidMutex     sync.Mutex
 	transactions map[int64]json.RawMessage
-	associations map[gomatrixserverlib.ServerName][]int64
+	associations map[spec.ServerName][]int64
 }
 
 func NewInMemoryRelayDatabase() *InMemoryRelayDatabase {
@@ -35,7 +36,7 @@ func NewInMemoryRelayDatabase() *InMemoryRelayDatabase {
 		nid:          1,
 		nidMutex:     sync.Mutex{},
 		transactions: make(map[int64]json.RawMessage),
-		associations: make(map[gomatrixserverlib.ServerName][]int64),
+		associations: make(map[spec.ServerName][]int64),
 	}
 }
 
@@ -43,7 +44,7 @@ func (d *InMemoryRelayDatabase) InsertQueueEntry(
 	ctx context.Context,
 	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	nid int64,
 ) error {
 	if _, ok := d.associations[serverName]; !ok {
@@ -56,7 +57,7 @@ func (d *InMemoryRelayDatabase) InsertQueueEntry(
 func (d *InMemoryRelayDatabase) DeleteQueueEntries(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
 	for _, nid := range jsonNIDs {
@@ -72,7 +73,7 @@ func (d *InMemoryRelayDatabase) DeleteQueueEntries(
 
 func (d *InMemoryRelayDatabase) SelectQueueEntries(
 	ctx context.Context,
-	txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	txn *sql.Tx, serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
 	results := []int64{}
@@ -92,7 +93,7 @@ func (d *InMemoryRelayDatabase) SelectQueueEntries(
 func (d *InMemoryRelayDatabase) SelectQueueEntryCount(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (int64, error) {
 	return int64(len(d.associations[serverName])), nil
 }

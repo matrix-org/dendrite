@@ -29,6 +29,7 @@ import (
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -58,7 +59,7 @@ type TxnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI                  api.FederationRoomserverAPI
 	userAPI                userAPI.FederationUserAPI
-	ourServerName          gomatrixserverlib.ServerName
+	ourServerName          spec.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
 	roomsMu                *MutexByRoom
 	producer               *producers.SyncAPIProducer
@@ -68,16 +69,16 @@ type TxnReq struct {
 func NewTxnReq(
 	rsAPI api.FederationRoomserverAPI,
 	userAPI userAPI.FederationUserAPI,
-	ourServerName gomatrixserverlib.ServerName,
+	ourServerName spec.ServerName,
 	keys gomatrixserverlib.JSONVerifier,
 	roomsMu *MutexByRoom,
 	producer *producers.SyncAPIProducer,
 	inboundPresenceEnabled bool,
 	pdus []json.RawMessage,
 	edus []gomatrixserverlib.EDU,
-	origin gomatrixserverlib.ServerName,
+	origin spec.ServerName,
 	transactionID gomatrixserverlib.TransactionID,
-	destination gomatrixserverlib.ServerName,
+	destination spec.ServerName,
 ) TxnReq {
 	t := TxnReq{
 		rsAPI:                  rsAPI,
@@ -336,7 +337,7 @@ func (t *TxnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 // processReceiptEvent sends receipt events to JetStream
 func (t *TxnReq) processReceiptEvent(ctx context.Context,
 	userID, roomID, receiptType string,
-	timestamp gomatrixserverlib.Timestamp,
+	timestamp spec.Timestamp,
 	eventIDs []string,
 ) error {
 	if _, serverName, err := gomatrixserverlib.SplitID('@', userID); err != nil {

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
@@ -39,7 +40,7 @@ type OutputPresenceConsumer struct {
 	durable                 string
 	db                      storage.Database
 	queues                  *queue.OutgoingQueues
-	isLocalServerName       func(gomatrixserverlib.ServerName) bool
+	isLocalServerName       func(spec.ServerName) bool
 	rsAPI                   roomserverAPI.FederationRoomserverAPI
 	topic                   string
 	outboundPresenceEnabled bool
@@ -127,7 +128,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		statusMsg = &status
 	}
 
-	p := types.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(ts)}
+	p := types.PresenceInternal{LastActiveTS: spec.Timestamp(ts)}
 
 	content := fedTypes.Presence{
 		Push: []fedTypes.PresenceContent{

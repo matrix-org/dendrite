@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -195,7 +196,7 @@ func ExchangeThirdPartyInvite(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
 	}
-	inviteEvent, err := signedEvent.Event.UntrustedEvent(verRes.RoomVersion)
+	inviteEvent, err := gomatrixserverlib.UntrustedEvent(signedEvent.Event, verRes.RoomVersion)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
@@ -361,7 +362,7 @@ func sendToRemoteServer(
 	federation federationAPI.FederationClient, cfg *config.FederationAPI,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
-	remoteServers := make([]gomatrixserverlib.ServerName, 2)
+	remoteServers := make([]spec.ServerName, 2)
 	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
 	if err != nil {
 		return

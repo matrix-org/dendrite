@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -119,5 +120,5 @@ type ReceiptMRead struct {
 }
 
 type ReceiptTS struct {
-	TS gomatrixserverlib.Timestamp `json:"ts"`
+	TS spec.Timestamp `json:"ts"`
 }

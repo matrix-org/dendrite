@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -74,11 +75,11 @@ func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 	})
 }
 
-func createGetRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, userID string) *http.Request {
+func createGetRelayTxnHTTPRequest(serverName spec.ServerName, userID string) *http.Request {
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
-	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	origin := spec.ServerName(hex.EncodeToString(pk))
 	req := fclient.NewFederationRequest("GET", origin, serverName, "/_matrix/federation/v1/relay_txn/"+userID)
 	content := fclient.RelayEntry{EntryID: 0}
 	req.SetContent(content)
@@ -94,11 +95,11 @@ type sendRelayContent struct {
 	EDUs []gomatrixserverlib.EDU `json:"edus"`
 }
 
-func createSendRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, txnID string, userID string) *http.Request {
+func createSendRelayTxnHTTPRequest(serverName spec.ServerName, txnID string, userID string) *http.Request {
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
-	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	origin := spec.ServerName(hex.EncodeToString(pk))
 	req := fclient.NewFederationRequest("PUT", origin, serverName, "/_matrix/federation/v1/send_relay/"+txnID+"/"+userID)
 	content := sendRelayContent{}
 	req.SetContent(content)

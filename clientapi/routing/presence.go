@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -123,7 +123,7 @@ func GetPresence(
 		}
 	}
 
-	p := types.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(lastActive)}
+	p := types.PresenceInternal{LastActiveTS: spec.Timestamp(lastActive)}
 	currentlyActive := p.CurrentlyActive()
 	return util.JSONResponse{
 		Code: http.StatusOK,

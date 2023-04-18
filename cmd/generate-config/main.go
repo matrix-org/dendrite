@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 			SingleDatabase: true,
 		})
 		if *serverName != "" {
-			cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
+			cfg.Global.ServerName = spec.ServerName(*serverName)
 		}
 		uri := config.DataSource(*dbURI)
 		if uri.IsSQLite() || uri == "" {

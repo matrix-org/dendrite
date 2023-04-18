@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const notaryServerKeysMetadataSchema = `
@@ -101,12 +102,12 @@ func NewSQLiteNotaryServerKeysMetadataTable(db *sql.DB) (s *notaryServerKeysMeta
 }
 
 func (s *notaryServerKeysMetadataStatements) UpsertKey(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, keyID gomatrixserverlib.KeyID, newNotaryID tables.NotaryID, newValidUntil gomatrixserverlib.Timestamp,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, keyID gomatrixserverlib.KeyID, newNotaryID tables.NotaryID, newValidUntil spec.Timestamp,
 ) (tables.NotaryID, error) {
 	notaryID := newNotaryID
 	// see if the existing notary ID a) exists, b) has a longer valid_until
 	var existingNotaryID tables.NotaryID
-	var existingValidUntil gomatrixserverlib.Timestamp
+	var existingValidUntil spec.Timestamp
 	if err := txn.Stmt(s.selectNotaryKeyMetadataStmt).QueryRowContext(ctx, serverName, keyID).Scan(&existingNotaryID, &existingValidUntil); err != nil {
 		if err != sql.ErrNoRows {
 			return 0, err
@@ -121,7 +122,7 @@ func (s *notaryServerKeysMetadataStatements) UpsertKey(
 	return notaryID, err
 }
 
-func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, keyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error) {
+func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn *sql.Tx, serverName spec.ServerName, keyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error) {
 	var rows *sql.Rows
 	var err error
 	if len(keyIDs) == 0 {

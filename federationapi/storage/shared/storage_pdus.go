@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // AssociatePDUWithDestination creates an association that the
@@ -30,7 +31,7 @@ import (
 // to which servers.
 func (d *Database) AssociatePDUWithDestinations(
 	ctx context.Context,
-	destinations map[gomatrixserverlib.ServerName]struct{},
+	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -52,7 +53,7 @@ func (d *Database) AssociatePDUWithDestinations(
 // the next pending transaction, up to the limit specified.
 func (d *Database) GetPendingPDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
 ) (
 	events map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent,
@@ -105,7 +106,7 @@ func (d *Database) GetPendingPDUs(
 // successfully.
 func (d *Database) CleanPDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	receipts []*receipt.Receipt,
 ) error {
 	if len(receipts) == 0 {
@@ -148,6 +149,6 @@ func (d *Database) CleanPDUs(
 // waiting to be sent.
 func (d *Database) GetPendingPDUServerNames(
 	ctx context.Context,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	return d.FederationQueuePDUs.SelectQueuePDUServerNames(ctx, nil)
 }

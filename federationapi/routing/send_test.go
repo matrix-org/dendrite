@@ -33,12 +33,13 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
 
 const (
-	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
+	testOrigin = spec.ServerName("kaer.morhen")
 )
 
 type sendContent struct {
@@ -71,7 +72,7 @@ func TestHandleSend(t *testing.T) {
 		_, sk, _ := ed25519.GenerateKey(nil)
 		keyID := signing.KeyID
 		pk := sk.Public().(ed25519.PublicKey)
-		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+		serverName := spec.ServerName(hex.EncodeToString(pk))
 		req := fclient.NewFederationRequest("PUT", serverName, testOrigin, "/send/1234")
 		content := sendContent{}
 		err := req.SetContent(content)

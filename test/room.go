@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 )
@@ -152,7 +153,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 		mod.origin = creator.srvName
 	}
 
-	var unsigned gomatrixserverlib.RawJSON
+	var unsigned spec.RawJSON
 	var err error
 	if mod.unsigned != nil {
 		unsigned, err = json.Marshal(mod.unsigned)

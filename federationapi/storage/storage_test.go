@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +24,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, caches, func(server gomatrixserverlib.ServerName) bool { return server == "localhost" })
+	}, caches, func(server spec.ServerName) bool { return server == "localhost" })
 	if err != nil {
 		t.Fatalf("NewDatabase returned %s", err)
 	}
@@ -38,7 +39,7 @@ func TestExpireEDUs(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	destinations := map[gomatrixserverlib.ServerName]struct{}{"localhost": {}}
+	destinations := map[spec.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateFederationDatabase(t, dbType)
 		defer close()
@@ -249,8 +250,8 @@ func TestInboundPeeking(t *testing.T) {
 }
 
 func TestServersAssumedOffline(t *testing.T) {
-	server1 := gomatrixserverlib.ServerName("server1")
-	server2 := gomatrixserverlib.ServerName("server2")
+	server1 := spec.ServerName("server1")
+	server2 := spec.ServerName("server2")
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
@@ -305,29 +306,29 @@ func TestServersAssumedOffline(t *testing.T) {
 }
 
 func TestRelayServersStored(t *testing.T) {
-	server := gomatrixserverlib.ServerName("server")
-	relayServer1 := gomatrixserverlib.ServerName("relayserver1")
-	relayServer2 := gomatrixserverlib.ServerName("relayserver2")
+	server := spec.ServerName("server")
+	relayServer1 := spec.ServerName("relayserver1")
+	relayServer2 := spec.ServerName("relayserver2")
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
 		defer closeDB()
 
-		err := db.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1})
+		err := db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)
 
 		relayServers, err := db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Equal(t, relayServer1, relayServers[0])
 
-		err = db.P2PRemoveRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1})
+		err = db.P2PRemoveRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)
 
 		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Zero(t, len(relayServers))
 
-		err = db.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1, relayServer2})
+		err = db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1, relayServer2})
 		assert.Nil(t, err)
 
 		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)

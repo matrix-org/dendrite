@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -91,10 +92,10 @@ func GetUserDevices(
 				for sourceUserID, forSourceUser := range targetKey {
 					for sourceKeyID, sourceKey := range forSourceUser {
 						if device.Keys.Signatures == nil {
-							device.Keys.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+							device.Keys.Signatures = map[string]map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 						}
 						if _, ok := device.Keys.Signatures[sourceUserID]; !ok {
-							device.Keys.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+							device.Keys.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 						}
 						device.Keys.Signatures[sourceUserID][sourceKeyID] = sourceKey
 					}

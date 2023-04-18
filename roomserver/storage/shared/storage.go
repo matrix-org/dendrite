@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
@@ -1469,7 +1470,7 @@ func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomN
 }
 
 // GetServerInRoom returns true if we think a server is in a given room or false otherwise.
-func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName spec.ServerName) (bool, error) {
 	return d.MembershipTable.SelectServerInRoom(ctx, nil, roomNID, serverName)
 }
 

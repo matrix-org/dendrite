@@ -20,6 +20,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -40,7 +41,7 @@ type KeyChangeConsumer struct {
 	durable           string
 	db                storage.Database
 	queues            *queue.OutgoingQueues
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 	rsAPI             roomserverAPI.FederationRoomserverAPI
 	topic             string
 }
