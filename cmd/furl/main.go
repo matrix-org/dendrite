@@ -83,7 +83,7 @@ func main() {
 		}
 	}
 
-	req := gomatrixserverlib.NewFederationRequest(
+	req := fclient.NewFederationRequest(
 		method,
 		serverName,
 		gomatrixserverlib.ServerName(u.Host),

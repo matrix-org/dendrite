@@ -79,7 +79,7 @@ func createGetRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, userI
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("GET", origin, serverName, "/_matrix/federation/v1/relay_txn/"+userID)
+	req := fclient.NewFederationRequest("GET", origin, serverName, "/_matrix/federation/v1/relay_txn/"+userID)
 	content := fclient.RelayEntry{EntryID: 0}
 	req.SetContent(content)
 	req.Sign(origin, gomatrixserverlib.KeyID(keyID), sk)
@@ -99,7 +99,7 @@ func createSendRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, txnI
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("PUT", origin, serverName, "/_matrix/federation/v1/send_relay/"+txnID+"/"+userID)
+	req := fclient.NewFederationRequest("PUT", origin, serverName, "/_matrix/federation/v1/send_relay/"+txnID+"/"+userID)
 	content := sendRelayContent{}
 	req.SetContent(content)
 	req.Sign(origin, gomatrixserverlib.KeyID(keyID), sk)

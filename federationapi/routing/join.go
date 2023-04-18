@@ -35,7 +35,7 @@ import (
 // MakeJoin implements the /make_join API
 func MakeJoin(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	roomID, userID string,
@@ -190,7 +190,7 @@ func MakeJoin(
 // nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,

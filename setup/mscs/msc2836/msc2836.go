@@ -134,7 +134,7 @@ func Enable(
 
 	routers.Federation.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
 		"msc2836_event_relationships", func(req *http.Request) util.JSONResponse {
-			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
+			fedReq, errResp := fclient.VerifyHTTPRequest(
 				req, time.Now(), cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 			)
 			if fedReq == nil {
@@ -192,7 +192,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 }
 
 func federatedEventRelationship(
-	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	ctx context.Context, fedReq *fclient.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 ) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {

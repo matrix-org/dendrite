@@ -325,7 +325,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 			t.Errorf("failed to parse event: %s", err)
 		}
 		he := ev.Headered(tc.roomVer)
-		invReq, err := gomatrixserverlib.NewInviteV2Request(he, nil)
+		invReq, err := fclient.NewInviteV2Request(he, nil)
 		if err != nil {
 			t.Errorf("failed to create invite v2 request: %s", err)
 			continue

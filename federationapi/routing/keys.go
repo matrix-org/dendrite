@@ -38,7 +38,7 @@ type queryKeysRequest struct {
 // QueryDeviceKeys returns device keys for users on this server.
 // https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-query
 func QueryDeviceKeys(
-	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
+	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var qkr queryKeysRequest
 	err := json.Unmarshal(request.Content(), &qkr)
@@ -92,7 +92,7 @@ type claimOTKsRequest struct {
 // ClaimOneTimeKeys claims OTKs for users on this server.
 // https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-claim
 func ClaimOneTimeKeys(
-	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
+	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var cor claimOTKsRequest
 	err := json.Unmarshal(request.Content(), &cor)

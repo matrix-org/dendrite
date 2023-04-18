@@ -26,7 +26,7 @@ import (
 // GetEventAuth returns event auth for the roomID and eventID
 func GetEventAuth(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,

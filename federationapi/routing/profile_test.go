@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
@@ -76,7 +77,7 @@ func TestHandleQueryProfile(t *testing.T) {
 		keyID := signing.KeyID
 		pk := sk.Public().(ed25519.PublicKey)
 		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-		req := gomatrixserverlib.NewFederationRequest("GET", serverName, testOrigin, "/query/profile?user_id="+url.QueryEscape("@user:"+string(testOrigin)))
+		req := fclient.NewFederationRequest("GET", serverName, testOrigin, "/query/profile?user_id="+url.QueryEscape("@user:"+string(testOrigin)))
 		type queryContent struct{}
 		content := queryContent{}
 		err := req.SetContent(content)

@@ -26,6 +26,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -510,7 +511,7 @@ func createRoom(
 	// If this is a direct message then we should invite the participants.
 	if len(r.Invite) > 0 {
 		// Build some stripped state for the invite.
-		var globalStrippedState []gomatrixserverlib.InviteV2StrippedState
+		var globalStrippedState []fclient.InviteV2StrippedState
 		for _, event := range builtEvents {
 			// Chosen events from the spec:
 			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
@@ -533,7 +534,7 @@ func createRoom(
 				ev := event.Event
 				globalStrippedState = append(
 					globalStrippedState,
-					gomatrixserverlib.NewInviteV2StrippedState(ev),
+					fclient.NewInviteV2StrippedState(ev),
 				)
 			}
 		}
@@ -551,7 +552,7 @@ func createRoom(
 			}
 			inviteStrippedState := append(
 				globalStrippedState,
-				gomatrixserverlib.NewInviteV2StrippedState(inviteEvent.Event),
+				fclient.NewInviteV2StrippedState(inviteEvent.Event),
 			)
 			// Send the invite event to the roomserver.
 			var inviteRes roomserverAPI.PerformInviteResponse

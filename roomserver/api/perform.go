@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -103,11 +104,11 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
-	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
-	SendAsServer    string                                    `json:"send_as_server"`
-	TransactionID   *TransactionID                            `json:"transaction_id"`
+	RoomVersion     gomatrixserverlib.RoomVersion    `json:"room_version"`
+	Event           *gomatrixserverlib.HeaderedEvent `json:"event"`
+	InviteRoomState []fclient.InviteV2StrippedState  `json:"invite_room_state"`
+	SendAsServer    string                           `json:"send_as_server"`
+	TransactionID   *TransactionID                   `json:"transaction_id"`
 }
 
 type PerformInviteResponse struct {

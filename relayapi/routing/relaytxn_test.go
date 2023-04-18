@@ -32,10 +32,10 @@ import (
 func createQuery(
 	userID gomatrixserverlib.UserID,
 	prevEntry fclient.RelayEntry,
-) gomatrixserverlib.FederationRequest {
+) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
 	path := federationPathPrefixV1 + "/relay_txn/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("GET", userID.Domain(), "relay", path)
+	request := fclient.NewFederationRequest("GET", userID.Domain(), "relay", path)
 	request.SetContent(prevEntry)
 
 	return request

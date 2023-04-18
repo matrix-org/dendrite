@@ -64,7 +64,7 @@ func Enable(
 
 	fedAPI := httputil.MakeExternalAPI(
 		"msc2946_fed_spaces", func(req *http.Request) util.JSONResponse {
-			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
+			fedReq, errResp := fclient.VerifyHTTPRequest(
 				req, time.Now(), cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 			)
 			if fedReq == nil {
@@ -85,7 +85,7 @@ func Enable(
 }
 
 func federatedSpacesHandler(
-	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, roomID string,
+	ctx context.Context, fedReq *fclient.FederationRequest, roomID string,
 	cache caching.SpaceSummaryRoomsCache,
 	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	thisServer gomatrixserverlib.ServerName,

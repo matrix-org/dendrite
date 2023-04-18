@@ -117,7 +117,7 @@ type FederationClient interface {
 	SendJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res fclient.RespSendJoin, err error)
 	MakeLeave(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, userID string) (res fclient.RespMakeLeave, err error)
 	SendLeave(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (err error)
-	SendInviteV2(ctx context.Context, origin, s gomatrixserverlib.ServerName, request gomatrixserverlib.InviteV2Request) (res fclient.RespInviteV2, err error)
+	SendInviteV2(ctx context.Context, origin, s gomatrixserverlib.ServerName, request fclient.InviteV2Request) (res fclient.RespInviteV2, err error)
 
 	GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 
@@ -223,9 +223,9 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
-	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
+	RoomVersion     gomatrixserverlib.RoomVersion    `json:"room_version"`
+	Event           *gomatrixserverlib.HeaderedEvent `json:"event"`
+	InviteRoomState []fclient.InviteV2StrippedState  `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {

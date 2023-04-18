@@ -649,7 +649,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := gomatrixserverlib.NewInviteV2Request(request.Event, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(request.Event, request.InviteRoomState)
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}

@@ -30,7 +30,7 @@ import (
 // This endpoint can be extracted into a separate relay server service.
 func GetTransactionFromRelay(
 	httpReq *http.Request,
-	fedReq *gomatrixserverlib.FederationRequest,
+	fedReq *fclient.FederationRequest,
 	relayAPI api.RelayInternalAPI,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {

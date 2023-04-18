@@ -27,7 +27,7 @@ import (
 // GetState returns state events & auth events for the roomID, eventID
 func GetState(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
@@ -50,7 +50,7 @@ func GetState(
 // GetStateIDs returns state event IDs & auth event IDs for the roomID, eventID
 func GetStateIDs(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
@@ -75,7 +75,7 @@ func GetStateIDs(
 }
 
 func parseEventIDParam(
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 ) (eventID string, resErr *util.JSONResponse) {
 	URL, err := url.Parse(request.RequestURI())
 	if err != nil {
@@ -97,7 +97,7 @@ func parseEventIDParam(
 
 func getState(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,

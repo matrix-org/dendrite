@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,10 +49,10 @@ func createFederationRequest(
 	origin gomatrixserverlib.ServerName,
 	destination gomatrixserverlib.ServerName,
 	content interface{},
-) gomatrixserverlib.FederationRequest {
+) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
 	path := federationPathPrefixV1 + "/send_relay/" + string(txnID) + "/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("PUT", origin, destination, path)
+	request := fclient.NewFederationRequest("PUT", origin, destination, path)
 	request.SetContent(content)
 
 	return request
