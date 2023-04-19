@@ -41,6 +41,7 @@ func GetState(
 		return *err
 	}
 
+	// TODO: (PowerDAG) return full power DAG instead of auth chains?
 	return util.JSONResponse{Code: http.StatusOK, JSON: &fclient.RespState{
 		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
 		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
@@ -67,6 +68,7 @@ func GetStateIDs(
 	stateEventIDs := getIDsFromEvent(stateEvents)
 	authEventIDs := getIDsFromEvent(authEvents)
 
+	// TODO: (PowerDAG) return full power DAG instead of auth chains?
 	return util.JSONResponse{Code: http.StatusOK, JSON: fclient.RespStateIDs{
 		StateEventIDs: stateEventIDs,
 		AuthEventIDs:  authEventIDs,
@@ -121,6 +123,7 @@ func getState(
 		return nil, nil, resErr
 	}
 
+	// TODO: (PowerDAG) query full power DAG instead of auth chains
 	var response api.QueryStateAndAuthChainResponse
 	err := rsAPI.QueryStateAndAuthChain(
 		ctx,
