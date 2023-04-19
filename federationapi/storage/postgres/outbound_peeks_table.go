@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const outboundPeeksSchema = `
@@ -85,7 +85,7 @@ func NewPostgresOutboundPeeksTable(db *sql.DB) (s *outboundPeeksStatements, err 
 }
 
 func (s *outboundPeeksStatements) InsertOutboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	stmt := sqlutil.TxStmt(txn, s.insertOutboundPeekStmt)
@@ -94,7 +94,7 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 }
 
 func (s *outboundPeeksStatements) RenewOutboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	_, err = sqlutil.TxStmt(txn, s.renewOutboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
@@ -102,7 +102,7 @@ func (s *outboundPeeksStatements) RenewOutboundPeek(
 }
 
 func (s *outboundPeeksStatements) SelectOutboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (*types.OutboundPeek, error) {
 	row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
 	outboundPeek := types.OutboundPeek{}
@@ -151,7 +151,7 @@ func (s *outboundPeeksStatements) SelectOutboundPeeks(
 }
 
 func (s *outboundPeeksStatements) DeleteOutboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.deleteOutboundPeekStmt).ExecContext(ctx, roomID, serverName, peekID)
 	return

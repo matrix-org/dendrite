@@ -23,6 +23,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -184,7 +185,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		for _, ev := range append(eventsBefore, eventsAfter...) {
 			profile, ok := knownUsersProfiles[event.Sender()]
 			if !ok {
-				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), gomatrixserverlib.MRoomMember, ev.Sender())
+				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, ev.Sender())
 				if err != nil {
 					logrus.WithError(err).WithField("user_id", event.Sender()).Warn("failed to query userprofile")
 					continue

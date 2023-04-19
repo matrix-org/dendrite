@@ -26,16 +26,17 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
 func createQuery(
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 	prevEntry fclient.RelayEntry,
-) gomatrixserverlib.FederationRequest {
+) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
 	path := federationPathPrefixV1 + "/relay_txn/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("GET", userID.Domain(), "relay", path)
+	request := fclient.NewFederationRequest("GET", userID.Domain(), "relay", path)
 	request.SetContent(prevEntry)
 
 	return request
@@ -49,7 +50,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
@@ -82,7 +83,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
@@ -107,7 +108,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
@@ -116,7 +117,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 
 	err = db.AssociateTransactionWithDestinations(
 		context.Background(),
-		map[gomatrixserverlib.UserID]struct{}{
+		map[spec.UserID]struct{}{
 			*userID: {},
 		},
 		transaction.TransactionID,
@@ -157,7 +158,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
@@ -166,7 +167,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 
 	err = db.AssociateTransactionWithDestinations(
 		context.Background(),
-		map[gomatrixserverlib.UserID]struct{}{
+		map[spec.UserID]struct{}{
 			*userID: {},
 		},
 		transaction.TransactionID,
@@ -179,7 +180,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 
 	err = db.AssociateTransactionWithDestinations(
 		context.Background(),
-		map[gomatrixserverlib.UserID]struct{}{
+		map[spec.UserID]struct{}{
 			*userID: {},
 		},
 		transaction2.TransactionID,

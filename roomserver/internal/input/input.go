@@ -25,6 +25,7 @@ import (
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
@@ -79,7 +80,7 @@ type Inputer struct {
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
-	ServerName          gomatrixserverlib.ServerName
+	ServerName          spec.ServerName
 	SigningIdentity     *fclient.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
@@ -284,7 +285,7 @@ func (w *worker) _next() {
 	var errString string
 	if err = w.r.processRoomEvent(
 		w.r.ProcessContext.Context(),
-		gomatrixserverlib.ServerName(msg.Header.Get("virtual_host")),
+		spec.ServerName(msg.Header.Get("virtual_host")),
 		&inputRoomEvent,
 	); err != nil {
 		switch err.(type) {

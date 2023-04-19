@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, *sql.DB, func()) {
@@ -110,11 +111,11 @@ func TestReindex(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomName, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomName, map[string]interface{}{
 		"name": "my new room name",
 	}, test.WithStateKey(""))
 
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomTopic, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomTopic, map[string]interface{}{
 		"topic": "my new room topic",
 	}, test.WithStateKey(""))
 
@@ -141,8 +142,8 @@ func TestReindex(t *testing.T) {
 		}
 
 		events, err := tab.ReIndex(ctx, nil, 10, 0, []string{
-			gomatrixserverlib.MRoomName,
-			gomatrixserverlib.MRoomTopic,
+			spec.MRoomName,
+			spec.MRoomTopic,
 			"m.room.message"})
 		if err != nil {
 			t.Fatal(err)

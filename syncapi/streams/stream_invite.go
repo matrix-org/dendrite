@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -79,7 +79,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		membership, _, err := snapshot.SelectMembershipForUser(ctx, roomID, req.Device.UserID, math.MaxInt64)
 		// Skip if the user is an existing member of the room.
 		// Otherwise, the NewLeaveResponse will eject the user from the room unintentionally
-		if membership == gomatrixserverlib.Join ||
+		if membership == spec.Join ||
 			err != nil {
 			continue
 		}
@@ -89,12 +89,12 @@ func (p *InviteStreamProvider) IncrementalSync(
 		lr.Timeline.Events = append(lr.Timeline.Events, synctypes.ClientEvent{
 			// fake event ID which muxes in the to position
 			EventID:        "$" + base64.RawURLEncoding.EncodeToString(h[:]),
-			OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+			OriginServerTS: spec.AsTimestamp(time.Now()),
 			RoomID:         roomID,
 			Sender:         req.Device.UserID,
 			StateKey:       &req.Device.UserID,
 			Type:           "m.room.member",
-			Content:        gomatrixserverlib.RawJSON(`{"membership":"leave"}`),
+			Content:        spec.RawJSON(`{"membership":"leave"}`),
 		})
 		req.Response.Rooms.Leave[roomID] = lr
 	}

@@ -20,6 +20,7 @@ import (
 
 	keytypes "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -159,7 +160,7 @@ func TrackChangedUsers(
 			RoomIDs: newlyLeftRooms,
 			StateTuples: []gomatrixserverlib.StateKeyTuple{
 				{
-					EventType: gomatrixserverlib.MRoomMember,
+					EventType: spec.MRoomMember,
 					StateKey:  "*",
 				},
 			},
@@ -170,7 +171,7 @@ func TrackChangedUsers(
 		}
 		for _, state := range stateRes.Rooms {
 			for tuple, membership := range state {
-				if membership != gomatrixserverlib.Join {
+				if membership != spec.Join {
 					continue
 				}
 				queryRes.UserIDsToCount[tuple.StateKey]--
@@ -201,7 +202,7 @@ func TrackChangedUsers(
 		RoomIDs: newlyJoinedRooms,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			{
-				EventType: gomatrixserverlib.MRoomMember,
+				EventType: spec.MRoomMember,
 				StateKey:  "*",
 			},
 		},
@@ -212,7 +213,7 @@ func TrackChangedUsers(
 	}
 	for _, state := range stateRes.Rooms {
 		for tuple, membership := range state {
-			if membership != gomatrixserverlib.Join {
+			if membership != spec.Join {
 				continue
 			}
 			// new user who we weren't previously sharing rooms with
@@ -283,7 +284,7 @@ func membershipEventPresent(events []synctypes.ClientEvent, userID string) bool 
 	for _, ev := range events {
 		// it's enough to know that we have our member event here, don't need to check membership content
 		// as it's implied by being in the respective section of the sync response.
-		if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
+		if ev.Type == spec.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
 			// ignore e.g. join -> join changes
 			if gjson.GetBytes(ev.Unsigned, "prev_content.membership").Str == gjson.GetBytes(ev.Content, "membership").Str {
 				continue
@@ -302,7 +303,7 @@ func membershipEventPresent(events []synctypes.ClientEvent, userID string) bool 
 func membershipEvents(res *types.Response) (joinUserIDs, leaveUserIDs []string) {
 	for _, room := range res.Rooms.Join {
 		for _, ev := range room.Timeline.Events {
-			if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil {
+			if ev.Type == spec.MRoomMember && ev.StateKey != nil {
 				if strings.Contains(string(ev.Content), `"join"`) {
 					joinUserIDs = append(joinUserIDs, *ev.StateKey)
 				} else if strings.Contains(string(ev.Content), `"invite"`) {

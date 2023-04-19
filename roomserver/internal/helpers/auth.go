@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -59,7 +60,7 @@ func CheckForSoftFail(
 	// state because we haven't received a m.room.create event yet.
 	// If we're now processing the first create event then never
 	// soft-fail it.
-	if len(authStateEntries) == 0 && event.Type() == gomatrixserverlib.MRoomCreate {
+	if len(authStateEntries) == 0 && event.Type() == spec.MRoomCreate {
 		return false, nil
 	}
 

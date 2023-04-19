@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -30,10 +31,10 @@ import (
 // This endpoint can be extracted into a separate relay server service.
 func SendTransactionToRelay(
 	httpReq *http.Request,
-	fedReq *gomatrixserverlib.FederationRequest,
+	fedReq *fclient.FederationRequest,
 	relayAPI api.RelayInternalAPI,
 	txnID gomatrixserverlib.TransactionID,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 ) util.JSONResponse {
 	logrus.Infof("Processing send_relay for %s", userID.Raw())
 

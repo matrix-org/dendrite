@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -200,7 +201,7 @@ func OnIncomingMessagesRequest(
 	}
 
 	// If the user already left the room, grep events from before that
-	if membershipResp.Membership == gomatrixserverlib.Leave {
+	if membershipResp.Membership == spec.Leave {
 		var token types.TopologyToken
 		token, err = snapshot.EventPositionInTopology(req.Context(), membershipResp.EventID)
 		if err != nil {
@@ -369,7 +370,7 @@ func (r *messagesReq) retrieveEvents() (
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if r.backwardOrdering {
 		start = *r.from
-		if events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+		if events[len(events)-1].Type() == spec.MRoomCreate {
 			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
 			// else to go. This seems to fix Element iOS from looping on /messages endlessly.
 			end = types.TopologyToken{}

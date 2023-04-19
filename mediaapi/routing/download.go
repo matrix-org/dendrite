@@ -36,8 +36,8 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -72,7 +72,7 @@ type downloadRequest struct {
 func Download(
 	w http.ResponseWriter,
 	req *http.Request,
-	origin gomatrixserverlib.ServerName,
+	origin spec.ServerName,
 	mediaID types.MediaID,
 	cfg *config.MediaAPI,
 	db storage.Database,

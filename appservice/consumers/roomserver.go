@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -240,7 +241,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return true
 	}
 
-	if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+	if event.Type() == spec.MRoomMember && event.StateKey() != nil {
 		if appservice.IsInterestedInUserID(*event.StateKey()) {
 			return true
 		}
@@ -286,7 +287,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			switch {
 			case ev.StateKey == nil:
 				continue
-			case ev.Type != gomatrixserverlib.MRoomMember:
+			case ev.Type != spec.MRoomMember:
 				continue
 			}
 			var membership gomatrixserverlib.MemberContent
@@ -294,7 +295,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			switch {
 			case err != nil:
 				continue
-			case membership.Membership == gomatrixserverlib.Join:
+			case membership.Membership == spec.Join:
 				if appservice.IsInterestedInUserID(*ev.StateKey) {
 					return true
 				}

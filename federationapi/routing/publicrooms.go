@@ -8,6 +8,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -126,11 +127,11 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.FederationRoomserverAPI) ([]fclient.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
-	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
+	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCanonicalAlias, StateKey: ""}
 	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
 	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
-	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
-	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
+	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomHistoryVisibility, StateKey: ""}
+	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomJoinRules, StateKey: ""}
 
 	var stateRes roomserverAPI.QueryBulkStateContentResponse
 	err := rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
@@ -138,7 +139,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple, avatarTuple,
-			{EventType: gomatrixserverlib.MRoomMember, StateKey: "*"},
+			{EventType: spec.MRoomMember, StateKey: "*"},
 		},
 	}, &stateRes)
 	if err != nil {
@@ -154,7 +155,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		joinCount := 0
 		var joinRule, guestAccess string
 		for tuple, contentVal := range data {
-			if tuple.EventType == gomatrixserverlib.MRoomMember && contentVal == "join" {
+			if tuple.EventType == spec.MRoomMember && contentVal == "join" {
 				joinCount++
 				continue
 			}
@@ -178,7 +179,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 				guestAccess = contentVal
 			}
 		}
-		if joinRule == gomatrixserverlib.Public && guestAccess == "can_join" {
+		if joinRule == spec.Public && guestAccess == "can_join" {
 			pub.GuestCanJoin = true
 		}
 		pub.JoinedMembersCount = joinCount

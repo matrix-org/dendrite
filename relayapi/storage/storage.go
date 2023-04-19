@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage/postgres"
 	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // NewDatabase opens a new database
@@ -33,7 +33,7 @@ func NewDatabase(
 	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	isLocalServerName func(spec.ServerName) bool,
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():

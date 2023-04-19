@@ -21,8 +21,8 @@ import (
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -46,7 +46,7 @@ func NewYggdrasilRoomProvider(
 func (p *YggdrasilRoomProvider) Rooms() []fclient.PublicRoom {
 	return bulkFetchPublicRoomsFromServers(
 		context.Background(), p.fedClient,
-		gomatrixserverlib.ServerName(p.node.DerivedServerName()),
+		spec.ServerName(p.node.DerivedServerName()),
 		p.node.KnownNodes(),
 	)
 }
@@ -55,8 +55,8 @@ func (p *YggdrasilRoomProvider) Rooms() []fclient.PublicRoom {
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
 	ctx context.Context, fedClient *fclient.FederationClient,
-	origin gomatrixserverlib.ServerName,
-	homeservers []gomatrixserverlib.ServerName,
+	origin spec.ServerName,
+	homeservers []spec.ServerName,
 ) (publicRooms []fclient.PublicRoom) {
 	limit := 200
 	// follow pipeline semantics, see https://blog.golang.org/pipelines for more info.
@@ -69,7 +69,7 @@ func bulkFetchPublicRoomsFromServers(
 	wg.Add(len(homeservers))
 	// concurrently query for public rooms
 	for _, hs := range homeservers {
-		go func(homeserverDomain gomatrixserverlib.ServerName) {
+		go func(homeserverDomain spec.ServerName) {
 			defer wg.Done()
 			util.GetLogger(ctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
 			fres, err := fedClient.GetPublicRooms(ctx, origin, homeserverDomain, int(limit), "", false, "")

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	syncAPITypes "github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -207,9 +208,9 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	}
 
 	// If we added new hosts, inform them about our known presence events for this room
-	if s.cfg.Matrix.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == gomatrixserverlib.MRoomMember && ore.Event.StateKey() != nil {
+	if s.cfg.Matrix.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == spec.MRoomMember && ore.Event.StateKey() != nil {
 		membership, _ := ore.Event.Membership()
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			s.sendPresence(ore.Event.RoomID(), addsJoinedHosts)
 		}
 	}
@@ -239,12 +240,12 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 
 	// Send the event.
 	return s.queues.SendEvent(
-		ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
+		ore.Event, spec.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
 }
 
 func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []types.JoinedHost) {
-	joined := make([]gomatrixserverlib.ServerName, 0, len(addedJoined))
+	joined := make([]spec.ServerName, 0, len(addedJoined))
 	for _, added := range addedJoined {
 		joined = append(joined, added.ServerName)
 	}
@@ -285,7 +286,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 			continue
 		}
 
-		p := syncAPITypes.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(lastActive)}
+		p := syncAPITypes.PresenceInternal{LastActiveTS: spec.Timestamp(lastActive)}
 
 		content.Push = append(content.Push, types.PresenceContent{
 			CurrentlyActive: p.CurrentlyActive(),
@@ -301,7 +302,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 	}
 
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MPresence,
+		Type:   spec.MPresence,
 		Origin: string(s.cfg.Matrix.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
@@ -326,7 +327,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 // Returns an error if there was a problem talking to the room server.
 func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	ore api.OutputNewRoomEvent, oldJoinedHosts []types.JoinedHost,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	// Combine the delta into a single delta so that the adds and removes can
 	// cancel each other out. This should reduce the number of times we need
 	// to fetch a state event from the room server.
@@ -349,7 +350,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		removed[eventID] = true
 	}
 
-	joined := map[gomatrixserverlib.ServerName]bool{}
+	joined := map[spec.ServerName]bool{}
 	for _, joinedHost := range oldJoinedHosts {
 		if removed[joinedHost.MemberEventID] {
 			// This m.room.member event is part of the current state of the
@@ -376,7 +377,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		joined[inboundPeek.ServerName] = true
 	}
 
-	var result []gomatrixserverlib.ServerName
+	var result []spec.ServerName
 	for serverName, include := range joined {
 		if include {
 			result = append(result, serverName)
@@ -398,7 +399,7 @@ func JoinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, 
 		if err != nil {
 			return nil, err
 		}
-		if membership != gomatrixserverlib.Join {
+		if membership != spec.Join {
 			continue
 		}
 		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())

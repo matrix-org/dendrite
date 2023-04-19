@@ -24,6 +24,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -83,7 +84,7 @@ func (r *Joiner) PerformJoin(
 func (r *Joiner) performJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (string, gomatrixserverlib.ServerName, error) {
+) (string, spec.ServerName, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return "", "", &rsAPI.PerformError{
@@ -112,7 +113,7 @@ func (r *Joiner) performJoin(
 func (r *Joiner) performJoinRoomByAlias(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (string, gomatrixserverlib.ServerName, error) {
+) (string, spec.ServerName, error) {
 	// Get the domain part of the room alias.
 	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
 	if err != nil {
@@ -167,7 +168,7 @@ func (r *Joiner) performJoinRoomByAlias(
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (string, gomatrixserverlib.ServerName, error) {
+) (string, spec.ServerName, error) {
 	// The original client request ?server_name=... may include this HS so filter that out so we
 	// don't attempt to make_join with ourselves
 	for i := 0; i < len(req.ServerNames); i++ {
@@ -204,7 +205,7 @@ func (r *Joiner) performJoinRoomByID(
 		}
 	}
 	eb := gomatrixserverlib.EventBuilder{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		Sender:   userID,
 		StateKey: &userID,
 		RoomID:   req.RoomIDOrAlias,
@@ -220,7 +221,7 @@ func (r *Joiner) performJoinRoomByID(
 	if req.Content == nil {
 		req.Content = map[string]interface{}{}
 	}
-	req.Content["membership"] = gomatrixserverlib.Join
+	req.Content["membership"] = spec.Join
 	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req); aerr != nil {
 		return "", "", aerr
 	} else if authorisedVia != "" {
@@ -274,7 +275,7 @@ func (r *Joiner) performJoinRoomByID(
 	if req.IsGuest {
 		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
 		guestAccess := "forbidden"
-		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
+		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
 		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
 			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}
@@ -293,7 +294,7 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// If we should do a forced federated join then do that.
-	var joinedVia gomatrixserverlib.ServerName
+	var joinedVia spec.ServerName
 	if forceFederatedJoin {
 		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
 		return req.RoomIDOrAlias, joinedVia, err
@@ -388,7 +389,7 @@ func (r *Joiner) performJoinRoomByID(
 func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (gomatrixserverlib.ServerName, error) {
+) (spec.ServerName, error) {
 	// Try joining by all of the supplied server names.
 	fedReq := fsAPI.PerformJoinRequest{
 		RoomID:      req.RoomIDOrAlias, // the room ID to try and join

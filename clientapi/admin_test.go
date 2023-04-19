@@ -18,8 +18,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
@@ -123,7 +123,7 @@ func TestPurgeRoom(t *testing.T) {
 	room := test.NewRoom(t, aliceAdmin, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite Bob
-	room.CreateAndInsert(t, aliceAdmin, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, aliceAdmin, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
 
@@ -194,7 +194,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 	room := test.NewRoom(t, aliceAdmin)
 
 	// Join Bob
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -291,10 +291,10 @@ func TestAdminEvacuateUser(t *testing.T) {
 	room2 := test.NewRoom(t, aliceAdmin)
 
 	// Join Bob
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
-	room2.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room2.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 

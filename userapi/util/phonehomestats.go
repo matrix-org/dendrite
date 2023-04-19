@@ -24,18 +24,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type phoneHomeStats struct {
 	prevData   timestampToRUUsage
 	stats      map[string]interface{}
-	serverName gomatrixserverlib.ServerName
+	serverName spec.ServerName
 	startTime  time.Time
 	cfg        *config.Dendrite
 	db         storage.Statistics

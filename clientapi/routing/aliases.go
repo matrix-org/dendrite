@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"
 )
@@ -31,7 +32,7 @@ func GetAliases(
 	req *http.Request, rsAPI api.ClientRoomserverAPI, device *userapi.Device, roomID string,
 ) util.JSONResponse {
 	stateTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomHistoryVisibility,
+		EventType: spec.MRoomHistoryVisibility,
 		StateKey:  "",
 	}
 	stateReq := &api.QueryCurrentStateRequest{
@@ -53,7 +54,7 @@ func GetAliases(
 			return util.ErrorResponse(fmt.Errorf("historyVisEvent.HistoryVisibility: %w", err))
 		}
 	}
-	if visibility != gomatrixserverlib.WorldReadable {
+	if visibility != spec.WorldReadable {
 		queryReq := api.QueryMembershipForUserRequest{
 			RoomID: roomID,
 			UserID: device.UserID,

@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -596,7 +597,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib
 	}
 	// make sure the origin_server_ts changes so we can test recency
 	time.Sleep(1 * time.Millisecond)
-	signedEvent, err := eb.Build(time.Now(), gomatrixserverlib.ServerName("localhost"), "ed25519:test", key, roomVer)
+	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key, roomVer)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}

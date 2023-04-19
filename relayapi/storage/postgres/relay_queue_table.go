@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const relayQueueSchema = `
@@ -90,7 +91,7 @@ func (s *relayQueueStatements) InsertQueueEntry(
 	ctx context.Context,
 	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	nid int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueueEntryStmt)
@@ -106,7 +107,7 @@ func (s *relayQueueStatements) InsertQueueEntry(
 func (s *relayQueueStatements) DeleteQueueEntries(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteQueueEntriesStmt)
@@ -117,7 +118,7 @@ func (s *relayQueueStatements) DeleteQueueEntries(
 func (s *relayQueueStatements) SelectQueueEntries(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEntriesStmt)
@@ -141,7 +142,7 @@ func (s *relayQueueStatements) SelectQueueEntries(
 func (s *relayQueueStatements) SelectQueueEntryCount(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (int64, error) {
 	var count int64
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)

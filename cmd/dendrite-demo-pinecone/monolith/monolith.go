@@ -51,7 +51,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
@@ -347,7 +347,7 @@ func (p *P2PMonolith) startEventHandler() {
 	eLog := logrus.WithField("pinecone", "events")
 	p.RelayRetriever = relay.NewRelayServerRetriever(
 		context.Background(),
-		gomatrixserverlib.ServerName(p.Router.PublicKey().String()),
+		spec.ServerName(p.Router.PublicKey().String()),
 		p.dendrite.FederationAPI,
 		p.dendrite.RelayAPI,
 		stopRelayServerSync,
@@ -373,7 +373,7 @@ func (p *P2PMonolith) startEventHandler() {
 					// eLog.Info("Broadcast received from: ", e.PeerID)
 
 					req := &federationAPI.PerformWakeupServersRequest{
-						ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
+						ServerNames: []spec.ServerName{spec.ServerName(e.PeerID)},
 					}
 					res := &federationAPI.PerformWakeupServersResponse{}
 					if err := p.dendrite.FederationAPI.PerformWakeupServers(p.ProcessCtx.Context(), req, res); err != nil {

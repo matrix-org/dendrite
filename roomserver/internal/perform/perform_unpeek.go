@@ -24,10 +24,11 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Unpeeker struct {
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 	Cfg        *config.RoomServer
 	FSAPI      fsAPI.RoomserverFederationAPI
 	Inputer    *input.Inputer

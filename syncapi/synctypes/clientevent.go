@@ -15,7 +15,10 @@
 
 package synctypes
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+)
 
 type ClientEventFormat int
 
@@ -29,15 +32,15 @@ const (
 
 // ClientEvent is an event which is fit for consumption by clients, in accordance with the specification.
 type ClientEvent struct {
-	Content        gomatrixserverlib.RawJSON   `json:"content"`
-	EventID        string                      `json:"event_id,omitempty"`         // EventID is omitted on receipt events
-	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts,omitempty"` // OriginServerTS is omitted on receipt events
-	RoomID         string                      `json:"room_id,omitempty"`          // RoomID is omitted on /sync responses
-	Sender         string                      `json:"sender,omitempty"`           // Sender is omitted on receipt events
-	StateKey       *string                     `json:"state_key,omitempty"`
-	Type           string                      `json:"type"`
-	Unsigned       gomatrixserverlib.RawJSON   `json:"unsigned,omitempty"`
-	Redacts        string                      `json:"redacts,omitempty"`
+	Content        spec.RawJSON   `json:"content"`
+	EventID        string         `json:"event_id,omitempty"`         // EventID is omitted on receipt events
+	OriginServerTS spec.Timestamp `json:"origin_server_ts,omitempty"` // OriginServerTS is omitted on receipt events
+	RoomID         string         `json:"room_id,omitempty"`          // RoomID is omitted on /sync responses
+	Sender         string         `json:"sender,omitempty"`           // Sender is omitted on receipt events
+	StateKey       *string        `json:"state_key,omitempty"`
+	Type           string         `json:"type"`
+	Unsigned       spec.RawJSON   `json:"unsigned,omitempty"`
+	Redacts        string         `json:"redacts,omitempty"`
 }
 
 // ToClientEvents converts server events to client events.
@@ -67,11 +70,11 @@ func HeaderedToClientEvents(serverEvs []*gomatrixserverlib.HeaderedEvent, format
 // ToClientEvent converts a single server event to a client event.
 func ToClientEvent(se *gomatrixserverlib.Event, format ClientEventFormat) ClientEvent {
 	ce := ClientEvent{
-		Content:        gomatrixserverlib.RawJSON(se.Content()),
+		Content:        spec.RawJSON(se.Content()),
 		Sender:         se.Sender(),
 		Type:           se.Type(),
 		StateKey:       se.StateKey(),
-		Unsigned:       gomatrixserverlib.RawJSON(se.Unsigned()),
+		Unsigned:       spec.RawJSON(se.Unsigned()),
 		OriginServerTS: se.OriginServerTS(),
 		EventID:        se.EventID(),
 		Redacts:        se.Redacts(),

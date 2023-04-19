@@ -28,6 +28,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -95,7 +97,7 @@ func (r *Inviter) PerformInvite(
 
 	inviteState := req.InviteRoomState
 	if len(inviteState) == 0 && info != nil {
-		var is []gomatrixserverlib.InviteV2StrippedState
+		var is []fclient.InviteV2StrippedState
 		if is, err = buildInviteStrippedState(ctx, r.DB, info, req); err == nil {
 			inviteState = is
 		}
@@ -266,14 +268,14 @@ func buildInviteStrippedState(
 	db storage.Database,
 	info *types.RoomInfo,
 	input *api.PerformInviteRequest,
-) ([]gomatrixserverlib.InviteV2StrippedState, error) {
+) ([]fclient.InviteV2StrippedState, error) {
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
 	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
 	for _, t := range []string{
-		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
-		gomatrixserverlib.MRoomJoinRules, gomatrixserverlib.MRoomAvatar,
-		gomatrixserverlib.MRoomEncryption, gomatrixserverlib.MRoomCreate,
+		spec.MRoomName, spec.MRoomCanonicalAlias,
+		spec.MRoomJoinRules, spec.MRoomAvatar,
+		spec.MRoomEncryption, spec.MRoomCreate,
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,
@@ -295,12 +297,12 @@ func buildInviteStrippedState(
 	if err != nil {
 		return nil, err
 	}
-	inviteState := []gomatrixserverlib.InviteV2StrippedState{
-		gomatrixserverlib.NewInviteV2StrippedState(input.Event.Event),
+	inviteState := []fclient.InviteV2StrippedState{
+		fclient.NewInviteV2StrippedState(input.Event.Event),
 	}
 	stateEvents = append(stateEvents, types.Event{Event: input.Event.Unwrap()})
 	for _, event := range stateEvents {
-		inviteState = append(inviteState, gomatrixserverlib.NewInviteV2StrippedState(event.Event))
+		inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.Event))
 	}
 	return inviteState, nil
 }

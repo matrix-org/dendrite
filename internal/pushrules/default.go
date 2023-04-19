@@ -1,12 +1,10 @@
 package pushrules
 
-import (
-	"github.com/matrix-org/gomatrixserverlib"
-)
+import "github.com/matrix-org/gomatrixserverlib/spec"
 
 // DefaultAccountRuleSets is the complete set of default push rules
 // for an account.
-func DefaultAccountRuleSets(localpart string, serverName gomatrixserverlib.ServerName) *AccountRuleSets {
+func DefaultAccountRuleSets(localpart string, serverName spec.ServerName) *AccountRuleSets {
 	return &AccountRuleSets{
 		Global: *DefaultGlobalRuleSet(localpart, serverName),
 	}
@@ -14,7 +12,7 @@ func DefaultAccountRuleSets(localpart string, serverName gomatrixserverlib.Serve
 
 // DefaultGlobalRuleSet returns the default ruleset for a given (fully
 // qualified) MXID.
-func DefaultGlobalRuleSet(localpart string, serverName gomatrixserverlib.ServerName) *RuleSet {
+func DefaultGlobalRuleSet(localpart string, serverName spec.ServerName) *RuleSet {
 	return &RuleSet{
 		Override:  defaultOverrideRules("@" + localpart + ":" + string(serverName)),
 		Content:   defaultContentRules(localpart),

@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const queueEDUsSchema = `
@@ -121,9 +120,9 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	ctx context.Context,
 	txn *sql.Tx,
 	eduType string,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	nid int64,
-	expiresAt gomatrixserverlib.Timestamp,
+	expiresAt spec.Timestamp,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
 	_, err := stmt.ExecContext(
@@ -138,7 +137,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 
 func (s *queueEDUsStatements) DeleteQueueEDUs(
 	ctx context.Context, txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
 	deleteSQL := strings.Replace(deleteQueueEDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
@@ -160,7 +159,7 @@ func (s *queueEDUsStatements) DeleteQueueEDUs(
 
 func (s *queueEDUsStatements) SelectQueueEDUs(
 	ctx context.Context, txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUStmt)
@@ -194,16 +193,16 @@ func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
 
 func (s *queueEDUsStatements) SelectQueueEDUServerNames(
 	ctx context.Context, txn *sql.Tx,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUServerNamesStmt)
 	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-	var result []gomatrixserverlib.ServerName
+	var result []spec.ServerName
 	for rows.Next() {
-		var serverName gomatrixserverlib.ServerName
+		var serverName spec.ServerName
 		if err = rows.Scan(&serverName); err != nil {
 			return nil, err
 		}
@@ -215,7 +214,7 @@ func (s *queueEDUsStatements) SelectQueueEDUServerNames(
 
 func (s *queueEDUsStatements) SelectExpiredEDUs(
 	ctx context.Context, txn *sql.Tx,
-	expiredBefore gomatrixserverlib.Timestamp,
+	expiredBefore spec.Timestamp,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectExpiredEDUsStmt)
 	rows, err := stmt.QueryContext(ctx, expiredBefore)
@@ -236,7 +235,7 @@ func (s *queueEDUsStatements) SelectExpiredEDUs(
 
 func (s *queueEDUsStatements) DeleteExpiredEDUs(
 	ctx context.Context, txn *sql.Tx,
-	expiredBefore gomatrixserverlib.Timestamp,
+	expiredBefore spec.Timestamp,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteExpiredEDUsStmt)
 	_, err := stmt.ExecContext(ctx, expiredBefore)

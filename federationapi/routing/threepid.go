@@ -27,6 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -114,7 +116,7 @@ func CreateInvitesFrom3PIDInvites(
 // ExchangeThirdPartyInvite implements PUT /_matrix/federation/v1/exchange_third_party_invite/{roomID}
 func ExchangeThirdPartyInvite(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	roomID string,
 	rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
@@ -184,7 +186,7 @@ func ExchangeThirdPartyInvite(
 
 	// Ask the requesting server to sign the newly created event so we know it
 	// acknowledged it
-	inviteReq, err := gomatrixserverlib.NewInviteV2Request(event.Headered(verRes.RoomVersion), nil)
+	inviteReq, err := fclient.NewInviteV2Request(event.Headered(verRes.RoomVersion), nil)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
 		return jsonerror.InternalServerError()
@@ -194,7 +196,7 @@ func ExchangeThirdPartyInvite(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
 	}
-	inviteEvent, err := signedEvent.Event.UntrustedEvent(verRes.RoomVersion)
+	inviteEvent, err := gomatrixserverlib.UntrustedEvent(signedEvent.Event, verRes.RoomVersion)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
@@ -264,7 +266,7 @@ func createInviteFrom3PIDInvite(
 	content := gomatrixserverlib.MemberContent{
 		AvatarURL:   profile.AvatarURL,
 		DisplayName: profile.DisplayName,
-		Membership:  gomatrixserverlib.Invite,
+		Membership:  spec.Invite,
 		ThirdPartyInvite: &gomatrixserverlib.MemberThirdPartyInvite{
 			Signed: inv.Signed,
 		},
@@ -360,7 +362,7 @@ func sendToRemoteServer(
 	federation federationAPI.FederationClient, cfg *config.FederationAPI,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
-	remoteServers := make([]gomatrixserverlib.ServerName, 2)
+	remoteServers := make([]spec.ServerName, 2)
 	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
 	if err != nil {
 		return

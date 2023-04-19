@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -41,7 +42,7 @@ import (
 type Queryer struct {
 	DB                storage.Database
 	Cache             caching.RoomServerCaches
-	IsLocalServerName func(gomatrixserverlib.ServerName) bool
+	IsLocalServerName func(spec.ServerName) bool
 	ServerACLs        *acls.ServerACLs
 }
 
@@ -305,7 +306,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 		// a given event, overwrite any other existing membership events.
 		for i := range memberships {
 			ev := memberships[i]
-			if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
+			if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(request.UserID) {
 				response.Membership[eventID] = ev.Event.Headered(info.RoomVersion)
 			}
 		}
@@ -435,7 +436,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
 func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	eventID string,
 ) (allowed bool, err error) {
 	events, err := r.DB.EventNIDs(ctx, []string{eventID})
@@ -896,7 +897,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// the flag.
 	res.Resident = true
 	// Get the join rules to work out if the join rule is "restricted".
-	joinRulesEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, gomatrixserverlib.MRoomJoinRules, "")
+	joinRulesEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, spec.MRoomJoinRules, "")
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 	}
@@ -908,7 +909,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
 	// If the join rule isn't "restricted" then there's nothing more to do.
-	res.Restricted = joinRules.JoinRule == gomatrixserverlib.Restricted
+	res.Restricted = joinRules.JoinRule == spec.Restricted
 	if !res.Restricted {
 		return nil
 	}
@@ -925,7 +926,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// We need to get the power levels content so that we can determine which
 	// users in the room are entitled to issue invites. We need to use one of
 	// these users as the authorising user.
-	powerLevelsEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, gomatrixserverlib.MRoomPowerLevels, "")
+	powerLevelsEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, spec.MRoomPowerLevels, "")
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 	}
@@ -937,7 +938,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	for _, rule := range joinRules.Allow {
 		// We only understand "m.room_membership" rules at this point in
 		// time, so skip any rule that doesn't match those.
-		if rule.Type != gomatrixserverlib.MRoomMembership {
+		if rule.Type != spec.MRoomMembership {
 			continue
 		}
 		// See if the room exists. If it doesn't exist or if it's a stub
@@ -984,7 +985,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 				continue
 			}
 			event := events[0]
-			if event.Type() != gomatrixserverlib.MRoomMember || event.StateKey() == nil {
+			if event.Type() != spec.MRoomMember || event.StateKey() == nil {
 				continue // shouldn't happen
 			}
 			// Only users that have the power to invite should be chosen.

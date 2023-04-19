@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/test"
 )
@@ -21,15 +22,15 @@ func Test_EventAuth(t *testing.T) {
 
 	// Add the legal auth events from room2
 	for _, x := range room2.Events() {
-		if x.Type() == gomatrixserverlib.MRoomCreate {
+		if x.Type() == spec.MRoomCreate {
 			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
-		if x.Type() == gomatrixserverlib.MRoomPowerLevels {
+		if x.Type() == spec.MRoomPowerLevels {
 			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
-		if x.Type() == gomatrixserverlib.MRoomJoinRules {
+		if x.Type() == spec.MRoomJoinRules {
 			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
@@ -37,7 +38,7 @@ func Test_EventAuth(t *testing.T) {
 
 	// Add the illegal auth event from room1 (rooms are different)
 	for _, x := range room1.Events() {
-		if x.Type() == gomatrixserverlib.MRoomMember {
+		if x.Type() == spec.MRoomMember {
 			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}

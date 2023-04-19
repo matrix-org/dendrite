@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -43,7 +44,7 @@ func SearchUserDirectory(
 	searchString string,
 	limit int,
 	federation *fclient.FederationClient,
-	localServerName gomatrixserverlib.ServerName,
+	localServerName spec.ServerName,
 ) util.JSONResponse {
 	if limit < 10 {
 		limit = 10

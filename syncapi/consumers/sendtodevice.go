@@ -20,6 +20,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -43,7 +44,7 @@ type OutputSendToDeviceEventConsumer struct {
 	topic             string
 	db                storage.Database
 	userAPI           api.SyncKeyAPI
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 	stream            streams.StreamProvider
 	notifier          *notifier.Notifier
 }

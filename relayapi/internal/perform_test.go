@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,9 +38,9 @@ type testFedClient struct {
 
 func (f *testFedClient) P2PGetTransactionFromRelay(
 	ctx context.Context,
-	u gomatrixserverlib.UserID,
+	u spec.UserID,
 	prev fclient.RelayEntry,
-	relayServer gomatrixserverlib.ServerName,
+	relayServer spec.ServerName,
 ) (res fclient.RespGetRelayTransaction, err error) {
 	f.queryCount++
 	if f.shouldFail {
@@ -68,7 +69,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.Nil(t, err, "Invalid userID")
 
 	fedClient := &testFedClient{}
@@ -76,7 +77,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, spec.ServerName("relay"))
 	assert.NoError(t, err)
 }
 
@@ -88,7 +89,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.Nil(t, err, "Invalid userID")
 
 	fedClient := &testFedClient{shouldFail: true}
@@ -96,7 +97,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, spec.ServerName("relay"))
 	assert.Error(t, err)
 }
 
@@ -108,7 +109,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.Nil(t, err, "Invalid userID")
 
 	fedClient := &testFedClient{queueDepth: 2}
@@ -116,7 +117,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, spec.ServerName("relay"))
 	assert.NoError(t, err)
 	assert.Equal(t, uint(3), fedClient.queryCount)
 }

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
@@ -83,11 +84,11 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, gomatrixserverlib.AsTimestamp(time.Now()))
+	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, spec.AsTimestamp(time.Now()))
 	return err
 }
 
-func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
 	// we only query for 1 domain or all domains so optimise for those use cases
 	if len(domains) == 0 {
 		rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)

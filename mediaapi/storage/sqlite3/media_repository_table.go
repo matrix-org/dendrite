@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage/tables"
 	"github.com/matrix-org/dendrite/mediaapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const mediaSchema = `
@@ -91,7 +91,7 @@ func NewSQLiteMediaRepositoryTable(db *sql.DB) (tables.MediaRepository, error) {
 func (s *mediaStatements) InsertMedia(
 	ctx context.Context, txn *sql.Tx, mediaMetadata *types.MediaMetadata,
 ) error {
-	mediaMetadata.CreationTimestamp = gomatrixserverlib.AsTimestamp(time.Now())
+	mediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
 	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertMediaStmt).ExecContext(
 		ctx,
 		mediaMetadata.MediaID,
@@ -107,7 +107,7 @@ func (s *mediaStatements) InsertMedia(
 }
 
 func (s *mediaStatements) SelectMedia(
-	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		MediaID: mediaID,
@@ -127,7 +127,7 @@ func (s *mediaStatements) SelectMedia(
 }
 
 func (s *mediaStatements) SelectMediaByHash(
-	ctx context.Context, txn *sql.Tx, mediaHash types.Base64Hash, mediaOrigin gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		Base64Hash: mediaHash,

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -54,7 +54,7 @@ func Test_validateUsername(t *testing.T) {
 	tests := []struct {
 		name      string
 		localpart string
-		domain    gomatrixserverlib.ServerName
+		domain    spec.ServerName
 		wantErr   error
 		wantJSON  *util.JSONResponse
 	}{

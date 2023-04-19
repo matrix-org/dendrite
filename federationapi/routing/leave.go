@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -29,7 +31,7 @@ import (
 // MakeLeave implements the /make_leave API
 func MakeLeave(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	roomID, userID string,
@@ -55,7 +57,7 @@ func MakeLeave(
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Leave})
+	err = builder.SetContent(map[string]interface{}{"membership": spec.Leave})
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
 		return jsonerror.InternalServerError()
@@ -95,7 +97,7 @@ func MakeLeave(
 		if !state.StateKeyEquals(userID) {
 			continue
 		}
-		if mem, merr := state.Membership(); merr == nil && mem == gomatrixserverlib.Leave {
+		if mem, merr := state.Membership(); merr == nil && mem == spec.Leave {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: map[string]interface{}{
@@ -132,7 +134,7 @@ func MakeLeave(
 // nolint:gocyclo
 func SendLeave(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
@@ -195,7 +197,7 @@ func SendLeave(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	var serverName gomatrixserverlib.ServerName
+	var serverName spec.ServerName
 	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -213,7 +215,7 @@ func SendLeave(
 		RoomID: roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
 			{
-				EventType: gomatrixserverlib.MRoomMember,
+				EventType: spec.MRoomMember,
 				StateKey:  *event.StateKey(),
 			},
 		},
@@ -242,7 +244,7 @@ func SendLeave(
 	// We are/were joined/invited/banned or something. Check if
 	// we can no-op here.
 	if len(queryRes.StateEvents) == 1 {
-		if mem, merr := queryRes.StateEvents[0].Membership(); merr == nil && mem == gomatrixserverlib.Leave {
+		if mem, merr := queryRes.StateEvents[0].Membership(); merr == nil && mem == spec.Leave {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: struct{}{},
@@ -286,7 +288,7 @@ func SendLeave(
 			JSON: jsonerror.BadJSON("missing content.membership key"),
 		}
 	}
-	if mem != gomatrixserverlib.Leave {
+	if mem != spec.Leave {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The membership in the event content must be set to leave"),

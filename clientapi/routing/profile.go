@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -351,7 +352,7 @@ func buildMembershipEvents(
 		}
 
 		content := gomatrixserverlib.MemberContent{
-			Membership: gomatrixserverlib.Join,
+			Membership: spec.Join,
 		}
 
 		content.DisplayName = newProfile.DisplayName

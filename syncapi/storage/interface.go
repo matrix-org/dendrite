@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -174,7 +175,7 @@ type Database interface {
 	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error
 	// StoreReceipt stores new receipt events
-	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
+	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
 	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
 	UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
@@ -188,7 +189,7 @@ type Database interface {
 
 type Presence interface {
 	GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error)
-	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
+	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS spec.Timestamp, fromSync bool) (types.StreamPosition, error)
 }
 
 type SharedUsers interface {

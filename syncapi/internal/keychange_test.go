@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -76,12 +77,12 @@ func (s *mockRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.Quer
 // QueryBulkStateContent does a bulk query for state event content in the given rooms.
 func (s *mockRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
 	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
-	if req.AllowWildcards && len(req.StateTuples) == 1 && req.StateTuples[0].EventType == gomatrixserverlib.MRoomMember && req.StateTuples[0].StateKey == "*" {
+	if req.AllowWildcards && len(req.StateTuples) == 1 && req.StateTuples[0].EventType == spec.MRoomMember && req.StateTuples[0].StateKey == "*" {
 		for _, roomID := range req.RoomIDs {
 			res.Rooms[roomID] = make(map[gomatrixserverlib.StateKeyTuple]string)
 			for _, userID := range s.roomIDToJoinedMembers[roomID] {
 				res.Rooms[roomID][gomatrixserverlib.StateKeyTuple{
-					EventType: gomatrixserverlib.MRoomMember,
+					EventType: spec.MRoomMember,
 					StateKey:  userID,
 				}] = "join"
 			}

@@ -25,6 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -32,7 +34,7 @@ import (
 // https://matrix.org/docs/spec/server_server/unstable.html#get-matrix-federation-v1-backfill-roomid
 func Backfill(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	cfg *config.FederationAPI,
@@ -126,7 +128,7 @@ func Backfill(
 	txn := gomatrixserverlib.Transaction{
 		Origin:         request.Destination(),
 		PDUs:           eventJSONs,
-		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		OriginServerTS: spec.AsTimestamp(time.Now()),
 	}
 
 	// Send the events to the client.

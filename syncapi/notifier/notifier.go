@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -112,16 +113,16 @@ func (n *Notifier) OnNewEvent(
 			} else {
 				// Keep the joined user map up-to-date
 				switch membership {
-				case gomatrixserverlib.Invite:
+				case spec.Invite:
 					usersToNotify = append(usersToNotify, targetUserID)
-				case gomatrixserverlib.Join:
+				case spec.Join:
 					// Manually append the new user's ID so they get notified
 					// along all members in the room
 					usersToNotify = append(usersToNotify, targetUserID)
 					n._addJoinedUser(ev.RoomID(), targetUserID)
-				case gomatrixserverlib.Leave:
+				case spec.Leave:
 					fallthrough
-				case gomatrixserverlib.Ban:
+				case spec.Ban:
 					n._removeJoinedUser(ev.RoomID(), targetUserID)
 				}
 			}
