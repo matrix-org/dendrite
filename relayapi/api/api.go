@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // RelayInternalAPI is used to query information from the relay server.
@@ -51,7 +52,7 @@ type RelayServerAPI interface {
 	QueryTransactions(
 		ctx context.Context,
 		userID gomatrixserverlib.UserID,
-		previousEntry gomatrixserverlib.RelayEntry,
+		previousEntry fclient.RelayEntry,
 	) (QueryRelayTransactionsResponse, error)
 }
 

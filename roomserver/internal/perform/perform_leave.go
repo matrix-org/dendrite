@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -28,6 +30,7 @@ import (
 
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -39,6 +42,7 @@ type Leaver struct {
 	Cfg     *config.RoomServer
 	DB      storage.Database
 	FSAPI   fsAPI.RoomserverFederationAPI
+	RSAPI   rsAPI.RoomserverInternalAPI
 	UserAPI userapi.RoomserverUserAPI
 	Inputer *input.Inputer
 }
@@ -173,9 +177,15 @@ func (r *Leaver) performLeaveRoomByID(
 	// a leave event.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, senderDomain, &eb)
+
+	var buildRes rsAPI.QueryLatestEventsAndStateResponse
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
 	if err != nil {
-		return nil, fmt.Errorf("eventutil.BuildEvent: %w", err)
+		return nil, fmt.Errorf("SigningIdentityFor: %w", err)
+	}
+	event, err := eventutil.QueryAndBuildEvent(ctx, &eb, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
+	if err != nil {
+		return nil, fmt.Errorf("eventutil.QueryAndBuildEvent: %w", err)
 	}
 
 	// Give our leave event to the roomserver input stream. The

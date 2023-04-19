@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -264,7 +265,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithAnyMembership(
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilter *gomatrixserverlib.StateFilter,
+	stateFilter *synctypes.StateFilter,
 	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	// We're going to query members later, so remove them from this request

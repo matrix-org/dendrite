@@ -32,7 +32,7 @@ import (
 	"time"
 
 	sentryhttp "github.com/getsentry/sentry-go/http"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
 
@@ -54,42 +54,42 @@ const HTTPServerTimeout = time.Minute * 5
 
 // CreateClient creates a new client (normally used for media fetch requests).
 // Should only be called once per component.
-func CreateClient(cfg *config.Dendrite, dnsCache *gomatrixserverlib.DNSCache) *gomatrixserverlib.Client {
+func CreateClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.Client {
 	if cfg.Global.DisableFederation {
-		return gomatrixserverlib.NewClient(
-			gomatrixserverlib.WithTransport(noOpHTTPTransport),
+		return fclient.NewClient(
+			fclient.WithTransport(noOpHTTPTransport),
 		)
 	}
-	opts := []gomatrixserverlib.ClientOption{
-		gomatrixserverlib.WithSkipVerify(cfg.FederationAPI.DisableTLSValidation),
-		gomatrixserverlib.WithWellKnownSRVLookups(true),
+	opts := []fclient.ClientOption{
+		fclient.WithSkipVerify(cfg.FederationAPI.DisableTLSValidation),
+		fclient.WithWellKnownSRVLookups(true),
 	}
 	if cfg.Global.DNSCache.Enabled && dnsCache != nil {
-		opts = append(opts, gomatrixserverlib.WithDNSCache(dnsCache))
+		opts = append(opts, fclient.WithDNSCache(dnsCache))
 	}
-	client := gomatrixserverlib.NewClient(opts...)
+	client := fclient.NewClient(opts...)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
 }
 
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
-func CreateFederationClient(cfg *config.Dendrite, dnsCache *gomatrixserverlib.DNSCache) *gomatrixserverlib.FederationClient {
+func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.FederationClient {
 	identities := cfg.Global.SigningIdentities()
 	if cfg.Global.DisableFederation {
-		return gomatrixserverlib.NewFederationClient(
-			identities, gomatrixserverlib.WithTransport(noOpHTTPTransport),
+		return fclient.NewFederationClient(
+			identities, fclient.WithTransport(noOpHTTPTransport),
 		)
 	}
-	opts := []gomatrixserverlib.ClientOption{
-		gomatrixserverlib.WithTimeout(time.Minute * 5),
-		gomatrixserverlib.WithSkipVerify(cfg.FederationAPI.DisableTLSValidation),
-		gomatrixserverlib.WithKeepAlives(!cfg.FederationAPI.DisableHTTPKeepalives),
+	opts := []fclient.ClientOption{
+		fclient.WithTimeout(time.Minute * 5),
+		fclient.WithSkipVerify(cfg.FederationAPI.DisableTLSValidation),
+		fclient.WithKeepAlives(!cfg.FederationAPI.DisableHTTPKeepalives),
 	}
 	if cfg.Global.DNSCache.Enabled {
-		opts = append(opts, gomatrixserverlib.WithDNSCache(dnsCache))
+		opts = append(opts, fclient.WithDNSCache(dnsCache))
 	}
-	client := gomatrixserverlib.NewFederationClient(
+	client := fclient.NewFederationClient(
 		identities, opts...,
 	)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))

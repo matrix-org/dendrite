@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -153,7 +154,7 @@ func TestRecentEventsPDU(t *testing.T) {
 		for i := range testCases {
 			tc := testCases[i]
 			t.Run(tc.Name, func(st *testing.T) {
-				var filter gomatrixserverlib.RoomEventFilter
+				var filter synctypes.RoomEventFilter
 				var gotEvents map[string]types.RecentEvents
 				var limited bool
 				filter.Limit = tc.Limit
@@ -206,7 +207,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			to := types.TopologyToken{}
 
 			// backpaginate 5 messages starting at the latest position.
-			filter := &gomatrixserverlib.RoomEventFilter{Limit: 5}
+			filter := &synctypes.RoomEventFilter{Limit: 5}
 			paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 			if err != nil {
 				t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
@@ -932,7 +933,7 @@ func TestRecentEvents(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		filter := gomatrixserverlib.DefaultRoomEventFilter()
+		filter := synctypes.DefaultRoomEventFilter()
 		db, close := MustCreateDatabase(t, dbType)
 		t.Cleanup(close)
 

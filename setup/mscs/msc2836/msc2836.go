@@ -34,8 +34,10 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -78,20 +80,20 @@ func (r *EventRelationshipRequest) Defaults() {
 }
 
 type EventRelationshipResponse struct {
-	Events    []gomatrixserverlib.ClientEvent `json:"events"`
-	NextBatch string                          `json:"next_batch"`
-	Limited   bool                            `json:"limited"`
+	Events    []synctypes.ClientEvent `json:"events"`
+	NextBatch string                  `json:"next_batch"`
+	Limited   bool                    `json:"limited"`
 }
 
 type MSC2836EventRelationshipsResponse struct {
-	gomatrixserverlib.MSC2836EventRelationshipsResponse
+	fclient.MSC2836EventRelationshipsResponse
 	ParsedEvents    []*gomatrixserverlib.Event
 	ParsedAuthChain []*gomatrixserverlib.Event
 }
 
 func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events:    gomatrixserverlib.ToClientEvents(res.ParsedEvents, gomatrixserverlib.FormatAll),
+		Events:    synctypes.ToClientEvents(res.ParsedEvents, synctypes.FormatAll),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,
 	}
@@ -398,7 +400,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 		serversToQuery := rc.getServersForEventID(parentID)
 		var result *MSC2836EventRelationshipsResponse
 		for _, srv := range serversToQuery {
-			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 				EventID:     parentID,
 				Direction:   "down",
 				Limit:       100,
@@ -485,7 +487,7 @@ func walkThread(
 
 // MSC2836EventRelationships performs an /event_relationships request to a remote server
 func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
-	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
 		DepthFirst:  rc.req.DepthFirst,
 		Direction:   rc.req.Direction,
@@ -652,11 +654,11 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 			messageEvents = append(messageEvents, ev)
 		}
 	}
-	respState := gomatrixserverlib.RespState{
+	respState := &fclient.RespState{
 		AuthEvents:  res.AuthChain,
 		StateEvents: stateEvents,
 	}
-	eventsInOrder := respState.Events(rc.roomVersion)
+	eventsInOrder := gomatrixserverlib.LineariseStateResponse(rc.roomVersion, respState)
 	// everything gets sent as an outlier because auth chain events may be disjoint from the DAG
 	// as may the threaded events.
 	var ires []roomserver.InputRoomEvent

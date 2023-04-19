@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -517,10 +518,10 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 		t.hadEvent(ev.EventID)
 	}
 
-	var missingResp *gomatrixserverlib.RespMissingEvents
+	var missingResp *fclient.RespMissingEvents
 	for _, server := range t.servers {
-		var m gomatrixserverlib.RespMissingEvents
-		if m, err = t.federation.LookupMissingEvents(ctx, t.virtualHost, server, e.RoomID(), gomatrixserverlib.MissingEvents{
+		var m fclient.RespMissingEvents
+		if m, err = t.federation.LookupMissingEvents(ctx, t.virtualHost, server, e.RoomID(), fclient.MissingEvents{
 			Limit: 20,
 			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 			EarliestEvents: latestEvents,
@@ -640,27 +641,19 @@ func (t *missingStateReq) lookupMissingStateViaState(
 	if err != nil {
 		return nil, err
 	}
+
 	// Check that the returned state is valid.
-	authEvents, stateEvents, err := state.Check(ctx, roomVersion, t.keys, nil)
+	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(ctx, &fclient.RespState{
+		StateEvents: state.GetStateEvents(),
+		AuthEvents:  state.GetAuthEvents(),
+	}, roomVersion, t.keys, nil)
 	if err != nil {
 		return nil, err
 	}
-	parsedState := &parsedRespState{
+	return &parsedRespState{
 		AuthEvents:  authEvents,
 		StateEvents: stateEvents,
-	}
-	// Cache the results of this state lookup and deduplicate anything we already
-	// have in the cache, freeing up memory.
-	// We load these as trusted as we called state.Check before which loaded them as untrusted.
-	for i, evJSON := range state.AuthEvents {
-		ev, _ := gomatrixserverlib.NewEventFromTrustedJSON(evJSON, false, roomVersion)
-		parsedState.AuthEvents[i] = t.cacheAndReturn(ev)
-	}
-	for i, evJSON := range state.StateEvents {
-		ev, _ := gomatrixserverlib.NewEventFromTrustedJSON(evJSON, false, roomVersion)
-		parsedState.StateEvents[i] = t.cacheAndReturn(ev)
-	}
-	return parsedState, nil
+	}, nil
 }
 
 func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
@@ -670,7 +663,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 	t.log.Infof("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
-	var stateIDs gomatrixserverlib.RespStateIDs
+	var stateIDs gomatrixserverlib.StateIDResponse
 	var err error
 	count := 0
 	totalctx, totalcancel := context.WithTimeout(ctx, time.Minute*5)
@@ -688,7 +681,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 		return nil, fmt.Errorf("t.federation.LookupStateIDs tried %d server(s), last error: %w", count, err)
 	}
 	// work out which auth/state IDs are missing
-	wantIDs := append(stateIDs.StateEventIDs, stateIDs.AuthEventIDs...)
+	wantIDs := append(stateIDs.GetStateEventIDs(), stateIDs.GetAuthEventIDs()...)
 	missing := make(map[string]bool)
 	var missingEventList []string
 	t.haveEventsMutex.Lock()
@@ -730,8 +723,8 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 		t.log.WithFields(logrus.Fields{
 			"missing":           missingCount,
 			"event_id":          eventID,
-			"total_state":       len(stateIDs.StateEventIDs),
-			"total_auth_events": len(stateIDs.AuthEventIDs),
+			"total_state":       len(stateIDs.GetStateEventIDs()),
+			"total_auth_events": len(stateIDs.GetAuthEventIDs()),
 		}).Debug("Fetching all state at event")
 		return t.lookupMissingStateViaState(ctx, roomID, eventID, roomVersion)
 	}
@@ -740,8 +733,8 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 		t.log.WithFields(logrus.Fields{
 			"missing":             missingCount,
 			"event_id":            eventID,
-			"total_state":         len(stateIDs.StateEventIDs),
-			"total_auth_events":   len(stateIDs.AuthEventIDs),
+			"total_state":         len(stateIDs.GetStateEventIDs()),
+			"total_auth_events":   len(stateIDs.GetAuthEventIDs()),
 			"concurrent_requests": concurrentRequests,
 		}).Debug("Fetching missing state at event")
 
@@ -808,7 +801,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 }
 
 func (t *missingStateReq) createRespStateFromStateIDs(
-	stateIDs gomatrixserverlib.RespStateIDs,
+	stateIDs gomatrixserverlib.StateIDResponse,
 ) (*parsedRespState, error) { // nolint:unparam
 	t.haveEventsMutex.Lock()
 	defer t.haveEventsMutex.Unlock()
@@ -816,18 +809,20 @@ func (t *missingStateReq) createRespStateFromStateIDs(
 	// create a RespState response using the response to /state_ids as a guide
 	respState := parsedRespState{}
 
-	for i := range stateIDs.StateEventIDs {
-		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]
+	stateEventIDs := stateIDs.GetStateEventIDs()
+	authEventIDs := stateIDs.GetAuthEventIDs()
+	for i := range stateEventIDs {
+		ev, ok := t.haveEvents[stateEventIDs[i]]
 		if !ok {
-			logrus.Tracef("Missing state event in createRespStateFromStateIDs: %s", stateIDs.StateEventIDs[i])
+			logrus.Tracef("Missing state event in createRespStateFromStateIDs: %s", stateEventIDs[i])
 			continue
 		}
 		respState.StateEvents = append(respState.StateEvents, ev)
 	}
-	for i := range stateIDs.AuthEventIDs {
-		ev, ok := t.haveEvents[stateIDs.AuthEventIDs[i]]
+	for i := range authEventIDs {
+		ev, ok := t.haveEvents[authEventIDs[i]]
 		if !ok {
-			logrus.Tracef("Missing auth event in createRespStateFromStateIDs: %s", stateIDs.AuthEventIDs[i])
+			logrus.Tracef("Missing auth event in createRespStateFromStateIDs: %s", authEventIDs[i])
 			continue
 		}
 		respState.AuthEvents = append(respState.AuthEvents, ev)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -255,10 +256,10 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// waste the effort.
 	// TODO: Can we expand Check here to return a list of missing auth
 	// events rather than failing one at a time?
-	var respState *gomatrixserverlib.RespState
-	respState, err = respSendJoin.Check(
+	var respState gomatrixserverlib.StateResponse
+	respState, err = gomatrixserverlib.CheckSendJoinResponse(
 		context.Background(),
-		respMakeJoin.RoomVersion,
+		respMakeJoin.RoomVersion, &respSendJoin,
 		r.keyRing,
 		event,
 		federatedAuthProvider(ctx, r.federation, r.keyRing, origin, serverName),
@@ -273,7 +274,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
 	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
 	// The events are trusted now as we performed auth checks above.
-	joinedHosts, err := consumers.JoinedHostsFromEvents(respState.StateEvents.TrustedEvents(respMakeJoin.RoomVersion, false))
+	joinedHosts, err := consumers.JoinedHostsFromEvents(respState.GetStateEvents().TrustedEvents(respMakeJoin.RoomVersion, false))
 	if err != nil {
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
@@ -468,11 +469,12 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// we have the peek state now so let's process regardless of whether upstream gives up
 	ctx = context.Background()
-	respState := respPeek.ToRespState()
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	authEvents, _, err := respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName))
+	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
+		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName),
+	)
 	if err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
@@ -496,7 +498,11 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI, r.cfg.Matrix.ServerName,
 		roomserverAPI.KindNew,
-		&respState,
+		// use the authorized state from CheckStateResponse
+		&fclient.RespState{
+			StateEvents: gomatrixserverlib.NewEventJSONsFromEvents(stateEvents),
+			AuthEvents:  gomatrixserverlib.NewEventJSONsFromEvents(authEvents),
+		},
 		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
 		serverName,
 		nil,

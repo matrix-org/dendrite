@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -229,9 +230,9 @@ func (a *UserInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *a
 func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) error {
 	var respMu sync.Mutex
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
-	res.MasterKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
-	res.SelfSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
-	res.UserSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
+	res.MasterKeys = make(map[string]fclient.CrossSigningKey)
+	res.SelfSigningKeys = make(map[string]fclient.CrossSigningKey)
+	res.UserSigningKeys = make(map[string]fclient.CrossSigningKey)
 	res.Failures = make(map[string]interface{})
 
 	// make a map from domain to device keys
@@ -362,7 +363,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 			if len(sigMap) == 0 {
 				continue
 			}
-			var deviceKey gomatrixserverlib.DeviceKeys
+			var deviceKey fclient.DeviceKeys
 			if err = json.Unmarshal(key, &deviceKey); err != nil {
 				continue
 			}
@@ -415,7 +416,7 @@ func (a *UserInternalAPI) queryRemoteKeys(
 	ctx context.Context, timeout time.Duration, res *api.QueryKeysResponse,
 	domainToDeviceKeys map[string]map[string][]string, domainToCrossSigningKeys map[string]map[string]struct{},
 ) {
-	resultCh := make(chan *gomatrixserverlib.RespQueryKeys, len(domainToDeviceKeys))
+	resultCh := make(chan *fclient.RespQueryKeys, len(domainToDeviceKeys))
 	// allows us to wait until all federation servers have been poked
 	var wg sync.WaitGroup
 	// mutex for writing directly to res (e.g failures)
@@ -450,7 +451,7 @@ func (a *UserInternalAPI) queryRemoteKeys(
 		close(resultCh)
 	}()
 
-	processResult := func(result *gomatrixserverlib.RespQueryKeys) {
+	processResult := func(result *fclient.RespQueryKeys) {
 		respMu.Lock()
 		defer respMu.Unlock()
 		for userID, nest := range result.DeviceKeys {
@@ -483,7 +484,7 @@ func (a *UserInternalAPI) queryRemoteKeys(
 
 func (a *UserInternalAPI) queryRemoteKeysOnServer(
 	ctx context.Context, serverName string, devKeys map[string][]string, crossSigningKeys map[string]struct{},
-	wg *sync.WaitGroup, respMu *sync.Mutex, timeout time.Duration, resultCh chan<- *gomatrixserverlib.RespQueryKeys,
+	wg *sync.WaitGroup, respMu *sync.Mutex, timeout time.Duration, resultCh chan<- *fclient.RespQueryKeys,
 	res *api.QueryKeysResponse,
 ) {
 	defer wg.Done()
