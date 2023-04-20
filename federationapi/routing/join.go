@@ -207,7 +207,7 @@ func SendJoin(
 		}
 	}
 
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	event, err := verRes.RoomVersion.NewEventFromUntrustedJSON(request.Content())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -287,7 +287,7 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	redacted, err := event.Version().RedactEventJSON(event.JSON())
 	if err != nil {
 		logrus.WithError(err).Errorf("XXX: join.go")
 		return util.JSONResponse{

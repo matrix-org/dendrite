@@ -235,7 +235,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// contain signatures that we don't know about.
 	if len(respSendJoin.Event) > 0 {
 		var remoteEvent *gomatrixserverlib.Event
-		remoteEvent, err = gomatrixserverlib.UntrustedEvent(respSendJoin.Event, respMakeJoin.RoomVersion)
+		remoteEvent, err = respMakeJoin.RoomVersion.NewEventFromUntrustedJSON(respSendJoin.Event)
 		if err == nil && isWellFormedMembershipEvent(
 			remoteEvent, roomID, userID,
 		) {
@@ -660,7 +660,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
 
-	inviteEvent, err := gomatrixserverlib.UntrustedEvent(inviteRes.Event, request.RoomVersion)
+	inviteEvent, err := request.RoomVersion.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
@@ -808,7 +808,7 @@ func federatedAuthProvider(
 			// event ID again.
 			for _, pdu := range tx.PDUs {
 				// Try to parse the event.
-				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+				ev, everr := roomVersion.NewEventFromUntrustedJSON(pdu)
 				if everr != nil {
 					return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
 				}

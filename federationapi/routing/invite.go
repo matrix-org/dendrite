@@ -78,7 +78,7 @@ func InviteV1(
 ) util.JSONResponse {
 	roomVer := gomatrixserverlib.RoomVersionV1
 	body := request.Content()
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(body, false, roomVer)
+	event, err := roomVer.NewEventFromTrustedJSON(body, false)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
@@ -157,7 +157,7 @@ func processInvite(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	redacted, err := event.Version().RedactEventJSON(event.JSON())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

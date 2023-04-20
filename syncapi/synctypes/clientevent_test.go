@@ -24,7 +24,7 @@ import (
 )
 
 func TestToClientEvent(t *testing.T) { // nolint: gocyclo
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	ev, err := gomatrixserverlib.RoomVersionV1.NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
 		"state_key": "",
 		"event_id": "$test:localhost",
@@ -39,7 +39,7 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 				"name": "Goodbye World"
 			}
 		}
-	}`), false, gomatrixserverlib.RoomVersionV1)
+	}`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
@@ -79,7 +79,7 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 }
 
 func TestToClientFormatSync(t *testing.T) {
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	ev, err := gomatrixserverlib.RoomVersionV1.NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
 		"state_key": "",
 		"event_id": "$test:localhost",
@@ -94,7 +94,7 @@ func TestToClientFormatSync(t *testing.T) {
 				"name": "Goodbye World"
 			}
 		}
-	}`), false, gomatrixserverlib.RoomVersionV1)
+	}`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}

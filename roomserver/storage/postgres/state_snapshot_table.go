@@ -232,7 +232,7 @@ func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
 			result[eventID] = ev
 			continue
 		}
-		event, err := gomatrixserverlib.NewEventFromTrustedJSON(evJson, false, roomInfo.RoomVersion)
+		event, err := roomInfo.RoomVersion.NewEventFromTrustedJSON(evJson, false)
 		if err != nil {
 			result[eventID] = &gomatrixserverlib.HeaderedEvent{}
 			// not fatal
