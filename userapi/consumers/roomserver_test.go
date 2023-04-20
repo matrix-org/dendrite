@@ -36,7 +36,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 
 func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {
 	t.Helper()
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(content), false, gomatrixserverlib.RoomVersionV10)
+	ev, err := gomatrixserverlib.RoomVersionV10.NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}

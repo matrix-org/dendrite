@@ -321,7 +321,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	)
 
 	for _, tc := range testCases {
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(tc.eventJSON), false, tc.roomVer)
+		ev, err := tc.roomVer.NewEventFromTrustedJSON([]byte(tc.eventJSON), false)
 		if err != nil {
 			t.Errorf("failed to parse event: %s", err)
 		}

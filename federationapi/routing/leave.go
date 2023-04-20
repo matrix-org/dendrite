@@ -150,7 +150,7 @@ func SendLeave(
 	}
 
 	// Decode the event JSON from the request.
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	event, err := verRes.RoomVersion.NewEventFromUntrustedJSON(request.Content())
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
@@ -253,7 +253,7 @@ func SendLeave(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	redacted, err := event.Version().RedactEventJSON(event.JSON())
 	if err != nil {
 		logrus.WithError(err).Errorf("XXX: leave.go")
 		return util.JSONResponse{

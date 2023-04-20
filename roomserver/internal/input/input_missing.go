@@ -865,7 +865,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 			}
 			continue
 		}
-		event, err = gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVersion)
+		event, err = roomVersion.NewEventFromUntrustedJSON(txn.PDUs[0])
 		if err != nil {
 			t.log.WithError(err).WithField("missing_event_id", missingEventID).Warnf("Failed to parse event JSON of event returned from /event")
 			continue

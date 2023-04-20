@@ -196,7 +196,7 @@ func ExchangeThirdPartyInvite(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
 	}
-	inviteEvent, err := gomatrixserverlib.UntrustedEvent(signedEvent.Event, verRes.RoomVersion)
+	inviteEvent, err := verRes.RoomVersion.NewEventFromUntrustedJSON(signedEvent.Event)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()

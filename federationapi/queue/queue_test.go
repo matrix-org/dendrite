@@ -105,7 +105,7 @@ func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u 
 func mustCreatePDU(t *testing.T) *gomatrixserverlib.HeaderedEvent {
 	t.Helper()
 	content := `{"type":"m.room.message"}`
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(content), false, gomatrixserverlib.RoomVersionV10)
+	ev, err := gomatrixserverlib.RoomVersionV10.NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}

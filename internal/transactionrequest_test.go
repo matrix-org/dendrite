@@ -633,7 +633,7 @@ func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 
 func init() {
 	for _, j := range testData {
-		e, err := gomatrixserverlib.NewEventFromTrustedJSON(j, false, testRoomVersion)
+		e, err := testRoomVersion.NewEventFromTrustedJSON(j, false)
 		if err != nil {
 			panic("cannot load test data: " + err.Error())
 		}
