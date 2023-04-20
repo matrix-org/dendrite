@@ -312,6 +312,9 @@ func SendJoin(
 		}
 	}
 
+	// TODO: (PowerDAG) query state & power DAG
+	// We return the entire power DAG with a send_join response
+
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
 	var stateAndAuthChainResponse api.QueryStateAndAuthChainResponse
@@ -338,6 +341,9 @@ func SendJoin(
 			JSON: jsonerror.Forbidden("State not known"),
 		}
 	}
+
+	// TODO: (Power DAG) will we have enough info in a join response to check membership?
+	// We should include the user membership event (if there is one) in the state response.
 
 	// Check if the user is already in the room. If they're already in then
 	// there isn't much point in sending another join event into the room.
@@ -424,6 +430,8 @@ func SendJoin(
 			return jsonerror.InternalServerError()
 		}
 	}
+
+	// TODO: (PowerDAG) Adapt this to return the full power DAG & state + user membership event (if it exists)
 
 	// sort events deterministically by depth (lower is earlier)
 	// We also do this because sytest's basic federation server isn't good at using the correct
