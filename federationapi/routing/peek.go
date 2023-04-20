@@ -21,13 +21,14 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
 // Peek implements the SS /peek API, handling inbound peeks
 func Peek(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	roomID, peekID string,
@@ -87,7 +88,7 @@ func Peek(
 		return util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	respPeek := gomatrixserverlib.RespPeek{
+	respPeek := fclient.RespPeek{
 		StateEvents:     gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.StateEvents),
 		AuthEvents:      gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		RoomVersion:     response.RoomVersion,

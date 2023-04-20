@@ -8,15 +8,15 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 type eventInfo struct {
 	EventID        string
-	OriginServerTS gomatrixserverlib.Timestamp
+	OriginServerTS spec.Timestamp
 	RoomID         string
 }
 
@@ -59,17 +59,17 @@ type DB struct {
 }
 
 // NewDatabase loads the database for msc2836
-func NewDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions) (Database, error) {
+func NewDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
 	if dbOpts.ConnectionString.IsPostgres() {
-		return newPostgresDatabase(base, dbOpts)
+		return newPostgresDatabase(conMan, dbOpts)
 	}
-	return newSQLiteDatabase(base, dbOpts)
+	return newSQLiteDatabase(conMan, dbOpts)
 }
 
-func newPostgresDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions) (Database, error) {
+func newPostgresDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
 	d := DB{}
 	var err error
-	if d.db, d.writer, err = base.DatabaseConnection(dbOpts, sqlutil.NewDummyWriter()); err != nil {
+	if d.db, d.writer, err = conMan.Connection(dbOpts); err != nil {
 		return nil, err
 	}
 	_, err = d.db.Exec(`
@@ -144,10 +144,10 @@ func newPostgresDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions
 	return &d, err
 }
 
-func newSQLiteDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions) (Database, error) {
+func newSQLiteDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
 	d := DB{}
 	var err error
-	if d.db, d.writer, err = base.DatabaseConnection(dbOpts, sqlutil.NewExclusiveWriter()); err != nil {
+	if d.db, d.writer, err = conMan.Connection(dbOpts); err != nil {
 		return nil, err
 	}
 	_, err = d.db.Exec(`
@@ -351,8 +351,8 @@ func roomIDAndServers(ev *gomatrixserverlib.HeaderedEvent) (roomID string, serve
 
 func extractChildMetadata(ev *gomatrixserverlib.HeaderedEvent) (count int, hash []byte) {
 	unsigned := struct {
-		Counts map[string]int                `json:"children"`
-		Hash   gomatrixserverlib.Base64Bytes `json:"children_hash"`
+		Counts map[string]int   `json:"children"`
+		Hash   spec.Base64Bytes `json:"children_hash"`
 	}{}
 	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err != nil {
 		// expected if there is no unsigned field at all

@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func TestMonolithStarts(t *testing.T) {
@@ -110,7 +110,7 @@ func TestParseServerKey(t *testing.T) {
 		name        string
 		serverKey   string
 		expectedErr bool
-		expectedKey gomatrixserverlib.ServerName
+		expectedKey spec.ServerName
 	}{
 		{
 			name:        "valid userid as key",

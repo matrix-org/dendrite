@@ -16,20 +16,17 @@ package appservice
 
 import (
 	"context"
-	"crypto/tls"
-	"net/http"
 	"sync"
-	"time"
 
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
-
-	"github.com/matrix-org/gomatrixserverlib"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/query"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -37,39 +34,31 @@ import (
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite,
+	processContext *process.ProcessContext,
+	cfg *config.Dendrite,
+	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
-	client := &http.Client{
-		Timeout: time.Second * 30,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: base.Cfg.AppServiceAPI.DisableTLSValidation,
-			},
-			Proxy: http.ProxyFromEnvironment,
-		},
-	}
+
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient:    client,
-		Cfg:           &base.Cfg.AppServiceAPI,
+		Cfg:           &cfg.AppServiceAPI,
 		ProtocolCache: map[string]appserviceAPI.ASProtocolResponse{},
 		CacheMu:       sync.Mutex{},
 	}
 
-	if len(base.Cfg.Derived.ApplicationServices) == 0 {
+	if len(cfg.Derived.ApplicationServices) == 0 {
 		return appserviceQueryAPI
 	}
 
 	// Wrap application services in a type that relates the application service and
 	// a sync.Cond object that can be used to notify workers when there are new
 	// events to be sent out.
-	for _, appservice := range base.Cfg.Derived.ApplicationServices {
+	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
-		if err := generateAppServiceAccount(userAPI, appservice, base.Cfg.Global.ServerName); err != nil {
+		if err := generateAppServiceAccount(userAPI, appservice, cfg.Global.ServerName); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
@@ -78,10 +67,10 @@ func NewInternalAPI(
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
 	consumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, &base.Cfg.AppServiceAPI,
-		client, js, rsAPI,
+		processContext, &cfg.AppServiceAPI,
+		js, rsAPI,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
@@ -96,7 +85,7 @@ func NewInternalAPI(
 func generateAppServiceAccount(
 	userAPI userapi.AppserviceUserAPI,
 	as config.ApplicationService,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{

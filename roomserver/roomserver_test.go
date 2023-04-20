@@ -7,11 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
@@ -29,21 +32,14 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
-	t.Helper()
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, base.Caches)
-	if err != nil {
-		t.Fatalf("failed to create Database: %v", err)
-	}
-	return base, db, close
-}
-
 func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, close := testrig.CreateBaseDendrite(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 
@@ -52,7 +48,7 @@ func TestUsers(t *testing.T) {
 		})
 
 		t.Run("kick users", func(t *testing.T) {
-			usrAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+			usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 			rsAPI.SetUserAPI(usrAPI)
 			testKickUsers(t, rsAPI, usrAPI)
 		})
@@ -66,10 +62,10 @@ func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite and join Bob
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -107,7 +103,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat), test.GuestsCanJoin(true))
 
 	// Join with the guest user
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -139,7 +135,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 	}
 
 	// revoke guest access
-	revokeEvent := room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
+	revokeEvent := room.CreateAndInsert(t, alice, spec.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
 		t.Errorf("failed to send events: %v", err)
 	}
@@ -169,19 +165,22 @@ func Test_QueryLeftUsers(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite and join Bob
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, _, close := mustCreateDatabase(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 		// Create the room
@@ -218,36 +217,42 @@ func TestPurgeRoom(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite Bob
-	inviteEvent := room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	inviteEvent := room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
 
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, db, close := mustCreateDatabase(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		natsInstance := jetstream.NATSInstance{}
 		defer close()
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
+		if err != nil {
+			t.Fatal(err)
+		}
+		jsCtx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsCtx, &cfg.Global.JetStream)
 
-		jsCtx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsCtx, &base.Cfg.Global.JetStream)
-
-		fedClient := base.CreateFederationClient()
-		rsAPI := roomserver.NewInternalAPI(base)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI)
-		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
+		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
+		federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 
 		// Create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
 		// some dummy entries to validate after purging
 		publishResp := &api.PerformPublishResponse{}
-		if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
 			t.Fatal(err)
 		}
 		if publishResp.Error != nil {
@@ -335,7 +340,7 @@ func TestPurgeRoom(t *testing.T) {
 				t.Fatalf("test timed out after %s", timeout)
 			}
 			sum = 0
-			consumerCh := jsCtx.Consumers(base.Cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
+			consumerCh := jsCtx.Consumers(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
 			for x := range consumerCh {
 				sum += x.NumAckPending
 			}
@@ -439,7 +444,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -456,7 +461,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, bob, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -473,7 +478,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     bob.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -489,7 +494,7 @@ func TestRedaction(t *testing.T) {
 				redactedEvent := room.CreateAndInsert(t, bob, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
-					Type:       gomatrixserverlib.MRoomRedaction,
+					Type:       spec.MRoomRedaction,
 					Sender:     charlie.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
@@ -503,8 +508,14 @@ func TestRedaction(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		_, db, close := mustCreateDatabase(t, dbType)
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -513,10 +524,10 @@ func TestRedaction(t *testing.T) {
 				var err error
 
 				room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, charlie, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(charlie.ID))
 
@@ -558,7 +569,7 @@ func TestRedaction(t *testing.T) {
 					if redactedEvent != nil {
 						assert.Equal(t, ev.Redacts(), redactedEvent.EventID())
 					}
-					if ev.Type() == gomatrixserverlib.MRoomRedaction {
+					if ev.Type() == spec.MRoomRedaction {
 						nids, err := db.EventNIDs(ctx, []string{ev.Redacts()})
 						assert.NoError(t, err)
 						evs, err := db.Events(ctx, roomInfo, []types.EventNID{nids[ev.Redacts()].EventNID})

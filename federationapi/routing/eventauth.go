@@ -19,13 +19,14 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
 // GetEventAuth returns event auth for the roomID and eventID
 func GetEventAuth(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
@@ -70,7 +71,7 @@ func GetEventAuth(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespEventAuth{
+		JSON: fclient.RespEventAuth{
 			AuthEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		},
 	}

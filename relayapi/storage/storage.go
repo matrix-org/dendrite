@@ -21,25 +21,25 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/storage/postgres"
 	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // NewDatabase opens a new database
 func NewDatabase(
-	base *base.BaseDendrite,
+	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	isLocalServerName func(spec.ServerName) bool,
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(base, dbProperties, cache, isLocalServerName)
+		return sqlite3.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(base, dbProperties, cache, isLocalServerName)
+		return postgres.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

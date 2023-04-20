@@ -30,8 +30,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
@@ -404,11 +407,15 @@ func Test_register(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
 
-		rsAPI := roomserver.NewInternalAPI(base)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -430,16 +437,16 @@ func Test_register(t *testing.T) {
 						}
 					}))
 					defer srv.Close()
-					base.Cfg.ClientAPI.RecaptchaSiteVerifyAPI = srv.URL
+					cfg.ClientAPI.RecaptchaSiteVerifyAPI = srv.URL
 				}
 
-				if err := base.Cfg.Derive(); err != nil {
+				if err := cfg.Derive(); err != nil {
 					t.Fatalf("failed to derive config: %s", err)
 				}
 
-				base.Cfg.ClientAPI.RecaptchaEnabled = tc.enableRecaptcha
-				base.Cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
-				base.Cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
+				cfg.ClientAPI.RecaptchaEnabled = tc.enableRecaptcha
+				cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
+				cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
 
 				if tc.kind == "" {
 					tc.kind = "user"
@@ -467,15 +474,15 @@ func Test_register(t *testing.T) {
 
 				req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/?kind=%s", tc.kind), body)
 
-				resp := Register(req, userAPI, &base.Cfg.ClientAPI)
+				resp := Register(req, userAPI, &cfg.ClientAPI)
 				t.Logf("Resp: %+v", resp)
 
 				// The first request should return a userInteractiveResponse
 				switch r := resp.JSON.(type) {
 				case userInteractiveResponse:
 					// Check that the flows are the ones we configured
-					if !reflect.DeepEqual(r.Flows, base.Cfg.Derived.Registration.Flows) {
-						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, base.Cfg.Derived.Registration.Flows)
+					if !reflect.DeepEqual(r.Flows, cfg.Derived.Registration.Flows) {
+						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
 					}
 				case *jsonerror.MatrixError:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
@@ -531,7 +538,7 @@ func Test_register(t *testing.T) {
 
 				req = httptest.NewRequest(http.MethodPost, "/", body)
 
-				resp = Register(req, userAPI, &base.Cfg.ClientAPI)
+				resp = Register(req, userAPI, &cfg.ClientAPI)
 
 				switch resp.JSON.(type) {
 				case *jsonerror.MatrixError:
@@ -574,16 +581,19 @@ func Test_register(t *testing.T) {
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
-		base.Cfg.Global.ServerName = "server"
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
+		cfg.Global.ServerName = "server"
 
-		rsAPI := roomserver.NewInternalAPI(base)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		deviceName, deviceID := "deviceName", "deviceID"
 		expectedDisplayName := "DisplayName"
 		response := completeRegistration(
-			base.Context(),
+			processCtx.Context(),
 			userAPI,
 			"user",
 			"server",
@@ -601,24 +611,25 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		req := api.QueryProfileRequest{UserID: "@user:server"}
-		var res api.QueryProfileResponse
-		err := userAPI.QueryProfile(base.Context(), &req, &res)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@user:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, res.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
-		base.Cfg.Global.ServerName = "server"
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		cfg.Global.ServerName = "server"
 		sharedSecret := "dendritetest"
-		base.Cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
+		cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
 
-		rsAPI := roomserver.NewInternalAPI(base)
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		expectedDisplayName := "rabbit"
 		jsonStr := []byte(`{"admin":true,"mac":"24dca3bba410e43fe64b9b5c28306693bf3baa9f","nonce":"759f047f312b99ff428b21d581256f8592b8976e58bc1b543972dc6147e529a79657605b52d7becd160ff5137f3de11975684319187e06901955f79e5a6c5a79","password":"wonderland","username":"alice","displayname":"rabbit"}`)
@@ -642,17 +653,15 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		ssrr := httptest.NewRequest(http.MethodPost, "/", body)
 
 		response := handleSharedSecretRegistration(
-			&base.Cfg.ClientAPI,
+			&cfg.ClientAPI,
 			userAPI,
 			r,
 			ssrr,
 		)
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		profilReq := api.QueryProfileRequest{UserID: "@alice:server"}
-		var profileRes api.QueryProfileResponse
-		err = userAPI.QueryProfile(base.Context(), &profilReq, &profileRes)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@alice:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, profileRes.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }

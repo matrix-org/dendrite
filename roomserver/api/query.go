@@ -22,8 +22,10 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -146,7 +148,7 @@ type QueryMembershipsForRoomRequest struct {
 // QueryMembershipsForRoomResponse is a response to QueryMembershipsForRoom
 type QueryMembershipsForRoomResponse struct {
 	// The "m.room.member" events (of "join" membership) in the client format
-	JoinEvents []gomatrixserverlib.ClientEvent `json:"join_events"`
+	JoinEvents []synctypes.ClientEvent `json:"join_events"`
 	// True if the user has been in room before and has either stayed in it or
 	// left it.
 	HasBeenInRoom bool `json:"has_been_in_room"`
@@ -158,7 +160,7 @@ type QueryMembershipsForRoomResponse struct {
 type QueryServerJoinedToRoomRequest struct {
 	// Server name of the server to find. If not specified, we will
 	// default to checking if the local server is joined.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 	// ID of the room to see if we are still joined to
 	RoomID string `json:"room_id"`
 }
@@ -176,7 +178,7 @@ type QueryServerAllowedToSeeEventRequest struct {
 	// The event ID to look up invites in.
 	EventID string `json:"event_id"`
 	// The server interested in the event
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 // QueryServerAllowedToSeeEventResponse is a response to QueryServerAllowedToSeeEvent
@@ -194,7 +196,7 @@ type QueryMissingEventsRequest struct {
 	// Limit the number of events this query returns.
 	Limit int `json:"limit"`
 	// The server interested in the event
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 // QueryMissingEventsResponse is a response to QueryMissingEvents
@@ -238,15 +240,6 @@ type QueryStateAndAuthChainResponse struct {
 	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
 	// True if the queried event was rejected earlier.
 	IsRejected bool `json:"is_rejected"`
-}
-
-// QueryRoomVersionCapabilitiesRequest asks for the default room version
-type QueryRoomVersionCapabilitiesRequest struct{}
-
-// QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
-type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
-	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
 // QueryRoomVersionForRoomRequest asks for the room version for a given room.
@@ -348,8 +341,8 @@ type QueryKnownUsersResponse struct {
 }
 
 type QueryServerBannedFromRoomRequest struct {
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-	RoomID     string                       `json:"room_id"`
+	ServerName spec.ServerName `json:"server_name"`
+	RoomID     string          `json:"room_id"`
 }
 
 type QueryServerBannedFromRoomResponse struct {

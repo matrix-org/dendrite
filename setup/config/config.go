@@ -26,6 +26,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
@@ -239,7 +240,7 @@ func loadConfig(
 
 			key.KeyID = keyID
 			key.PrivateKey = privateKey
-			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
+			key.PublicKey = spec.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
 
 		case key.KeyID == "":
 			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")

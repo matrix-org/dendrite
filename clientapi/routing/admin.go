@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -22,23 +23,16 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
-func AdminEvacuateRoom(req *http.Request, cfg *config.ClientAPI, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
-	}
-	roomID, ok := vars["roomID"]
-	if !ok {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting room ID."),
-		}
 	}
 	res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
 	if err := rsAPI.PerformAdminEvacuateRoom(
 		req.Context(),
 		&roomserverAPI.PerformAdminEvacuateRoomRequest{
-			RoomID: roomID,
+			RoomID: vars["roomID"],
 		},
 		res,
 	); err != nil {
@@ -55,18 +49,13 @@ func AdminEvacuateRoom(req *http.Request, cfg *config.ClientAPI, device *api.Dev
 	}
 }
 
-func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	userID, ok := vars["userID"]
-	if !ok {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting user ID."),
-		}
-	}
+	userID := vars["userID"]
+
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
@@ -103,13 +92,8 @@ func AdminPurgeRoom(req *http.Request, cfg *config.ClientAPI, device *api.Device
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	roomID, ok := vars["roomID"]
-	if !ok {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting room ID."),
-		}
-	}
+	roomID := vars["roomID"]
+
 	res := &roomserverAPI.PerformAdminPurgeRoomResponse{}
 	if err := rsAPI.PerformAdminPurgeRoom(
 		context.Background(),
@@ -279,7 +263,7 @@ func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.De
 		&roomserverAPI.PerformAdminDownloadStateRequest{
 			UserID:     device.UserID,
 			RoomID:     roomID,
-			ServerName: gomatrixserverlib.ServerName(serverName),
+			ServerName: spec.ServerName(serverName),
 		},
 		res,
 	); err != nil {

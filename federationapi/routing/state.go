@@ -20,13 +20,14 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
 // GetState returns state events & auth events for the roomID, eventID
 func GetState(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
@@ -40,7 +41,7 @@ func GetState(
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: &gomatrixserverlib.RespState{
+	return util.JSONResponse{Code: http.StatusOK, JSON: &fclient.RespState{
 		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
 		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
 	}}
@@ -49,7 +50,7 @@ func GetState(
 // GetStateIDs returns state event IDs & auth event IDs for the roomID, eventID
 func GetStateIDs(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
@@ -66,7 +67,7 @@ func GetStateIDs(
 	stateEventIDs := getIDsFromEvent(stateEvents)
 	authEventIDs := getIDsFromEvent(authEvents)
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.RespStateIDs{
+	return util.JSONResponse{Code: http.StatusOK, JSON: fclient.RespStateIDs{
 		StateEventIDs: stateEventIDs,
 		AuthEventIDs:  authEventIDs,
 	},
@@ -74,7 +75,7 @@ func GetStateIDs(
 }
 
 func parseEventIDParam(
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 ) (eventID string, resErr *util.JSONResponse) {
 	URL, err := url.Parse(request.RequestURI())
 	if err != nil {
@@ -96,7 +97,7 @@ func parseEventIDParam(
 
 func getState(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,

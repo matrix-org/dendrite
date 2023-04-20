@@ -33,9 +33,11 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -48,23 +50,23 @@ const (
 )
 
 type MSC2946ClientResponse struct {
-	Rooms     []gomatrixserverlib.MSC2946Room `json:"rooms"`
-	NextBatch string                          `json:"next_batch,omitempty"`
+	Rooms     []fclient.MSC2946Room `json:"rooms"`
+	NextBatch string                `json:"next_batch,omitempty"`
 }
 
 // Enable this MSC
 func Enable(
-	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
+	cfg *config.Dendrite, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
 	fsAPI fs.FederationInternalAPI, keyRing gomatrixserverlib.JSONVerifier, cache caching.SpaceSummaryRoomsCache,
 ) error {
-	clientAPI := httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(rsAPI, fsAPI, cache, base.Cfg.Global.ServerName), httputil.WithAllowGuests())
-	base.PublicClientAPIMux.Handle("/v1/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
-	base.PublicClientAPIMux.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
+	clientAPI := httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(rsAPI, fsAPI, cache, cfg.Global.ServerName), httputil.WithAllowGuests())
+	routers.Client.Handle("/v1/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
+	routers.Client.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
 
 	fedAPI := httputil.MakeExternalAPI(
 		"msc2946_fed_spaces", func(req *http.Request) util.JSONResponse {
-			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
-				req, time.Now(), base.Cfg.Global.ServerName, base.Cfg.Global.IsLocalServerName, keyRing,
+			fedReq, errResp := fclient.VerifyHTTPRequest(
+				req, time.Now(), cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 			)
 			if fedReq == nil {
 				return errResp
@@ -75,19 +77,19 @@ func Enable(
 				return util.ErrorResponse(err)
 			}
 			roomID := params["roomID"]
-			return federatedSpacesHandler(req.Context(), fedReq, roomID, cache, rsAPI, fsAPI, base.Cfg.Global.ServerName)
+			return federatedSpacesHandler(req.Context(), fedReq, roomID, cache, rsAPI, fsAPI, cfg.Global.ServerName)
 		},
 	)
-	base.PublicFederationAPIMux.Handle("/unstable/org.matrix.msc2946/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
-	base.PublicFederationAPIMux.Handle("/v1/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
+	routers.Federation.Handle("/unstable/org.matrix.msc2946/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
+	routers.Federation.Handle("/v1/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
 	return nil
 }
 
 func federatedSpacesHandler(
-	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, roomID string,
+	ctx context.Context, fedReq *fclient.FederationRequest, roomID string,
 	cache caching.SpaceSummaryRoomsCache,
 	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
-	thisServer gomatrixserverlib.ServerName,
+	thisServer spec.ServerName,
 ) util.JSONResponse {
 	u, err := url.Parse(fedReq.RequestURI())
 	if err != nil {
@@ -121,7 +123,7 @@ func spacesHandler(
 	rsAPI roomserver.RoomserverInternalAPI,
 	fsAPI fs.FederationInternalAPI,
 	cache caching.SpaceSummaryRoomsCache,
-	thisServer gomatrixserverlib.ServerName,
+	thisServer spec.ServerName,
 ) func(*http.Request, *userapi.Device) util.JSONResponse {
 	// declared outside the returned handler so it persists between calls
 	// TODO: clear based on... time?
@@ -161,8 +163,8 @@ type paginationInfo struct {
 type walker struct {
 	rootRoomID      string
 	caller          *userapi.Device
-	serverName      gomatrixserverlib.ServerName
-	thisServer      gomatrixserverlib.ServerName
+	serverName      spec.ServerName
+	thisServer      spec.ServerName
 	rsAPI           roomserver.RoomserverInternalAPI
 	fsAPI           fs.FederationInternalAPI
 	ctx             context.Context
@@ -222,7 +224,7 @@ func (w *walker) walk() util.JSONResponse {
 		}
 	}
 
-	var discoveredRooms []gomatrixserverlib.MSC2946Room
+	var discoveredRooms []fclient.MSC2946Room
 
 	var cache *paginationInfo
 	if w.paginationToken != "" {
@@ -268,14 +270,14 @@ func (w *walker) walk() util.JSONResponse {
 
 		// if this room is not a space room, skip.
 		var roomType string
-		create := w.stateEvent(rv.roomID, gomatrixserverlib.MRoomCreate, "")
+		create := w.stateEvent(rv.roomID, spec.MRoomCreate, "")
 		if create != nil {
 			// escape the `.`s so gjson doesn't think it's nested
 			roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 		}
 
 		// Collect rooms/events to send back (either locally or fetched via federation)
-		var discoveredChildEvents []gomatrixserverlib.MSC2946StrippedEvent
+		var discoveredChildEvents []fclient.MSC2946StrippedEvent
 
 		// If we know about this room and the caller is authorised (joined/world_readable) then pull
 		// events locally
@@ -306,7 +308,7 @@ func (w *walker) walk() util.JSONResponse {
 
 			pubRoom := w.publicRoomsChunk(rv.roomID)
 
-			discoveredRooms = append(discoveredRooms, gomatrixserverlib.MSC2946Room{
+			discoveredRooms = append(discoveredRooms, fclient.MSC2946Room{
 				PublicRoom:    *pubRoom,
 				RoomType:      roomType,
 				ChildrenState: events,
@@ -379,7 +381,7 @@ func (w *walker) walk() util.JSONResponse {
 	}
 	return util.JSONResponse{
 		Code: 200,
-		JSON: gomatrixserverlib.MSC2946SpacesResponse{
+		JSON: fclient.MSC2946SpacesResponse{
 			Room:     discoveredRooms[0],
 			Children: discoveredRooms[1:],
 		},
@@ -402,7 +404,7 @@ func (w *walker) stateEvent(roomID, evType, stateKey string) *gomatrixserverlib.
 	return queryRes.StateEvents[tuple]
 }
 
-func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
+func (w *walker) publicRoomsChunk(roomID string) *fclient.PublicRoom {
 	pubRooms, err := roomserver.PopulatePublicRooms(w.ctx, []string{roomID}, w.rsAPI)
 	if err != nil {
 		util.GetLogger(w.ctx).WithError(err).Error("failed to PopulatePublicRooms")
@@ -416,7 +418,7 @@ func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
 
 // federatedRoomInfo returns more of the spaces graph from another server. Returns nil if this was
 // unsuccessful.
-func (w *walker) federatedRoomInfo(roomID string, vias []string) *gomatrixserverlib.MSC2946SpacesResponse {
+func (w *walker) federatedRoomInfo(roomID string, vias []string) *fclient.MSC2946SpacesResponse {
 	// only do federated requests for client requests
 	if w.caller == nil {
 		return nil
@@ -433,19 +435,19 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) *gomatrixserver
 		if serverName == string(w.thisServer) {
 			continue
 		}
-		res, err := w.fsAPI.MSC2946Spaces(ctx, w.thisServer, gomatrixserverlib.ServerName(serverName), roomID, w.suggestedOnly)
+		res, err := w.fsAPI.MSC2946Spaces(ctx, w.thisServer, spec.ServerName(serverName), roomID, w.suggestedOnly)
 		if err != nil {
 			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call MSC2946Spaces on server %s", serverName)
 			continue
 		}
 		// ensure nil slices are empty as we send this to the client sometimes
 		if res.Room.ChildrenState == nil {
-			res.Room.ChildrenState = []gomatrixserverlib.MSC2946StrippedEvent{}
+			res.Room.ChildrenState = []fclient.MSC2946StrippedEvent{}
 		}
 		for i := 0; i < len(res.Children); i++ {
 			child := res.Children[i]
 			if child.ChildrenState == nil {
-				child.ChildrenState = []gomatrixserverlib.MSC2946StrippedEvent{}
+				child.ChildrenState = []fclient.MSC2946StrippedEvent{}
 			}
 			res.Children[i] = child
 		}
@@ -483,11 +485,11 @@ func (w *walker) authorised(roomID, parentRoomID string) (authed, isJoinedOrInvi
 func (w *walker) authorisedServer(roomID string) bool {
 	// Check history visibility / join rules first
 	hisVisTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomHistoryVisibility,
+		EventType: spec.MRoomHistoryVisibility,
 		StateKey:  "",
 	}
 	joinRuleTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomJoinRules,
+		EventType: spec.MRoomJoinRules,
 		StateKey:  "",
 	}
 	var queryRoomRes roomserver.QueryCurrentStateResponse
@@ -521,11 +523,11 @@ func (w *walker) authorisedServer(roomID string) bool {
 			return false
 		}
 
-		if rule == gomatrixserverlib.Public || rule == gomatrixserverlib.Knock {
+		if rule == spec.Public || rule == spec.Knock {
 			return true
 		}
 
-		if rule == gomatrixserverlib.Restricted {
+		if rule == spec.Restricted {
 			allowJoinedToRoomIDs = append(allowJoinedToRoomIDs, w.restrictedJoinRuleAllowedRooms(joinRuleEv, "m.room_membership")...)
 		}
 	}
@@ -555,15 +557,15 @@ func (w *walker) authorisedServer(roomID string) bool {
 // Failing that, if the room has a restricted join rule and belongs to the space parent listed, it will return true.
 func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoinedOrInvited bool) {
 	hisVisTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomHistoryVisibility,
+		EventType: spec.MRoomHistoryVisibility,
 		StateKey:  "",
 	}
 	joinRuleTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomJoinRules,
+		EventType: spec.MRoomJoinRules,
 		StateKey:  "",
 	}
 	roomMemberTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomMember,
+		EventType: spec.MRoomMember,
 		StateKey:  w.caller.UserID,
 	}
 	var queryRes roomserver.QueryCurrentStateResponse
@@ -580,7 +582,7 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 	memberEv := queryRes.StateEvents[roomMemberTuple]
 	if memberEv != nil {
 		membership, _ := memberEv.Membership()
-		if membership == gomatrixserverlib.Join || membership == gomatrixserverlib.Invite {
+		if membership == spec.Join || membership == spec.Invite {
 			return true, true
 		}
 	}
@@ -597,9 +599,9 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 		rule, ruleErr := joinRuleEv.JoinRule()
 		if ruleErr != nil {
 			util.GetLogger(w.ctx).WithError(ruleErr).WithField("parent_room_id", parentRoomID).Warn("failed to get join rule")
-		} else if rule == gomatrixserverlib.Public || rule == gomatrixserverlib.Knock {
+		} else if rule == spec.Public || rule == spec.Knock {
 			allowed = true
-		} else if rule == gomatrixserverlib.Restricted {
+		} else if rule == spec.Restricted {
 			allowedRoomIDs := w.restrictedJoinRuleAllowedRooms(joinRuleEv, "m.room_membership")
 			// check parent is in the allowed set
 			for _, a := range allowedRoomIDs {
@@ -624,7 +626,7 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 				memberEv = queryRes2.StateEvents[roomMemberTuple]
 				if memberEv != nil {
 					membership, _ := memberEv.Membership()
-					if membership == gomatrixserverlib.Join {
+					if membership == spec.Join {
 						return true, false
 					}
 				}
@@ -636,7 +638,7 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 
 func (w *walker) restrictedJoinRuleAllowedRooms(joinRuleEv *gomatrixserverlib.HeaderedEvent, allowType string) (allows []string) {
 	rule, _ := joinRuleEv.JoinRule()
-	if rule != gomatrixserverlib.Restricted {
+	if rule != spec.Restricted {
 		return nil
 	}
 	var jrContent gomatrixserverlib.JoinRuleContent
@@ -653,9 +655,9 @@ func (w *walker) restrictedJoinRuleAllowedRooms(joinRuleEv *gomatrixserverlib.He
 }
 
 // references returns all child references pointing to or from this room.
-func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946StrippedEvent, error) {
+func (w *walker) childReferences(roomID string) ([]fclient.MSC2946StrippedEvent, error) {
 	createTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomCreate,
+		EventType: spec.MRoomCreate,
 		StateKey:  "",
 	}
 	var res roomserver.QueryCurrentStateResponse
@@ -678,12 +680,12 @@ func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946Stri
 		// escape the `.`s so gjson doesn't think it's nested
 		roomType := gjson.GetBytes(res.StateEvents[createTuple].Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 		if roomType != ConstCreateEventContentValueSpace {
-			return []gomatrixserverlib.MSC2946StrippedEvent{}, nil
+			return []fclient.MSC2946StrippedEvent{}, nil
 		}
 	}
 	delete(res.StateEvents, createTuple)
 
-	el := make([]gomatrixserverlib.MSC2946StrippedEvent, 0, len(res.StateEvents))
+	el := make([]fclient.MSC2946StrippedEvent, 0, len(res.StateEvents))
 	for _, ev := range res.StateEvents {
 		content := gjson.ParseBytes(ev.Content())
 		// only return events that have a `via` key as per MSC1772
@@ -720,11 +722,11 @@ func (s set) isSet(val string) bool {
 	return ok
 }
 
-func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEvent {
+func stripped(ev *gomatrixserverlib.Event) *fclient.MSC2946StrippedEvent {
 	if ev.StateKey() == nil {
 		return nil
 	}
-	return &gomatrixserverlib.MSC2946StrippedEvent{
+	return &fclient.MSC2946StrippedEvent{
 		Type:           ev.Type(),
 		StateKey:       *ev.StateKey(),
 		Content:        ev.Content(),

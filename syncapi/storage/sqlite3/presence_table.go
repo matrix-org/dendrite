@@ -20,10 +20,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -112,7 +113,7 @@ func (p *presenceStatements) UpsertPresence(
 	userID string,
 	statusMsg *string,
 	presence types.Presence,
-	lastActiveTS gomatrixserverlib.Timestamp,
+	lastActiveTS spec.Timestamp,
 	fromSync bool,
 ) (pos types.StreamPosition, err error) {
 	pos, err = p.streamIDStatements.nextPresenceID(ctx, txn)
@@ -180,11 +181,11 @@ func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) 
 // GetPresenceAfter returns the changes presences after a given stream id
 func (p *presenceStatements) GetPresenceAfter(
 	ctx context.Context, txn *sql.Tx,
-	after types.StreamPosition, filter gomatrixserverlib.EventFilter,
+	after types.StreamPosition, filter synctypes.EventFilter,
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
-	afterTS := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute * -5))
+	afterTS := spec.AsTimestamp(time.Now().Add(time.Minute * -5))
 	rows, err := stmt.QueryContext(ctx, after, afterTS, filter.Limit)
 	if err != nil {
 		return nil, err

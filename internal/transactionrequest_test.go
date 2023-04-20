@@ -22,6 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/nats-io/nats.go"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/atomic"
+	"gotest.tools/v3/poll"
+
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -30,16 +37,11 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	keyAPI "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/atomic"
-	"gotest.tools/v3/poll"
 )
 
 const (
-	testOrigin      = gomatrixserverlib.ServerName("kaer.morhen")
-	testDestination = gomatrixserverlib.ServerName("white.orchard")
+	testOrigin      = spec.ServerName("kaer.morhen")
+	testDestination = spec.ServerName("white.orchard")
 )
 
 var (
@@ -234,7 +236,7 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.typing"}
-	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	ctx := process.NewProcessContext()
@@ -300,7 +302,7 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.direct_to_device"}
-	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	ctx := process.NewProcessContext()
@@ -377,7 +379,7 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.device_list_update"}
-	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	ctx := process.NewProcessContext()
@@ -427,7 +429,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		roomID: map[string]interface{}{
 			"m.read": map[string]interface{}{
 				"@john:kaer.morhen": map[string]interface{}{
-					"data": map[string]interface{}{
+					"data": map[string]int64{
 						"ts": 1533358089009,
 					},
 					"event_ids": []string{
@@ -440,13 +442,13 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.receipt"}
-	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badEDU.Content = spec.RawJSON("badjson")
 	badUser := gomatrixserverlib.EDU{Type: "m.receipt"}
 	if badUser.Content, err = json.Marshal(map[string]interface{}{
 		roomID: map[string]interface{}{
 			"m.read": map[string]interface{}{
 				"johnkaer.morhen": map[string]interface{}{
-					"data": map[string]interface{}{
+					"data": map[string]int64{
 						"ts": 1533358089009,
 					},
 					"event_ids": []string{
@@ -463,7 +465,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		roomID: map[string]interface{}{
 			"m.read": map[string]interface{}{
 				"@john:bad.domain": map[string]interface{}{
-					"data": map[string]interface{}{
+					"data": map[string]int64{
 						"ts": 1533358089009,
 					},
 					"event_ids": []string{
@@ -518,7 +520,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
-	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	ctx := process.NewProcessContext()
@@ -575,7 +577,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.presence"}
-	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	ctx := process.NewProcessContext()

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -50,15 +52,15 @@ type messagesReq struct {
 	device           *userapi.Device
 	wasToProvided    bool
 	backwardOrdering bool
-	filter           *gomatrixserverlib.RoomEventFilter
+	filter           *synctypes.RoomEventFilter
 }
 
 type messagesResp struct {
-	Start       string                          `json:"start"`
-	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
-	End         string                          `json:"end,omitempty"`
-	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
-	State       []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
+	Start       string                  `json:"start"`
+	StartStream string                  `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
+	End         string                  `json:"end,omitempty"`
+	Chunk       []synctypes.ClientEvent `json:"chunk"`
+	State       []synctypes.ClientEvent `json:"state,omitempty"`
 }
 
 // OnIncomingMessagesRequest implements the /messages endpoint from the
@@ -199,7 +201,7 @@ func OnIncomingMessagesRequest(
 	}
 
 	// If the user already left the room, grep events from before that
-	if membershipResp.Membership == gomatrixserverlib.Leave {
+	if membershipResp.Membership == spec.Leave {
 		var token types.TopologyToken
 		token, err = snapshot.EventPositionInTopology(req.Context(), membershipResp.EventID)
 		if err != nil {
@@ -253,7 +255,7 @@ func OnIncomingMessagesRequest(
 			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
 			return jsonerror.InternalServerError()
 		}
-		res.State = append(res.State, gomatrixserverlib.HeaderedToClientEvents(membershipEvents, gomatrixserverlib.FormatAll)...)
+		res.State = append(res.State, synctypes.HeaderedToClientEvents(membershipEvents, synctypes.FormatAll)...)
 	}
 
 	// If we didn't return any events, set the end to an empty string, so it will be omitted
@@ -291,7 +293,7 @@ func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.
 // Returns an error if there was an issue talking to the database or with the
 // remote homeserver.
 func (r *messagesReq) retrieveEvents() (
-	clientEvents []gomatrixserverlib.ClientEvent, start,
+	clientEvents []synctypes.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
 	// Retrieve the events from the local database.
@@ -323,7 +325,7 @@ func (r *messagesReq) retrieveEvents() (
 
 	// If we didn't get any event, we don't need to proceed any further.
 	if len(events) == 0 {
-		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
+		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}
 
 	// Get the position of the first and the last event in the room's topology.
@@ -334,7 +336,7 @@ func (r *messagesReq) retrieveEvents() (
 	// only have to change it in one place, i.e. the database.
 	start, end, err = r.getStartEnd(events)
 	if err != nil {
-		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, err
+		return []synctypes.ClientEvent{}, *r.from, *r.to, err
 	}
 
 	// Sort the events to ensure we send them in the right order.
@@ -350,7 +352,7 @@ func (r *messagesReq) retrieveEvents() (
 		events = reversed(events)
 	}
 	if len(events) == 0 {
-		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
+		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}
 
 	// Apply room history visibility filter
@@ -362,13 +364,13 @@ func (r *messagesReq) retrieveEvents() (
 		"events_before": len(events),
 		"events_after":  len(filteredEvents),
 	}).Debug("applied history visibility (messages)")
-	return gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll), start, end, err
+	return synctypes.HeaderedToClientEvents(filteredEvents, synctypes.FormatAll), start, end, err
 }
 
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if r.backwardOrdering {
 		start = *r.from
-		if events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+		if events[len(events)-1].Type() == spec.MRoomCreate {
 			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
 			// else to go. This seems to fix Element iOS from looping on /messages endlessly.
 			end = types.TopologyToken{}

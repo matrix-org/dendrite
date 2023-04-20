@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
@@ -33,7 +34,7 @@ type getMissingEventRequest struct {
 // Events are fetched from room DAG starting from latest_events until we reach earliest_events or the limit.
 func GetMissingEvents(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
@@ -67,7 +68,7 @@ func GetMissingEvents(
 
 	eventsResponse.Events = filterEvents(eventsResponse.Events, roomID)
 
-	resp := gomatrixserverlib.RespMissingEvents{
+	resp := fclient.RespMissingEvents{
 		Events: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(eventsResponse.Events),
 	}
 

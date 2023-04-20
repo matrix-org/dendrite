@@ -22,9 +22,11 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 var (
@@ -451,13 +453,13 @@ type UnreadNotifications struct {
 }
 
 type ClientEvents struct {
-	Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	Events []synctypes.ClientEvent `json:"events,omitempty"`
 }
 
 type Timeline struct {
-	Events    []gomatrixserverlib.ClientEvent `json:"events"`
-	Limited   bool                            `json:"limited"`
-	PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
+	Events    []synctypes.ClientEvent `json:"events"`
+	Limited   bool                    `json:"limited"`
+	PrevBatch *TopologyToken          `json:"prev_batch,omitempty"`
 }
 
 type Summary struct {
@@ -549,7 +551,7 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), gomatrixserverlib.FormatSync)
+	inviteEvent := synctypes.ToClientEvent(event.Unwrap(), synctypes.FormatSync)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
@@ -605,11 +607,11 @@ type Peek struct {
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
 type OutputReceiptEvent struct {
-	UserID    string                      `json:"user_id"`
-	RoomID    string                      `json:"room_id"`
-	EventID   string                      `json:"event_id"`
-	Type      string                      `json:"type"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+	UserID    string         `json:"user_id"`
+	RoomID    string         `json:"room_id"`
+	EventID   string         `json:"event_id"`
+	Type      string         `json:"type"`
+	Timestamp spec.Timestamp `json:"timestamp"`
 }
 
 // OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.

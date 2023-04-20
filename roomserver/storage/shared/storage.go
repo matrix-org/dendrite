@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
@@ -567,6 +568,7 @@ func (d *EventDatabase) events(
 		if !redactionsArePermanent {
 			d.applyRedactions(results)
 		}
+		return results, nil
 	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
@@ -578,8 +580,9 @@ func (d *EventDatabase) events(
 	}
 
 	for _, eventJSON := range eventJSONs {
+		redacted := gjson.GetBytes(eventJSON.EventJSON, "unsigned.redacted_because").Exists()
 		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomInfo.RoomVersion,
+			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, redacted, roomInfo.RoomVersion,
 		)
 		if err != nil {
 			return nil, err
@@ -903,7 +906,7 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 	var err error
 	var roomVersion gomatrixserverlib.RoomVersion
 	// Look for m.room.create events.
-	if event.Type() != gomatrixserverlib.MRoomCreate {
+	if event.Type() != spec.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
 	roomVersion = gomatrixserverlib.RoomVersionV1
@@ -947,7 +950,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 	)
 
 	wErr := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+		isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 		if isRedactionEvent {
 			// an event which redacts itself should be ignored
 			if event.EventID() == event.Redacts() {
@@ -1020,7 +1023,9 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 		}
 
-		d.Cache.StoreRoomServerEvent(redactedEvent.EventNID, redactedEvent.Event)
+		// We remove the entry from the cache, as if we just "StoreRoomServerEvent", we can't be
+		// certain that the cached entry actually is updated, since ristretto is eventual-persistent.
+		d.Cache.InvalidateRoomServerEvent(redactedEvent.EventNID)
 
 		return nil
 	})
@@ -1040,7 +1045,7 @@ func (d *EventDatabase) loadRedactionPair(
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
 	var err error
-	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+	isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 
 	var eventBeingRedacted string
 	if isRedactionEvent {
@@ -1465,7 +1470,7 @@ func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomN
 }
 
 // GetServerInRoom returns true if we think a server is in a given room or false otherwise.
-func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName spec.ServerName) (bool, error) {
 	return d.MembershipTable.SelectServerInRoom(ctx, nil, roomNID, serverName)
 }
 

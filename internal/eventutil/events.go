@@ -22,6 +22,8 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -39,7 +41,7 @@ var ErrRoomNoExists = errors.New("room does not exist")
 func QueryAndBuildEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
-	identity *gomatrixserverlib.SigningIdentity, evTime time.Time,
+	identity *fclient.SigningIdentity, evTime time.Time,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	if queryRes == nil {
@@ -59,7 +61,7 @@ func QueryAndBuildEvent(
 func BuildEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
-	identity *gomatrixserverlib.SigningIdentity, evTime time.Time,
+	identity *fclient.SigningIdentity, evTime time.Time,
 	eventsNeeded *gomatrixserverlib.StateNeeded, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	if err := addPrevEventsToEvent(builder, eventsNeeded, queryRes); err != nil {
@@ -173,7 +175,7 @@ func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
 // downstream components to the roomserver when an OutputTypeRedactedEvent occurs.
 func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) error {
 	// sanity check
-	if redactionEvent.Type() != gomatrixserverlib.MRoomRedaction {
+	if redactionEvent.Type() != spec.MRoomRedaction {
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
 	redactedEvent.Redact()

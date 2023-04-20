@@ -31,10 +31,14 @@ import (
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -77,20 +81,20 @@ func (r *EventRelationshipRequest) Defaults() {
 }
 
 type EventRelationshipResponse struct {
-	Events    []gomatrixserverlib.ClientEvent `json:"events"`
-	NextBatch string                          `json:"next_batch"`
-	Limited   bool                            `json:"limited"`
+	Events    []synctypes.ClientEvent `json:"events"`
+	NextBatch string                  `json:"next_batch"`
+	Limited   bool                    `json:"limited"`
 }
 
 type MSC2836EventRelationshipsResponse struct {
-	gomatrixserverlib.MSC2836EventRelationshipsResponse
+	fclient.MSC2836EventRelationshipsResponse
 	ParsedEvents    []*gomatrixserverlib.Event
 	ParsedAuthChain []*gomatrixserverlib.Event
 }
 
 func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events:    gomatrixserverlib.ToClientEvents(res.ParsedEvents, gomatrixserverlib.FormatAll),
+		Events:    synctypes.ToClientEvents(res.ParsedEvents, synctypes.FormatAll),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,
 	}
@@ -99,10 +103,10 @@ func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationship
 
 // Enable this MSC
 func Enable(
-	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(base, &base.Cfg.MSCs.Database)
+	db, err := NewDatabase(cm, &cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}
@@ -125,14 +129,14 @@ func Enable(
 		}
 	})
 
-	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
+	routers.Client.Handle("/unstable/event_relationships",
 		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
+	routers.Federation.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
 		"msc2836_event_relationships", func(req *http.Request) util.JSONResponse {
-			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
-				req, time.Now(), base.Cfg.Global.ServerName, base.Cfg.Global.IsLocalServerName, keyRing,
+			fedReq, errResp := fclient.VerifyHTTPRequest(
+				req, time.Now(), cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 			)
 			if fedReq == nil {
 				return errResp
@@ -153,7 +157,7 @@ type reqCtx struct {
 
 	// federated request args
 	isFederatedRequest bool
-	serverName         gomatrixserverlib.ServerName
+	serverName         spec.ServerName
 	fsAPI              fs.FederationInternalAPI
 }
 
@@ -189,7 +193,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 }
 
 func federatedEventRelationship(
-	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	ctx context.Context, fedReq *fclient.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 ) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {
@@ -397,7 +401,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 		serversToQuery := rc.getServersForEventID(parentID)
 		var result *MSC2836EventRelationshipsResponse
 		for _, srv := range serversToQuery {
-			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 				EventID:     parentID,
 				Direction:   "down",
 				Limit:       100,
@@ -483,8 +487,8 @@ func walkThread(
 }
 
 // MSC2836EventRelationships performs an /event_relationships request to a remote server
-func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
-	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv spec.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
+	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, fclient.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
 		DepthFirst:  rc.req.DepthFirst,
 		Direction:   rc.req.Direction,
@@ -542,7 +546,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) b
 	return queryMembershipRes.IsInRoom
 }
 
-func (rc *reqCtx) getServersForEventID(eventID string) []gomatrixserverlib.ServerName {
+func (rc *reqCtx) getServersForEventID(eventID string) []spec.ServerName {
 	if rc.req.RoomID == "" {
 		util.GetLogger(rc.ctx).WithField("event_id", eventID).Error(
 			"getServersForEventID: event exists in unknown room",
@@ -651,11 +655,11 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 			messageEvents = append(messageEvents, ev)
 		}
 	}
-	respState := gomatrixserverlib.RespState{
+	respState := &fclient.RespState{
 		AuthEvents:  res.AuthChain,
 		StateEvents: stateEvents,
 	}
-	eventsInOrder := respState.Events(rc.roomVersion)
+	eventsInOrder := gomatrixserverlib.LineariseStateResponse(rc.roomVersion, respState)
 	// everything gets sent as an outlier because auth chain events may be disjoint from the DAG
 	// as may the threaded events.
 	var ires []roomserver.InputRoomEvent
@@ -686,7 +690,7 @@ func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
 	if count == 0 {
 		return
 	}
-	err := ev.SetUnsignedField("children_hash", gomatrixserverlib.Base64Bytes(hash))
+	err := ev.SetUnsignedField("children_hash", spec.Base64Bytes(hash))
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
 	}

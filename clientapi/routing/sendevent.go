@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -117,7 +118,7 @@ func SendEvent(
 	// If we're sending a membership update, make sure to strip the authorised
 	// via key if it is present, otherwise other servers won't be able to auth
 	// the event if the room is set to the "restricted" join rule.
-	if eventType == gomatrixserverlib.MRoomMember {
+	if eventType == spec.MRoomMember {
 		delete(r, "join_authorised_via_users_server")
 	}
 
@@ -136,7 +137,7 @@ func SendEvent(
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
 
 	// validate that the aliases exists
-	if eventType == gomatrixserverlib.MRoomCanonicalAlias && stateKey != nil && *stateKey == "" {
+	if eventType == spec.MRoomCanonicalAlias && stateKey != nil && *stateKey == "" {
 		aliasReq := api.AliasEvent{}
 		if err = json.Unmarshal(e.Content(), &aliasReq); err != nil {
 			return util.ErrorResponse(fmt.Errorf("unable to parse alias event: %w", err))

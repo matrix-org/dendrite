@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -34,7 +36,7 @@ import (
 // MakeJoin implements the /make_join API
 func MakeJoin(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	roomID, userID string,
@@ -123,7 +125,7 @@ func MakeJoin(
 		StateKey: &userID,
 	}
 	content := gomatrixserverlib.MemberContent{
-		Membership:    gomatrixserverlib.Join,
+		Membership:    spec.Join,
 		AuthorisedVia: authorisedVia,
 	}
 	if err = builder.SetContent(content); err != nil {
@@ -189,7 +191,7 @@ func MakeJoin(
 // nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
@@ -230,7 +232,7 @@ func SendJoin(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	var serverName gomatrixserverlib.ServerName
+	var serverName spec.ServerName
 	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -277,7 +279,7 @@ func SendJoin(
 			JSON: jsonerror.BadJSON("missing content.membership key"),
 		}
 	}
-	if membership != gomatrixserverlib.Join {
+	if membership != spec.Join {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("membership must be 'join'"),
@@ -348,8 +350,8 @@ func SendJoin(
 			continue
 		}
 		if membership, merr := se.Membership(); merr == nil {
-			alreadyJoined = (membership == gomatrixserverlib.Join)
-			isBanned = (membership == gomatrixserverlib.Ban)
+			alreadyJoined = (membership == spec.Join)
+			isBanned = (membership == spec.Ban)
 			break
 		}
 	}
@@ -433,7 +435,7 @@ func SendJoin(
 	// https://matrix.org/docs/spec/server_server/latest#put-matrix-federation-v1-send-join-roomid-eventid
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespSendJoin{
+		JSON: fclient.RespSendJoin{
 			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,

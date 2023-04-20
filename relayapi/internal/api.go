@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type RelayInternalAPI struct {
@@ -31,7 +32,7 @@ type RelayInternalAPI struct {
 	keyRing                *gomatrixserverlib.KeyRing
 	producer               *producers.SyncAPIProducer
 	presenceEnabledInbound bool
-	serverName             gomatrixserverlib.ServerName
+	serverName             spec.ServerName
 	relayingEnabledMutex   sync.Mutex
 	relayingEnabled        bool
 }
@@ -43,7 +44,7 @@ func NewRelayInternalAPI(
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
 	presenceEnabledInbound bool,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	relayingEnabled bool,
 ) *RelayInternalAPI {
 	return &RelayInternalAPI{

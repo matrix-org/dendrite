@@ -19,6 +19,8 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -34,7 +36,7 @@ type roomDirectoryResponse struct {
 	Servers []string `json:"servers"`
 }
 
-func (r *roomDirectoryResponse) fillServers(servers []gomatrixserverlib.ServerName) {
+func (r *roomDirectoryResponse) fillServers(servers []spec.ServerName) {
 	r.Servers = make([]string, len(servers))
 	for i, s := range servers {
 		r.Servers[i] = string(s)
@@ -45,7 +47,7 @@ func (r *roomDirectoryResponse) fillServers(servers []gomatrixserverlib.ServerNa
 func DirectoryRoom(
 	req *http.Request,
 	roomAlias string,
-	federation *gomatrixserverlib.FederationClient,
+	federation *fclient.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	fedSenderAPI federationAPI.ClientFederationAPI,
@@ -252,7 +254,7 @@ func GetVisibility(
 
 	var v roomVisibility
 	if len(res.RoomIDs) == 1 {
-		v.Visibility = gomatrixserverlib.Public
+		v.Visibility = spec.Public
 	} else {
 		v.Visibility = "private"
 	}
@@ -277,7 +279,7 @@ func SetVisibility(
 	queryEventsReq := roomserverAPI.QueryLatestEventsAndStateRequest{
 		RoomID: roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
-			EventType: gomatrixserverlib.MRoomPowerLevels,
+			EventType: spec.MRoomPowerLevels,
 			StateKey:  "",
 		}},
 	}
@@ -290,7 +292,7 @@ func SetVisibility(
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
-	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+	if power.UserLevel(dev.UserID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),

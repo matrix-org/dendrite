@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -50,7 +51,7 @@ var calculateHistoryVisibilityDuration = prometheus.NewHistogramVec(
 )
 
 var historyVisibilityPriority = map[gomatrixserverlib.HistoryVisibility]uint8{
-	gomatrixserverlib.WorldReadable:            0,
+	spec.WorldReadable:                         0,
 	gomatrixserverlib.HistoryVisibilityShared:  1,
 	gomatrixserverlib.HistoryVisibilityInvited: 2,
 	gomatrixserverlib.HistoryVisibilityJoined:  3,
@@ -72,23 +73,23 @@ func (ev eventVisibility) allowed() (allowed bool) {
 		return true
 	case gomatrixserverlib.HistoryVisibilityJoined:
 		// If the user’s membership was join, allow.
-		if ev.membershipAtEvent == gomatrixserverlib.Join {
+		if ev.membershipAtEvent == spec.Join {
 			return true
 		}
 		return false
 	case gomatrixserverlib.HistoryVisibilityShared:
 		// If the user’s membership was join, allow.
 		// If history_visibility was set to shared, and the user joined the room at any point after the event was sent, allow.
-		if ev.membershipAtEvent == gomatrixserverlib.Join || ev.membershipCurrent == gomatrixserverlib.Join {
+		if ev.membershipAtEvent == spec.Join || ev.membershipCurrent == spec.Join {
 			return true
 		}
 		return false
 	case gomatrixserverlib.HistoryVisibilityInvited:
 		// If the user’s membership was join, allow.
-		if ev.membershipAtEvent == gomatrixserverlib.Join {
+		if ev.membershipAtEvent == spec.Join {
 			return true
 		}
-		if ev.membershipAtEvent == gomatrixserverlib.Invite {
+		if ev.membershipAtEvent == spec.Invite {
 			return true
 		}
 		return false
@@ -132,7 +133,7 @@ func ApplyHistoryVisibilityFilter(
 			}
 		}
 		// NOTSPEC: Always allow user to see their own membership events (spec contains more "rules")
-		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(userID) {
+		if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(userID) {
 			eventsFiltered = append(eventsFiltered, ev)
 			continue
 		}
@@ -195,7 +196,7 @@ func visibilityForEvents(
 	for _, event := range events {
 		eventID := event.EventID()
 		vis := eventVisibility{
-			membershipAtEvent: gomatrixserverlib.Leave, // default to leave, to not expose events by accident
+			membershipAtEvent: spec.Leave, // default to leave, to not expose events by accident
 			visibility:        event.Visibility,
 		}
 		ev, ok := membershipResp.Membership[eventID]

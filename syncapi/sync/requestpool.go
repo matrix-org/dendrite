@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -61,7 +61,7 @@ type PresencePublisher interface {
 }
 
 type PresenceConsumer interface {
-	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool)
+	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts spec.Timestamp, fromSync bool)
 }
 
 // NewRequestPool makes a new RequestPool
@@ -138,7 +138,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	newPresence := types.PresenceInternal{
 		Presence:     presenceID,
 		UserID:       userID,
-		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		LastActiveTS: spec.AsTimestamp(time.Now()),
 	}
 
 	// ensure we also send the current status_msg to federated servers and not nil
@@ -170,7 +170,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	// the /sync response else we may not return presence: online immediately.
 	rp.consumer.EmitPresence(
 		context.Background(), userID, presenceID, newPresence.ClientFields.StatusMsg,
-		gomatrixserverlib.AsTimestamp(time.Now()), true,
+		spec.AsTimestamp(time.Now()), true,
 	)
 }
 

@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -206,10 +207,10 @@ var (
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
 	// registration parameters
-	Password   string                       `json:"password"`
-	Username   string                       `json:"username"`
-	ServerName gomatrixserverlib.ServerName `json:"-"`
-	Admin      bool                         `json:"admin"`
+	Password   string          `json:"password"`
+	Username   string          `json:"username"`
+	ServerName spec.ServerName `json:"-"`
+	Admin      bool            `json:"admin"`
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
@@ -478,7 +479,7 @@ func Register(
 	}
 
 	var r registerRequest
-	host := gomatrixserverlib.ServerName(req.Host)
+	host := spec.ServerName(req.Host)
 	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
 		r.ServerName = v.ServerName
 	} else {
@@ -824,7 +825,7 @@ func checkAndCompleteFlow(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.ClientUserAPI,
-	username string, serverName gomatrixserverlib.ServerName, displayName string,
+	username string, serverName spec.ServerName, displayName string,
 	password, appserviceID, ipAddr, userAgent, sessionID string,
 	inhibitLogin eventutil.WeakBoolean,
 	deviceDisplayName, deviceID *string,
@@ -888,13 +889,7 @@ func completeRegistration(
 	}
 
 	if displayName != "" {
-		nameReq := userapi.PerformUpdateDisplayNameRequest{
-			Localpart:   username,
-			ServerName:  serverName,
-			DisplayName: displayName,
-		}
-		var nameRes userapi.PerformUpdateDisplayNameResponse
-		err = userAPI.SetDisplayName(ctx, &nameReq, &nameRes)
+		_, _, err = userAPI.SetDisplayName(ctx, username, serverName, displayName)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -1000,7 +995,7 @@ func RegisterAvailable(
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
 	domain := cfg.Matrix.ServerName
-	host := gomatrixserverlib.ServerName(req.Host)
+	host := spec.ServerName(req.Host)
 	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
 		domain = v.ServerName
 	}

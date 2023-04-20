@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-pushers
@@ -98,7 +98,7 @@ type pushersStatements struct {
 func (s *pushersStatements) InsertPusher(
 	ctx context.Context, txn *sql.Tx, session_id int64,
 	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertPusherStmt).ExecContext(ctx, localpart, serverName, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
 	return err
@@ -106,7 +106,7 @@ func (s *pushersStatements) InsertPusher(
 
 func (s *pushersStatements) SelectPushers(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) ([]api.Pusher, error) {
 	pushers := []api.Pusher{}
 	rows, err := s.selectPushersStmt.QueryContext(ctx, localpart, serverName)
@@ -147,7 +147,7 @@ func (s *pushersStatements) SelectPushers(
 // deletePusher removes a single pusher by pushkey and user localpart.
 func (s *pushersStatements) DeletePusher(
 	ctx context.Context, txn *sql.Tx, appid, pushkey,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.deletePusherStmt).ExecContext(ctx, appid, pushkey, localpart, serverName)
 	return err

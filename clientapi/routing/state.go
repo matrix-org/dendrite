@@ -22,14 +22,16 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
 type stateEventInStateResp struct {
-	gomatrixserverlib.ClientEvent
+	synctypes.ClientEvent
 	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
 	ReplacesState string          `json:"replaces_state,omitempty"`
 }
@@ -67,7 +69,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
 	for _, ev := range stateRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -122,7 +124,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		"state_at_event": !wantLatestState,
 	}).Info("Fetching all state")
 
-	stateEvents := []gomatrixserverlib.ClientEvent{}
+	stateEvents := []synctypes.ClientEvent{}
 	if wantLatestState {
 		// If we are happy to use the latest state, either because the user is
 		// still in the room, or because the room is world-readable, then just
@@ -131,7 +133,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
+				synctypes.HeaderedToClientEvent(ev, synctypes.FormatAll),
 			)
 		}
 	} else {
@@ -150,7 +152,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateAfterRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
+				synctypes.HeaderedToClientEvent(ev, synctypes.FormatAll),
 			)
 		}
 	}
@@ -184,9 +186,9 @@ func OnIncomingStateTypeRequest(
 			StateKey:  stateKey,
 		},
 	}
-	if evType != gomatrixserverlib.MRoomHistoryVisibility && stateKey != "" {
+	if evType != spec.MRoomHistoryVisibility && stateKey != "" {
 		stateToFetch = append(stateToFetch, gomatrixserverlib.StateKeyTuple{
-			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			EventType: spec.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
 	}
@@ -207,7 +209,7 @@ func OnIncomingStateTypeRequest(
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
 	for _, ev := range stateRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -241,7 +243,7 @@ func OnIncomingStateTypeRequest(
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
-		if !membershipRes.HasBeenInRoom || membershipRes.Membership == gomatrixserverlib.Ban {
+		if !membershipRes.HasBeenInRoom || membershipRes.Membership == spec.Ban {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: jsonerror.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
@@ -309,7 +311,7 @@ func OnIncomingStateTypeRequest(
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll),
+		ClientEvent: synctypes.HeaderedToClientEvent(event, synctypes.FormatAll),
 	}
 
 	var res interface{}

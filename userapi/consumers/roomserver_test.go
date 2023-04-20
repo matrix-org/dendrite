@@ -7,22 +7,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
-	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
 	if err != nil {
@@ -30,7 +31,6 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 	}
 	return db, func() {
 		close()
-		baseclose()
 	}
 }
 
@@ -140,9 +140,9 @@ func TestMessageStats(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           args
-		ourServer      gomatrixserverlib.ServerName
+		ourServer      spec.ServerName
 		lastUpdate     time.Time
-		initRoomCounts map[gomatrixserverlib.ServerName]map[string]bool
+		initRoomCounts map[spec.ServerName]map[string]bool
 		wantStats      userAPITypes.MessageStats
 	}{
 		{
@@ -198,7 +198,7 @@ func TestMessageStats(t *testing.T) {
 			name:       "day change creates a new room map",
 			ourServer:  "localhost",
 			lastUpdate: time.Now().Add(-time.Hour * 24),
-			initRoomCounts: map[gomatrixserverlib.ServerName]map[string]bool{
+			initRoomCounts: map[spec.ServerName]map[string]bool{
 				"localhost": {"encryptedRoom": true},
 			},
 			args: args{
@@ -220,11 +220,11 @@ func TestMessageStats(t *testing.T) {
 					tt.lastUpdate = time.Now()
 				}
 				if tt.initRoomCounts == nil {
-					tt.initRoomCounts = map[gomatrixserverlib.ServerName]map[string]bool{}
+					tt.initRoomCounts = map[spec.ServerName]map[string]bool{}
 				}
 				s := &OutputRoomEventConsumer{
 					db:         db,
-					msgCounts:  map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+					msgCounts:  map[spec.ServerName]userAPITypes.MessageStats{},
 					roomCounts: tt.initRoomCounts,
 					countsLock: sync.Mutex{},
 					lastUpdate: tt.lastUpdate,

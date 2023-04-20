@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -49,7 +49,7 @@ func PeekRoomByIDOrAlias(
 		for _, serverName := range serverNames {
 			peekReq.ServerNames = append(
 				peekReq.ServerNames,
-				gomatrixserverlib.ServerName(serverName),
+				spec.ServerName(serverName),
 			)
 		}
 	}

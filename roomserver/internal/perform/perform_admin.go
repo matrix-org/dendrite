@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -107,12 +108,12 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			}
 			return nil
 		}
-		memberContent.Membership = gomatrixserverlib.Leave
+		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
 			RoomID:     req.RoomID,
-			Type:       gomatrixserverlib.MRoomMember,
+			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
 			PrevEvents: prevEvents,
@@ -195,7 +196,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Join)
 	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -204,7 +205,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -227,6 +228,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 			}
 			return nil
 		}
+		res.Affected = append(res.Affected, roomID)
 		if len(outputEvents) == 0 {
 			continue
 		}
@@ -237,8 +239,6 @@ func (r *Admin) PerformAdminEvacuateUser(
 			}
 			return nil
 		}
-
-		res.Affected = append(res.Affected, roomID)
 	}
 	return nil
 }
@@ -323,7 +323,7 @@ func (r *Admin) PerformAdminDownloadState(
 	stateEventMap := map[string]*gomatrixserverlib.Event{}
 
 	for _, fwdExtremity := range fwdExtremities {
-		var state gomatrixserverlib.RespState
+		var state gomatrixserverlib.StateResponse
 		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
 		if err != nil {
 			res.Error = &api.PerformError{
@@ -332,13 +332,13 @@ func (r *Admin) PerformAdminDownloadState(
 			}
 			return nil
 		}
-		for _, authEvent := range state.AuthEvents.UntrustedEvents(roomInfo.RoomVersion) {
+		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			authEventMap[authEvent.EventID()] = authEvent
 		}
-		for _, stateEvent := range state.StateEvents.UntrustedEvents(roomInfo.RoomVersion) {
+		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = stateEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
 				continue
 			}
@@ -362,7 +362,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Type:    "org.matrix.dendrite.state_download",
 		Sender:  req.UserID,
 		RoomID:  req.RoomID,
-		Content: gomatrixserverlib.RawJSON("{}"),
+		Content: spec.RawJSON("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)

@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // MembershipRequest represents the body of an incoming POST request
@@ -209,24 +210,17 @@ func queryIDServerStoreInvite(
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
-	localpart, serverName, err := gomatrixserverlib.SplitID('@', device.UserID)
+	_, serverName, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	var profile *authtypes.Profile
 	if cfg.Matrix.IsLocalServerName(serverName) {
-		res := &userapi.QueryProfileResponse{}
-		err = userAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
+		profile, err = userAPI.QueryProfile(ctx, device.UserID)
 		if err != nil {
 			return nil, err
 		}
-		profile = &authtypes.Profile{
-			Localpart:   localpart,
-			DisplayName: res.DisplayName,
-			AvatarURL:   res.AvatarURL,
-		}
-
 	} else {
 		profile = &authtypes.Profile{}
 	}
@@ -285,7 +279,7 @@ func queryIDServerPubKey(ctx context.Context, idServerName string, keyID string)
 	}
 
 	var pubKeyRes struct {
-		PublicKey gomatrixserverlib.Base64Bytes `json:"public_key"`
+		PublicKey spec.Base64Bytes `json:"public_key"`
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -21,18 +21,19 @@ import (
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 type YggdrasilRoomProvider struct {
 	node      *yggconn.Node
 	fedSender api.FederationInternalAPI
-	fedClient *gomatrixserverlib.FederationClient
+	fedClient *fclient.FederationClient
 }
 
 func NewYggdrasilRoomProvider(
-	node *yggconn.Node, fedSender api.FederationInternalAPI, fedClient *gomatrixserverlib.FederationClient,
+	node *yggconn.Node, fedSender api.FederationInternalAPI, fedClient *fclient.FederationClient,
 ) *YggdrasilRoomProvider {
 	p := &YggdrasilRoomProvider{
 		node:      node,
@@ -42,10 +43,10 @@ func NewYggdrasilRoomProvider(
 	return p
 }
 
-func (p *YggdrasilRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
+func (p *YggdrasilRoomProvider) Rooms() []fclient.PublicRoom {
 	return bulkFetchPublicRoomsFromServers(
 		context.Background(), p.fedClient,
-		gomatrixserverlib.ServerName(p.node.DerivedServerName()),
+		spec.ServerName(p.node.DerivedServerName()),
 		p.node.KnownNodes(),
 	)
 }
@@ -53,14 +54,14 @@ func (p *YggdrasilRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
-	ctx context.Context, fedClient *gomatrixserverlib.FederationClient,
-	origin gomatrixserverlib.ServerName,
-	homeservers []gomatrixserverlib.ServerName,
-) (publicRooms []gomatrixserverlib.PublicRoom) {
+	ctx context.Context, fedClient *fclient.FederationClient,
+	origin spec.ServerName,
+	homeservers []spec.ServerName,
+) (publicRooms []fclient.PublicRoom) {
 	limit := 200
 	// follow pipeline semantics, see https://blog.golang.org/pipelines for more info.
 	// goroutines send rooms to this channel
-	roomCh := make(chan gomatrixserverlib.PublicRoom, int(limit))
+	roomCh := make(chan fclient.PublicRoom, int(limit))
 	// signalling channel to tell goroutines to stop sending rooms and quit
 	done := make(chan bool)
 	// signalling to say when we can close the room channel
@@ -68,7 +69,7 @@ func bulkFetchPublicRoomsFromServers(
 	wg.Add(len(homeservers))
 	// concurrently query for public rooms
 	for _, hs := range homeservers {
-		go func(homeserverDomain gomatrixserverlib.ServerName) {
+		go func(homeserverDomain spec.ServerName) {
 			defer wg.Done()
 			util.GetLogger(ctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
 			fres, err := fedClient.GetPublicRooms(ctx, origin, homeserverDomain, int(limit), "", false, "")

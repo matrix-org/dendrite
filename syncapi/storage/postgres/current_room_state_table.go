@@ -26,8 +26,10 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const currentRoomStateSchema = `
@@ -270,16 +272,16 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithAnyMembership(
 // SelectCurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilter *gomatrixserverlib.StateFilter,
+	stateFilter *synctypes.StateFilter,
 	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
 	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	// We're going to query members later, so remove them from this request
 	if stateFilter.LazyLoadMembers && !stateFilter.IncludeRedundantMembers {
-		notTypes := &[]string{gomatrixserverlib.MRoomMember}
+		notTypes := &[]string{spec.MRoomMember}
 		if stateFilter.NotTypes != nil {
-			*stateFilter.NotTypes = append(*stateFilter.NotTypes, gomatrixserverlib.MRoomMember)
+			*stateFilter.NotTypes = append(*stateFilter.NotTypes, spec.MRoomMember)
 		} else {
 			stateFilter.NotTypes = notTypes
 		}

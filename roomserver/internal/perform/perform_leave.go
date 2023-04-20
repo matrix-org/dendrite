@@ -19,15 +19,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -39,6 +43,7 @@ type Leaver struct {
 	Cfg     *config.RoomServer
 	DB      storage.Database
 	FSAPI   fsAPI.RoomserverFederationAPI
+	RSAPI   rsAPI.RoomserverInternalAPI
 	UserAPI userapi.RoomserverUserAPI
 	Inputer *input.Inputer
 }
@@ -122,7 +127,7 @@ func (r *Leaver) performLeaveRoomByID(
 		RoomID: req.RoomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
 			{
-				EventType: gomatrixserverlib.MRoomMember,
+				EventType: spec.MRoomMember,
 				StateKey:  req.UserID,
 			},
 		},
@@ -143,14 +148,14 @@ func (r *Leaver) performLeaveRoomByID(
 	if err != nil {
 		return nil, fmt.Errorf("error getting membership: %w", err)
 	}
-	if membership != gomatrixserverlib.Join && membership != gomatrixserverlib.Invite {
+	if membership != spec.Join && membership != spec.Invite {
 		return nil, fmt.Errorf("user %q is not joined to the room (membership is %q)", req.UserID, membership)
 	}
 
 	// Prepare the template for the leave event.
 	userID := req.UserID
 	eb := gomatrixserverlib.EventBuilder{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		Sender:   userID,
 		StateKey: &userID,
 		RoomID:   req.RoomID,
@@ -173,9 +178,15 @@ func (r *Leaver) performLeaveRoomByID(
 	// a leave event.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, senderDomain, &eb)
+
+	var buildRes rsAPI.QueryLatestEventsAndStateResponse
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
 	if err != nil {
-		return nil, fmt.Errorf("eventutil.BuildEvent: %w", err)
+		return nil, fmt.Errorf("SigningIdentityFor: %w", err)
+	}
+	event, err := eventutil.QueryAndBuildEvent(ctx, &eb, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
+	if err != nil {
+		return nil, fmt.Errorf("eventutil.QueryAndBuildEvent: %w", err)
 	}
 
 	// Give our leave event to the roomserver input stream. The
@@ -217,7 +228,7 @@ func (r *Leaver) performFederatedRejectInvite(
 	leaveReq := fsAPI.PerformLeaveRequest{
 		RoomID:      req.RoomID,
 		UserID:      req.UserID,
-		ServerNames: []gomatrixserverlib.ServerName{domain},
+		ServerNames: []spec.ServerName{domain},
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
 	if err = r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {

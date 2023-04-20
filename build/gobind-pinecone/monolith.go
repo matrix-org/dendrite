@@ -30,8 +30,12 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/relay"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/pinecone/types"
 	"github.com/sirupsen/logrus"
 
@@ -137,9 +141,9 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	}
 }
 
-func getServerKeyFromString(nodeID string) (gomatrixserverlib.ServerName, error) {
-	var nodeKey gomatrixserverlib.ServerName
-	if userID, err := gomatrixserverlib.NewUserID(nodeID, false); err == nil {
+func getServerKeyFromString(nodeID string) (spec.ServerName, error) {
+	var nodeKey spec.ServerName
+	if userID, err := spec.NewUserID(nodeID, false); err == nil {
 		hexKey, decodeErr := hex.DecodeString(string(userID.Domain()))
 		if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
 			return "", fmt.Errorf("UserID domain is not a valid ed25519 public key: %v", userID.Domain())
@@ -151,7 +155,7 @@ func getServerKeyFromString(nodeID string) (gomatrixserverlib.ServerName, error)
 		if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
 			return "", fmt.Errorf("Relay server uri is not a valid ed25519 public key: %v", nodeID)
 		} else {
-			nodeKey = gomatrixserverlib.ServerName(nodeID)
+			nodeKey = spec.ServerName(nodeID)
 		}
 	}
 
@@ -159,7 +163,7 @@ func getServerKeyFromString(nodeID string) (gomatrixserverlib.ServerName, error)
 }
 
 func (m *DendriteMonolith) SetRelayServers(nodeID string, uris string) {
-	relays := []gomatrixserverlib.ServerName{}
+	relays := []spec.ServerName{}
 	for _, uri := range strings.Split(uris, ",") {
 		uri = strings.TrimSpace(uri)
 		if len(uri) == 0 {
@@ -185,9 +189,9 @@ func (m *DendriteMonolith) SetRelayServers(nodeID string, uris string) {
 		m.p2pMonolith.RelayRetriever.SetRelayServers(relays)
 	} else {
 		relay.UpdateNodeRelayServers(
-			gomatrixserverlib.ServerName(nodeKey),
+			spec.ServerName(nodeKey),
 			relays,
-			m.p2pMonolith.BaseDendrite.Context(),
+			m.p2pMonolith.ProcessCtx.Context(),
 			m.p2pMonolith.GetFederationAPI(),
 		)
 	}
@@ -212,9 +216,9 @@ func (m *DendriteMonolith) GetRelayServers(nodeID string) string {
 			relaysString += string(relay)
 		}
 	} else {
-		request := api.P2PQueryRelayServersRequest{Server: gomatrixserverlib.ServerName(nodeKey)}
+		request := api.P2PQueryRelayServersRequest{Server: spec.ServerName(nodeKey)}
 		response := api.P2PQueryRelayServersResponse{}
-		err := m.p2pMonolith.GetFederationAPI().P2PQueryRelayServers(m.p2pMonolith.BaseDendrite.Context(), &request, &response)
+		err := m.p2pMonolith.GetFederationAPI().P2PQueryRelayServers(m.p2pMonolith.ProcessCtx.Context(), &request, &response)
 		if err != nil {
 			logrus.Warnf("Failed obtaining list of this node's relay servers: %s", err.Error())
 			return ""
@@ -288,7 +292,7 @@ func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, err
 	pubkey := m.p2pMonolith.Router.PublicKey()
 	userID := userutil.MakeUserID(
 		localpart,
-		gomatrixserverlib.ServerName(hex.EncodeToString(pubkey[:])),
+		spec.ServerName(hex.EncodeToString(pubkey[:])),
 	)
 	userReq := &userapiAPI.PerformAccountCreationRequest{
 		AccountType: userapiAPI.AccountTypeUser,
@@ -339,17 +343,21 @@ func (m *DendriteMonolith) Start() {
 
 	prefix := hex.EncodeToString(pk)
 	cfg := monolith.GenerateDefaultConfig(sk, m.StorageDirectory, m.CacheDirectory, prefix)
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.ServerName = spec.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.JetStream.InMemory = false
 	// NOTE : disabled for now since there is a 64 bit alignment panic on 32 bit systems
 	// This isn't actually fixed: https://github.com/blevesearch/zapx/pull/147
 	cfg.SyncAPI.Fulltext.Enabled = false
 
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+
 	enableRelaying := false
 	enableMetrics := false
 	enableWebsockets := false
-	m.p2pMonolith.SetupDendrite(cfg, 65432, enableRelaying, enableMetrics, enableWebsockets)
+	m.p2pMonolith.SetupDendrite(processCtx, cfg, cm, routers, 65432, enableRelaying, enableMetrics, enableWebsockets)
 	m.p2pMonolith.StartMonolith()
 }
 

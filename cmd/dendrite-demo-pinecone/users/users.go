@@ -27,7 +27,8 @@ import (
 	clienthttputil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -38,7 +39,7 @@ type PineconeUserProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
 	userAPI   userapi.QuerySearchProfilesAPI
-	fedClient *gomatrixserverlib.FederationClient
+	fedClient *fclient.FederationClient
 }
 
 const PublicURL = "/_matrix/p2p/profiles"
@@ -47,7 +48,7 @@ func NewPineconeUserProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
 	userAPI userapi.QuerySearchProfilesAPI,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient *fclient.FederationClient,
 ) *PineconeUserProvider {
 	p := &PineconeUserProvider{
 		r:         r,
@@ -79,12 +80,12 @@ func (p *PineconeUserProvider) FederatedUserProfiles(w http.ResponseWriter, r *h
 }
 
 func (p *PineconeUserProvider) QuerySearchProfiles(ctx context.Context, req *userapi.QuerySearchProfilesRequest, res *userapi.QuerySearchProfilesResponse) error {
-	list := map[gomatrixserverlib.ServerName]struct{}{}
+	list := map[spec.ServerName]struct{}{}
 	for k := range defaults.DefaultServerNames {
 		list[k] = struct{}{}
 	}
 	for _, k := range p.r.Peers() {
-		list[gomatrixserverlib.ServerName(k.PublicKey)] = struct{}{}
+		list[spec.ServerName(k.PublicKey)] = struct{}{}
 	}
 	res.Profiles = bulkFetchUserDirectoriesFromServers(context.Background(), req, p.fedClient, list)
 	return nil
@@ -94,8 +95,8 @@ func (p *PineconeUserProvider) QuerySearchProfiles(ctx context.Context, req *use
 // Returns a list of user profiles.
 func bulkFetchUserDirectoriesFromServers(
 	ctx context.Context, req *userapi.QuerySearchProfilesRequest,
-	fedClient *gomatrixserverlib.FederationClient,
-	homeservers map[gomatrixserverlib.ServerName]struct{},
+	fedClient *fclient.FederationClient,
+	homeservers map[spec.ServerName]struct{},
 ) (profiles []authtypes.Profile) {
 	jsonBody, err := json.Marshal(req)
 	if err != nil {
@@ -114,7 +115,7 @@ func bulkFetchUserDirectoriesFromServers(
 	// concurrently query for public rooms
 	reqctx, reqcancel := context.WithTimeout(ctx, time.Second*5)
 	for hs := range homeservers {
-		go func(homeserverDomain gomatrixserverlib.ServerName) {
+		go func(homeserverDomain spec.ServerName) {
 			defer wg.Done()
 			util.GetLogger(reqctx).WithField("hs", homeserverDomain).Info("Querying HS for users")
 

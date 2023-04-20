@@ -18,11 +18,12 @@ import (
 	"net/http"
 	"time"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -48,7 +49,7 @@ func JoinRoomByIDOrAlias(
 		for _, serverName := range serverNames {
 			joinReq.ServerNames = append(
 				joinReq.ServerNames,
-				gomatrixserverlib.ServerName(serverName),
+				spec.ServerName(serverName),
 			)
 		}
 	}
@@ -61,21 +62,19 @@ func JoinRoomByIDOrAlias(
 	// Work out our localpart for the client profile request.
 
 	// Request our profile content to populate the request content with.
-	res := &api.QueryProfileResponse{}
-	err := profileAPI.QueryProfile(req.Context(), &api.QueryProfileRequest{UserID: device.UserID}, res)
-	if err != nil || !res.UserExists {
-		if !res.UserExists {
-			util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("Unable to query user profile, no profile found."),
-			}
-		}
+	profile, err := profileAPI.QueryProfile(req.Context(), device.UserID)
 
-		util.GetLogger(req.Context()).WithError(err).Error("UserProfileAPI.QueryProfile failed")
-	} else {
-		joinReq.Content["displayname"] = res.DisplayName
-		joinReq.Content["avatar_url"] = res.AvatarURL
+	switch err {
+	case nil:
+		joinReq.Content["displayname"] = profile.DisplayName
+		joinReq.Content["avatar_url"] = profile.AvatarURL
+	case appserviceAPI.ErrProfileNotExists:
+		util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("Unable to query user profile, no profile found."),
+		}
+	default:
 	}
 
 	// Ask the roomserver to perform the join.

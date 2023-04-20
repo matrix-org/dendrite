@@ -7,11 +7,17 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/test"
@@ -28,20 +34,24 @@ func TestLogin(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
-		base.Cfg.ClientAPI.RateLimiting.Enabled = false
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
-		base.Cfg.Global.VirtualHosts = append(base.Cfg.Global.VirtualHosts, &config.VirtualHost{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"},
+		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
+			SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"},
 		})
 
-		rsAPI := roomserver.NewInternalAPI(base)
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		routers := httputil.NewRouters()
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(base, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		Setup(base, &base.Cfg.ClientAPI, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, &base.Cfg.MSCs, nil)
+		Setup(routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, caching.DisableMetrics)
 
 		// Create password
 		password := util.RandomString(8)
@@ -114,7 +124,7 @@ func TestLogin(t *testing.T) {
 					"password": password,
 				}))
 				rec := httptest.NewRecorder()
-				base.PublicClientAPIMux.ServeHTTP(rec, req)
+				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("failed to login: %s", rec.Body.String())
 				}

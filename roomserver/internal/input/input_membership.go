@@ -18,13 +18,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/opentracing/opentracing-go"
 )
 
 // updateMembership updates the current membership and the invites for each
@@ -36,8 +38,8 @@ func (r *Inputer) updateMemberships(
 	updater *shared.RoomUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "updateMemberships")
-	defer span.Finish()
+	trace, ctx := internal.StartRegion(ctx, "updateMemberships")
+	defer trace.EndRegion()
 
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID
@@ -85,7 +87,7 @@ func (r *Inputer) updateMembership(
 ) ([]api.OutputEvent, error) {
 	var err error
 	// Default the membership to Leave if no event was added or removed.
-	newMembership := gomatrixserverlib.Leave
+	newMembership := spec.Leave
 	if add != nil {
 		newMembership, err = add.Membership()
 		if err != nil {
@@ -119,13 +121,13 @@ func (r *Inputer) updateMembership(
 	}
 
 	switch newMembership {
-	case gomatrixserverlib.Invite:
+	case spec.Invite:
 		return helpers.UpdateToInviteMembership(mu, add, updates, updater.RoomVersion())
-	case gomatrixserverlib.Join:
+	case spec.Join:
 		return updateToJoinMembership(mu, add, updates)
-	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
+	case spec.Leave, spec.Ban:
 		return updateToLeaveMembership(mu, add, newMembership, updates)
-	case gomatrixserverlib.Knock:
+	case spec.Knock:
 		return updateToKnockMembership(mu, add, updates)
 	default:
 		panic(fmt.Errorf(
@@ -159,7 +161,7 @@ func updateToJoinMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
+				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetUserID:     *add.StateKey(),
 			},

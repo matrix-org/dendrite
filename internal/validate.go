@@ -21,7 +21,7 @@ import (
 	"regexp"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -70,7 +70,7 @@ func PasswordResponse(err error) *util.JSONResponse {
 }
 
 // ValidateUsername returns an error if the username is invalid
-func ValidateUsername(localpart string, domain gomatrixserverlib.ServerName) error {
+func ValidateUsername(localpart string, domain spec.ServerName) error {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return ErrUsernameTooLong
@@ -100,7 +100,7 @@ func UsernameResponse(err error) *util.JSONResponse {
 }
 
 // ValidateApplicationServiceUsername returns an error if the username is invalid for an application service
-func ValidateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) error {
+func ValidateApplicationServiceUsername(localpart string, domain spec.ServerName) error {
 	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return ErrUsernameTooLong
 	} else if !validUsernameRegex.MatchString(localpart) {

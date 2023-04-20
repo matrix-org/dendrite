@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -35,7 +36,7 @@ type DeviceListUpdateConsumer struct {
 	durable           string
 	topic             string
 	updater           *internal.DeviceListUpdater
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 }
 
 // NewDeviceListUpdateConsumer creates a new DeviceListConsumer. Call Start() to begin consuming from key servers.
@@ -72,7 +73,7 @@ func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		logrus.WithError(err).Errorf("Failed to read from device list update input topic")
 		return true
 	}
-	origin := gomatrixserverlib.ServerName(msg.Header.Get("origin"))
+	origin := spec.ServerName(msg.Header.Get("origin"))
 	if _, serverName, err := gomatrixserverlib.SplitID('@', m.UserID); err != nil {
 		return true
 	} else if t.isLocalServerName(serverName) {

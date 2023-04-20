@@ -24,6 +24,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -35,7 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -84,7 +84,7 @@ func (r *Joiner) PerformJoin(
 func (r *Joiner) performJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (string, gomatrixserverlib.ServerName, error) {
+) (string, spec.ServerName, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return "", "", &rsAPI.PerformError{
@@ -113,7 +113,7 @@ func (r *Joiner) performJoin(
 func (r *Joiner) performJoinRoomByAlias(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (string, gomatrixserverlib.ServerName, error) {
+) (string, spec.ServerName, error) {
 	// Get the domain part of the room alias.
 	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
 	if err != nil {
@@ -168,7 +168,7 @@ func (r *Joiner) performJoinRoomByAlias(
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (string, gomatrixserverlib.ServerName, error) {
+) (string, spec.ServerName, error) {
 	// The original client request ?server_name=... may include this HS so filter that out so we
 	// don't attempt to make_join with ourselves
 	for i := 0; i < len(req.ServerNames); i++ {
@@ -205,7 +205,7 @@ func (r *Joiner) performJoinRoomByID(
 		}
 	}
 	eb := gomatrixserverlib.EventBuilder{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		Sender:   userID,
 		StateKey: &userID,
 		RoomID:   req.RoomIDOrAlias,
@@ -221,7 +221,7 @@ func (r *Joiner) performJoinRoomByID(
 	if req.Content == nil {
 		req.Content = map[string]interface{}{}
 	}
-	req.Content["membership"] = gomatrixserverlib.Join
+	req.Content["membership"] = spec.Join
 	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req); aerr != nil {
 		return "", "", aerr
 	} else if authorisedVia != "" {
@@ -275,7 +275,7 @@ func (r *Joiner) performJoinRoomByID(
 	if req.IsGuest {
 		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
 		guestAccess := "forbidden"
-		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
+		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
 		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
 			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}
@@ -294,7 +294,7 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// If we should do a forced federated join then do that.
-	var joinedVia gomatrixserverlib.ServerName
+	var joinedVia spec.ServerName
 	if forceFederatedJoin {
 		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
 		return req.RoomIDOrAlias, joinedVia, err
@@ -305,7 +305,13 @@ func (r *Joiner) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, userDomain, &eb)
+
+	var buildRes rsAPI.QueryLatestEventsAndStateResponse
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(userDomain)
+	if err != nil {
+		return "", "", fmt.Errorf("error joining local room: %q", err)
+	}
+	event, err := eventutil.QueryAndBuildEvent(ctx, &eb, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err {
 	case nil:
@@ -383,7 +389,7 @@ func (r *Joiner) performJoinRoomByID(
 func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-) (gomatrixserverlib.ServerName, error) {
+) (spec.ServerName, error) {
 	// Try joining by all of the supplied server names.
 	fedReq := fsAPI.PerformJoinRequest{
 		RoomID:      req.RoomIDOrAlias, // the room ID to try and join
@@ -429,47 +435,4 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 		}
 	}
 	return res.AuthorisedVia, nil
-}
-
-func buildEvent(
-	ctx context.Context, db storage.Database, cfg *config.Global,
-	senderDomain gomatrixserverlib.ServerName,
-	builder *gomatrixserverlib.EventBuilder,
-) (*gomatrixserverlib.HeaderedEvent, *rsAPI.QueryLatestEventsAndStateResponse, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
-	}
-
-	if len(eventsNeeded.Tuples()) == 0 {
-		return nil, nil, errors.New("expecting state tuples for event builder, got none")
-	}
-
-	var queryRes rsAPI.QueryLatestEventsAndStateResponse
-	err = helpers.QueryLatestEventsAndState(ctx, db, &rsAPI.QueryLatestEventsAndStateRequest{
-		RoomID:       builder.RoomID,
-		StateToFetch: eventsNeeded.Tuples(),
-	}, &queryRes)
-	if err != nil {
-		switch err.(type) {
-		case types.MissingStateError:
-			// We know something about the room but the state seems to be
-			// insufficient to actually build a new event, so in effect we
-			// had might as well treat the room as if it doesn't exist.
-			return nil, nil, eventutil.ErrRoomNoExists
-		default:
-			return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
-		}
-	}
-
-	identity, err := cfg.SigningIdentityFor(senderDomain)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ev, err := eventutil.BuildEvent(ctx, builder, cfg, identity, time.Now(), &eventsNeeded, &queryRes)
-	if err != nil {
-		return nil, nil, err
-	}
-	return ev, &queryRes, nil
 }

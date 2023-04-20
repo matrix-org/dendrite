@@ -20,6 +20,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -40,7 +41,7 @@ type KeyChangeConsumer struct {
 	durable           string
 	db                storage.Database
 	queues            *queue.OutgoingQueues
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 	rsAPI             roomserverAPI.FederationRoomserverAPI
 	topic             string
 }
@@ -140,7 +141,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	}
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MDeviceListUpdate,
+		Type:   spec.MDeviceListUpdate,
 		Origin: string(originServerName),
 	}
 	event := gomatrixserverlib.DeviceListUpdateEvent{

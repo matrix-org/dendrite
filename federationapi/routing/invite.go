@@ -25,20 +25,21 @@ import (
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
 
 // InviteV2 implements /_matrix/federation/v2/invite/{roomID}/{eventID}
 func InviteV2(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
-	inviteReq := gomatrixserverlib.InviteV2Request{}
+	inviteReq := fclient.InviteV2Request{}
 	err := json.Unmarshal(request.Content(), &inviteReq)
 	switch e := err.(type) {
 	case gomatrixserverlib.UnsupportedRoomVersionError:
@@ -68,7 +69,7 @@ func InviteV2(
 // InviteV1 implements /_matrix/federation/v1/invite/{roomID}/{eventID}
 func InviteV1(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
@@ -91,7 +92,7 @@ func InviteV1(
 			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
 		}
 	}
-	var strippedState []gomatrixserverlib.InviteV2StrippedState
+	var strippedState []fclient.InviteV2StrippedState
 	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
@@ -106,7 +107,7 @@ func processInvite(
 	isInviteV2 bool,
 	event *gomatrixserverlib.Event,
 	roomVer gomatrixserverlib.RoomVersion,
-	strippedState []gomatrixserverlib.InviteV2StrippedState,
+	strippedState []fclient.InviteV2StrippedState,
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
@@ -218,12 +219,12 @@ func processInvite(
 	if isInviteV2 {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent.JSON()},
+			JSON: fclient.RespInviteV2{Event: signedEvent.JSON()},
 		}
 	} else {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: gomatrixserverlib.RespInvite{Event: signedEvent.JSON()},
+			JSON: fclient.RespInvite{Event: signedEvent.JSON()},
 		}
 	}
 }

@@ -29,20 +29,22 @@ import (
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
 type ContextRespsonse struct {
-	End          string                          `json:"end"`
-	Event        *gomatrixserverlib.ClientEvent  `json:"event,omitempty"`
-	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after,omitempty"`
-	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before,omitempty"`
-	Start        string                          `json:"start"`
-	State        []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
+	End          string                  `json:"end"`
+	Event        *synctypes.ClientEvent  `json:"event,omitempty"`
+	EventsAfter  []synctypes.ClientEvent `json:"events_after,omitempty"`
+	EventsBefore []synctypes.ClientEvent `json:"events_before,omitempty"`
+	Start        string                  `json:"start"`
+	State        []synctypes.ClientEvent `json:"state,omitempty"`
 }
 
 func Context(
@@ -94,7 +96,7 @@ func Context(
 		}
 	}
 
-	stateFilter := gomatrixserverlib.StateFilter{
+	stateFilter := synctypes.StateFilter{
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,
@@ -167,14 +169,14 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBeforeFiltered, gomatrixserverlib.FormatAll)
-	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfterFiltered, gomatrixserverlib.FormatAll)
+	eventsBeforeClient := synctypes.HeaderedToClientEvents(eventsBeforeFiltered, synctypes.FormatAll)
+	eventsAfterClient := synctypes.HeaderedToClientEvents(eventsAfterFiltered, synctypes.FormatAll)
 
 	newState := state
 	if filter.LazyLoadMembers {
 		allEvents := append(eventsBeforeFiltered, eventsAfterFiltered...)
 		allEvents = append(allEvents, &requestedEvent)
-		evs := gomatrixserverlib.HeaderedToClientEvents(allEvents, gomatrixserverlib.FormatAll)
+		evs := synctypes.HeaderedToClientEvents(allEvents, synctypes.FormatAll)
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
 			logrus.WithError(err).Error("unable to load membership events")
@@ -182,12 +184,12 @@ func Context(
 		}
 	}
 
-	ev := gomatrixserverlib.HeaderedToClientEvent(&requestedEvent, gomatrixserverlib.FormatAll)
+	ev := synctypes.HeaderedToClientEvent(&requestedEvent, synctypes.FormatAll)
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,
 		EventsBefore: eventsBeforeClient,
-		State:        gomatrixserverlib.HeaderedToClientEvents(newState, gomatrixserverlib.FormatAll),
+		State:        synctypes.HeaderedToClientEvents(newState, synctypes.FormatAll),
 	}
 
 	if len(response.State) > filter.Limit {
@@ -261,7 +263,7 @@ func applyLazyLoadMembers(
 	device *userapi.Device,
 	snapshot storage.DatabaseTransaction,
 	roomID string,
-	events []gomatrixserverlib.ClientEvent,
+	events []synctypes.ClientEvent,
 	lazyLoadCache caching.LazyLoadCache,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	eventSenders := make(map[string]struct{})
@@ -280,9 +282,9 @@ func applyLazyLoadMembers(
 	}
 
 	// Query missing membership events
-	filter := gomatrixserverlib.DefaultStateFilter()
+	filter := synctypes.DefaultStateFilter()
 	filter.Senders = &wantUsers
-	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
+	filter.Types = &[]string{spec.MRoomMember}
 	memberships, err := snapshot.GetStateEventsForRoom(ctx, roomID, &filter)
 	if err != nil {
 		return nil, err
@@ -296,9 +298,9 @@ func applyLazyLoadMembers(
 	return memberships, nil
 }
 
-func parseRoomEventFilter(req *http.Request) (*gomatrixserverlib.RoomEventFilter, error) {
+func parseRoomEventFilter(req *http.Request) (*synctypes.RoomEventFilter, error) {
 	// Default room filter
-	filter := &gomatrixserverlib.RoomEventFilter{Limit: 10}
+	filter := &synctypes.RoomEventFilter{Limit: 10}
 
 	l := req.URL.Query().Get("limit")
 	f := req.URL.Query().Get("filter")

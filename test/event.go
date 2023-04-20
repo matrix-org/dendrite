@@ -21,11 +21,12 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type eventMods struct {
 	originServerTS time.Time
-	origin         gomatrixserverlib.ServerName
+	origin         spec.ServerName
 	stateKey       *string
 	unsigned       interface{}
 	keyID          gomatrixserverlib.KeyID
@@ -71,7 +72,7 @@ func WithPrivateKey(pkey ed25519.PrivateKey) eventModifier {
 	}
 }
 
-func WithOrigin(origin gomatrixserverlib.ServerName) eventModifier {
+func WithOrigin(origin spec.ServerName) eventModifier {
 	return func(e *eventMods) {
 		e.origin = origin
 	}

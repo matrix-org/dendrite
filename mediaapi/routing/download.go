@@ -36,7 +36,8 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -71,11 +72,11 @@ type downloadRequest struct {
 func Download(
 	w http.ResponseWriter,
 	req *http.Request,
-	origin gomatrixserverlib.ServerName,
+	origin spec.ServerName,
 	mediaID types.MediaID,
 	cfg *config.MediaAPI,
 	db storage.Database,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	isThumbnailRequest bool,
@@ -205,7 +206,7 @@ func (r *downloadRequest) doDownload(
 	w http.ResponseWriter,
 	cfg *config.MediaAPI,
 	db storage.Database,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) (*types.MediaMetadata, error) {
@@ -513,7 +514,7 @@ func (r *downloadRequest) generateThumbnail(
 // Note: The named errorResponse return variable is used in a deferred broadcast of the metadata and error response to waiting goroutines.
 func (r *downloadRequest) getRemoteFile(
 	ctx context.Context,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	cfg *config.MediaAPI,
 	db storage.Database,
 	activeRemoteRequests *types.ActiveRemoteRequests,
@@ -615,7 +616,7 @@ func (r *downloadRequest) broadcastMediaMetadata(activeRemoteRequests *types.Act
 // fetchRemoteFileAndStoreMetadata fetches the file from the remote server and stores its metadata in the database
 func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	ctx context.Context,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	absBasePath config.Path,
 	maxFileSizeBytes config.FileSizeBytes,
 	db storage.Database,
@@ -713,7 +714,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 
 func (r *downloadRequest) fetchRemoteFile(
 	ctx context.Context,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	absBasePath config.Path,
 	maxFileSizeBytes config.FileSizeBytes,
 ) (types.Path, bool, error) {

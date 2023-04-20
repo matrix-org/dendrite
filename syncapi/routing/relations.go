@@ -27,14 +27,15 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type RelationsResponse struct {
-	Chunk     []gomatrixserverlib.ClientEvent `json:"chunk"`
-	NextBatch string                          `json:"next_batch,omitempty"`
-	PrevBatch string                          `json:"prev_batch,omitempty"`
+	Chunk     []synctypes.ClientEvent `json:"chunk"`
+	NextBatch string                  `json:"next_batch,omitempty"`
+	PrevBatch string                  `json:"prev_batch,omitempty"`
 }
 
 // nolint:gocyclo
@@ -85,7 +86,7 @@ func Relations(
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	res := &RelationsResponse{
-		Chunk: []gomatrixserverlib.ClientEvent{},
+		Chunk: []synctypes.ClientEvent{},
 	}
 	var events []types.StreamEvent
 	events, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
@@ -108,11 +109,11 @@ func Relations(
 
 	// Convert the events into client events, and optionally filter based on the event
 	// type if it was specified.
-	res.Chunk = make([]gomatrixserverlib.ClientEvent, 0, len(filteredEvents))
+	res.Chunk = make([]synctypes.ClientEvent, 0, len(filteredEvents))
 	for _, event := range filteredEvents {
 		res.Chunk = append(
 			res.Chunk,
-			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
+			synctypes.ToClientEvent(event.Event, synctypes.FormatAll),
 		)
 	}
 
