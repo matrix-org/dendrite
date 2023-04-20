@@ -41,7 +41,7 @@ func GetProfile(
 	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
@@ -69,7 +69,7 @@ func GetProfile(
 func GetAvatarURL(
 	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
 	profile := GetProfile(req, profileAPI, cfg, userID, asAPI, federation)
 	p, ok := profile.JSON.(eventutil.UserProfile)
@@ -158,7 +158,7 @@ func SetAvatarURL(
 func GetDisplayName(
 	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
 	profile := GetProfile(req, profileAPI, cfg, userID, asAPI, federation)
 	p, ok := profile.JSON.(eventutil.UserProfile)
@@ -294,7 +294,7 @@ func getProfile(
 	ctx context.Context, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 ) (*authtypes.Profile, error) {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

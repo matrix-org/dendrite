@@ -25,7 +25,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	fedAPI "github.com/matrix-org/dendrite/federationapi"
-	fedclient "github.com/matrix-org/dendrite/federationapi/api"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -42,7 +41,7 @@ import (
 )
 
 type fakeFedClient struct {
-	fedclient.FederationClient
+	fclient.FederationClient
 }
 
 func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.ServerName, roomAlias string) (res fclient.RespDirectory, err error) {

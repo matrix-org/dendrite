@@ -62,7 +62,7 @@ func Send(
 	rsAPI api.FederationRoomserverAPI,
 	keyAPI userAPI.FederationUserAPI,
 	keys gomatrixserverlib.JSONVerifier,
-	federation federationAPI.FederationClient,
+	federation fclient.FederationClient,
 	mu *internal.MutexByRoom,
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,

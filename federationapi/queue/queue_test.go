@@ -32,7 +32,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -75,7 +74,7 @@ func (r *stubFederationRoomServerAPI) QueryServerBannedFromRoom(ctx context.Cont
 }
 
 type stubFederationClient struct {
-	api.FederationClient
+	fclient.FederationClient
 	shouldTxSucceed      bool
 	shouldTxRelaySucceed bool
 	txCount              atomic.Uint32

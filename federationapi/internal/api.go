@@ -17,6 +17,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
@@ -27,7 +28,7 @@ type FederationInternalAPI struct {
 	cfg        *config.FederationAPI
 	statistics *statistics.Statistics
 	rsAPI      roomserverAPI.FederationRoomserverAPI
-	federation api.FederationClient
+	federation fclient.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
 	joins      sync.Map // joins currently in progress
@@ -36,7 +37,7 @@ type FederationInternalAPI struct {
 func NewFederationInternalAPI(
 	db storage.Database, cfg *config.FederationAPI,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-	federation api.FederationClient,
+	federation fclient.FederationClient,
 	statistics *statistics.Statistics,
 	caches *caching.Caches,
 	queues *queue.OutgoingQueues,

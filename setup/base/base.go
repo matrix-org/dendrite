@@ -74,7 +74,7 @@ func CreateClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.Cli
 
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
-func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.FederationClient {
+func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fclient.FederationClient {
 	identities := cfg.Global.SigningIdentities()
 	if cfg.Global.DisableFederation {
 		return fclient.NewFederationClient(
@@ -92,7 +92,7 @@ func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *f
 	client := fclient.NewFederationClient(
 		identities, opts...,
 	)
-	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	client.InternalClient().SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
 }
 

@@ -767,7 +767,7 @@ func setDefaultRoomVersionFromJoinEvent(
 
 // FederatedAuthProvider is an auth chain provider which fetches events from the server provided
 func federatedAuthProvider(
-	ctx context.Context, federation api.FederationClient,
+	ctx context.Context, federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
 ) gomatrixserverlib.AuthChainProvider {
 	// A list of events that we have retried, if they were not included in

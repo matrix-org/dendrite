@@ -29,7 +29,7 @@ type server struct {
 	name      spec.ServerName           // server name
 	validity  time.Duration             // key validity duration from now
 	config    *config.FederationAPI     // skeleton config, from TestMain
-	fedclient *fclient.FederationClient // uses MockRoundTripper
+	fedclient fclient.FederationClient  // uses MockRoundTripper
 	cache     *caching.Caches           // server-specific cache
 	api       api.FederationInternalAPI // server-specific server key API
 }

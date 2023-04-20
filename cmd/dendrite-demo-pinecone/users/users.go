@@ -39,7 +39,7 @@ type PineconeUserProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
 	userAPI   userapi.QuerySearchProfilesAPI
-	fedClient *fclient.FederationClient
+	fedClient fclient.FederationClient
 }
 
 const PublicURL = "/_matrix/p2p/profiles"
@@ -48,7 +48,7 @@ func NewPineconeUserProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
 	userAPI userapi.QuerySearchProfilesAPI,
-	fedClient *fclient.FederationClient,
+	fedClient fclient.FederationClient,
 ) *PineconeUserProvider {
 	p := &PineconeUserProvider{
 		r:         r,
@@ -95,7 +95,7 @@ func (p *PineconeUserProvider) QuerySearchProfiles(ctx context.Context, req *use
 // Returns a list of user profiles.
 func bulkFetchUserDirectoriesFromServers(
 	ctx context.Context, req *userapi.QuerySearchProfilesRequest,
-	fedClient *fclient.FederationClient,
+	fedClient fclient.FederationClient,
 	homeservers map[spec.ServerName]struct{},
 ) (profiles []authtypes.Profile) {
 	jsonBody, err := json.Marshal(req)
@@ -127,7 +127,7 @@ func bulkFetchUserDirectoriesFromServers(
 				)
 			}
 			res := &userapi.QuerySearchProfilesResponse{}
-			if err = fedClient.DoRequestAndParseResponse(reqctx, httpReq, res); err != nil {
+			if err = fedClient.InternalClient().DoRequestAndParseResponse(reqctx, httpReq, res); err != nil {
 				util.GetLogger(reqctx).WithError(err).WithField("hs", homeserverDomain).Warn(
 					"bulkFetchUserDirectoriesFromServers: failed to query hs",
 				)

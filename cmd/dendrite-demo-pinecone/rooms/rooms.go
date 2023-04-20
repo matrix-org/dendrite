@@ -33,14 +33,14 @@ type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
 	fedSender api.FederationInternalAPI
-	fedClient *fclient.FederationClient
+	fedClient fclient.FederationClient
 }
 
 func NewPineconeRoomProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
 	fedSender api.FederationInternalAPI,
-	fedClient *fclient.FederationClient,
+	fedClient fclient.FederationClient,
 ) *PineconeRoomProvider {
 	p := &PineconeRoomProvider{
 		r:         r,
@@ -68,7 +68,7 @@ func (p *PineconeRoomProvider) Rooms() []fclient.PublicRoom {
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
-	ctx context.Context, fedClient *fclient.FederationClient,
+	ctx context.Context, fedClient fclient.FederationClient,
 	origin spec.ServerName,
 	homeservers map[spec.ServerName]struct{},
 ) (publicRooms []fclient.PublicRoom) {

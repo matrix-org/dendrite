@@ -28,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
@@ -54,7 +53,7 @@ type destinationQueue struct {
 	process            *process.ProcessContext
 	signing            map[spec.ServerName]*fclient.SigningIdentity
 	rsAPI              api.FederationRoomserverAPI
-	client             fedapi.FederationClient         // federation client
+	client             fclient.FederationClient        // federation client
 	origin             spec.ServerName                 // origin of requests
 	destination        spec.ServerName                 // destination of requests
 	running            atomic.Bool                     // is the queue worker running?

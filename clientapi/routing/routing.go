@@ -56,7 +56,7 @@ func Setup(
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
