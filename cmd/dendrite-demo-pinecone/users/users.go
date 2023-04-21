@@ -127,7 +127,7 @@ func bulkFetchUserDirectoriesFromServers(
 				)
 			}
 			res := &userapi.QuerySearchProfilesResponse{}
-			if err = fedClient.InternalClient().DoRequestAndParseResponse(reqctx, httpReq, res); err != nil {
+			if err = fedClient.DoRequestAndParseResponse(reqctx, httpReq, res); err != nil {
 				util.GetLogger(reqctx).WithError(err).WithField("hs", homeserverDomain).Warn(
 					"bulkFetchUserDirectoriesFromServers: failed to query hs",
 				)

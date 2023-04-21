@@ -92,7 +92,7 @@ func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fc
 	client := fclient.NewFederationClient(
 		identities, opts...,
 	)
-	client.InternalClient().SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	client.WithUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
 }
 

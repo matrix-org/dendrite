@@ -111,7 +111,7 @@ func main() {
 	}
 
 	var res interface{}
-	err = client.InternalClient().DoRequestAndParseResponse(
+	err = client.DoRequestAndParseResponse(
 		context.TODO(),
 		httpReq,
 		&res,
