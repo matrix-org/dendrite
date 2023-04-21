@@ -28,39 +28,32 @@ func DefaultRoomVersion() gomatrixserverlib.RoomVersion {
 
 // RoomVersions returns a map of all known room versions to this
 // server.
-func RoomVersions() map[gomatrixserverlib.RoomVersion]gomatrixserverlib.RoomVersionDescription {
+func RoomVersions() map[gomatrixserverlib.RoomVersion]gomatrixserverlib.RoomVersionImpl {
 	return gomatrixserverlib.RoomVersions()
 }
 
 // SupportedRoomVersions returns a map of descriptions for room
 // versions that are supported by this homeserver.
-func SupportedRoomVersions() map[gomatrixserverlib.RoomVersion]gomatrixserverlib.RoomVersionDescription {
-	return gomatrixserverlib.SupportedRoomVersions()
+func SupportedRoomVersions() map[gomatrixserverlib.RoomVersion]gomatrixserverlib.RoomVersionImpl {
+	return gomatrixserverlib.RoomVersions()
 }
 
 // RoomVersion returns information about a specific room version.
 // An UnknownVersionError is returned if the version is not known
 // to the server.
-func RoomVersion(version gomatrixserverlib.RoomVersion) (gomatrixserverlib.RoomVersionDescription, error) {
+func RoomVersion(version gomatrixserverlib.RoomVersion) (gomatrixserverlib.RoomVersionImpl, error) {
 	if version, ok := gomatrixserverlib.RoomVersions()[version]; ok {
 		return version, nil
 	}
-	return gomatrixserverlib.RoomVersionDescription{}, UnknownVersionError{version}
+	return gomatrixserverlib.RoomVersionImpl{}, UnknownVersionError{version}
 }
 
 // SupportedRoomVersion returns information about a specific room
 // version. An UnknownVersionError is returned if the version is not
 // known to the server, or an UnsupportedVersionError is returned if
 // the version is known but specifically marked as unsupported.
-func SupportedRoomVersion(version gomatrixserverlib.RoomVersion) (gomatrixserverlib.RoomVersionDescription, error) {
-	result, err := RoomVersion(version)
-	if err != nil {
-		return gomatrixserverlib.RoomVersionDescription{}, err
-	}
-	if !result.Supported {
-		return gomatrixserverlib.RoomVersionDescription{}, UnsupportedVersionError{version}
-	}
-	return result, nil
+func SupportedRoomVersion(version gomatrixserverlib.RoomVersion) (gomatrixserverlib.RoomVersionImpl, error) {
+	return RoomVersion(version)
 }
 
 // UnknownVersionError is caused when the room version is not known.
