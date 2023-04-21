@@ -206,8 +206,17 @@ func SendJoin(
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(verRes.RoomVersion)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("QueryRoomVersionForRoom returned unknown room version: %s", verRes.RoomVersion),
+			),
+		}
+	}
 
-	event, err := verRes.RoomVersion.NewEventFromUntrustedJSON(request.Content())
+	event, err := verImpl.NewEventFromUntrustedJSON(request.Content())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -287,7 +296,7 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted, err := event.Version().RedactEventJSON(event.JSON())
+	redacted, err := verImpl.RedactEventJSON(event.JSON())
 	if err != nil {
 		logrus.WithError(err).Errorf("XXX: join.go")
 		return util.JSONResponse{
@@ -461,9 +470,11 @@ func checkRestrictedJoin(
 	roomVersion gomatrixserverlib.RoomVersion,
 	roomID, userID string,
 ) (*util.JSONResponse, string, error) {
-	if allowRestricted, err := roomVersion.MayAllowRestrictedJoinsInEventAuth(); err != nil {
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
 		return nil, "", err
-	} else if !allowRestricted {
+	}
+	if !verImpl.MayAllowRestrictedJoinsInEventAuth() {
 		return nil, "", nil
 	}
 	req := &api.QueryRestrictedJoinAllowedRequest{

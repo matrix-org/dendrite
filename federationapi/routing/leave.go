@@ -149,8 +149,18 @@ func SendLeave(
 		}
 	}
 
+	verImpl, err := gomatrixserverlib.GetRoomVersion(verRes.RoomVersion)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", verRes.RoomVersion),
+			),
+		}
+	}
+
 	// Decode the event JSON from the request.
-	event, err := verRes.RoomVersion.NewEventFromUntrustedJSON(request.Content())
+	event, err := verImpl.NewEventFromUntrustedJSON(request.Content())
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
@@ -253,7 +263,7 @@ func SendLeave(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted, err := event.Version().RedactEventJSON(event.JSON())
+	redacted, err := verImpl.RedactEventJSON(event.JSON())
 	if err != nil {
 		logrus.WithError(err).Errorf("XXX: leave.go")
 		return util.JSONResponse{

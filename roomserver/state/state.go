@@ -878,10 +878,12 @@ func (v *StateResolution) resolveConflicts(
 	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflicts")
 	defer trace.EndRegion()
 
-	stateResAlgo, err := version.StateResAlgorithm()
+	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
 	if err != nil {
 		return nil, err
 	}
+
+	stateResAlgo := verImpl.StateResAlgorithm()
 	switch stateResAlgo {
 	case gomatrixserverlib.StateResV1:
 		return v.resolveConflictsV1(ctx, notConflicted, conflicted)
