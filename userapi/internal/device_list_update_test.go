@@ -147,8 +147,8 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.F
 				PrivateKey: pkey,
 			},
 		},
+		fclient.WithTransport(&roundTripper{tripper}),
 	)
-	fedClient.SetInternalClient(*fclient.NewClient(fclient.WithTransport(&roundTripper{tripper})))
 	return fedClient
 }
 
