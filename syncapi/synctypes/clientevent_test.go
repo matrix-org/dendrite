@@ -24,7 +24,7 @@ import (
 )
 
 func TestToClientEvent(t *testing.T) { // nolint: gocyclo
-	ev, err := gomatrixserverlib.RoomVersionV1.NewEventFromTrustedJSON([]byte(`{
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
 		"state_key": "",
 		"event_id": "$test:localhost",
@@ -79,7 +79,7 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 }
 
 func TestToClientFormatSync(t *testing.T) {
-	ev, err := gomatrixserverlib.RoomVersionV1.NewEventFromTrustedJSON([]byte(`{
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
 		"state_key": "",
 		"event_id": "$test:localhost",

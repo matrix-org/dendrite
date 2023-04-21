@@ -884,12 +884,14 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if roomInfo == nil || roomInfo.IsStub() {
 		return nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
 	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
+	if err != nil {
+		return err
+	}
 	// If the room version doesn't allow restricted joins then don't
 	// try to process any further.
-	allowRestrictedJoins, err := roomInfo.RoomVersion.MayAllowRestrictedJoinsInEventAuth()
-	if err != nil {
-		return fmt.Errorf("roomInfo.RoomVersion.AllowRestrictedJoinsInEventAuth: %w", err)
-	} else if !allowRestrictedJoins {
+	allowRestrictedJoins := verImpl.MayAllowRestrictedJoinsInEventAuth()
+	if !allowRestrictedJoins {
 		return nil
 	}
 	// Start off by populating the "resident" flag in the response. If we

@@ -838,6 +838,11 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 	trace, ctx := internal.StartRegion(ctx, "lookupEvent")
 	defer trace.EndRegion()
 
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return nil, err
+	}
+
 	if localFirst {
 		// fetch from the roomserver
 		events, err := t.db.EventsFromIDs(ctx, t.roomInfo, []string{missingEventID})
@@ -865,7 +870,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 			}
 			continue
 		}
-		event, err = roomVersion.NewEventFromUntrustedJSON(txn.PDUs[0])
+		event, err = verImpl.NewEventFromUntrustedJSON(txn.PDUs[0])
 		if err != nil {
 			t.log.WithError(err).WithField("missing_event_id", missingEventID).Warnf("Failed to parse event JSON of event returned from /event")
 			continue

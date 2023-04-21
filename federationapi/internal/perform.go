@@ -201,8 +201,9 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if respMakeJoin.RoomVersion == "" {
 		respMakeJoin.RoomVersion = setDefaultRoomVersionFromJoinEvent(respMakeJoin.JoinEvent)
 	}
-	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
-		return fmt.Errorf("respMakeJoin.RoomVersion.EventFormat: %w", err)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(respMakeJoin.RoomVersion)
+	if err != nil {
+		return err
 	}
 
 	// Build the join event.
@@ -235,7 +236,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// contain signatures that we don't know about.
 	if len(respSendJoin.Event) > 0 {
 		var remoteEvent *gomatrixserverlib.Event
-		remoteEvent, err = respMakeJoin.RoomVersion.NewEventFromUntrustedJSON(respSendJoin.Event)
+		remoteEvent, err = verImpl.NewEventFromUntrustedJSON(respSendJoin.Event)
 		if err == nil && isWellFormedMembershipEvent(
 			remoteEvent, roomID, userID,
 		) {
@@ -464,8 +465,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	if respPeek.RoomVersion == "" {
 		respPeek.RoomVersion = gomatrixserverlib.RoomVersionV1
 	}
-	if _, err = respPeek.RoomVersion.EventFormat(); err != nil {
-		return fmt.Errorf("respPeek.RoomVersion.EventFormat: %w", err)
+	if !gomatrixserverlib.KnownRoomVersion(respPeek.RoomVersion) {
+		return fmt.Errorf("unknown room version: %s", respPeek.RoomVersion)
 	}
 
 	// we have the peek state now so let's process regardless of whether upstream gives up
@@ -552,6 +553,13 @@ func (r *FederationInternalAPI) PerformLeave(
 			continue
 		}
 
+		// Work out if we support the room version that has been supplied in
+		// the make_leave response.
+		_, err = gomatrixserverlib.GetRoomVersion(respMakeLeave.RoomVersion)
+		if err != nil {
+			return err
+		}
+
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
@@ -571,12 +579,6 @@ func (r *FederationInternalAPI) PerformLeave(
 		if err = respMakeLeave.LeaveEvent.SetUnsigned(struct{}{}); err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetUnsigned failed")
 			continue
-		}
-
-		// Work out if we support the room version that has been supplied in
-		// the make_leave response.
-		if _, err = respMakeLeave.RoomVersion.EventFormat(); err != nil {
-			return gomatrixserverlib.UnsupportedRoomVersionError{}
 		}
 
 		// Build the leave event.
@@ -659,8 +661,12 @@ func (r *FederationInternalAPI) PerformInvite(
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(request.RoomVersion)
+	if err != nil {
+		return err
+	}
 
-	inviteEvent, err := request.RoomVersion.NewEventFromUntrustedJSON(inviteRes.Event)
+	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
@@ -779,6 +785,10 @@ func federatedAuthProvider(
 	// to repeat the entire set of checks just for a missing event or two.
 	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
 		returning := []*gomatrixserverlib.Event{}
+		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+		if err != nil {
+			return nil, err
+		}
 
 		// See if we have retry entries for each of the supplied event IDs.
 		for _, eventID := range eventIDs {
@@ -808,7 +818,7 @@ func federatedAuthProvider(
 			// event ID again.
 			for _, pdu := range tx.PDUs {
 				// Try to parse the event.
-				ev, everr := roomVersion.NewEventFromUntrustedJSON(pdu)
+				ev, everr := verImpl.NewEventFromUntrustedJSON(pdu)
 				if everr != nil {
 					return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
 				}

@@ -112,10 +112,11 @@ func addPrevEventsToEvent(
 		return ErrRoomNoExists
 	}
 
-	eventFormat, err := queryRes.RoomVersion.EventFormat()
+	verImpl, err := gomatrixserverlib.GetRoomVersion(queryRes.RoomVersion)
 	if err != nil {
-		return fmt.Errorf("queryRes.RoomVersion.EventFormat: %w", err)
+		return fmt.Errorf("GetRoomVersion: %w", err)
 	}
+	eventFormat := verImpl.EventFormat()
 
 	builder.Depth = queryRes.Depth
 

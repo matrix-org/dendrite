@@ -137,7 +137,11 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			continue
 		}
 		roomVersion := getRoomVersion(header.RoomID)
-		event, err := roomVersion.NewEventFromUntrustedJSON(pdu)
+		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+		if err != nil {
+			continue
+		}
+		event, err := verImpl.NewEventFromUntrustedJSON(pdu)
 		if err != nil {
 			if _, ok := err.(gomatrixserverlib.BadJSONError); ok {
 				// Room version 6 states that homeservers should strictly enforce canonical JSON
