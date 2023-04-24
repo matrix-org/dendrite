@@ -141,70 +141,47 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 func (r *Admin) PerformAdminEvacuateUser(
 	ctx context.Context,
-	req *api.PerformAdminEvacuateUserRequest,
-	res *api.PerformAdminEvacuateUserResponse,
-) error {
-	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	userID string,
+) (affected []string, err error) {
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Malformed user ID: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  "Can only evacuate local users using this endpoint",
-		}
-		return nil
+		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Join)
+	if err != nil {
+		return nil, err
+	}
+
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Invite)
-	if err != nil && err != sql.ErrNoRows {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
-		}
-		return nil
-	}
-
-	for _, roomID := range append(roomIDs, inviteRoomIDs...) {
+	allRooms := append(roomIDs, inviteRoomIDs...)
+	affected = make([]string, 0, len(allRooms))
+	for _, roomID := range allRooms {
 		leaveReq := &api.PerformLeaveRequest{
 			RoomID: roomID,
-			UserID: req.UserID,
+			UserID: userID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
 		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("r.Leaver.PerformLeave: %s", err),
-			}
-			return nil
+			return nil, err
 		}
-		res.Affected = append(res.Affected, roomID)
+		affected = append(affected, roomID)
 		if len(outputEvents) == 0 {
 			continue
 		}
 		if err := r.Inputer.OutputProducer.ProduceRoomEvents(roomID, outputEvents); err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("r.Inputer.WriteOutputEvents: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 	}
-	return nil
+	return affected, nil
 }
 
 func (r *Admin) PerformAdminPurgeRoom(

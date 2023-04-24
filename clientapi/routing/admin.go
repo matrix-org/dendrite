@@ -40,7 +40,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 		}
 	default:
 		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
-		return jsonerror.InternalServerError()
+		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -50,40 +50,22 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	}
 }
 
-func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	userID := vars["userID"]
 
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
-		return util.MessageResponse(http.StatusBadRequest, err.Error())
+		logrus.WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
+		return util.ErrorResponse(err)
 	}
-	if !cfg.Matrix.IsLocalServerName(domain) {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("User ID must belong to this server."),
-		}
-	}
-	res := &roomserverAPI.PerformAdminEvacuateUserResponse{}
-	if err := rsAPI.PerformAdminEvacuateUser(
-		req.Context(),
-		&roomserverAPI.PerformAdminEvacuateUserRequest{
-			UserID: userID,
-		},
-		res,
-	); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
-	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
-			"affected": res.Affected,
+			"affected": affected,
 		},
 	}
 }

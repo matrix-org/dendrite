@@ -624,15 +624,10 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return fmt.Errorf("server name %q not locally configured", serverName)
 	}
 
-	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
-		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),
-	}
-	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
-	if err := a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes); err != nil {
-		return err
-	}
-	if err := evacuateRes.Error; err != nil {
-		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
+	userID := fmt.Sprintf("@%s:%s", req.Localpart, serverName)
+	_, err := a.RSAPI.PerformAdminEvacuateUser(ctx, userID)
+	if err != nil {
+		logrus.WithError(err).WithField("userID", userID).Errorf("Failed to evacuate user after account deactivation")
 	}
 
 	deviceReq := &api.PerformDeviceDeletionRequest{
@@ -650,7 +645,7 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return err
 	}
 
-	err := a.DB.DeactivateAccount(ctx, req.Localpart, serverName)
+	err = a.DB.DeactivateAccount(ctx, req.Localpart, serverName)
 	res.AccountDeactivated = err == nil
 	return err
 }

@@ -152,7 +152,7 @@ type ClientRoomserverAPI interface {
 	// PerformRoomUpgrade upgrades a room to a newer version
 	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse) error
 	PerformAdminEvacuateRoom(ctx context.Context, roomID string) (affected []string, err error)
-	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformAdminPurgeRoom(ctx context.Context, req *PerformAdminPurgeRoomRequest, res *PerformAdminPurgeRoomResponse) error
 	PerformAdminDownloadState(ctx context.Context, req *PerformAdminDownloadStateRequest, res *PerformAdminDownloadStateResponse) error
 	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse) error
@@ -172,7 +172,7 @@ type UserRoomserverAPI interface {
 	KeyserverRoomserverAPI
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
-	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse) error
 }
 

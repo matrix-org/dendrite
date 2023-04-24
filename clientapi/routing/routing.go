@@ -162,7 +162,7 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
 		httputil.MakeAdminAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateUser(req, cfg, rsAPI)
+			return AdminEvacuateUser(req, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
