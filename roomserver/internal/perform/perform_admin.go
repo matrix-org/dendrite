@@ -43,55 +43,34 @@ type Admin struct {
 // PerformEvacuateRoom will remove all local users from the given room.
 func (r *Admin) PerformAdminEvacuateRoom(
 	ctx context.Context,
-	req *api.PerformAdminEvacuateRoomRequest,
-	res *api.PerformAdminEvacuateRoomResponse,
-) error {
-	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	roomID string,
+) (affected []string, err error) {
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.RoomInfo: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 	if roomInfo == nil || roomInfo.IsStub() {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorNoRoom,
-			Msg:  fmt.Sprintf("Room %s not found", req.RoomID),
-		}
-		return nil
+		return nil, eventutil.ErrRoomNoExists
 	}
 
 	memberNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.GetMembershipEventNIDsForRoom: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
 	memberEvents, err := r.DB.Events(ctx, roomInfo, memberNIDs)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.Events: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
 	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
-	res.Affected = make([]string, 0, len(memberEvents))
+	affected = make([]string, 0, len(memberEvents))
 	latestReq := &api.QueryLatestEventsAndStateRequest{
-		RoomID: req.RoomID,
+		RoomID: roomID,
 	}
 	latestRes := &api.QueryLatestEventsAndStateResponse{}
 	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.Queryer.QueryLatestEventsAndState: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
 	prevEvents := latestRes.LatestEvents
@@ -102,17 +81,13 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 		var memberContent gomatrixserverlib.MemberContent
 		if err = json.Unmarshal(memberEvent.Content(), &memberContent); err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("json.Unmarshal: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
-			RoomID:     req.RoomID,
+			RoomID:     roomID,
 			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
@@ -125,20 +100,12 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		}
 
 		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("json.Marshal: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 
 		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 
 		identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
@@ -148,11 +115,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("eventutil.BuildEvent: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 
 		inputEvents = append(inputEvents, api.InputRoomEvent{
@@ -161,7 +124,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			Origin:       senderDomain,
 			SendAsServer: string(senderDomain),
 		})
-		res.Affected = append(res.Affected, stateKey)
+		affected = append(affected, stateKey)
 		prevEvents = []gomatrixserverlib.EventReference{
 			event.EventReference(),
 		}
@@ -172,7 +135,8 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		Asynchronous:    true,
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	return r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+	err = r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+	return affected, err
 }
 
 func (r *Admin) PerformAdminEvacuateUser(

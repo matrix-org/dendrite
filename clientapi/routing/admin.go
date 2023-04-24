@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -28,23 +29,23 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
-	if err := rsAPI.PerformAdminEvacuateRoom(
-		req.Context(),
-		&roomserverAPI.PerformAdminEvacuateRoomRequest{
-			RoomID: vars["roomID"],
-		},
-		res,
-	); err != nil {
-		return util.ErrorResponse(err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
+
+	affected, err := rsAPI.PerformAdminEvacuateRoom(req.Context(), vars["roomID"])
+	switch err {
+	case nil:
+	case eventutil.ErrRoomNoExists:
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	default:
+		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
+		return jsonerror.InternalServerError()
 	}
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
-			"affected": res.Affected,
+			"affected": affected,
 		},
 	}
 }
