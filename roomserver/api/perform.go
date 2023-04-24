@@ -112,10 +112,6 @@ type PerformInviteRequest struct {
 	TransactionID   *TransactionID                   `json:"transaction_id"`
 }
 
-type PerformInviteResponse struct {
-	Error *PerformError
-}
-
 type PerformPeekRequest struct {
 	RoomIDOrAlias string            `json:"room_id_or_alias"`
 	UserID        string            `json:"user_id"`

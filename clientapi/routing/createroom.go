@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
@@ -556,22 +557,32 @@ func createRoom(
 				fclient.NewInviteV2StrippedState(inviteEvent.Event),
 			)
 			// Send the invite event to the roomserver.
-			var inviteRes roomserverAPI.PerformInviteResponse
 			event := inviteEvent.Headered(roomVersion)
-			if err := rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
+			err = rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
 				RoomVersion:     event.RoomVersion,
 				SendAsServer:    string(userDomain),
-			}, &inviteRes); err != nil {
+			})
+			switch e := err.(type) {
+			case roomserverAPI.ErrInvalidID:
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.Unknown(e.Error()),
+				}
+			case roomserverAPI.ErrNotAllowed:
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden(e.Error()),
+				}
+			case nil:
+			default:
 				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+				sentry.CaptureException(err)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: jsonerror.InternalServerError(),
 				}
-			}
-			if inviteRes.Error != nil {
-				return inviteRes.Error.JSONResponse()
 			}
 		}
 	}

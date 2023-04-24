@@ -11,6 +11,25 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
+// ErrInvalidID is an error returned if the userID is invalid
+type ErrInvalidID struct {
+	Err error
+}
+
+func (e ErrInvalidID) Error() string {
+	return e.Err.Error()
+}
+
+// ErrNotAllowed is an error returned if the user is not allowed
+// to execute some action (e.g. invite)
+type ErrNotAllowed struct {
+	Err error
+}
+
+func (e ErrNotAllowed) Error() string {
+	return e.Err.Error()
+}
+
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
 	SyncRoomserverAPI
@@ -157,7 +176,7 @@ type ClientRoomserverAPI interface {
 	PerformAdminDownloadState(ctx context.Context, roomID, userID string, serverName spec.ServerName) error
 	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse) error
 	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse) error
-	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
+	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse) error
 	PerformLeave(ctx context.Context, req *PerformLeaveRequest, res *PerformLeaveResponse) error
 	PerformPublish(ctx context.Context, req *PerformPublishRequest, res *PerformPublishResponse) error
@@ -202,7 +221,7 @@ type FederationRoomserverAPI interface {
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
 	QueryRestrictedJoinAllowed(ctx context.Context, req *QueryRestrictedJoinAllowedRequest, res *QueryRestrictedJoinAllowedResponse) error
 	PerformInboundPeek(ctx context.Context, req *PerformInboundPeekRequest, res *PerformInboundPeekResponse) error
-	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
+	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
 }
