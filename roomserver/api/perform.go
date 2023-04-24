@@ -224,39 +224,3 @@ type PerformRoomUpgradeResponse struct {
 	NewRoomID string
 	Error     *PerformError
 }
-
-type PerformAdminEvacuateRoomRequest struct {
-	RoomID string `json:"room_id"`
-}
-
-type PerformAdminEvacuateRoomResponse struct {
-	Affected []string `json:"affected"`
-	Error    *PerformError
-}
-
-type PerformAdminEvacuateUserRequest struct {
-	UserID string `json:"user_id"`
-}
-
-type PerformAdminEvacuateUserResponse struct {
-	Affected []string `json:"affected"`
-	Error    *PerformError
-}
-
-type PerformAdminPurgeRoomRequest struct {
-	RoomID string `json:"room_id"`
-}
-
-type PerformAdminPurgeRoomResponse struct {
-	Error *PerformError `json:"error,omitempty"`
-}
-
-type PerformAdminDownloadStateRequest struct {
-	RoomID     string          `json:"room_id"`
-	UserID     string          `json:"user_id"`
-	ServerName spec.ServerName `json:"server_name"`
-}
-
-type PerformAdminDownloadStateResponse struct {
-	Error *PerformError `json:"error,omitempty"`
-}

@@ -211,7 +211,7 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI api.Clien
 	}
 }
 
-func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -240,6 +240,6 @@ func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.De
 	}
 	return util.JSONResponse{
 		Code: 200,
-		JSON: map[string]interface{}{},
+		JSON: struct{}{},
 	}
 }

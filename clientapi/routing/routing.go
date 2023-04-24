@@ -180,7 +180,7 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/downloadState/{serverName}/{roomID}",
 		httputil.MakeAdminAPI("admin_download_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminDownloadState(req, cfg, device, rsAPI)
+			return AdminDownloadState(req, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

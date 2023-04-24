@@ -325,8 +325,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// purge the room from the database
-		purgeResp := &api.PerformAdminPurgeRoomResponse{}
-		if err = rsAPI.PerformAdminPurgeRoom(ctx, &api.PerformAdminPurgeRoomRequest{RoomID: room.ID}, purgeResp); err != nil {
+		if err = rsAPI.PerformAdminPurgeRoom(ctx, room.ID); err != nil {
 			t.Fatal(err)
 		}
 
