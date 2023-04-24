@@ -40,7 +40,7 @@ type Admin struct {
 	Leaver  *Leaver
 }
 
-// PerformEvacuateRoom will remove all local users from the given room.
+// PerformAdminEvacuateRoom will remove all local users from the given room.
 func (r *Admin) PerformAdminEvacuateRoom(
 	ctx context.Context,
 	roomID string,
@@ -139,6 +139,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	return affected, err
 }
 
+// PerformAdminEvacuateUser will remove the given user from all rooms.
 func (r *Admin) PerformAdminEvacuateUser(
 	ctx context.Context,
 	userID string,
@@ -184,12 +185,19 @@ func (r *Admin) PerformAdminEvacuateUser(
 	return affected, nil
 }
 
+// PerformAdminPurgeRoom removes all traces for the given room from the database.
 func (r *Admin) PerformAdminPurgeRoom(
 	ctx context.Context,
 	roomID string,
 ) error {
 	// Validate we actually got a room ID and nothing else
 	if _, _, err := gomatrixserverlib.SplitID('!', roomID); err != nil {
+		return err
+	}
+
+	// Evacuate the room before purging it from the database
+	if _, err := r.PerformAdminEvacuateRoom(ctx, roomID); err != nil {
+		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to evacuate room before purging")
 		return err
 	}
 

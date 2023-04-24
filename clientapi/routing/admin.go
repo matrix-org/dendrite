@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -231,6 +232,12 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 		}
 	}
 	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {
+		if errors.Is(err, eventutil.ErrRoomNoExists) {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: jsonerror.NotFound(eventutil.ErrRoomNoExists.Error()),
+			}
+		}
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"userID":     device.UserID,
 			"serverName": serverName,
