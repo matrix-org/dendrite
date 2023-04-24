@@ -55,7 +55,7 @@ var latest, _ = semver.NewVersion("v6.6.6") // Dummy version, used as "HEAD"
 // due to the error:
 // When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const DockerfilePostgreSQL = `FROM golang:1.18-stretch as build
+const DockerfilePostgreSQL = `FROM golang:1.18-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
@@ -101,7 +101,7 @@ ENV BINARY=dendrite
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh`
 
-const DockerfileSQLite = `FROM golang:1.18-stretch as build
+const DockerfileSQLite = `FROM golang:1.18-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
