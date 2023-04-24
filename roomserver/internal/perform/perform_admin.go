@@ -213,42 +213,25 @@ func (r *Admin) PerformAdminPurgeRoom(
 
 func (r *Admin) PerformAdminDownloadState(
 	ctx context.Context,
-	req *api.PerformAdminDownloadStateRequest,
-	res *api.PerformAdminDownloadStateResponse,
+	roomID, userID string, serverName spec.ServerName,
 ) error {
-	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', req.UserID)
+	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.Cfg.Matrix.SplitLocalID: %s", err),
-		}
-		return nil
+		return err
 	}
 
-	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.RoomInfo: %s", err),
-		}
-		return nil
+		return err
 	}
 
 	if roomInfo == nil || roomInfo.IsStub() {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("room %q not found", req.RoomID),
-		}
-		return nil
+		return eventutil.ErrRoomNoExists
 	}
 
 	fwdExtremities, _, depth, err := r.DB.LatestEventIDs(ctx, roomInfo.RoomNID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.LatestEventIDs: %s", err),
-		}
-		return nil
+		return err
 	}
 
 	authEventMap := map[string]*gomatrixserverlib.Event{}
@@ -256,13 +239,9 @@ func (r *Admin) PerformAdminDownloadState(
 
 	for _, fwdExtremity := range fwdExtremities {
 		var state gomatrixserverlib.StateResponse
-		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, serverName, roomID, fwdExtremity.EventID, roomInfo.RoomVersion)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity.EventID, err),
-			}
-			return nil
+			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity.EventID, err)
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
@@ -292,18 +271,14 @@ func (r *Admin) PerformAdminDownloadState(
 
 	builder := &gomatrixserverlib.EventBuilder{
 		Type:    "org.matrix.dendrite.state_download",
-		Sender:  req.UserID,
-		RoomID:  req.RoomID,
+		Sender:  userID,
+		RoomID:  roomID,
 		Content: spec.RawJSON("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
-		}
-		return nil
+		return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 	}
 
 	queryRes := &api.QueryLatestEventsAndStateResponse{
@@ -321,11 +296,7 @@ func (r *Admin) PerformAdminDownloadState(
 
 	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("eventutil.BuildEvent: %s", err),
-		}
-		return nil
+		return fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}
 
 	inputReq := &api.InputRoomEventsRequest{
@@ -349,19 +320,12 @@ func (r *Admin) PerformAdminDownloadState(
 		SendAsServer:  string(r.Cfg.Matrix.ServerName),
 	})
 
-	if err := r.Inputer.InputRoomEvents(ctx, inputReq, inputRes); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.Inputer.InputRoomEvents: %s", err),
-		}
-		return nil
+	if err = r.Inputer.InputRoomEvents(ctx, inputReq, inputRes); err != nil {
+		return fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
 	}
 
 	if inputRes.ErrMsg != "" {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  inputRes.ErrMsg,
-		}
+		return inputRes.Err()
 	}
 
 	return nil

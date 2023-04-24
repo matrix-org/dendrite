@@ -168,7 +168,7 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/purgeRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_purge_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminPurgeRoom(req, cfg, device, rsAPI)
+			return AdminPurgeRoom(req, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

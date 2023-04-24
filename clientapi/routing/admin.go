@@ -230,20 +230,13 @@ func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.De
 			JSON: jsonerror.MissingArgument("Expecting remote server name."),
 		}
 	}
-	res := &roomserverAPI.PerformAdminDownloadStateResponse{}
-	if err := rsAPI.PerformAdminDownloadState(
-		req.Context(),
-		&roomserverAPI.PerformAdminDownloadStateRequest{
-			UserID:     device.UserID,
-			RoomID:     roomID,
-			ServerName: spec.ServerName(serverName),
-		},
-		res,
-	); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
+	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"userID":     device.UserID,
+			"serverName": serverName,
+			"roomID":     roomID,
+		}).Error("failed to download state")
+		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
 		Code: 200,
