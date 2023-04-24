@@ -1,45 +1,49 @@
-FROM golang:1.18-buster as build
-RUN apt-get update && apt-get install -y postgresql
-WORKDIR /build
-ARG BINARY
+#syntax=docker/dockerfile:1.2
 
-# Copy the build context to the repo as this is the right dendrite code. This is different to the
-# Complement Dockerfile which wgets a branch.
-COPY . .
+#
+# base installs required dependencies and runs go mod download to cache dependencies
+#
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.20-alpine AS base
+RUN apk --update --no-cache add bash build-base curl
 
-RUN go build ./cmd/${BINARY}
-RUN go build ./cmd/generate-keys
-RUN go build ./cmd/generate-config
-RUN go build ./cmd/create-account
-RUN ./generate-config --ci > dendrite.yaml
-RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
+#
+# build creates all needed binaries
+#
+FROM --platform=${BUILDPLATFORM} base AS build
+WORKDIR /src
+ARG TARGETOS
+ARG TARGETARCH
+ARG FLAGS
+RUN --mount=target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    USERARCH=`go env GOARCH` \
+    GOARCH="$TARGETARCH" \
+    GOOS="linux" \
+    CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
+    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
 
-# Replace the connection string with a single postgres DB, using user/db = 'postgres' and no password
-RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml 
-# No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/11/main/pg_hba.conf
-# Bump up max conns for moar concurrency
-RUN sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/11/main/postgresql.conf
-RUN sed -i 's/max_open_conns:.*$/max_open_conns: 100/g' dendrite.yaml
 
-# This entry script starts postgres, waits for it to be up then starts dendrite
-RUN echo '\
-#!/bin/bash -eu \n\
-pg_lsclusters \n\
-pg_ctlcluster 11 main start \n\
- \n\
-until pg_isready \n\
-do \n\
-  echo "Waiting for postgres"; \n\
-  sleep 1; \n\
-done \n\
- \n\
-sed -i "s/server_name: localhost/server_name: ${SERVER_NAME}/g" dendrite.yaml \n\
-PARAMS="--tls-cert server.crt --tls-key server.key --config dendrite.yaml" \n\
-./${BINARY} --really-enable-open-registration ${PARAMS} || ./${BINARY} ${PARAMS} \n\
-' > run_dendrite.sh && chmod +x run_dendrite.sh
+#
+# Builds the Dendrite image containing all required binaries
+#
+FROM alpine:latest
+RUN apk --update --no-cache add curl
+LABEL org.opencontainers.image.title="Dendrite"
+LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
+LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.documentation="https://matrix-org.github.io/dendrite/"
+LABEL org.opencontainers.image.vendor="The Matrix.org Foundation C.I.C."
 
-ENV SERVER_NAME=localhost
-ENV BINARY=dendrite
+COPY --from=build /out/create-account /usr/bin/create-account
+COPY --from=build /out/generate-config /usr/bin/generate-config
+COPY --from=build /out/generate-keys /usr/bin/generate-keys
+COPY --from=build /out/dendrite /usr/bin/dendrite
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["/usr/bin/dendrite"]
 EXPOSE 8008 8448
-CMD /build/run_dendrite.sh
+
