@@ -77,6 +77,7 @@ func InviteV1(
 ) util.JSONResponse {
 	roomVer := gomatrixserverlib.RoomVersionV1
 	body := request.Content()
+	// roomVer is hardcoded to v1 so we know we won't panic on Must
 	event, err := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventFromTrustedJSON(body, false)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
