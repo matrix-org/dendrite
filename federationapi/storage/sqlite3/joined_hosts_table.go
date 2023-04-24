@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const joinedHostsSchema = `
@@ -104,7 +104,7 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 	ctx context.Context,
 	txn *sql.Tx,
 	roomID, eventID string,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
 	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
@@ -146,20 +146,20 @@ func (s *joinedHostsStatements) SelectJoinedHosts(
 
 func (s *joinedHostsStatements) SelectAllJoinedHosts(
 	ctx context.Context,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAllJoinedHosts: rows.close() failed")
 
-	var result []gomatrixserverlib.ServerName
+	var result []spec.ServerName
 	for rows.Next() {
 		var serverName string
 		if err = rows.Scan(&serverName); err != nil {
 			return nil, err
 		}
-		result = append(result, gomatrixserverlib.ServerName(serverName))
+		result = append(result, spec.ServerName(serverName))
 	}
 
 	return result, rows.Err()
@@ -167,7 +167,7 @@ func (s *joinedHostsStatements) SelectAllJoinedHosts(
 
 func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 	ctx context.Context, roomIDs []string, excludingBlacklisted bool,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	iRoomIDs := make([]interface{}, len(roomIDs))
 	for i := range roomIDs {
 		iRoomIDs[i] = roomIDs[i]
@@ -183,13 +183,13 @@ func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedHostsForRoomsStmt: rows.close() failed")
 
-	var result []gomatrixserverlib.ServerName
+	var result []spec.ServerName
 	for rows.Next() {
 		var serverName string
 		if err = rows.Scan(&serverName); err != nil {
 			return nil, err
 		}
-		result = append(result, gomatrixserverlib.ServerName(serverName))
+		result = append(result, spec.ServerName(serverName))
 	}
 
 	return result, rows.Err()
@@ -212,7 +212,7 @@ func joinedHostsFromStmt(
 		}
 		result = append(result, types.JoinedHost{
 			MemberEventID: eventID,
-			ServerName:    gomatrixserverlib.ServerName(serverName),
+			ServerName:    spec.ServerName(serverName),
 		})
 	}
 

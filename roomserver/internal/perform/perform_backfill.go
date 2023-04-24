@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -37,13 +38,13 @@ import (
 const maxBackfillServers = 5
 
 type Backfiller struct {
-	IsLocalServerName func(gomatrixserverlib.ServerName) bool
+	IsLocalServerName func(spec.ServerName) bool
 	DB                storage.Database
 	FSAPI             federationAPI.RoomserverFederationAPI
 	KeyRing           gomatrixserverlib.JSONVerifier
 
 	// The servers which should be preferred above other servers when backfilling
-	PreferServers []gomatrixserverlib.ServerName
+	PreferServers []spec.ServerName
 }
 
 // PerformBackfill implements api.RoomServerQueryAPI
@@ -175,7 +176,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 // fetchAndStoreMissingEvents does a best-effort fetch and store of missing events specified in stateIDs. Returns no error as it is just
 // best effort.
 func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
-	backfillRequester *backfillRequester, stateIDs []string, virtualHost gomatrixserverlib.ServerName) {
+	backfillRequester *backfillRequester, stateIDs []string, virtualHost spec.ServerName) {
 
 	servers := backfillRequester.servers
 
@@ -245,13 +246,13 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 type backfillRequester struct {
 	db                storage.Database
 	fsAPI             federationAPI.RoomserverFederationAPI
-	virtualHost       gomatrixserverlib.ServerName
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
-	preferServer      map[gomatrixserverlib.ServerName]bool
+	virtualHost       spec.ServerName
+	isLocalServerName func(spec.ServerName) bool
+	preferServer      map[spec.ServerName]bool
 	bwExtrems         map[string][]string
 
 	// per-request state
-	servers                 []gomatrixserverlib.ServerName
+	servers                 []spec.ServerName
 	eventIDToBeforeStateIDs map[string][]string
 	eventIDMap              map[string]*gomatrixserverlib.Event
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
@@ -260,11 +261,11 @@ type backfillRequester struct {
 
 func newBackfillRequester(
 	db storage.Database, fsAPI federationAPI.RoomserverFederationAPI,
-	virtualHost gomatrixserverlib.ServerName,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
-	bwExtrems map[string][]string, preferServers []gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
+	isLocalServerName func(spec.ServerName) bool,
+	bwExtrems map[string][]string, preferServers []spec.ServerName,
 ) *backfillRequester {
-	preferServer := make(map[gomatrixserverlib.ServerName]bool)
+	preferServer := make(map[spec.ServerName]bool)
 	for _, p := range preferServers {
 		preferServer[p] = true
 	}
@@ -415,7 +416,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // It returns a list of servers which can be queried for backfill requests. These servers
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
-func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
+func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []spec.ServerName {
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.
 	successor := ""
@@ -478,19 +479,19 @@ FindSuccessor:
 	memberEvents = append(memberEvents, memberEventsFromVis...)
 
 	// Store the server names in a temporary map to avoid duplicates.
-	serverSet := make(map[gomatrixserverlib.ServerName]bool)
+	serverSet := make(map[spec.ServerName]bool)
 	for _, event := range memberEvents {
 		if _, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender()); err == nil {
 			serverSet[senderDomain] = true
 		}
 	}
-	var servers []gomatrixserverlib.ServerName
+	var servers []spec.ServerName
 	for server := range serverSet {
 		if b.isLocalServerName(server) {
 			continue
 		}
 		if b.preferServer[server] { // insert at the front
-			servers = append([]gomatrixserverlib.ServerName{server}, servers...)
+			servers = append([]spec.ServerName{server}, servers...)
 		} else { // insert at the back
 			servers = append(servers, server)
 		}
@@ -505,7 +506,7 @@ FindSuccessor:
 
 // Backfill performs a backfill request to the given server.
 // https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
-func (b *backfillRequester) Backfill(ctx context.Context, origin, server gomatrixserverlib.ServerName, roomID string,
+func (b *backfillRequester) Backfill(ctx context.Context, origin, server spec.ServerName, roomID string,
 	limit int, fromEventIDs []string) (gomatrixserverlib.Transaction, error) {
 
 	tx, err := b.fsAPI.Backfill(ctx, origin, server, roomID, limit, fromEventIDs)
@@ -547,7 +548,7 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 // pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
 	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
-	thisServer gomatrixserverlib.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
+	thisServer spec.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Database interface {
@@ -29,19 +30,19 @@ type Database interface {
 
 	// Adds a new transaction_id: server_name mapping with associated json table nid to the queue
 	// entry table for each provided destination.
-	AssociateTransactionWithDestinations(ctx context.Context, destinations map[gomatrixserverlib.UserID]struct{}, transactionID gomatrixserverlib.TransactionID, dbReceipt *receipt.Receipt) error
+	AssociateTransactionWithDestinations(ctx context.Context, destinations map[spec.UserID]struct{}, transactionID gomatrixserverlib.TransactionID, dbReceipt *receipt.Receipt) error
 
 	// Removes every server_name: receipt pair provided from the queue entries table.
 	// Will then remove every entry for each receipt provided from the queue json table.
 	// If any of the entries don't exist in either table, nothing will happen for that entry and
 	// an error will not be generated.
-	CleanTransactions(ctx context.Context, userID gomatrixserverlib.UserID, receipts []*receipt.Receipt) error
+	CleanTransactions(ctx context.Context, userID spec.UserID, receipts []*receipt.Receipt) error
 
 	// Gets the oldest transaction for the provided server_name.
 	// If no transactions exist, returns nil and no error.
-	GetTransaction(ctx context.Context, userID gomatrixserverlib.UserID) (*gomatrixserverlib.Transaction, *receipt.Receipt, error)
+	GetTransaction(ctx context.Context, userID spec.UserID) (*gomatrixserverlib.Transaction, *receipt.Receipt, error)
 
 	// Gets the number of transactions being stored for the provided server_name.
 	// If the server doesn't exist in the database then 0 is returned with no error.
-	GetTransactionCount(ctx context.Context, userID gomatrixserverlib.UserID) (int64, error)
+	GetTransactionCount(ctx context.Context, userID spec.UserID) (int64, error)
 }

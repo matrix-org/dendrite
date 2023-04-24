@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -75,8 +76,8 @@ func (r *FederationInternalAPI) PerformJoin(
 	// Deduplicate the server names we were provided but keep the ordering
 	// as this encodes useful information about which servers are most likely
 	// to respond.
-	seenSet := make(map[gomatrixserverlib.ServerName]bool)
-	var uniqueList []gomatrixserverlib.ServerName
+	seenSet := make(map[spec.ServerName]bool)
+	var uniqueList []spec.ServerName
 	for _, srv := range request.ServerNames {
 		if seenSet[srv] || r.cfg.Matrix.IsLocalServerName(srv) {
 			continue
@@ -137,14 +138,14 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	ctx context.Context,
 	roomID, userID string,
 	content map[string]interface{},
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	unsigned map[string]interface{},
 ) error {
 	if !r.shouldAttemptDirectFederation(serverName) {
 		return fmt.Errorf("relay servers have no meaningful response for join.")
 	}
 
-	user, err := gomatrixserverlib.NewUserID(userID, true)
+	user, err := spec.NewUserID(userID, true)
 	if err != nil {
 		return err
 	}
@@ -161,10 +162,10 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		EventProvider: federatedEventProvider,
 	}
 	callbacks := fclient.SendJoinCallbacks{
-		FederationFailure: func(server gomatrixserverlib.ServerName) {
+		FederationFailure: func(server spec.ServerName) {
 			r.statistics.ForServer(server).Failure()
 		},
-		FederationSuccess: func(server gomatrixserverlib.ServerName) {
+		FederationSuccess: func(server spec.ServerName) {
 			r.statistics.ForServer(server).Success(statistics.SendDirect)
 		},
 	}
@@ -221,8 +222,8 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 	// Deduplicate the server names we were provided but keep the ordering
 	// as this encodes useful information about which servers are most likely
 	// to respond.
-	seenSet := make(map[gomatrixserverlib.ServerName]bool)
-	var uniqueList []gomatrixserverlib.ServerName
+	seenSet := make(map[spec.ServerName]bool)
+	var uniqueList []spec.ServerName
 	for _, srv := range request.ServerNames {
 		if seenSet[srv] {
 			continue
@@ -288,7 +289,7 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	ctx context.Context,
 	roomID string,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
 	if !r.shouldAttemptDirectFederation(serverName) {
@@ -341,8 +342,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	if respPeek.RoomVersion == "" {
 		respPeek.RoomVersion = gomatrixserverlib.RoomVersionV1
 	}
-	if _, err = respPeek.RoomVersion.EventFormat(); err != nil {
-		return fmt.Errorf("respPeek.RoomVersion.EventFormat: %w", err)
+	if !gomatrixserverlib.KnownRoomVersion(respPeek.RoomVersion) {
+		return fmt.Errorf("unknown room version: %s", respPeek.RoomVersion)
 	}
 
 	// we have the peek state now so let's process regardless of whether upstream gives up
@@ -429,9 +430,16 @@ func (r *FederationInternalAPI) PerformLeave(
 			continue
 		}
 
+		// Work out if we support the room version that has been supplied in
+		// the make_leave response.
+		_, err = gomatrixserverlib.GetRoomVersion(respMakeLeave.RoomVersion)
+		if err != nil {
+			return err
+		}
+
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
-		respMakeLeave.LeaveEvent.Type = gomatrixserverlib.MRoomMember
+		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
 		respMakeLeave.LeaveEvent.Sender = request.UserID
 		respMakeLeave.LeaveEvent.StateKey = &request.UserID
 		respMakeLeave.LeaveEvent.RoomID = request.RoomID
@@ -448,12 +456,6 @@ func (r *FederationInternalAPI) PerformLeave(
 		if err = respMakeLeave.LeaveEvent.SetUnsigned(struct{}{}); err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetUnsigned failed")
 			continue
-		}
-
-		// Work out if we support the room version that has been supplied in
-		// the make_leave response.
-		if _, err = respMakeLeave.RoomVersion.EventFormat(); err != nil {
-			return gomatrixserverlib.UnsupportedRoomVersionError{}
 		}
 
 		// Build the leave event.
@@ -527,7 +529,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := gomatrixserverlib.NewInviteV2Request(request.Event, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(request.Event, request.InviteRoomState)
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
@@ -536,8 +538,12 @@ func (r *FederationInternalAPI) PerformInvite(
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(request.RoomVersion)
+	if err != nil {
+		return err
+	}
 
-	inviteEvent, err := inviteRes.Event.UntrustedEvent(request.RoomVersion)
+	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
@@ -583,7 +589,7 @@ func (r *FederationInternalAPI) PerformWakeupServers(
 	return nil
 }
 
-func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
+func (r *FederationInternalAPI) MarkServersAlive(destinations []spec.ServerName) {
 	for _, srv := range destinations {
 		wasBlacklisted := r.statistics.ForServer(srv).MarkServerAlive()
 		r.queues.RetryServer(srv, wasBlacklisted)
@@ -593,7 +599,7 @@ func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverli
 func checkEventsContainCreateEvent(events []*gomatrixserverlib.Event) error {
 	// sanity check we have a create event and it has a known room version
 	for _, ev := range events {
-		if ev.Type() == gomatrixserverlib.MRoomCreate && ev.StateKeyEquals("") {
+		if ev.Type() == spec.MRoomCreate && ev.StateKeyEquals("") {
 			// make sure the room version is known
 			content := ev.Content()
 			verBody := struct {
@@ -618,10 +624,10 @@ func checkEventsContainCreateEvent(events []*gomatrixserverlib.Event) error {
 	return fmt.Errorf("response is missing m.room.create event")
 }
 
-// federatedEventProvider is an event provider which fetches events from the server provided
+// FederatedEventProvider is an auth chain provider which fetches events from the server provided
 func federatedEventProvider(
-	ctx context.Context, federation api.FederationClient,
-	keyRing gomatrixserverlib.JSONVerifier, origin, server gomatrixserverlib.ServerName,
+	ctx context.Context, federation fclient.FederationClient,
+	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
 ) gomatrixserverlib.EventProvider {
 	// A list of events that we have retried, if they were not included in
 	// the events supplied in the send_join.
@@ -632,6 +638,10 @@ func federatedEventProvider(
 	// to repeat the entire set of checks just for a missing event or two.
 	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
 		returning := []*gomatrixserverlib.Event{}
+		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+		if err != nil {
+			return nil, err
+		}
 
 		// See if we have retry entries for each of the supplied event IDs.
 		for _, eventID := range eventIDs {
@@ -661,7 +671,7 @@ func federatedEventProvider(
 			// event ID again.
 			for _, pdu := range tx.PDUs {
 				// Try to parse the event.
-				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+				ev, everr := verImpl.NewEventFromUntrustedJSON(pdu)
 				if everr != nil {
 					return nil, fmt.Errorf("missingEvent gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
 				}
@@ -727,7 +737,7 @@ func (r *FederationInternalAPI) P2PRemoveRelayServers(
 }
 
 func (r *FederationInternalAPI) shouldAttemptDirectFederation(
-	destination gomatrixserverlib.ServerName,
+	destination spec.ServerName,
 ) bool {
 	var shouldRelay bool
 	stats := r.statistics.ForServer(destination)

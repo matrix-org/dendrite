@@ -28,7 +28,7 @@ import (
 // Peek implements the SS /peek API, handling inbound peeks
 func Peek(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	roomID, peekID string,

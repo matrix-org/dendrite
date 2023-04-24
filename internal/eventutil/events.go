@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -111,10 +112,11 @@ func addPrevEventsToEvent(
 		return ErrRoomNoExists
 	}
 
-	eventFormat, err := queryRes.RoomVersion.EventFormat()
+	verImpl, err := gomatrixserverlib.GetRoomVersion(queryRes.RoomVersion)
 	if err != nil {
-		return fmt.Errorf("queryRes.RoomVersion.EventFormat: %w", err)
+		return fmt.Errorf("GetRoomVersion: %w", err)
 	}
+	eventFormat := verImpl.EventFormat()
 
 	builder.Depth = queryRes.Depth
 
@@ -174,7 +176,7 @@ func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
 // downstream components to the roomserver when an OutputTypeRedactedEvent occurs.
 func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) error {
 	// sanity check
-	if redactionEvent.Type() != gomatrixserverlib.MRoomRedaction {
+	if redactionEvent.Type() != spec.MRoomRedaction {
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
 	redactedEvent.Redact()

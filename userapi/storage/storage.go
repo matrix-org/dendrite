@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres"
@@ -36,7 +36,7 @@ func NewUserDatabase(
 	ctx context.Context,
 	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	bcryptCost int,
 	openIDTokenLifetimeMS int64,
 	loginTokenLifetime time.Duration,

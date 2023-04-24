@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -68,7 +69,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
 	for _, ev := range stateRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -185,9 +186,9 @@ func OnIncomingStateTypeRequest(
 			StateKey:  stateKey,
 		},
 	}
-	if evType != gomatrixserverlib.MRoomHistoryVisibility && stateKey != "" {
+	if evType != spec.MRoomHistoryVisibility && stateKey != "" {
 		stateToFetch = append(stateToFetch, gomatrixserverlib.StateKeyTuple{
-			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			EventType: spec.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
 	}
@@ -208,7 +209,7 @@ func OnIncomingStateTypeRequest(
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
 	for _, ev := range stateRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -242,7 +243,7 @@ func OnIncomingStateTypeRequest(
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
-		if !membershipRes.HasBeenInRoom || membershipRes.Membership == gomatrixserverlib.Ban {
+		if !membershipRes.HasBeenInRoom || membershipRes.Membership == spec.Ban {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: jsonerror.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),

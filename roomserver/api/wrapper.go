@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -27,8 +28,8 @@ import (
 func SendEvents(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
 	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
-	virtualHost, origin gomatrixserverlib.ServerName,
-	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
+	virtualHost, origin spec.ServerName,
+	sendAsServer spec.ServerName, txnID *TransactionID,
 	async bool,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
@@ -49,9 +50,9 @@ func SendEvents(
 // marked as `true` in haveEventIDs.
 func SendEventWithState(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
-	virtualHost gomatrixserverlib.ServerName, kind Kind,
+	virtualHost spec.ServerName, kind Kind,
 	state gomatrixserverlib.StateResponse, event *gomatrixserverlib.HeaderedEvent,
-	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool, async bool,
+	origin spec.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
 	outliers := gomatrixserverlib.LineariseStateResponse(event.RoomVersion, state)
 	ires := make([]InputRoomEvent, 0, len(outliers))
@@ -93,7 +94,7 @@ func SendEventWithState(
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
-	virtualHost gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
 	ires []InputRoomEvent, async bool,
 ) error {
 	request := InputRoomEventsRequest{
@@ -144,7 +145,7 @@ func GetStateEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID string, tup
 }
 
 // IsServerBannedFromRoom returns whether the server is banned from a room by server ACLs.
-func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, roomID string, serverName gomatrixserverlib.ServerName) bool {
+func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, roomID string, serverName spec.ServerName) bool {
 	req := &QueryServerBannedFromRoomRequest{
 		ServerName: serverName,
 		RoomID:     roomID,
@@ -163,11 +164,11 @@ func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, 
 func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkStateContentAPI) ([]fclient.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
-	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
+	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCanonicalAlias, StateKey: ""}
 	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
 	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
-	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
-	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
+	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomHistoryVisibility, StateKey: ""}
+	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomJoinRules, StateKey: ""}
 
 	var stateRes QueryBulkStateContentResponse
 	err := rsAPI.QueryBulkStateContent(ctx, &QueryBulkStateContentRequest{
@@ -175,7 +176,7 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple, avatarTuple,
-			{EventType: gomatrixserverlib.MRoomMember, StateKey: "*"},
+			{EventType: spec.MRoomMember, StateKey: "*"},
 		},
 	}, &stateRes)
 	if err != nil {
@@ -191,7 +192,7 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 		joinCount := 0
 		var joinRule, guestAccess string
 		for tuple, contentVal := range data {
-			if tuple.EventType == gomatrixserverlib.MRoomMember && contentVal == "join" {
+			if tuple.EventType == spec.MRoomMember && contentVal == "join" {
 				joinCount++
 				continue
 			}
@@ -215,7 +216,7 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 				guestAccess = contentVal
 			}
 		}
-		if joinRule == gomatrixserverlib.Public && guestAccess == "can_join" {
+		if joinRule == spec.Public && guestAccess == "can_join" {
 			pub.GuestCanJoin = true
 		}
 		pub.JoinedMembersCount = joinCount

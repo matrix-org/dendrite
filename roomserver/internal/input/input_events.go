@@ -28,6 +28,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -73,7 +74,7 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
-	virtualHost gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
 	input *api.InputRoomEvent,
 ) error {
 	select {
@@ -123,7 +124,7 @@ func (r *Inputer) processRoomEvent(
 	if rerr != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", rerr)
 	}
-	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
@@ -180,7 +181,7 @@ func (r *Inputer) processRoomEvent(
 		// Sort all of the servers into a map so that we can randomise
 		// their order. Then make sure that the input origin and the
 		// event origin are first on the list.
-		servers := map[gomatrixserverlib.ServerName]struct{}{}
+		servers := map[spec.ServerName]struct{}{}
 		for _, server := range serverRes.ServerNames {
 			servers[server] = struct{}{}
 		}
@@ -476,7 +477,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// If guest_access changed and is not can_join, kick all guest users.
-	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
+	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
 		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
 			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
@@ -509,7 +510,7 @@ func (r *Inputer) processStateBefore(
 ) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
 	historyVisibility = gomatrixserverlib.HistoryVisibilityShared // Default to shared.
 	event := input.Event.Unwrap()
-	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	var stateBeforeEvent []*gomatrixserverlib.Event
 	switch {
 	case isCreateEvent:
@@ -546,7 +547,7 @@ func (r *Inputer) processStateBefore(
 		// output events.
 		tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
 		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
-			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			EventType: spec.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
 		stateBeforeReq := &api.QueryStateAfterEventsRequest{
@@ -579,7 +580,7 @@ func (r *Inputer) processStateBefore(
 	// Work out what the history visibility was at the time of the
 	// event.
 	for _, event := range stateBeforeEvent {
-		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
+		if event.Type() != spec.MRoomHistoryVisibility || !event.StateKeyEquals("") {
 			continue
 		}
 		if hisVis, err := event.HistoryVisibility(); err == nil {
@@ -602,11 +603,11 @@ func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
 	logger *logrus.Entry,
 	roomInfo *types.RoomInfo,
-	virtualHost gomatrixserverlib.ServerName,
+	virtualHost spec.ServerName,
 	event *gomatrixserverlib.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
 	known map[string]*types.Event,
-	servers []gomatrixserverlib.ServerName,
+	servers []spec.ServerName,
 ) error {
 	trace, ctx := internal.StartRegion(ctx, "fetchAuthEvents")
 	defer trace.EndRegion()
@@ -842,12 +843,12 @@ func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event
 		if err = json.Unmarshal(memberEvent.Content(), &memberContent); err != nil {
 			return err
 		}
-		memberContent.Membership = gomatrixserverlib.Leave
+		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
 			RoomID:     event.RoomID(),
-			Type:       gomatrixserverlib.MRoomMember,
+			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
 			PrevEvents: prevEvents,

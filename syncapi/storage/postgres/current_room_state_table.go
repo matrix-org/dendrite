@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const currentRoomStateSchema = `
@@ -278,9 +279,9 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	// We're going to query members later, so remove them from this request
 	if stateFilter.LazyLoadMembers && !stateFilter.IncludeRedundantMembers {
-		notTypes := &[]string{gomatrixserverlib.MRoomMember}
+		notTypes := &[]string{spec.MRoomMember}
 		if stateFilter.NotTypes != nil {
-			*stateFilter.NotTypes = append(*stateFilter.NotTypes, gomatrixserverlib.MRoomMember)
+			*stateFilter.NotTypes = append(*stateFilter.NotTypes, spec.MRoomMember)
 		} else {
 			stateFilter.NotTypes = notTypes
 		}

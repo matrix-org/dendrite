@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
@@ -528,11 +529,11 @@ func Test_Notification(t *testing.T) {
 					{},
 				},
 				Event: synctypes.ClientEvent{
-					Content: gomatrixserverlib.RawJSON("{}"),
+					Content: spec.RawJSON("{}"),
 				},
 				Read:   false,
 				RoomID: roomID,
-				TS:     gomatrixserverlib.AsTimestamp(ts),
+				TS:     spec.AsTimestamp(ts),
 			}
 			err = db.InsertNotification(ctx, aliceLocalpart, aliceDomain, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -54,7 +55,7 @@ func UpdateToInviteMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
+				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetUserID:     *add.StateKey(),
 			},
@@ -67,7 +68,7 @@ func UpdateToInviteMembership(
 // memberships. If the servername is not supplied then the local server will be
 // checked instead using a faster code path.
 // TODO: This should probably be replaced by an API call.
-func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
+func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverName spec.ServerName, roomID string) (bool, error) {
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
 		return false, err
@@ -93,7 +94,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	for i := range events {
 		gmslEvents[i] = events[i].Event
 	}
-	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, gomatrixserverlib.Join), nil
+	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, spec.Join), nil
 }
 
 func IsInvitePending(
@@ -148,7 +149,12 @@ func IsInvitePending(
 		return false, "", "", nil, fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, info.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(info.RoomVersion)
+	if err != nil {
+		return false, "", "", nil, err
+	}
+
+	event, err := verImpl.NewEventFromTrustedJSON(eventJSON, false)
 
 	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
 }
@@ -194,7 +200,7 @@ func GetMembershipsAtState(
 			return nil, err
 		}
 
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			events = append(events, event)
 		}
 	}
@@ -252,7 +258,7 @@ func LoadStateEvents(
 }
 
 func CheckServerAllowedToSeeEvent(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName, isServerInRoom bool,
 ) (bool, error) {
 	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
 	switch err {
@@ -280,7 +286,7 @@ func CheckServerAllowedToSeeEvent(
 }
 
 func slowGetHistoryVisibilityState(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName,
 ) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
@@ -332,7 +338,7 @@ func slowGetHistoryVisibilityState(
 // TODO: Remove this when we have tests to assert correctness of this function
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, front []string, visited map[string]bool, limit int,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) ([]types.EventNID, map[string]struct{}, error) {
 	var resultNIDs []types.EventNID
 	var err error

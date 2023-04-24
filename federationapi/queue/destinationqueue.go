@@ -24,10 +24,10 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
@@ -51,11 +51,11 @@ type destinationQueue struct {
 	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
-	signing            map[gomatrixserverlib.ServerName]*fclient.SigningIdentity
+	signing            map[spec.ServerName]*fclient.SigningIdentity
 	rsAPI              api.FederationRoomserverAPI
-	client             fedapi.FederationClient         // federation client
-	origin             gomatrixserverlib.ServerName    // origin of requests
-	destination        gomatrixserverlib.ServerName    // destination of requests
+	client             fclient.FederationClient        // federation client
+	origin             spec.ServerName                 // origin of requests
+	destination        spec.ServerName                 // destination of requests
 	running            atomic.Bool                     // is the queue worker running?
 	backingOff         atomic.Bool                     // true if we're backing off
 	overflowed         atomic.Bool                     // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
@@ -426,7 +426,7 @@ func (oq *destinationQueue) nextTransaction(
 			relaySuccess := false
 			logrus.Infof("Sending %q to relay servers: %v", t.TransactionID, relayServers)
 			// TODO : how to pass through actual userID here?!?!?!?!
-			userID, userErr := gomatrixserverlib.NewUserID("@user:"+string(oq.destination), false)
+			userID, userErr := spec.NewUserID("@user:"+string(oq.destination), false)
 			if userErr != nil {
 				return userErr, sendMethod
 			}
@@ -507,7 +507,7 @@ func (oq *destinationQueue) createTransaction(
 	// it so that we retry with the same transaction ID.
 	oq.transactionIDMutex.Lock()
 	if oq.transactionID == "" {
-		now := gomatrixserverlib.AsTimestamp(time.Now())
+		now := spec.AsTimestamp(time.Now())
 		oq.transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
 	}
 	oq.transactionIDMutex.Unlock()
@@ -518,7 +518,7 @@ func (oq *destinationQueue) createTransaction(
 	}
 	t.Origin = oq.origin
 	t.Destination = oq.destination
-	t.OriginServerTS = gomatrixserverlib.AsTimestamp(time.Now())
+	t.OriginServerTS = spec.AsTimestamp(time.Now())
 	t.TransactionID = oq.transactionID
 
 	var pduReceipts []*receipt.Receipt

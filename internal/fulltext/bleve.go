@@ -23,6 +23,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	// side effect imports to allow all possible languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
@@ -47,7 +48,6 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/sv"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/tr"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -79,9 +79,9 @@ func (i *IndexElement) SetContentType(v string) {
 	switch v {
 	case "m.room.message":
 		i.ContentType = "content.body"
-	case gomatrixserverlib.MRoomName:
+	case spec.MRoomName:
 		i.ContentType = "content.name"
-	case gomatrixserverlib.MRoomTopic:
+	case spec.MRoomTopic:
 		i.ContentType = "content.topic"
 	}
 }

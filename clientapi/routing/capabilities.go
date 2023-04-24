@@ -27,7 +27,7 @@ import (
 func GetCapabilities() util.JSONResponse {
 	versionsMap := map[gomatrixserverlib.RoomVersion]string{}
 	for v, desc := range version.SupportedRoomVersions() {
-		if desc.Stable {
+		if desc.Stable() {
 			versionsMap[v] = "stable"
 		} else {
 			versionsMap[v] = "unstable"

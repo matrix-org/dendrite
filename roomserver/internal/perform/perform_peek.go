@@ -26,12 +26,13 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
 type Peeker struct {
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 	Cfg        *config.RoomServer
 	FSAPI      fsAPI.RoomserverFederationAPI
 	DB         storage.Database

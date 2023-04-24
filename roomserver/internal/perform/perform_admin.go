@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -107,12 +108,12 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			}
 			return nil
 		}
-		memberContent.Membership = gomatrixserverlib.Leave
+		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
 			RoomID:     req.RoomID,
-			Type:       gomatrixserverlib.MRoomMember,
+			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
 			PrevEvents: prevEvents,
@@ -195,7 +196,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Join)
 	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -204,7 +205,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -361,7 +362,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Type:    "org.matrix.dendrite.state_download",
 		Sender:  req.UserID,
 		RoomID:  req.RoomID,
-		Content: gomatrixserverlib.RawJSON("{}"),
+		Content: spec.RawJSON("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)

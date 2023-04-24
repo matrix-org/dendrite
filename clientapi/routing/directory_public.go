@@ -23,8 +23,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -57,7 +57,7 @@ type filter struct {
 func GetPostPublicRooms(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var request PublicRoomReq
@@ -72,7 +72,7 @@ func GetPostPublicRooms(
 		}
 	}
 
-	serverName := gomatrixserverlib.ServerName(request.Server)
+	serverName := spec.ServerName(request.Server)
 	if serverName != "" && !cfg.Matrix.IsLocalServerName(serverName) {
 		res, err := federation.GetPublicRoomsFiltered(
 			req.Context(), cfg.Matrix.ServerName, serverName,

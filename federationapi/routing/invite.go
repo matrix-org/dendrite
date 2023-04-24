@@ -22,7 +22,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -32,14 +31,14 @@ import (
 // InviteV2 implements /_matrix/federation/v2/invite/{roomID}/{eventID}
 func InviteV2(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
-	inviteReq := gomatrixserverlib.InviteV2Request{}
+	inviteReq := fclient.InviteV2Request{}
 	err := json.Unmarshal(request.Content(), &inviteReq)
 	switch e := err.(type) {
 	case gomatrixserverlib.UnsupportedRoomVersionError:
@@ -69,7 +68,7 @@ func InviteV2(
 // InviteV1 implements /_matrix/federation/v1/invite/{roomID}/{eventID}
 func InviteV1(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
@@ -78,7 +77,8 @@ func InviteV1(
 ) util.JSONResponse {
 	roomVer := gomatrixserverlib.RoomVersionV1
 	body := request.Content()
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(body, false, roomVer)
+	// roomVer is hardcoded to v1 so we know we won't panic on Must
+	event, err := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventFromTrustedJSON(body, false)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
@@ -92,7 +92,7 @@ func InviteV1(
 			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
 		}
 	}
-	var strippedState []gomatrixserverlib.InviteV2StrippedState
+	var strippedState []fclient.InviteV2StrippedState
 	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
@@ -107,7 +107,7 @@ func processInvite(
 	isInviteV2 bool,
 	event *gomatrixserverlib.Event,
 	roomVer gomatrixserverlib.RoomVersion,
-	strippedState []gomatrixserverlib.InviteV2StrippedState,
+	strippedState []fclient.InviteV2StrippedState,
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
@@ -116,7 +116,8 @@ func processInvite(
 ) util.JSONResponse {
 
 	// Check that we can accept invites for this room version.
-	if _, err := roomserverVersion.SupportedRoomVersion(roomVer); err != nil {
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVer)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
@@ -157,7 +158,7 @@ func processInvite(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	redacted, err := verImpl.RedactEventJSON(event.JSON())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

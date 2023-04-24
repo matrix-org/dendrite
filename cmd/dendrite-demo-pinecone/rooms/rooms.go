@@ -21,8 +21,8 @@ import (
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
 	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -33,14 +33,14 @@ type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
 	fedSender api.FederationInternalAPI
-	fedClient *fclient.FederationClient
+	fedClient fclient.FederationClient
 }
 
 func NewPineconeRoomProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
 	fedSender api.FederationInternalAPI,
-	fedClient *fclient.FederationClient,
+	fedClient fclient.FederationClient,
 ) *PineconeRoomProvider {
 	p := &PineconeRoomProvider{
 		r:         r,
@@ -52,25 +52,25 @@ func NewPineconeRoomProvider(
 }
 
 func (p *PineconeRoomProvider) Rooms() []fclient.PublicRoom {
-	list := map[gomatrixserverlib.ServerName]struct{}{}
+	list := map[spec.ServerName]struct{}{}
 	for k := range defaults.DefaultServerNames {
 		list[k] = struct{}{}
 	}
 	for _, k := range p.r.Peers() {
-		list[gomatrixserverlib.ServerName(k.PublicKey)] = struct{}{}
+		list[spec.ServerName(k.PublicKey)] = struct{}{}
 	}
 	return bulkFetchPublicRoomsFromServers(
 		context.Background(), p.fedClient,
-		gomatrixserverlib.ServerName(p.r.PublicKey().String()), list,
+		spec.ServerName(p.r.PublicKey().String()), list,
 	)
 }
 
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
-	ctx context.Context, fedClient *fclient.FederationClient,
-	origin gomatrixserverlib.ServerName,
-	homeservers map[gomatrixserverlib.ServerName]struct{},
+	ctx context.Context, fedClient fclient.FederationClient,
+	origin spec.ServerName,
+	homeservers map[spec.ServerName]struct{},
 ) (publicRooms []fclient.PublicRoom) {
 	limit := 200
 	// follow pipeline semantics, see https://blog.golang.org/pipelines for more info.
@@ -84,7 +84,7 @@ func bulkFetchPublicRoomsFromServers(
 	// concurrently query for public rooms
 	reqctx, reqcancel := context.WithTimeout(ctx, time.Second*5)
 	for hs := range homeservers {
-		go func(homeserverDomain gomatrixserverlib.ServerName) {
+		go func(homeserverDomain spec.ServerName) {
 			defer wg.Done()
 			util.GetLogger(reqctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
 			fres, err := fedClient.GetPublicRooms(reqctx, origin, homeserverDomain, int(limit), "", false, "")

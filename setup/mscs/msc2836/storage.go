@@ -10,12 +10,13 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 type eventInfo struct {
 	EventID        string
-	OriginServerTS gomatrixserverlib.Timestamp
+	OriginServerTS spec.Timestamp
 	RoomID         string
 }
 
@@ -350,8 +351,8 @@ func roomIDAndServers(ev *gomatrixserverlib.HeaderedEvent) (roomID string, serve
 
 func extractChildMetadata(ev *gomatrixserverlib.HeaderedEvent) (count int, hash []byte) {
 	unsigned := struct {
-		Counts map[string]int                `json:"children"`
-		Hash   gomatrixserverlib.Base64Bytes `json:"children_hash"`
+		Counts map[string]int   `json:"children"`
+		Hash   spec.Base64Bytes `json:"children_hash"`
 	}{}
 	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err != nil {
 		// expected if there is no unsigned field at all

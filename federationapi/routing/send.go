@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -55,13 +56,13 @@ var inFlightTxnsPerOrigin sync.Map // transaction ID -> chan util.JSONResponse
 // Send implements /_matrix/federation/v1/send/{txnID}
 func Send(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keyAPI userAPI.FederationUserAPI,
 	keys gomatrixserverlib.JSONVerifier,
-	federation federationAPI.FederationClient,
+	federation fclient.FederationClient,
 	mu *internal.MutexByRoom,
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,

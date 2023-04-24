@@ -20,9 +20,8 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
-
-	"github.com/matrix-org/gomatrixserverlib"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
@@ -86,7 +85,7 @@ func NewInternalAPI(
 func generateAppServiceAccount(
 	userAPI userapi.AppserviceUserAPI,
 	as config.ApplicationService,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{

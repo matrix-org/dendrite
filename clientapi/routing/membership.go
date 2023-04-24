@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -70,7 +71,7 @@ func SendBan(
 		}
 	}
 
-	return sendMembership(req.Context(), profileAPI, device, roomID, gomatrixserverlib.Ban, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Ban, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
 }
 
 func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, device *userapi.Device,
@@ -149,14 +150,14 @@ func SendKick(
 		return util.ErrorResponse(err)
 	}
 	// kick is only valid if the user is not currently banned or left (that is, they are joined or invited)
-	if queryRes.Membership != gomatrixserverlib.Join && queryRes.Membership != gomatrixserverlib.Invite {
+	if queryRes.Membership != spec.Join && queryRes.Membership != spec.Invite {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Unknown("cannot /kick banned or left users"),
 		}
 	}
 	// TODO: should we be using SendLeave instead?
-	return sendMembership(req.Context(), profileAPI, device, roomID, gomatrixserverlib.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
 }
 
 func SendUnban(
@@ -190,14 +191,14 @@ func SendUnban(
 	}
 
 	// unban is only valid if the user is currently banned
-	if queryRes.Membership != gomatrixserverlib.Ban {
+	if queryRes.Membership != spec.Ban {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("can only /unban users that are banned"),
 		}
 	}
 	// TODO: should we be using SendLeave instead?
-	return sendMembership(req.Context(), profileAPI, device, roomID, gomatrixserverlib.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
 }
 
 func SendInvite(
@@ -255,7 +256,7 @@ func sendInvite(
 	asAPI appserviceAPI.AppServiceInternalAPI, evTime time.Time,
 ) (util.JSONResponse, error) {
 	event, err := buildMembershipEvent(
-		ctx, userID, reason, profileAPI, device, gomatrixserverlib.Invite,
+		ctx, userID, reason, profileAPI, device, spec.Invite,
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err != nil {
@@ -480,7 +481,7 @@ func SendForget(
 
 func getPowerlevels(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, roomID string) (*gomatrixserverlib.PowerLevelContent, *util.JSONResponse) {
 	plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomPowerLevels,
+		EventType: spec.MRoomPowerLevels,
 		StateKey:  "",
 	})
 	if plEvent == nil {

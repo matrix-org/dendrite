@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -148,7 +149,7 @@ func (r *Upgrader) performRoomUpgrade(
 
 func (r *Upgrader) getRoomPowerLevels(ctx context.Context, roomID string) (*gomatrixserverlib.PowerLevelContent, *api.PerformError) {
 	oldPowerLevelsEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomPowerLevels,
+		EventType: spec.MRoomPowerLevels,
 		StateKey:  "",
 	})
 	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
@@ -161,7 +162,7 @@ func (r *Upgrader) getRoomPowerLevels(ctx context.Context, roomID string) (*goma
 	return powerLevelContent, nil
 }
 
-func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.Time, userID string, userDomain gomatrixserverlib.ServerName, roomID string) *api.PerformError {
+func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.Time, userID string, userDomain spec.ServerName, roomID string) *api.PerformError {
 	restrictedPowerLevelContent, pErr := r.getRoomPowerLevels(ctx, roomID)
 	if pErr != nil {
 		return pErr
@@ -179,7 +180,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 	restrictedPowerLevelContent.Invite = restrictedDefaultPowerLevel
 
 	restrictedPowerLevelsHeadered, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, fledglingEvent{
-		Type:     gomatrixserverlib.MRoomPowerLevels,
+		Type:     spec.MRoomPowerLevels,
 		StateKey: "",
 		Content:  restrictedPowerLevelContent,
 	})
@@ -230,9 +231,9 @@ func moveLocalAliases(ctx context.Context,
 	return nil
 }
 
-func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, evTime time.Time, userID string, userDomain gomatrixserverlib.ServerName, roomID string) *api.PerformError {
+func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, evTime time.Time, userID string, userDomain spec.ServerName, roomID string) *api.PerformError {
 	for _, event := range oldRoom.StateEvents {
-		if event.Type() != gomatrixserverlib.MRoomCanonicalAlias || !event.StateKeyEquals("") {
+		if event.Type() != spec.MRoomCanonicalAlias || !event.StateKeyEquals("") {
 			continue
 		}
 		var aliasContent struct {
@@ -251,7 +252,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 	}
 
 	emptyCanonicalAliasEvent, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, fledglingEvent{
-		Type:    gomatrixserverlib.MRoomCanonicalAlias,
+		Type:    spec.MRoomCanonicalAlias,
 		Content: map[string]interface{}{},
 	})
 	if resErr != nil {
@@ -332,7 +333,7 @@ func (r *Upgrader) validateRoomExists(ctx context.Context, roomID string) error 
 func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 ) bool {
 	plEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomPowerLevels,
+		EventType: spec.MRoomPowerLevels,
 		StateKey:  "",
 	})
 	if plEvent == nil {
@@ -355,7 +356,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			// This shouldn't ever happen, but better to be safe than sorry.
 			continue
 		}
-		if event.Type() == gomatrixserverlib.MRoomMember && !event.StateKeyEquals(userID) {
+		if event.Type() == spec.MRoomMember && !event.StateKeyEquals(userID) {
 			// With the exception of bans and invites which we do want to copy, we
 			// should ignore membership events that aren't our own, as event auth will
 			// prevent us from being able to create membership events on behalf of other
@@ -365,8 +366,8 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 				continue
 			}
 			switch membership {
-			case gomatrixserverlib.Ban:
-			case gomatrixserverlib.Invite:
+			case spec.Ban:
+			case spec.Invite:
 			default:
 				continue
 			}
@@ -377,10 +378,10 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// The following events are ones that we are going to override manually
 	// in the following section.
 	override := map[gomatrixserverlib.StateKeyTuple]struct{}{
-		{EventType: gomatrixserverlib.MRoomCreate, StateKey: ""}:      {},
-		{EventType: gomatrixserverlib.MRoomMember, StateKey: userID}:  {},
-		{EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: ""}: {},
-		{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}:   {},
+		{EventType: spec.MRoomCreate, StateKey: ""}:      {},
+		{EventType: spec.MRoomMember, StateKey: userID}:  {},
+		{EventType: spec.MRoomPowerLevels, StateKey: ""}: {},
+		{EventType: spec.MRoomJoinRules, StateKey: ""}:   {},
 	}
 
 	// The overridden events are essential events that must be present in the
@@ -393,10 +394,10 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 		}
 	}
 
-	oldCreateEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCreate, StateKey: ""}]
-	oldMembershipEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomMember, StateKey: userID}]
-	oldPowerLevelsEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: ""}]
-	oldJoinRulesEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}]
+	oldCreateEvent := state[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCreate, StateKey: ""}]
+	oldMembershipEvent := state[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomMember, StateKey: userID}]
+	oldPowerLevelsEvent := state[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomPowerLevels, StateKey: ""}]
+	oldJoinRulesEvent := state[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomJoinRules, StateKey: ""}]
 
 	// Create the new room create event. Using a map here instead of CreateContent
 	// means that we preserve any other interesting fields that might be present
@@ -410,7 +411,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 		RoomID:  roomID,
 	}
 	newCreateEvent := fledglingEvent{
-		Type:     gomatrixserverlib.MRoomCreate,
+		Type:     spec.MRoomCreate,
 		StateKey: "",
 		Content:  newCreateContent,
 	}
@@ -421,9 +422,9 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// the events after it.
 	newMembershipContent := map[string]interface{}{}
 	_ = json.Unmarshal(oldMembershipEvent.Content(), &newMembershipContent)
-	newMembershipContent["membership"] = gomatrixserverlib.Join
+	newMembershipContent["membership"] = spec.Join
 	newMembershipEvent := fledglingEvent{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		StateKey: userID,
 		Content:  newMembershipContent,
 	}
@@ -447,11 +448,11 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// existing join rules contains garbage, the room can still be
 	// upgraded.
 	newJoinRulesContent := map[string]interface{}{
-		"join_rule": gomatrixserverlib.Invite, // sane default
+		"join_rule": spec.Invite, // sane default
 	}
 	_ = json.Unmarshal(oldJoinRulesEvent.Content(), &newJoinRulesContent)
 	newJoinRulesEvent := fledglingEvent{
-		Type:     gomatrixserverlib.MRoomJoinRules,
+		Type:     spec.MRoomJoinRules,
 		StateKey: "",
 		Content:  newJoinRulesContent,
 	}
@@ -464,9 +465,9 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 
 	// For some reason Sytest expects there to be a guest access event.
 	// Create one if it doesn't exist.
-	if _, ok := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomGuestAccess, StateKey: ""}]; !ok {
+	if _, ok := state[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomGuestAccess, StateKey: ""}]; !ok {
 		eventsToMake = append(eventsToMake, fledglingEvent{
-			Type: gomatrixserverlib.MRoomGuestAccess,
+			Type: spec.MRoomGuestAccess,
 			Content: map[string]string{
 				"guest_access": "forbidden",
 			},
@@ -495,14 +496,14 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// override that now by restoring the original power levels.
 	if powerLevelsOverridden {
 		eventsToMake = append(eventsToMake, fledglingEvent{
-			Type:    gomatrixserverlib.MRoomPowerLevels,
+			Type:    spec.MRoomPowerLevels,
 			Content: powerLevelContent,
 		})
 	}
 	return eventsToMake, nil
 }
 
-func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID string, userDomain gomatrixserverlib.ServerName, newRoomID, newVersion string, eventsToMake []fledglingEvent) *api.PerformError {
+func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID string, userDomain spec.ServerName, newRoomID, newVersion string, eventsToMake []fledglingEvent) *api.PerformError {
 	var err error
 	var builtEvents []*gomatrixserverlib.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
@@ -681,14 +682,14 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 
 	// Then return the temporary power levels event.
 	return fledglingEvent{
-		Type:    gomatrixserverlib.MRoomPowerLevels,
+		Type:    spec.MRoomPowerLevels,
 		Content: tempPowerLevelContent,
 	}, powerLevelsOverridden
 }
 
 func (r *Upgrader) sendHeaderedEvent(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	headeredEvent *gomatrixserverlib.HeaderedEvent,
 	sendAsServer string,
 ) *api.PerformError {

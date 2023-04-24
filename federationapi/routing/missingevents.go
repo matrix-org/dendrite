@@ -34,7 +34,7 @@ type getMissingEventRequest struct {
 // Events are fetched from room DAG starting from latest_events until we reach earliest_events or the limit.
 func GetMissingEvents(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {

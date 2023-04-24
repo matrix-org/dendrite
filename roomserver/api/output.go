@@ -16,6 +16,7 @@ package api
 
 import (
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // An OutputType is a type of roomserver output.
@@ -250,7 +251,7 @@ type OutputNewInboundPeek struct {
 	// a race between tracking the state returned by /peek and emitting subsequent
 	// peeked events)
 	LatestEventID string
-	ServerName    gomatrixserverlib.ServerName
+	ServerName    spec.ServerName
 	// how often we told the peeking server to renew the peek
 	RenewalInterval int64
 }

@@ -31,7 +31,7 @@ import (
 // RoomAliasToID converts the queried alias into a room ID and returns it
 func RoomAliasToID(
 	httpReq *http.Request,
-	federation federationAPI.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	senderAPI federationAPI.FederationInternalAPI,

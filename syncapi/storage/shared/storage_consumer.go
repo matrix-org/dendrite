@@ -23,6 +23,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -504,7 +505,7 @@ func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) (string,
 }
 
 // StoreReceipt stores user receipts
-func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
+func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		pos, err = d.Receipts.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId, timestamp)
 		return err
@@ -541,7 +542,7 @@ func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, igno
 	})
 }
 
-func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS spec.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	var pos types.StreamPosition
 	var err error
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -561,15 +562,15 @@ func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID s
 
 func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
 	return d.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
-		gomatrixserverlib.MRoomName,
-		gomatrixserverlib.MRoomTopic,
+		spec.MRoomName,
+		spec.MRoomTopic,
 		"m.room.message",
 	})
 }
 
 func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
 	// No need to unmarshal if the event is a redaction
-	if event.Type() == gomatrixserverlib.MRoomRedaction {
+	if event.Type() == spec.MRoomRedaction {
 		return nil
 	}
 	var content gomatrixserverlib.RelationContent

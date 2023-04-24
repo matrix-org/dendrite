@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/federationapi/types"
 )
@@ -22,9 +23,9 @@ type FederationInternalAPI interface {
 	P2PFederationAPI
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
-	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
-	MSC2836EventRelationships(ctx context.Context, origin, dst gomatrixserverlib.ServerName, r fclient.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res fclient.MSC2836EventRelationshipsResponse, err error)
-	MSC2946Spaces(ctx context.Context, origin, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool) (res fclient.MSC2946SpacesResponse, err error)
+	LookupServerKeys(ctx context.Context, s spec.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
+	MSC2836EventRelationships(ctx context.Context, origin, dst spec.ServerName, r fclient.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res fclient.MSC2836EventRelationshipsResponse, err error)
+	MSC2946Spaces(ctx context.Context, origin, dst spec.ServerName, roomID string, suggestedOnly bool) (res fclient.MSC2946SpacesResponse, err error)
 
 	// Broadcasts an EDU to all servers in rooms we are joined to. Used in the yggdrasil demos.
 	PerformBroadcastEDU(
@@ -67,9 +68,9 @@ type RoomserverFederationAPI interface {
 	// containing only the server names (without information for membership events).
 	// The response will include this server if they are joined to the room.
 	QueryJoinedHostServerNamesInRoom(ctx context.Context, request *QueryJoinedHostServerNamesInRoomRequest, response *QueryJoinedHostServerNamesInRoomResponse) error
-	GetEventAuth(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (res fclient.RespEventAuth, err error)
-	GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
-	LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing fclient.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res fclient.RespMissingEvents, err error)
+	GetEventAuth(ctx context.Context, origin, s spec.ServerName, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (res fclient.RespEventAuth, err error)
+	GetEvent(ctx context.Context, origin, s spec.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
+	LookupMissingEvents(ctx context.Context, origin, s spec.ServerName, roomID string, missing fclient.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res fclient.RespMissingEvents, err error)
 }
 
 type P2PFederationAPI interface {
@@ -99,46 +100,9 @@ type P2PFederationAPI interface {
 // implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
 // this interface are of type FederationClientError
 type KeyserverFederationAPI interface {
-	GetUserDevices(ctx context.Context, origin, s gomatrixserverlib.ServerName, userID string) (res fclient.RespUserDevices, err error)
-	ClaimKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res fclient.RespClaimKeys, err error)
-	QueryKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string) (res fclient.RespQueryKeys, err error)
-}
-
-// an interface for gmsl.FederationClient - contains functions called by federationapi only.
-type FederationClient interface {
-	P2PFederationClient
-	gomatrixserverlib.KeyClient
-	SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res fclient.RespSend, err error)
-
-	// Perform operations
-	LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res fclient.RespDirectory, err error)
-	Peek(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, peekID string, roomVersions []gomatrixserverlib.RoomVersion) (res fclient.RespPeek, err error)
-	MakeJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res fclient.RespMakeJoin, err error)
-	SendJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res fclient.RespSendJoin, err error)
-	SendJoinPowerDAG(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res fclient.RespSendJoinPowerDAG, err error)
-	MakeLeave(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, userID string) (res fclient.RespMakeLeave, err error)
-	SendLeave(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (err error)
-	SendInviteV2(ctx context.Context, origin, s gomatrixserverlib.ServerName, request gomatrixserverlib.InviteV2Request) (res fclient.RespInviteV2, err error)
-
-	GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
-
-	GetEventAuth(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (res fclient.RespEventAuth, err error)
-	GetUserDevices(ctx context.Context, origin, s gomatrixserverlib.ServerName, userID string) (fclient.RespUserDevices, error)
-	ClaimKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (fclient.RespClaimKeys, error)
-	QueryKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string) (fclient.RespQueryKeys, error)
-	Backfill(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, limit int, eventIDs []string) (res gomatrixserverlib.Transaction, err error)
-	MSC2836EventRelationships(ctx context.Context, origin, dst gomatrixserverlib.ServerName, r fclient.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res fclient.MSC2836EventRelationshipsResponse, err error)
-	MSC2946Spaces(ctx context.Context, origin, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool) (res fclient.MSC2946SpacesResponse, err error)
-
-	ExchangeThirdPartyInvite(ctx context.Context, origin, s gomatrixserverlib.ServerName, builder gomatrixserverlib.EventBuilder) (err error)
-	LookupState(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (res fclient.RespState, err error)
-	LookupStateIDs(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string) (res fclient.RespStateIDs, err error)
-	LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing fclient.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res fclient.RespMissingEvents, err error)
-}
-
-type P2PFederationClient interface {
-	P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res fclient.EmptyResp, err error)
-	P2PGetTransactionFromRelay(ctx context.Context, u gomatrixserverlib.UserID, prev fclient.RelayEntry, relayServer gomatrixserverlib.ServerName) (res fclient.RespGetRelayTransaction, err error)
+	GetUserDevices(ctx context.Context, origin, s spec.ServerName, userID string) (res fclient.RespUserDevices, err error)
+	ClaimKeys(ctx context.Context, origin, s spec.ServerName, oneTimeKeys map[string]map[string]string) (res fclient.RespClaimKeys, err error)
+	QueryKeys(ctx context.Context, origin, s spec.ServerName, keys map[string][]string) (res fclient.RespQueryKeys, err error)
 }
 
 // FederationClientError is returned from FederationClient methods in the event of a problem.
@@ -154,7 +118,7 @@ func (e FederationClientError) Error() string {
 }
 
 type QueryServerKeysRequest struct {
-	ServerName      gomatrixserverlib.ServerName
+	ServerName      spec.ServerName
 	KeyIDToCriteria map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyNotaryQueryCriteria
 }
 
@@ -173,7 +137,7 @@ type QueryServerKeysResponse struct {
 }
 
 type QueryPublicKeysRequest struct {
-	Requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp `json:"requests"`
+	Requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp `json:"requests"`
 }
 
 type QueryPublicKeysResponse struct {
@@ -181,13 +145,13 @@ type QueryPublicKeysResponse struct {
 }
 
 type PerformDirectoryLookupRequest struct {
-	RoomAlias  string                       `json:"room_alias"`
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	RoomAlias  string          `json:"room_alias"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 type PerformDirectoryLookupResponse struct {
-	RoomID      string                         `json:"room_id"`
-	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+	RoomID      string            `json:"room_id"`
+	ServerNames []spec.ServerName `json:"server_names"`
 }
 
 type PerformJoinRequest struct {
@@ -200,7 +164,7 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
-	JoinedVia gomatrixserverlib.ServerName
+	JoinedVia spec.ServerName
 	LastError *gomatrix.HTTPError
 }
 
@@ -224,9 +188,9 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
-	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
+	RoomVersion     gomatrixserverlib.RoomVersion    `json:"room_version"`
+	Event           *gomatrixserverlib.HeaderedEvent `json:"event"`
+	InviteRoomState []fclient.InviteV2StrippedState  `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {
@@ -242,7 +206,7 @@ type QueryJoinedHostServerNamesInRoomRequest struct {
 
 // QueryJoinedHostServerNamesInRoomResponse is a response to QueryJoinedHostServerNames
 type QueryJoinedHostServerNamesInRoomResponse struct {
-	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+	ServerNames []spec.ServerName `json:"server_names"`
 }
 
 type PerformBroadcastEDURequest struct {
@@ -252,7 +216,7 @@ type PerformBroadcastEDUResponse struct {
 }
 
 type PerformWakeupServersRequest struct {
-	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+	ServerNames []spec.ServerName `json:"server_names"`
 }
 
 type PerformWakeupServersResponse struct {
@@ -266,24 +230,24 @@ type InputPublicKeysResponse struct {
 }
 
 type P2PQueryRelayServersRequest struct {
-	Server gomatrixserverlib.ServerName
+	Server spec.ServerName
 }
 
 type P2PQueryRelayServersResponse struct {
-	RelayServers []gomatrixserverlib.ServerName
+	RelayServers []spec.ServerName
 }
 
 type P2PAddRelayServersRequest struct {
-	Server       gomatrixserverlib.ServerName
-	RelayServers []gomatrixserverlib.ServerName
+	Server       spec.ServerName
+	RelayServers []spec.ServerName
 }
 
 type P2PAddRelayServersResponse struct {
 }
 
 type P2PRemoveRelayServersRequest struct {
-	Server       gomatrixserverlib.ServerName
-	RelayServers []gomatrixserverlib.ServerName
+	Server       spec.ServerName
+	RelayServers []spec.ServerName
 }
 
 type P2PRemoveRelayServersResponse struct {

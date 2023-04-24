@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -35,7 +36,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 
 func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {
 	t.Helper()
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(content), false, gomatrixserverlib.RoomVersionV10)
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
@@ -139,9 +140,9 @@ func TestMessageStats(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           args
-		ourServer      gomatrixserverlib.ServerName
+		ourServer      spec.ServerName
 		lastUpdate     time.Time
-		initRoomCounts map[gomatrixserverlib.ServerName]map[string]bool
+		initRoomCounts map[spec.ServerName]map[string]bool
 		wantStats      userAPITypes.MessageStats
 	}{
 		{
@@ -197,7 +198,7 @@ func TestMessageStats(t *testing.T) {
 			name:       "day change creates a new room map",
 			ourServer:  "localhost",
 			lastUpdate: time.Now().Add(-time.Hour * 24),
-			initRoomCounts: map[gomatrixserverlib.ServerName]map[string]bool{
+			initRoomCounts: map[spec.ServerName]map[string]bool{
 				"localhost": {"encryptedRoom": true},
 			},
 			args: args{
@@ -219,11 +220,11 @@ func TestMessageStats(t *testing.T) {
 					tt.lastUpdate = time.Now()
 				}
 				if tt.initRoomCounts == nil {
-					tt.initRoomCounts = map[gomatrixserverlib.ServerName]map[string]bool{}
+					tt.initRoomCounts = map[spec.ServerName]map[string]bool{}
 				}
 				s := &OutputRoomEventConsumer{
 					db:         db,
-					msgCounts:  map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+					msgCounts:  map[spec.ServerName]userAPITypes.MessageStats{},
 					roomCounts: tt.initRoomCounts,
 					countsLock: sync.Mutex{},
 					lastUpdate: tt.lastUpdate,

@@ -22,7 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/userapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -31,7 +31,7 @@ import (
 )
 
 func SetReceipt(req *http.Request, userAPI api.ClientUserAPI, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
-	timestamp := gomatrixserverlib.AsTimestamp(time.Now())
+	timestamp := spec.AsTimestamp(time.Now())
 	logrus.WithFields(logrus.Fields{
 		"roomID":      roomID,
 		"receiptType": receiptType,

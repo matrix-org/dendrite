@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -147,7 +148,7 @@ type Membership interface {
 	SelectKnownUsers(ctx context.Context, txn *sql.Tx, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
 	UpdateForgetMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool) error
 	SelectLocalServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) (bool, error)
-	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
+	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName spec.ServerName) (bool, error)
 	DeleteMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) error
 	SelectJoinedUsers(ctx context.Context, txn *sql.Tx, targetUserNIDs []types.EventStateKeyNID) ([]types.EventStateKeyNID, error)
 }
@@ -199,17 +200,17 @@ func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 	content := ev.Content()
 	key := ""
 	switch ev.Type() {
-	case gomatrixserverlib.MRoomCreate:
+	case spec.MRoomCreate:
 		key = "creator"
-	case gomatrixserverlib.MRoomCanonicalAlias:
+	case spec.MRoomCanonicalAlias:
 		key = "alias"
-	case gomatrixserverlib.MRoomHistoryVisibility:
+	case spec.MRoomHistoryVisibility:
 		key = "history_visibility"
-	case gomatrixserverlib.MRoomJoinRules:
+	case spec.MRoomJoinRules:
 		key = "join_rule"
-	case gomatrixserverlib.MRoomMember:
+	case spec.MRoomMember:
 		key = "membership"
-	case gomatrixserverlib.MRoomName:
+	case spec.MRoomName:
 		key = "name"
 	case "m.room.avatar":
 		key = "url"

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"golang.org/x/crypto/bcrypt"
@@ -41,7 +42,7 @@ import (
 )
 
 const (
-	serverName = gomatrixserverlib.ServerName("example.com")
+	serverName = spec.ServerName("example.com")
 )
 
 type apiTestOpts struct {
@@ -74,7 +75,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	cfg, ctx, close := testrig.CreateConfig(t, dbType)
 	sName := serverName
 	if opts.serverName != "" {
-		sName = gomatrixserverlib.ServerName(opts.serverName)
+		sName = spec.ServerName(opts.serverName)
 	}
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 

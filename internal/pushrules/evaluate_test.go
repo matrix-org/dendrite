@@ -189,7 +189,7 @@ func TestPatternMatches(t *testing.T) {
 }
 
 func mustEventFromJSON(t *testing.T, json string) *gomatrixserverlib.Event {
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(json), false, gomatrixserverlib.RoomVersionV7)
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV7).NewEventFromTrustedJSON([]byte(json), false)
 	if err != nil {
 		t.Fatal(err)
 	}
