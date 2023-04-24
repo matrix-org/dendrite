@@ -43,7 +43,7 @@ type Monolith struct {
 	Config    *config.Dendrite
 	KeyRing   *gomatrixserverlib.KeyRing
 	Client    *fclient.Client
-	FedClient *fclient.FederationClient
+	FedClient fclient.FederationClient
 
 	AppserviceAPI appserviceAPI.AppServiceInternalAPI
 	FederationAPI federationAPI.FederationInternalAPI

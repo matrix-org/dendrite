@@ -43,7 +43,7 @@ func SearchUserDirectory(
 	provider userapi.QuerySearchProfilesAPI,
 	searchString string,
 	limit int,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	localServerName spec.ServerName,
 ) util.JSONResponse {
 	if limit < 10 {

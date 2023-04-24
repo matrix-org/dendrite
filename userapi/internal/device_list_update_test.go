@@ -137,7 +137,7 @@ func (t *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.fn(req)
 }
 
-func newFedClient(tripper func(*http.Request) (*http.Response, error)) *fclient.FederationClient {
+func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.FederationClient {
 	_, pkey, _ := ed25519.GenerateKey(nil)
 	fedClient := fclient.NewFederationClient(
 		[]*fclient.SigningIdentity{
@@ -147,8 +147,6 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) *fclient.
 				PrivateKey: pkey,
 			},
 		},
-	)
-	fedClient.Client = *fclient.NewClient(
 		fclient.WithTransport(&roundTripper{tripper}),
 	)
 	return fedClient

@@ -57,7 +57,7 @@ type filter struct {
 func GetPostPublicRooms(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var request PublicRoomReq

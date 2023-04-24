@@ -30,7 +30,7 @@ import (
 )
 
 type testFedClient struct {
-	api.FederationClient
+	fclient.FederationClient
 	queryKeysCalled bool
 	claimKeysCalled bool
 	shouldFail      bool

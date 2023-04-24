@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -60,7 +59,7 @@ var (
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
-	federation federationAPI.FederationClient,
+	federation fclient.FederationClient,
 	userAPI userapi.FederationUserAPI,
 ) util.JSONResponse {
 	var body invites
@@ -120,7 +119,7 @@ func ExchangeThirdPartyInvite(
 	roomID string,
 	rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
-	federation federationAPI.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
 	var builder gomatrixserverlib.EventBuilder
 	if err := json.Unmarshal(request.Content(), &builder); err != nil {
@@ -237,7 +236,7 @@ func ExchangeThirdPartyInvite(
 func createInviteFrom3PIDInvite(
 	ctx context.Context, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
-	inv invite, federation federationAPI.FederationClient,
+	inv invite, federation fclient.FederationClient,
 	userAPI userapi.FederationUserAPI,
 ) (*gomatrixserverlib.Event, error) {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
@@ -364,7 +363,7 @@ func buildMembershipEvent(
 // them responded with an error.
 func sendToRemoteServer(
 	ctx context.Context, inv invite,
-	federation federationAPI.FederationClient, cfg *config.FederationAPI,
+	federation fclient.FederationClient, cfg *config.FederationAPI,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]spec.ServerName, 2)
