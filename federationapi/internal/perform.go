@@ -150,7 +150,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return err
 	}
 
-	sendJoinInput := fclient.SendJoinInput{
+	joinInput := fclient.PerformJoinInput{
 		UserID:        user,
 		RoomID:        roomID,
 		ServerName:    serverName,
@@ -161,7 +161,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		KeyRing:       r.keyRing,
 		EventProvider: federatedEventProvider,
 	}
-	callbacks := fclient.SendJoinCallbacks{
+	callbacks := fclient.PerformJoinCallbacks{
 		FederationFailure: func(server spec.ServerName) {
 			r.statistics.ForServer(server).Failure()
 		},
@@ -170,7 +170,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		},
 	}
 
-	event, respState, err := fclient.HandleSendJoin(ctx, r.federation, sendJoinInput, callbacks)
+	event, respState, err := fclient.PerformJoin(ctx, r.federation, joinInput, callbacks)
 	if err != nil {
 		return err
 	}
