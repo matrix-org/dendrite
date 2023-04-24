@@ -186,35 +186,26 @@ func (r *Admin) PerformAdminEvacuateUser(
 
 func (r *Admin) PerformAdminPurgeRoom(
 	ctx context.Context,
-	req *api.PerformAdminPurgeRoomRequest,
-	res *api.PerformAdminPurgeRoomResponse,
+	roomID string,
 ) error {
 	// Validate we actually got a room ID and nothing else
-	if _, _, err := gomatrixserverlib.SplitID('!', req.RoomID); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Malformed room ID: %s", err),
-		}
-		return nil
+	if _, _, err := gomatrixserverlib.SplitID('!', roomID); err != nil {
+		return err
 	}
 
-	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
-	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
-		logrus.WithField("room_id", req.RoomID).WithError(err).Warn("Failed to purge room from roomserver")
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  err.Error(),
-		}
-		return nil
+	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
+	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
+		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+		return err
 	}
 
-	logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
+	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver")
 
-	return r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
+	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypePurgeRoom,
 			PurgeRoom: &api.OutputPurgeRoom{
-				RoomID: req.RoomID,
+				RoomID: roomID,
 			},
 		},
 	})

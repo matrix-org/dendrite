@@ -70,29 +70,19 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	}
 }
 
-func AdminPurgeRoom(req *http.Request, cfg *config.ClientAPI, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminPurgeRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	roomID := vars["roomID"]
 
-	res := &roomserverAPI.PerformAdminPurgeRoomResponse{}
-	if err := rsAPI.PerformAdminPurgeRoom(
-		context.Background(),
-		&roomserverAPI.PerformAdminPurgeRoomRequest{
-			RoomID: roomID,
-		},
-		res,
-	); err != nil {
+	if err = rsAPI.PerformAdminPurgeRoom(context.Background(), vars["roomID"]); err != nil {
 		return util.ErrorResponse(err)
 	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
-	}
+
 	return util.JSONResponse{
 		Code: 200,
-		JSON: res,
+		JSON: struct{}{},
 	}
 }
 
