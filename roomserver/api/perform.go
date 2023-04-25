@@ -121,11 +121,6 @@ type PerformPublishRequest struct {
 	NetworkID    string
 }
 
-type PerformPublishResponse struct {
-	// If non-nil, the publish request failed. Contains more information why it failed.
-	Error *PerformError
-}
-
 type PerformInboundPeekRequest struct {
 	UserID          string          `json:"user_id"`
 	RoomID          string          `json:"room_id"`

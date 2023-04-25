@@ -587,18 +587,14 @@ func createRoom(
 		}
 	}
 
-	if r.Visibility == "public" {
+	if r.Visibility == spec.Public {
 		// expose this room in the published room list
-		var pubRes roomserverAPI.PerformPublishResponse
-		if err := rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
+		if err = rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
 			RoomID:     roomID,
-			Visibility: "public",
-		}, &pubRes); err != nil {
-			return jsonerror.InternalAPIError(ctx, err)
-		}
-		if pubRes.Error != nil {
-			// treat as non-fatal since the room is already made by this point
-			util.GetLogger(ctx).WithError(pubRes.Error).Error("failed to visibility:public")
+			Visibility: spec.Public,
+		}); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("failed to publish room")
+			return jsonerror.InternalServerError()
 		}
 	}
 

@@ -251,12 +251,8 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// some dummy entries to validate after purging
-		publishResp := &api.PerformPublishResponse{}
-		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: spec.Public}); err != nil {
 			t.Fatal(err)
-		}
-		if publishResp.Error != nil {
-			t.Fatal(publishResp.Error)
 		}
 
 		isPublished, err := db.GetPublishedRoom(ctx, room.ID)
