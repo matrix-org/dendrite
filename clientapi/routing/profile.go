@@ -357,7 +357,7 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err := builder.SetContent(content); err != nil {
+		if err = builder.SetContent(content); err != nil {
 			return nil, err
 		}
 
