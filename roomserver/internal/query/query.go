@@ -521,14 +521,10 @@ func (r *Queryer) QueryMissingEvents(
 	response.Events = make([]*gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
-			roomVersion, verr := r.roomVersion(event.RoomID())
-			if verr != nil {
-				return verr
-			}
 			if _, ok := redactEventIDs[event.EventID()]; ok {
 				event.Redact()
 			}
-			response.Events = append(response.Events, event.Headered(roomVersion))
+			response.Events = append(response.Events, event.Headered(info.RoomVersion))
 		}
 	}
 
@@ -718,14 +714,6 @@ func (r *Queryer) QueryRoomVersionForRoom(
 	return nil
 }
 
-func (r *Queryer) roomVersion(roomID string) (gomatrixserverlib.RoomVersion, error) {
-	var res api.QueryRoomVersionForRoomResponse
-	err := r.QueryRoomVersionForRoom(context.Background(), &api.QueryRoomVersionForRoomRequest{
-		RoomID: roomID,
-	}, &res)
-	return res.RoomVersion, err
-}
-
 func (r *Queryer) QueryPublishedRooms(
 	ctx context.Context,
 	req *api.QueryPublishedRoomsRequest,
@@ -910,8 +898,8 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
 		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
-	// If the join rule isn't "restricted" then there's nothing more to do.
-	res.Restricted = joinRules.JoinRule == spec.Restricted
+	// If the join rule isn't "restricted" or "knock_restricted" then there's nothing more to do.
+	res.Restricted = joinRules.JoinRule == spec.Restricted || joinRules.JoinRule == spec.KnockRestricted
 	if !res.Restricted {
 		return nil
 	}
@@ -932,9 +920,9 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 	}
-	var powerLevels gomatrixserverlib.PowerLevelContent
-	if err = json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
-		return fmt.Errorf("json.Unmarshal: %w", err)
+	powerLevels, err := powerLevelsEvent.PowerLevels()
+	if err != nil {
+		return fmt.Errorf("unable to get powerlevels: %w", err)
 	}
 	// Step through the join rules and see if the user matches any of them.
 	for _, rule := range joinRules.Allow {

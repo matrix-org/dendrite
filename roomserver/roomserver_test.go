@@ -582,3 +582,175 @@ func TestRedaction(t *testing.T) {
 		}
 	})
 }
+
+func TestQueryRestrictedJoinAllowed(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+
+	// a room we don't create in the database
+	allowedByRoomNotExists := test.NewRoom(t, alice)
+
+	// a room we create in the database, used for authorisation
+	allowedByRoomExists := test.NewRoom(t, alice)
+	allowedByRoomExists.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+		"membership": spec.Join,
+	}, test.WithStateKey(bob.ID))
+
+	testCases := []struct {
+		name            string
+		prepareRoomFunc func(t *testing.T) *test.Room
+		wantResponse    api.QueryRestrictedJoinAllowedResponse
+	}{
+		{
+			name: "public room unrestricted",
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				return test.NewRoom(t, alice)
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident: true,
+			},
+		},
+		{
+			name: "room version without restrictions",
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				return test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV7))
+			},
+		},
+		{
+			name: "restricted only", // bob is not allowed to join
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV8))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.Restricted,
+				}, test.WithStateKey(""))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:   true,
+				Restricted: true,
+			},
+		},
+		{
+			name: "knock_restricted",
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV8))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.KnockRestricted,
+				}, test.WithStateKey(""))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:   true,
+				Restricted: true,
+			},
+		},
+		{
+			name: "restricted with pending invite", // bob should be allowed to join
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV8))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.Restricted,
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
+					"membership": spec.Invite,
+				}, test.WithStateKey(bob.ID))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:   true,
+				Restricted: true,
+				Allowed:    true,
+			},
+		},
+		{
+			name: "restricted with allowed room_id, but missing room", // bob should not be allowed to join, as we don't know about the room
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV10))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.KnockRestricted,
+					"allow": []map[string]interface{}{
+						{
+							"room_id": allowedByRoomNotExists.ID,
+							"type":    spec.MRoomMembership,
+						},
+					},
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+					"membership":                       spec.Join,
+					"join_authorised_via_users_server": alice.ID,
+				}, test.WithStateKey(bob.ID))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Restricted: true,
+			},
+		},
+		{
+			name: "restricted with allowed room_id", // bob should be allowed to join, as we know about the room
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV10))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.KnockRestricted,
+					"allow": []map[string]interface{}{
+						{
+							"room_id": allowedByRoomExists.ID,
+							"type":    spec.MRoomMembership,
+						},
+					},
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+					"membership":                       spec.Join,
+					"join_authorised_via_users_server": alice.ID,
+				}, test.WithStateKey(bob.ID))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:      true,
+				Restricted:    true,
+				Allowed:       true,
+				AuthorisedVia: alice.ID,
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if tc.prepareRoomFunc == nil {
+					t.Fatal("missing prepareRoomFunc")
+				}
+				testRoom := tc.prepareRoomFunc(t)
+				// Create the room
+				if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, testRoom.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+
+				if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, allowedByRoomExists.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+
+				req := api.QueryRestrictedJoinAllowedRequest{
+					UserID: bob.ID,
+					RoomID: testRoom.ID,
+				}
+				res := api.QueryRestrictedJoinAllowedResponse{}
+				if err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), &req, &res); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(tc.wantResponse, res) {
+					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, res)
+				}
+			})
+		}
+	})
+}
