@@ -12,6 +12,36 @@ import (
 // Functions here are "proxying" calls to the gomatrixserverlib federation
 // client.
 
+func (a *FederationInternalAPI) MakeJoin(
+	ctx context.Context, origin, s spec.ServerName, roomID, userID string,
+) (res gomatrixserverlib.MakeJoinResponse, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
+		return a.federation.MakeJoin(ctx, origin, s, roomID, userID)
+	})
+	if err != nil {
+		return &fclient.RespMakeJoin{}, err
+	}
+	r := ires.(fclient.RespMakeJoin)
+	return &r, nil
+}
+
+func (a *FederationInternalAPI) SendJoin(
+	ctx context.Context, origin, s spec.ServerName, event *gomatrixserverlib.Event,
+) (res gomatrixserverlib.SendJoinResponse, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
+		return a.federation.SendJoin(ctx, origin, s, event)
+	})
+	if err != nil {
+		return &fclient.RespSendJoin{}, err
+	}
+	r := ires.(fclient.RespSendJoin)
+	return &r, nil
+}
+
 func (a *FederationInternalAPI) GetEventAuth(
 	ctx context.Context, origin, s spec.ServerName,
 	roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string,

@@ -150,7 +150,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return err
 	}
 
-	joinInput := fclient.PerformJoinInput{
+	joinInput := gomatrixserverlib.PerformJoinInput{
 		UserID:        user,
 		RoomID:        roomID,
 		ServerName:    serverName,
@@ -161,7 +161,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		KeyRing:       r.keyRing,
 		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName),
 	}
-	response, joinErr := fclient.PerformJoin(ctx, r.federation, joinInput)
+	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
 
 	if err != nil {
 		if !joinErr.Reachable {
