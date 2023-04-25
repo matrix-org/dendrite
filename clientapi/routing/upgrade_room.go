@@ -28,7 +28,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 type upgradeRoomRequest struct {
@@ -75,7 +74,6 @@ func UpgradeRoom(
 				JSON: jsonerror.NotFound("Room does not exist"),
 			}
 		}
-		logrus.WithError(err).Errorf("Error: %#v", err)
 		return jsonerror.InternalServerError()
 	}
 
