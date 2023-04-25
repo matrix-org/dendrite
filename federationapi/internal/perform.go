@@ -159,7 +159,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		PrivateKey:    r.cfg.Matrix.PrivateKey,
 		KeyID:         r.cfg.Matrix.KeyID,
 		KeyRing:       r.keyRing,
-		EventProvider: federatedEventProvider,
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName),
 	}
 	callbacks := fclient.PerformJoinCallbacks{
 		FederationFailure: func(server spec.ServerName) {
@@ -191,6 +191,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
 
+	// TODO: Can I change this to not take respState but instead just take an opaque list of events?
 	if err = roomserverAPI.SendEventWithState(
 		context.Background(),
 		r.rsAPI,
