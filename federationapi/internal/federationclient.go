@@ -15,7 +15,7 @@ import (
 func (a *FederationInternalAPI) MakeJoin(
 	ctx context.Context, origin, s spec.ServerName, roomID, userID string,
 ) (res gomatrixserverlib.MakeJoinResponse, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.MakeJoin(ctx, origin, s, roomID, userID)
@@ -30,7 +30,7 @@ func (a *FederationInternalAPI) MakeJoin(
 func (a *FederationInternalAPI) SendJoin(
 	ctx context.Context, origin, s spec.ServerName, event *gomatrixserverlib.Event,
 ) (res gomatrixserverlib.SendJoinResponse, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.SendJoin(ctx, origin, s, event)
