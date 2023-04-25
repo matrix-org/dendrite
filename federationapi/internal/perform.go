@@ -161,19 +161,17 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		KeyRing:       r.keyRing,
 		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName),
 	}
-	callbacks := fclient.PerformJoinCallbacks{
-		FederationFailure: func(server spec.ServerName) {
-			r.statistics.ForServer(server).Failure()
-		},
-		FederationSuccess: func(server spec.ServerName) {
-			r.statistics.ForServer(server).Success(statistics.SendDirect)
-		},
-	}
+	response, joinErr := fclient.PerformJoin(ctx, r.federation, joinInput)
 
-	response, err := fclient.PerformJoin(ctx, r.federation, joinInput, callbacks)
 	if err != nil {
+		if !joinErr.Reachable {
+			r.statistics.ForServer(joinErr.ServerName).Failure()
+		} else {
+			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
+		}
 		return err
 	}
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// We need to immediately update our list of joined hosts for this room now as we are technically
 	// joined. We must do this synchronously: we cannot rely on the roomserver output events as they
