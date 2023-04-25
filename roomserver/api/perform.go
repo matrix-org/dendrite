@@ -1,52 +1,10 @@
 package api
 
 import (
-	"fmt"
-	"net/http"
-
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
-
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-)
-
-type PerformErrorCode int
-
-type PerformError struct {
-	Msg        string
-	RemoteCode int // remote HTTP status code, for PerformErrRemote
-	Code       PerformErrorCode
-}
-
-func (p *PerformError) Error() string {
-	return fmt.Sprintf("%d : %s", p.Code, p.Msg)
-}
-
-// JSONResponse maps error codes to suitable HTTP error codes, defaulting to 500.
-func (p *PerformError) JSONResponse() util.JSONResponse {
-	switch p.Code {
-	case PerformErrorNoRoom:
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(p.Msg),
-		}
-	case PerformErrorNotAllowed:
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(p.Msg),
-		}
-	default:
-		return util.ErrorResponse(p)
-	}
-}
-
-const (
-	// PerformErrorNotAllowed means the user is not allowed to invite/join/etc this room (e.g join_rule:invite or banned)
-	PerformErrorNotAllowed PerformErrorCode = 1
-	// PerformErrorNoRoom means that the room being joined doesn't exist.
-	PerformErrorNoRoom PerformErrorCode = 3
 )
 
 type PerformJoinRequest struct {
@@ -150,14 +108,3 @@ type PerformForgetRequest struct {
 }
 
 type PerformForgetResponse struct{}
-
-type PerformRoomUpgradeRequest struct {
-	RoomID      string                        `json:"room_id"`
-	UserID      string                        `json:"user_id"`
-	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
-}
-
-type PerformRoomUpgradeResponse struct {
-	NewRoomID string
-	Error     *PerformError
-}
