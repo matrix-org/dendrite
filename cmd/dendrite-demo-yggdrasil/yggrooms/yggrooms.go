@@ -29,11 +29,11 @@ import (
 type YggdrasilRoomProvider struct {
 	node      *yggconn.Node
 	fedSender api.FederationInternalAPI
-	fedClient *fclient.FederationClient
+	fedClient fclient.FederationClient
 }
 
 func NewYggdrasilRoomProvider(
-	node *yggconn.Node, fedSender api.FederationInternalAPI, fedClient *fclient.FederationClient,
+	node *yggconn.Node, fedSender api.FederationInternalAPI, fedClient fclient.FederationClient,
 ) *YggdrasilRoomProvider {
 	p := &YggdrasilRoomProvider{
 		node:      node,
@@ -54,7 +54,7 @@ func (p *YggdrasilRoomProvider) Rooms() []fclient.PublicRoom {
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
-	ctx context.Context, fedClient *fclient.FederationClient,
+	ctx context.Context, fedClient fclient.FederationClient,
 	origin spec.ServerName,
 	homeservers []spec.ServerName,
 ) (publicRooms []fclient.PublicRoom) {

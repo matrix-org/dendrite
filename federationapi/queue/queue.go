@@ -29,7 +29,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
@@ -45,7 +44,7 @@ type OutgoingQueues struct {
 	disabled    bool
 	rsAPI       api.FederationRoomserverAPI
 	origin      spec.ServerName
-	client      fedapi.FederationClient
+	client      fclient.FederationClient
 	statistics  *statistics.Statistics
 	signing     map[spec.ServerName]*fclient.SigningIdentity
 	queuesMutex sync.Mutex // protects the below
@@ -89,7 +88,7 @@ func NewOutgoingQueues(
 	process *process.ProcessContext,
 	disabled bool,
 	origin spec.ServerName,
-	client fedapi.FederationClient,
+	client fclient.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
 	signing []*fclient.SigningIdentity,

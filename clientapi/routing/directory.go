@@ -47,7 +47,7 @@ func (r *roomDirectoryResponse) fillServers(servers []spec.ServerName) {
 func DirectoryRoom(
 	req *http.Request,
 	roomAlias string,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	fedSenderAPI federationAPI.ClientFederationAPI,

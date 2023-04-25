@@ -55,7 +55,7 @@ func (f *fedRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *rsapi.Que
 // TODO: This struct isn't generic, only works for TestFederationAPIJoinThenKeyUpdate
 type fedClient struct {
 	fedClientMutex sync.Mutex
-	api.FederationClient
+	fclient.FederationClient
 	allowJoins []*test.Room
 	keys       map[spec.ServerName]struct {
 		key   ed25519.PrivateKey
