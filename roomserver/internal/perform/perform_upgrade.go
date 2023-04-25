@@ -319,9 +319,7 @@ func publishNewRoomAndUnpublishOldRoom(
 }
 
 func (r *Upgrader) validateRoomExists(ctx context.Context, roomID string) error {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := r.URSAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+	if _, err := r.URSAPI.QueryRoomVersionForRoom(ctx, roomID); err != nil {
 		return &api.PerformError{
 			Code: api.PerformErrorNoRoom,
 			Msg:  "Room does not exist",

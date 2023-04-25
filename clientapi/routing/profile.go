@@ -338,9 +338,8 @@ func buildMembershipEvents(
 	evs := []*gomatrixserverlib.HeaderedEvent{}
 
 	for _, roomID := range roomIDs {
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+		roomVersion, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+		if err != nil {
 			return nil, err
 		}
 
@@ -372,7 +371,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		evs = append(evs, event.Headered(verRes.RoomVersion))
+		evs = append(evs, event.Headered(roomVersion))
 	}
 
 	return evs, nil

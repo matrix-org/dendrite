@@ -692,26 +692,20 @@ func GetAuthChain(
 }
 
 // QueryRoomVersionForRoom implements api.RoomserverInternalAPI
-func (r *Queryer) QueryRoomVersionForRoom(
-	ctx context.Context,
-	request *api.QueryRoomVersionForRoomRequest,
-	response *api.QueryRoomVersionForRoomResponse,
-) error {
-	if roomVersion, ok := r.Cache.GetRoomVersion(request.RoomID); ok {
-		response.RoomVersion = roomVersion
-		return nil
+func (r *Queryer) QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
+	if roomVersion, ok := r.Cache.GetRoomVersion(roomID); ok {
+		return roomVersion, nil
 	}
 
-	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if info == nil {
-		return fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", request.RoomID)
+		return "", fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", roomID)
 	}
-	response.RoomVersion = info.RoomVersion
-	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
-	return nil
+	r.Cache.StoreRoomVersion(roomID, info.RoomVersion)
+	return info.RoomVersion, nil
 }
 
 func (r *Queryer) QueryPublishedRooms(
