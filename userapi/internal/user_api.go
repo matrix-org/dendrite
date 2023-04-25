@@ -634,14 +634,14 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),
 	}
 	deviceRes := &api.PerformDeviceDeletionResponse{}
-	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
+	if err = a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
 		return err
 	}
 
 	pusherReq := &api.PerformPusherDeletionRequest{
 		Localpart: req.Localpart,
 	}
-	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+	if err = a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
 		return err
 	}
 

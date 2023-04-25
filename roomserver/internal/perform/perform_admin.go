@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
@@ -74,6 +75,10 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	}
 
 	prevEvents := latestRes.LatestEvents
+	var senderDomain spec.ServerName
+	var eventsNeeded gomatrixserverlib.StateNeeded
+	var identity *fclient.SigningIdentity
+	var event *gomatrixserverlib.HeaderedEvent
 	for _, memberEvent := range memberEvents {
 		if memberEvent.StateKey() == nil {
 			continue
@@ -94,7 +99,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			PrevEvents: prevEvents,
 		}
 
-		_, senderDomain, err := gomatrixserverlib.SplitID('@', fledglingEvent.Sender)
+		_, senderDomain, err = gomatrixserverlib.SplitID('@', fledglingEvent.Sender)
 		if err != nil {
 			continue
 		}
@@ -103,17 +108,17 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return nil, err
 		}
 
-		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		eventsNeeded, err = gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
 		if err != nil {
 			return nil, err
 		}
 
-		identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+		identity, err = r.Cfg.Matrix.SigningIdentityFor(senderDomain)
 		if err != nil {
 			continue
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
+		event, err = eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			return nil, err
 		}

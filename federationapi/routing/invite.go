@@ -206,7 +206,7 @@ func processInvite(
 		TransactionID:   nil,
 	}
 
-	if err := rsAPI.PerformInvite(ctx, request); err != nil {
+	if err = rsAPI.PerformInvite(ctx, request); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

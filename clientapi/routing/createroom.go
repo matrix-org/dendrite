@@ -542,9 +542,10 @@ func createRoom(
 		}
 
 		// Process the invites.
+		var inviteEvent *gomatrixserverlib.HeaderedEvent
 		for _, invitee := range r.Invite {
 			// Build the invite event.
-			inviteEvent, err := buildMembershipEvent(
+			inviteEvent, err = buildMembershipEvent(
 				ctx, invitee, "", profileAPI, device, spec.Invite,
 				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
 			)
