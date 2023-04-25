@@ -172,6 +172,9 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return err
 	}
 	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	if response == nil {
+		return fmt.Errorf("Received nil response from gomatrixserverlib.PerformJoin")
+	}
 
 	// We need to immediately update our list of joined hosts for this room now as we are technically
 	// joined. We must do this synchronously: we cannot rely on the roomserver output events as they
