@@ -163,13 +163,13 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
 
-	if err != nil {
+	if joinErr != nil {
 		if !joinErr.Reachable {
 			r.statistics.ForServer(joinErr.ServerName).Failure()
 		} else {
 			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
 		}
-		return err
+		return joinErr
 	}
 	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 	if response == nil {
