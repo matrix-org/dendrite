@@ -172,8 +172,8 @@ func addUserToRoom(
 		UserID:        userID,
 		Content:       addGroupContent,
 	}
-	joinRes := rsapi.PerformJoinResponse{}
-	return rsAPI.PerformJoin(ctx, &joinReq, &joinRes)
+	_, _, err := rsAPI.PerformJoin(ctx, &joinReq)
+	return err
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {

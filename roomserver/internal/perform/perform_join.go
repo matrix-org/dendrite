@@ -53,32 +53,22 @@ type Joiner struct {
 func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-	res *rsAPI.PerformJoinResponse,
-) error {
+) (roomID string, joinedVia spec.ServerName, err error) {
 	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
 		"room_id": req.RoomIDOrAlias,
 		"user_id": req.UserID,
 		"servers": req.ServerNames,
 	})
 	logger.Info("User requested to room join")
-	roomID, joinedVia, err := r.performJoin(context.Background(), req)
+	roomID, joinedVia, err = r.performJoin(context.Background(), req)
 	if err != nil {
 		logger.WithError(err).Error("Failed to join room")
 		sentry.CaptureException(err)
-		perr, ok := err.(*rsAPI.PerformError)
-		if ok {
-			res.Error = perr
-		} else {
-			res.Error = &rsAPI.PerformError{
-				Msg: err.Error(),
-			}
-		}
-		return nil
+		return "", "", err
 	}
 	logger.Info("User joined room successfully")
-	res.RoomID = roomID
-	res.JoinedVia = joinedVia
-	return nil
+
+	return roomID, joinedVia, nil
 }
 
 func (r *Joiner) performJoin(
@@ -87,16 +77,10 @@ func (r *Joiner) performJoin(
 ) (string, spec.ServerName, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		return "", "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Supplied user ID %q in incorrect format", req.UserID),
-		}
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)}
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		return "", "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("User %q does not belong to this homeserver", req.UserID),
-		}
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", req.UserID)}
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
 		return r.performJoinRoomByID(ctx, req)
@@ -104,10 +88,7 @@ func (r *Joiner) performJoin(
 	if strings.HasPrefix(req.RoomIDOrAlias, "#") {
 		return r.performJoinRoomByAlias(ctx, req)
 	}
-	return "", "", &rsAPI.PerformError{
-		Code: rsAPI.PerformErrorBadRequest,
-		Msg:  fmt.Sprintf("Room ID or alias %q is invalid", req.RoomIDOrAlias),
-	}
+	return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("room ID or alias %q is invalid", req.RoomIDOrAlias)}
 }
 
 func (r *Joiner) performJoinRoomByAlias(
@@ -182,10 +163,7 @@ func (r *Joiner) performJoinRoomByID(
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
-		return "", "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Room ID %q is invalid: %s", req.RoomIDOrAlias, err),
-		}
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", req.RoomIDOrAlias, err)}
 	}
 
 	// If the server name in the room ID isn't ours then it's a
@@ -199,10 +177,7 @@ func (r *Joiner) performJoinRoomByID(
 	userID := req.UserID
 	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
-		return "", "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("User ID %q is invalid: %s", userID, err),
-		}
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", userID, err)}
 	}
 	eb := gomatrixserverlib.EventBuilder{
 		Type:     spec.MRoomMember,
@@ -286,10 +261,7 @@ func (r *Joiner) performJoinRoomByID(
 		// Servers MUST only allow guest users to join rooms if the m.room.guest_access state event
 		// is present on the room and has the guest_access value can_join.
 		if guestAccess != "can_join" {
-			return "", "", &rsAPI.PerformError{
-				Code: rsAPI.PerformErrorNotAllowed,
-				Msg:  "Guest access is forbidden",
-			}
+			return "", "", rsAPI.ErrNotAllowed{Err: fmt.Errorf("guest access is forbidden")}
 		}
 	}
 
@@ -341,16 +313,10 @@ func (r *Joiner) performJoinRoomByID(
 			}
 			inputRes := rsAPI.InputRoomEventsResponse{}
 			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
-				return "", "", &rsAPI.PerformError{
-					Code: rsAPI.PerformErrorNoOperation,
-					Msg:  fmt.Sprintf("InputRoomEvents failed: %s", err),
-				}
+				return "", "", rsAPI.ErrNotAllowed{Err: err}
 			}
 			if err = inputRes.Err(); err != nil {
-				return "", "", &rsAPI.PerformError{
-					Code: rsAPI.PerformErrorNotAllowed,
-					Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
-				}
+				return "", "", rsAPI.ErrNotAllowed{Err: err}
 			}
 		}
 
@@ -363,10 +329,7 @@ func (r *Joiner) performJoinRoomByID(
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.
 			if len(req.ServerNames) == 0 {
-				return "", "", &rsAPI.PerformError{
-					Code: rsAPI.PerformErrorNoRoom,
-					Msg:  fmt.Sprintf("room ID %q does not exist", req.RoomIDOrAlias),
-				}
+				return "", "", eventutil.ErrRoomNoExists
 			}
 		}
 
@@ -401,11 +364,7 @@ func (r *Joiner) performFederatedJoinRoomByID(
 	fedRes := fsAPI.PerformJoinResponse{}
 	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)
 	if fedRes.LastError != nil {
-		return "", &rsAPI.PerformError{
-			Code:       rsAPI.PerformErrRemote,
-			Msg:        fedRes.LastError.Message,
-			RemoteCode: fedRes.LastError.Code,
-		}
+		return "", fedRes.LastError
 	}
 	return fedRes.JoinedVia, nil
 }
@@ -429,10 +388,7 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 		return "", nil
 	}
 	if !res.Allowed {
-		return "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorNotAllowed,
-			Msg:  fmt.Sprintf("The join to room %s was not allowed.", joinReq.RoomIDOrAlias),
-		}
+		return "", rsAPI.ErrNotAllowed{Err: fmt.Errorf("the join to room %s was not allowed", joinReq.RoomIDOrAlias)}
 	}
 	return res.AuthorisedVia, nil
 }

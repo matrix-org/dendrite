@@ -15,14 +15,18 @@
 package routing
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -41,7 +45,6 @@ func JoinRoomByIDOrAlias(
 		IsGuest:       device.AccountType == api.AccountTypeGuest,
 		Content:       map[string]interface{}{},
 	}
-	joinRes := roomserverAPI.PerformJoinResponse{}
 
 	// Check to see if any ?server_name= query parameters were
 	// given in the request.
@@ -81,37 +84,66 @@ func JoinRoomByIDOrAlias(
 	done := make(chan util.JSONResponse, 1)
 	go func() {
 		defer close(done)
-		if err := rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes); err != nil {
-			done <- jsonerror.InternalAPIError(req.Context(), err)
-		} else if joinRes.Error != nil {
-			if joinRes.Error.Code == roomserverAPI.PerformErrorNotAllowed && device.AccountType == api.AccountTypeGuest {
-				done <- util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.GuestAccessForbidden(joinRes.Error.Msg),
-				}
-			} else {
-				done <- joinRes.Error.JSONResponse()
-			}
-		} else {
-			done <- util.JSONResponse{
+		roomID, _, err := rsAPI.PerformJoin(req.Context(), &joinReq)
+		var response util.JSONResponse
+
+		switch e := err.(type) {
+		case nil: // success case
+			response = util.JSONResponse{
 				Code: http.StatusOK,
 				// TODO: Put the response struct somewhere internal.
 				JSON: struct {
 					RoomID string `json:"room_id"`
-				}{joinRes.RoomID},
+				}{roomID},
+			}
+		case roomserverAPI.ErrInvalidID:
+			response = util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.Unknown(e.Error()),
+			}
+		case roomserverAPI.ErrNotAllowed:
+			jsonErr := jsonerror.Forbidden(e.Error())
+			if device.AccountType == api.AccountTypeGuest {
+				jsonErr = jsonerror.GuestAccessForbidden(e.Error())
+			}
+			response = util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonErr,
+			}
+		case *gomatrix.HTTPError: // this ensures we proxy responses over federation to the client
+			response = util.JSONResponse{
+				Code: e.Code,
+				JSON: json.RawMessage(e.Message),
+			}
+		default:
+			response = util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.InternalServerError(),
+			}
+			if errors.Is(err, eventutil.ErrRoomNoExists) {
+				response = util.JSONResponse{
+					Code: http.StatusNotFound,
+					JSON: jsonerror.NotFound(e.Error()),
+				}
 			}
 		}
+		done <- response
 	}()
 
 	// Wait either for the join to finish, or for us to hit a reasonable
 	// timeout, at which point we'll just return a 200 to placate clients.
+	timer := time.NewTimer(time.Second * 20)
 	select {
-	case <-time.After(time.Second * 20):
+	case <-timer.C:
 		return util.JSONResponse{
 			Code: http.StatusAccepted,
 			JSON: jsonerror.Unknown("The room join will continue in the background."),
 		}
 	case result := <-done:
+		// Stop and drain the timer
+		if !timer.Stop() {
+			<-timer.C
+		}
 		return result
 	}
 }
