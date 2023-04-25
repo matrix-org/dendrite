@@ -60,7 +60,7 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
 		logrus.WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
-		return util.ErrorResponse(err)
+		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
 
 	return util.JSONResponse{
