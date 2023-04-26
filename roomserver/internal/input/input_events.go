@@ -567,7 +567,7 @@ func (r *Inputer) processStateBefore(
 			rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
 			return
 		default:
-			stateBeforeEvent := make([]*gomatrixserverlib.Event, len(stateBeforeRes.StateEvents))
+			stateBeforeEvent = make([]*gomatrixserverlib.Event, len(stateBeforeRes.StateEvents))
 			for i := range stateBeforeRes.StateEvents {
 				stateBeforeEvent[i] = stateBeforeRes.StateEvents[i].Event
 			}
@@ -578,6 +578,7 @@ func (r *Inputer) processStateBefore(
 	// Check whether the event is allowed or not.
 	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
 	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
+		rejectionErr = fmt.Errorf("Allowed() failed for stateBeforeEvent: %w", rejectionErr)
 		return
 	}
 	// Work out what the history visibility was at the time of the
