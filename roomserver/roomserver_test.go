@@ -764,6 +764,7 @@ func TestUpgrade(t *testing.T) {
 	charlie := test.NewUser(t)
 	ctx := context.Background()
 
+	spaceChild := test.NewRoom(t, alice)
 	validateTuples := []gomatrixserverlib.StateKeyTuple{
 		{EventType: spec.MRoomCreate},
 		{EventType: spec.MRoomPowerLevels},
@@ -772,8 +773,8 @@ func TestUpgrade(t *testing.T) {
 		{EventType: spec.MRoomCanonicalAlias},
 		{EventType: "m.room.tombstone"},
 		{EventType: "m.custom.event"},
+		{EventType: "m.space.child", StateKey: spaceChild.ID},
 		{EventType: "m.custom.event", StateKey: alice.ID},
-		{EventType: spec.MRoomMember, StateKey: bob.ID},     // invite should be transferred
 		{EventType: spec.MRoomMember, StateKey: charlie.ID}, // ban should be transferred
 	}
 
@@ -984,16 +985,28 @@ func TestUpgrade(t *testing.T) {
 			},
 		},
 		{
-			name:        "invites/bans are transferred",
+			name:        "bans are transferred",
 			upgradeUser: alice.ID,
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
-					"membership": spec.Invite,
-				}, test.WithStateKey(bob.ID))
-				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": spec.Ban,
 				}, test.WithStateKey(charlie.ID))
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return r.ID
+			},
+			wantNewRoom:  true,
+			validateFunc: validate,
+		},
+		{
+			name:        "space childs are transferred",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice)
+
+				r.CreateAndInsert(t, alice, "m.space.child", map[string]interface{}{}, test.WithStateKey(spaceChild.ID))
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
 				}
