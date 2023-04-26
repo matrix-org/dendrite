@@ -169,7 +169,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		} else {
 			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
 		}
-		return joinErr
+		return joinErr.Err
 	}
 	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 	if response == nil {
