@@ -119,8 +119,8 @@ func (r *Inviter) PerformInvite(
 		}
 		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 			EventNID: 0,
-			Event:    event.Unwrap(),
-		}, outputUpdates, req.Event.RoomVersion)
+			Event:    event.Event,
+		}, outputUpdates, req.Event.Version())
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
@@ -300,7 +300,7 @@ func buildInviteStrippedState(
 	inviteState := []fclient.InviteV2StrippedState{
 		fclient.NewInviteV2StrippedState(input.Event.Event),
 	}
-	stateEvents = append(stateEvents, types.Event{Event: input.Event.Unwrap()})
+	stateEvents = append(stateEvents, types.Event{Event: input.Event.Event})
 	for _, event := range stateEvents {
 		inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.Event))
 	}

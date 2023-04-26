@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -67,7 +68,7 @@ func CreateInvitesFrom3PIDInvites(
 		return *reqErr
 	}
 
-	evs := []*gomatrixserverlib.HeaderedEvent{}
+	evs := []*types.HeaderedEvent{}
 	for _, inv := range body.Invites {
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
@@ -86,7 +87,7 @@ func CreateInvitesFrom3PIDInvites(
 			return jsonerror.InternalServerError()
 		}
 		if event != nil {
-			evs = append(evs, event.Headered(verRes.RoomVersion))
+			evs = append(evs, &types.HeaderedEvent{Event: event})
 		}
 	}
 
@@ -185,7 +186,7 @@ func ExchangeThirdPartyInvite(
 
 	// Ask the requesting server to sign the newly created event so we know it
 	// acknowledged it
-	inviteReq, err := fclient.NewInviteV2Request(event.Headered(verRes.RoomVersion), nil)
+	inviteReq, err := fclient.NewInviteV2Request(event, nil)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
 		return jsonerror.InternalServerError()
@@ -210,8 +211,8 @@ func ExchangeThirdPartyInvite(
 	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			inviteEvent.Headered(verRes.RoomVersion),
+		[]*types.HeaderedEvent{
+			{Event: inviteEvent},
 		},
 		request.Destination(),
 		request.Origin(),

@@ -95,7 +95,7 @@ type StateSnapshot interface {
 
 	BulkSelectMembershipForHistoryVisibility(
 		ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
-	) (map[string]*gomatrixserverlib.HeaderedEvent, error)
+	) (map[string]*types.HeaderedEvent, error)
 }
 
 type StateBlock interface {
@@ -196,7 +196,7 @@ type StrippedEvent struct {
 // ExtractContentValue from the given state event. For example, given an m.room.name event with:
 // content: { name: "Foo" }
 // this returns "Foo".
-func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
+func ExtractContentValue(ev *types.HeaderedEvent) string {
 	content := ev.Content()
 	key := ""
 	switch ev.Type() {

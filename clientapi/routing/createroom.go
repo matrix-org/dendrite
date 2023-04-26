@@ -24,6 +24,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -429,7 +430,7 @@ func createRoom(
 	// TODO: invite events
 	// TODO: 3pid invite events
 
-	var builtEvents []*gomatrixserverlib.HeaderedEvent
+	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
@@ -462,7 +463,7 @@ func createRoom(
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, ev.Headered(roomVersion))
+		builtEvents = append(builtEvents, &types.HeaderedEvent{Event: ev})
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("authEvents.AddEvent failed")
@@ -557,11 +558,11 @@ func createRoom(
 			)
 			// Send the invite event to the roomserver.
 			var inviteRes roomserverAPI.PerformInviteResponse
-			event := inviteEvent.Headered(roomVersion)
+			event := inviteEvent
 			if err := rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
-				RoomVersion:     event.RoomVersion,
+				RoomVersion:     event.Version(),
 				SendAsServer:    string(userDomain),
 			}, &inviteRes); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")

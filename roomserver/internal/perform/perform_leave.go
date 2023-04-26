@@ -196,7 +196,7 @@ func (r *Leaver) performLeaveRoomByID(
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:         api.KindNew,
-				Event:        event.Headered(buildRes.RoomVersion),
+				Event:        event,
 				Origin:       senderDomain,
 				SendAsServer: string(senderDomain),
 			},

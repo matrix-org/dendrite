@@ -16,6 +16,7 @@
 package synctypes
 
 import (
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -56,7 +57,7 @@ func ToClientEvents(serverEvs []*gomatrixserverlib.Event, format ClientEventForm
 }
 
 // HeaderedToClientEvents converts headered server events to client events.
-func HeaderedToClientEvents(serverEvs []*gomatrixserverlib.HeaderedEvent, format ClientEventFormat) []ClientEvent {
+func HeaderedToClientEvents(serverEvs []*types.HeaderedEvent, format ClientEventFormat) []ClientEvent {
 	evs := make([]ClientEvent, 0, len(serverEvs))
 	for _, se := range serverEvs {
 		if se == nil {
@@ -86,6 +87,6 @@ func ToClientEvent(se *gomatrixserverlib.Event, format ClientEventFormat) Client
 }
 
 // HeaderedToClientEvent converts a single headered server event to a client event.
-func HeaderedToClientEvent(se *gomatrixserverlib.HeaderedEvent, format ClientEventFormat) ClientEvent {
+func HeaderedToClientEvent(se *types.HeaderedEvent, format ClientEventFormat) ClientEvent {
 	return ToClientEvent(se.Event, format)
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
@@ -302,7 +303,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		origin,
 		roomserverAPI.KindNew,
 		respState,
-		event.Headered(respMakeJoin.RoomVersion),
+		&types.HeaderedEvent{Event: event},
 		serverName,
 		nil,
 		false,
@@ -505,7 +506,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromEvents(stateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromEvents(authEvents),
 		},
-		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
+		&types.HeaderedEvent{Event: respPeek.LatestEvent},
 		serverName,
 		nil,
 		false,
@@ -652,7 +653,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := fclient.NewInviteV2Request(request.Event, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(request.Event.Event, request.InviteRoomState)
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
@@ -670,7 +671,7 @@ func (r *FederationInternalAPI) PerformInvite(
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
-	response.Event = inviteEvent.Headered(request.RoomVersion)
+	response.Event = &types.HeaderedEvent{Event: inviteEvent}
 	return nil
 }
 

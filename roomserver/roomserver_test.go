@@ -136,7 +136,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 
 	// revoke guest access
 	revokeEvent := room.CreateAndInsert(t, alice, spec.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
 		t.Errorf("failed to send events: %v", err)
 	}
 
@@ -401,7 +401,7 @@ type fledglingEvent struct {
 	PrevEvents []interface{}
 }
 
-func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEvent) {
 	t.Helper()
 	roomVer := gomatrixserverlib.RoomVersionV9
 	seed := make([]byte, ed25519.SeedSize) // zero seed
@@ -423,7 +423,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := signedEvent.Headered(roomVer)
+	h := &types.HeaderedEvent{Event: signedEvent}
 	return h
 }
 
@@ -451,7 +451,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 		{
@@ -468,7 +468,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 		{
@@ -485,7 +485,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 		{
@@ -501,7 +501,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 	}

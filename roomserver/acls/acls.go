@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
@@ -34,7 +35,7 @@ type ServerACLDatabase interface {
 	// GetStateEvent returns the state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
-	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
 }
 
 type ServerACLs struct {

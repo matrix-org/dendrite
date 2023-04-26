@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -388,7 +389,7 @@ func (w *walker) walk() util.JSONResponse {
 	}
 }
 
-func (w *walker) stateEvent(roomID, evType, stateKey string) *gomatrixserverlib.HeaderedEvent {
+func (w *walker) stateEvent(roomID, evType, stateKey string) *types.HeaderedEvent {
 	var queryRes roomserver.QueryCurrentStateResponse
 	tuple := gomatrixserverlib.StateKeyTuple{
 		EventType: evType,
@@ -636,7 +637,7 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 	return false, false
 }
 
-func (w *walker) restrictedJoinRuleAllowedRooms(joinRuleEv *gomatrixserverlib.HeaderedEvent, allowType string) (allows []string) {
+func (w *walker) restrictedJoinRuleAllowedRooms(joinRuleEv *types.HeaderedEvent, allowType string) (allows []string) {
 	rule, _ := joinRuleEv.JoinRule()
 	if rule != spec.Restricted {
 		return nil

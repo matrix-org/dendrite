@@ -102,7 +102,7 @@ func (r *Inputer) processRoomEvent(
 
 	// Parse and validate the event JSON
 	headered := input.Event
-	event := headered.Unwrap()
+	event := headered.Event
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id": event.EventID(),
 		"room_id":  event.RoomID(),
@@ -235,7 +235,7 @@ func (r *Inputer) processRoomEvent(
 				haveEvents:  map[string]*gomatrixserverlib.Event{},
 			}
 			var stateSnapshot *parsedRespState
-			if stateSnapshot, err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			if stateSnapshot, err = missingState.processEventWithMissingState(ctx, event, headered.Version()); err != nil {
 				// Something went wrong with retrieving the missing state, so we can't
 				// really do anything with the event other than reject it at this point.
 				isRejected = true
@@ -467,7 +467,7 @@ func (r *Inputer) processRoomEvent(
 				Type: api.OutputTypeRedactedEvent,
 				RedactedEvent: &api.OutputRedactedEvent{
 					RedactedEventID: redactedEventID,
-					RedactedBecause: redactionEvent.Headered(headered.RoomVersion),
+					RedactedBecause: &types.HeaderedEvent{Event: redactionEvent},
 				},
 			},
 		})
@@ -509,7 +509,7 @@ func (r *Inputer) processStateBefore(
 	missingPrev bool,
 ) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
 	historyVisibility = gomatrixserverlib.HistoryVisibilityShared // Default to shared.
-	event := input.Event.Unwrap()
+	event := input.Event.Event
 	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	var stateBeforeEvent []*gomatrixserverlib.Event
 	switch {
@@ -567,7 +567,10 @@ func (r *Inputer) processStateBefore(
 			rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
 			return
 		default:
-			stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
+			stateBeforeEvent := make([]*gomatrixserverlib.Event, len(stateBeforeRes.StateEvents))
+			for i := range stateBeforeRes.StateEvents {
+				stateBeforeEvent[i] = stateBeforeRes.StateEvents[i].Event
+			}
 		}
 	}
 	// At this point, stateBeforeEvent should be populated either by
@@ -604,7 +607,7 @@ func (r *Inputer) fetchAuthEvents(
 	logger *logrus.Entry,
 	roomInfo *types.RoomInfo,
 	virtualHost spec.ServerName,
-	event *gomatrixserverlib.HeaderedEvent,
+	event *types.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
 	known map[string]*types.Event,
 	servers []spec.ServerName,
@@ -654,7 +657,7 @@ func (r *Inputer) fetchAuthEvents(
 		// Request the entire auth chain for the event in question. This should
 		// contain all of the auth events — including ones that we already know —
 		// so we'll need to filter through those in the next section.
-		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.RoomVersion, event.RoomID(), event.EventID())
+		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.Version(), event.RoomID(), event.EventID())
 		if err != nil {
 			logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 			continue
@@ -671,7 +674,7 @@ func (r *Inputer) fetchAuthEvents(
 	isRejected := false
 nextAuthEvent:
 	for _, authEvent := range gomatrixserverlib.ReverseTopologicalOrdering(
-		res.AuthEvents.UntrustedEvents(event.RoomVersion),
+		res.AuthEvents.UntrustedEvents(event.Version()),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	) {
 		// If we already know about this event from the database then we don't

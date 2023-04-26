@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/federationapi/types"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type Database interface {
@@ -38,7 +39,7 @@ type Database interface {
 
 	StoreJSON(ctx context.Context, js string) (*receipt.Receipt, error)
 
-	GetPendingPDUs(ctx context.Context, serverName spec.ServerName, limit int) (pdus map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent, err error)
+	GetPendingPDUs(ctx context.Context, serverName spec.ServerName, limit int) (pdus map[*receipt.Receipt]*rstypes.HeaderedEvent, err error)
 	GetPendingEDUs(ctx context.Context, serverName spec.ServerName, limit int) (edus map[*receipt.Receipt]*gomatrixserverlib.EDU, err error)
 
 	AssociatePDUWithDestinations(ctx context.Context, destinations map[spec.ServerName]struct{}, dbReceipt *receipt.Receipt) error

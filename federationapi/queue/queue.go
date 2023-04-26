@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
 
@@ -140,7 +141,7 @@ func NewOutgoingQueues(
 
 type queuedPDU struct {
 	dbReceipt *receipt.Receipt
-	pdu       *gomatrixserverlib.HeaderedEvent
+	pdu       *types.HeaderedEvent
 }
 
 type queuedEDU struct {
@@ -187,7 +188,7 @@ func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
-	ev *gomatrixserverlib.HeaderedEvent, origin spec.ServerName,
+	ev *types.HeaderedEvent, origin spec.ServerName,
 	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
