@@ -48,7 +48,6 @@ type createRoomRequest struct {
 	CreationContent           json.RawMessage               `json:"creation_content"`
 	InitialState              []fledglingEvent              `json:"initial_state"`
 	RoomAliasName             string                        `json:"room_alias_name"`
-	GuestCanJoin              bool                          `json:"guest_can_join"`
 	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
 	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
 	IsDirect                  bool                          `json:"is_direct"`
@@ -253,16 +252,19 @@ func createRoom(
 		}
 	}
 
+	var guestsCanJoin bool
 	switch r.Preset {
 	case presetPrivateChat:
 		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
+		guestsCanJoin = true
 	case presetTrustedPrivateChat:
 		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 		for _, invitee := range r.Invite {
 			powerLevelContent.Users[invitee] = 100
 		}
+		guestsCanJoin = true
 	case presetPublicChat:
 		joinRuleContent.JoinRule = spec.Public
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
@@ -317,7 +319,7 @@ func createRoom(
 		}
 	}
 
-	if r.GuestCanJoin {
+	if guestsCanJoin {
 		guestAccessEvent = &fledglingEvent{
 			Type: spec.MRoomGuestAccess,
 			Content: eventutil.GuestAccessContent{

@@ -370,6 +370,10 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 				continue
 			}
 		}
+		// skip events that rely on a specific user being present
+		if event.Type() != spec.MRoomMember && !event.StateKeyEquals("") {
+			continue
+		}
 		state[gomatrixserverlib.StateKeyTuple{EventType: event.Type(), StateKey: *event.StateKey()}] = event
 	}
 
