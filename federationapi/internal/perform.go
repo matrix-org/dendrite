@@ -182,7 +182,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
 	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
 	// The events are trusted now as we performed auth checks above.
-	joinedHosts, err := consumers.JoinedHostsFromEvents(response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.RoomVersion, false))
+	joinedHosts, err := consumers.JoinedHostsFromEvents(response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false))
 	if err != nil {
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
@@ -199,7 +199,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		user.Domain(),
 		roomserverAPI.KindNew,
 		response.StateSnapshot,
-		response.JoinEvent,
+		response.JoinEvent.Headered(response.JoinEvent.Version()),
 		serverName,
 		nil,
 		false,
