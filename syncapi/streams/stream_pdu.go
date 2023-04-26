@@ -274,13 +274,20 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	recentStreamEvents := dbEvents[delta.RoomID].Events
 	limited := dbEvents[delta.RoomID].Limited
 
+	hisVisMap := map[string]gomatrixserverlib.HistoryVisibility{}
+	for _, re := range recentStreamEvents {
+		hisVisMap[re.EventID()] = re.Visibility
+	}
 	recEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
 		toEvents(snapshot.StreamEventsToEvents(device, recentStreamEvents)),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
 	recentEvents := make([]*rstypes.HeaderedEvent, len(recEvents))
 	for i := range recEvents {
-		recentEvents[i] = &rstypes.HeaderedEvent{Event: recEvents[i]}
+		recentEvents[i] = &rstypes.HeaderedEvent{
+			Event:      recEvents[i],
+			Visibility: hisVisMap[recEvents[i].EventID()],
+		}
 	}
 
 	// If we didn't return any events at all then don't bother doing anything else.
@@ -346,13 +353,20 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Now that we've filtered the timeline, work out which state events are still
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
+	hisVisMap = map[string]gomatrixserverlib.HistoryVisibility{}
+	for _, re := range delta.StateEvents {
+		hisVisMap[re.EventID()] = re.Visibility
+	}
 	sEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
 		toEvents(removeDuplicates(delta.StateEvents, events)),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	)
 	delta.StateEvents = make([]*rstypes.HeaderedEvent, len(sEvents))
 	for i := range sEvents {
-		delta.StateEvents[i] = &rstypes.HeaderedEvent{Event: sEvents[i]}
+		delta.StateEvents[i] = &rstypes.HeaderedEvent{
+			Event:      sEvents[i],
+			Visibility: hisVisMap[sEvents[i].EventID()],
+		}
 	}
 
 	if len(delta.StateEvents) > 0 {
