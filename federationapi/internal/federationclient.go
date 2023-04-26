@@ -19,14 +19,11 @@ func (a *FederationInternalAPI) MakeJoin(
 ) (res gomatrixserverlib.MakeJoinResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
-		return a.federation.MakeJoin(ctx, origin, s, roomID, userID)
-	})
+	ires, err := a.federation.MakeJoin(ctx, origin, s, roomID, userID)
 	if err != nil {
 		return &fclient.RespMakeJoin{}, err
 	}
-	r := ires.(fclient.RespMakeJoin)
-	return &r, nil
+	return &ires, nil
 }
 
 func (a *FederationInternalAPI) SendJoin(
@@ -34,14 +31,11 @@ func (a *FederationInternalAPI) SendJoin(
 ) (res gomatrixserverlib.SendJoinResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
-		return a.federation.SendJoin(ctx, origin, s, event)
-	})
+	ires, err := a.federation.SendJoin(ctx, origin, s, event)
 	if err != nil {
 		return &fclient.RespSendJoin{}, err
 	}
-	r := ires.(fclient.RespSendJoin)
-	return &r, nil
+	return &ires, nil
 }
 
 func (a *FederationInternalAPI) GetEventAuth(
