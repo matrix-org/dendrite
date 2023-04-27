@@ -66,7 +66,6 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			Preset:        presetPublicChat,
 			RoomAliasName: "alias",
 			Invite:        []string{bob.ID},
-			GuestCanJoin:  false,
 		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crResp, ok := resp.JSON.(createRoomResponse)
 		if !ok {
@@ -75,13 +74,12 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 		// create a room with guest access enabled and invite Charlie
 		resp = createRoom(ctx, createRoomRequest{
-			Name:         "testing",
-			IsDirect:     true,
-			Topic:        "testing",
-			Visibility:   "public",
-			Preset:       presetPublicChat,
-			Invite:       []string{charlie.ID},
-			GuestCanJoin: true,
+			Name:       "testing",
+			IsDirect:   true,
+			Topic:      "testing",
+			Visibility: "public",
+			Preset:     presetPublicChat,
+			Invite:     []string{charlie.ID},
 		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crRespWithGuestAccess, ok := resp.JSON.(createRoomResponse)
 		if !ok {

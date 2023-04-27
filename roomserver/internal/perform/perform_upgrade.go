@@ -319,9 +319,7 @@ func publishNewRoomAndUnpublishOldRoom(
 }
 
 func (r *Upgrader) validateRoomExists(ctx context.Context, roomID string) error {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := r.URSAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+	if _, err := r.URSAPI.QueryRoomVersionForRoom(ctx, roomID); err != nil {
 		return &api.PerformError{
 			Code: api.PerformErrorNoRoom,
 			Msg:  "Room does not exist",
@@ -357,7 +355,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			continue
 		}
 		if event.Type() == spec.MRoomMember && !event.StateKeyEquals(userID) {
-			// With the exception of bans and invites which we do want to copy, we
+			// With the exception of bans which we do want to copy, we
 			// should ignore membership events that aren't our own, as event auth will
 			// prevent us from being able to create membership events on behalf of other
 			// users anyway unless they are invites or bans.
@@ -367,10 +365,14 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			}
 			switch membership {
 			case spec.Ban:
-			case spec.Invite:
 			default:
 				continue
 			}
+		}
+		// skip events that rely on a specific user being present
+		sKey := *event.StateKey()
+		if event.Type() != spec.MRoomMember && len(sKey) > 0 && sKey[:1] == "@" {
+			continue
 		}
 		state[gomatrixserverlib.StateKeyTuple{EventType: event.Type(), StateKey: *event.StateKey()}] = event
 	}

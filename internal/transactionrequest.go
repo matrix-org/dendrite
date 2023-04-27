@@ -115,14 +115,13 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if v, ok := roomVersions[roomID]; ok {
 			return v
 		}
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := t.rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
-			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", verReq.RoomID)
+		roomVersion, err := t.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
 			return ""
 		}
-		roomVersions[roomID] = verRes.RoomVersion
-		return verRes.RoomVersion
+		roomVersions[roomID] = roomVersion
+		return roomVersion
 	}
 
 	for _, pdu := range t.PDUs {
