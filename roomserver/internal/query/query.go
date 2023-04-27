@@ -696,34 +696,20 @@ func GetAuthChain(
 }
 
 // QueryRoomVersionForRoom implements api.RoomserverInternalAPI
-func (r *Queryer) QueryRoomVersionForRoom(
-	ctx context.Context,
-	request *api.QueryRoomVersionForRoomRequest,
-	response *api.QueryRoomVersionForRoomResponse,
-) error {
-	if roomVersion, ok := r.Cache.GetRoomVersion(request.RoomID); ok {
-		response.RoomVersion = roomVersion
-		return nil
+func (r *Queryer) QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
+	if roomVersion, ok := r.Cache.GetRoomVersion(roomID); ok {
+		return roomVersion, nil
 	}
 
-	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if info == nil {
-		return fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", request.RoomID)
+		return "", fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", roomID)
 	}
-	response.RoomVersion = info.RoomVersion
-	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
-	return nil
-}
-
-func (r *Queryer) roomVersion(roomID string) (gomatrixserverlib.RoomVersion, error) {
-	var res api.QueryRoomVersionForRoomResponse
-	err := r.QueryRoomVersionForRoom(context.Background(), &api.QueryRoomVersionForRoomRequest{
-		RoomID: roomID,
-	}, &res)
-	return res.RoomVersion, err
+	r.Cache.StoreRoomVersion(roomID, info.RoomVersion)
+	return info.RoomVersion, nil
 }
 
 func (r *Queryer) QueryPublishedRooms(
@@ -910,8 +896,8 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
 		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
-	// If the join rule isn't "restricted" then there's nothing more to do.
-	res.Restricted = joinRules.JoinRule == spec.Restricted
+	// If the join rule isn't "restricted" or "knock_restricted" then there's nothing more to do.
+	res.Restricted = joinRules.JoinRule == spec.Restricted || joinRules.JoinRule == spec.KnockRestricted
 	if !res.Restricted {
 		return nil
 	}
@@ -932,9 +918,9 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 	}
-	var powerLevels gomatrixserverlib.PowerLevelContent
-	if err = json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
-		return fmt.Errorf("json.Unmarshal: %w", err)
+	powerLevels, err := powerLevelsEvent.PowerLevels()
+	if err != nil {
+		return fmt.Errorf("unable to get powerlevels: %w", err)
 	}
 	// Step through the join rules and see if the user matches any of them.
 	for _, rule := range joinRules.Allow {

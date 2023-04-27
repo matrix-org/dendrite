@@ -669,13 +669,17 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserve
 	if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
 		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
-	if roomVersion == "" {
-		rv, ok := d.Cache.GetRoomVersion(event.RoomID())
-		if ok {
-			roomVersion = rv
-		}
+
+	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID())
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID())
+	// if we found both, the roomNID and version in our cache, no need to query the database
+	if nidOK && versionOK {
+		return &types.RoomInfo{
+			RoomNID:     roomNID,
+			RoomVersion: cachedRoomVersion,
+		}, nil
 	}
-	var roomNID types.RoomNID
+
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion)
 		if err != nil {
@@ -1164,7 +1168,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if roomInfo.IsStub() {
 		return nil, nil
 	}
-	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, evType)
 	if err == sql.ErrNoRows {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
@@ -1172,7 +1176,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
+	stateKeyNID, err := d.GetOrCreateEventStateKeyNID(ctx, &stateKey)
 	if err == sql.ErrNoRows {
 		// No rooms have a state event with this state key, otherwise we'd have an state key NID
 		return nil, nil
@@ -1201,6 +1205,10 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	// return the event requested
 	for _, e := range entries {
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
+			cachedEvent, ok := d.Cache.GetRoomServerEvent(e.EventNID)
+			if ok {
+				return cachedEvent.Headered(roomInfo.RoomVersion), nil
+			}
 			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{e.EventNID})
 			if err != nil {
 				return nil, err
@@ -1324,7 +1332,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	}
 	// we don't bother failing the request if we get asked for event types we don't know about, as all that would result in is no matches which
 	// isn't a failure.
-	eventTypeNIDMap, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, nil, eventTypes)
+	eventTypeNIDMap, err := d.eventTypeNIDs(ctx, nil, eventTypes)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to map event type nids: %w", err)
 	}

@@ -73,14 +73,12 @@ type FakeRsAPI struct {
 
 func (r *FakeRsAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
-	req *rsAPI.QueryRoomVersionForRoomRequest,
-	res *rsAPI.QueryRoomVersionForRoomResponse,
-) error {
+	roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
 	if r.shouldFailQuery {
-		return fmt.Errorf("Failure")
+		return "", fmt.Errorf("Failure")
 	}
-	res.RoomVersion = gomatrixserverlib.RoomVersionV10
-	return nil
+	return gomatrixserverlib.RoomVersionV10, nil
 }
 
 func (r *FakeRsAPI) QueryServerBannedFromRoom(
@@ -723,11 +721,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 // Asks for the room version for a given room.
 func (t *testRoomserverAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
-	request *rsAPI.QueryRoomVersionForRoomRequest,
-	response *rsAPI.QueryRoomVersionForRoomResponse,
-) error {
-	response.RoomVersion = testRoomVersion
-	return nil
+	roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	return testRoomVersion, nil
 }
 
 func (t *testRoomserverAPI) QueryServerBannedFromRoom(

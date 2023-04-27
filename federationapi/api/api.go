@@ -17,6 +17,7 @@ import (
 // FederationInternalAPI is used to query information from the federation sender.
 type FederationInternalAPI interface {
 	gomatrixserverlib.FederatedStateClient
+	gomatrixserverlib.FederatedJoinClient
 	KeyserverFederationAPI
 	gomatrixserverlib.KeyDatabase
 	ClientFederationAPI

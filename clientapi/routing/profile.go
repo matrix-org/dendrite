@@ -339,9 +339,8 @@ func buildMembershipEvents(
 	evs := []*types.HeaderedEvent{}
 
 	for _, roomID := range roomIDs {
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+		roomVersion, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+		if err != nil {
 			return nil, err
 		}
 
@@ -359,7 +358,7 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err := builder.SetContent(content); err != nil {
+		if err = builder.SetContent(content); err != nil {
 			return nil, err
 		}
 

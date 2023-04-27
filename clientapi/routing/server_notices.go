@@ -157,7 +157,6 @@ func SendServerNotice(
 			Visibility:                "private",
 			Preset:                    presetPrivateChat,
 			CreationContent:           cc,
-			GuestCanJoin:              false,
 			RoomVersion:               roomVersion,
 			PowerLevelContentOverride: pl,
 		}

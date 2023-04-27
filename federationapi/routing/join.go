@@ -43,9 +43,8 @@ func MakeJoin(
 	roomID, userID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -58,7 +57,7 @@ func MakeJoin(
 	// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
 	remoteSupportsVersion := false
 	for _, v := range remoteVersions {
-		if v == verRes.RoomVersion {
+		if v == roomVersion {
 			remoteSupportsVersion = true
 			break
 		}
@@ -67,7 +66,7 @@ func MakeJoin(
 	if !remoteSupportsVersion {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.IncompatibleRoomVersion(verRes.RoomVersion),
+			JSON: jsonerror.IncompatibleRoomVersion(roomVersion),
 		}
 	}
 
@@ -110,7 +109,7 @@ func MakeJoin(
 
 	// Check if the restricted join is allowed. If the room doesn't
 	// support restricted joins then this is effectively a no-op.
-	res, authorisedVia, err := checkRestrictedJoin(httpReq, rsAPI, verRes.RoomVersion, roomID, userID)
+	res, authorisedVia, err := checkRestrictedJoin(httpReq, rsAPI, roomVersion, roomID, userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("checkRestrictedJoin failed")
 		return jsonerror.InternalServerError()
@@ -145,7 +144,7 @@ func MakeJoin(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{
-		RoomVersion: verRes.RoomVersion,
+		RoomVersion: roomVersion,
 	}
 	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
@@ -181,7 +180,7 @@ func MakeJoin(
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
 			"event":        builder,
-			"room_version": verRes.RoomVersion,
+			"room_version": roomVersion,
 		},
 	}
 }
@@ -198,21 +197,20 @@ func SendJoin(
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
+	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
-	verImpl, err := gomatrixserverlib.GetRoomVersion(verRes.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("QueryRoomVersionForRoom returned unknown room version: %s", verRes.RoomVersion),
+				fmt.Sprintf("QueryRoomVersionForRoom returned unknown room version: %s", roomVersion),
 			),
 		}
 	}

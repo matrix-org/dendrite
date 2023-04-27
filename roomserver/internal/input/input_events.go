@@ -478,7 +478,7 @@ func (r *Inputer) processRoomEvent(
 
 	// If guest_access changed and is not can_join, kick all guest users.
 	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
-		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
+		if err = r.kickGuests(ctx, event, roomInfo); err != nil && err != sql.ErrNoRows {
 			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}
