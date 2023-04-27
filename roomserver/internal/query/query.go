@@ -521,10 +521,6 @@ func (r *Queryer) QueryMissingEvents(
 	response.Events = make([]*types.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
-			_, verr := r.roomVersion(event.RoomID())
-			if verr != nil {
-				return verr
-			}
 			if _, ok := redactEventIDs[event.EventID()]; ok {
 				event.Redact()
 			}

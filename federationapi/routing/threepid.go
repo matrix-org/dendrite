@@ -70,7 +70,7 @@ func CreateInvitesFrom3PIDInvites(
 
 	evs := []*types.HeaderedEvent{}
 	for _, inv := range body.Invites {
-		roomVersion, err := rsAPI.QueryRoomVersionForRoom(req.Context(), inv.RoomID)
+		_, err := rsAPI.QueryRoomVersionForRoom(req.Context(), inv.RoomID)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,

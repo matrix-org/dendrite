@@ -1207,7 +1207,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
 			cachedEvent, ok := d.Cache.GetRoomServerEvent(e.EventNID)
 			if ok {
-				return cachedEvent.Headered(roomInfo.RoomVersion), nil
+				return &types.HeaderedEvent{Event: cachedEvent}, nil
 			}
 			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{e.EventNID})
 			if err != nil {

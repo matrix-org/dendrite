@@ -339,11 +339,6 @@ func buildMembershipEvents(
 	evs := []*types.HeaderedEvent{}
 
 	for _, roomID := range roomIDs {
-		roomVersion, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
-		if err != nil {
-			return nil, err
-		}
-
 		builder := gomatrixserverlib.EventBuilder{
 			Sender:   userID,
 			RoomID:   roomID,
@@ -358,7 +353,7 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err = builder.SetContent(content); err != nil {
+		if err := builder.SetContent(content); err != nil {
 			return nil, err
 		}
 
