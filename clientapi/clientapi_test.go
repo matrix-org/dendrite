@@ -1758,3 +1758,106 @@ func (d dummyStore) GetEncryptionEvent(roomID id.RoomID) *event.EncryptionEventC
 func (d dummyStore) FindSharedRooms(userID id.UserID) []id.RoomID {
 	return []id.RoomID{}
 }
+
+func TestKeyBackup(t *testing.T) {
+	alice := test.NewUser(t)
+
+	testCases := []struct {
+		name     string
+		request  func(t *testing.T) *http.Request
+		validate func(t *testing.T, rec *httptest.ResponseRecorder)
+	}{
+		{
+			name: "can not create backup with invalid JSON",
+			request: func(t *testing.T) *http.Request {
+				reqBody := strings.NewReader(`{"algorithm":"m.megolm_backup.v1"`)
+				return httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/room_keys/version", reqBody)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusBadRequest {
+					t.Fatalf("HTTP[%d]: expected an error, but got none: %s", rec.Code, rec.Body.String())
+				}
+			},
+		},
+		{
+			name: "can create backup",
+			request: func(t *testing.T) *http.Request {
+				reqBody := strings.NewReader(`{"algorithm":"m.megolm_backup.v1"}`)
+				return httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/room_keys/version", reqBody)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("HTTP[%d]: expected no error, but got: %s", rec.Code, rec.Body.String())
+				}
+				wantVersion := "1"
+				if gotVersion := gjson.GetBytes(rec.Body.Bytes(), "version").Str; gotVersion != wantVersion {
+					t.Fatalf("expected version '%s', got '%s'", wantVersion, gotVersion)
+				}
+			},
+		},
+		{
+			name: "can not delete invalid version backup",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/2", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusNotFound {
+					t.Fatalf("HTTP[%d]: expected HTTP 404, but got: %d", rec.Code, rec.Code)
+				}
+			},
+		},
+		{
+			name: "can delete version backup",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/1", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("HTTP[%d]: expected HTTP 200, but got: %d", rec.Code, rec.Code)
+				}
+			},
+		},
+		{
+			name: "deleting the same backup version twice doesn't error",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/1", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("HTTP[%d]: expected HTTP 200, but got: %d", rec.Code, rec.Code)
+				}
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				req := tc.request(t)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+				routers.Client.ServeHTTP(rec, req)
+				tc.validate(t, rec)
+			})
+		}
+	})
+}

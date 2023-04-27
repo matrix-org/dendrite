@@ -683,22 +683,11 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 	return nil
 }
 
+func (a *UserInternalAPI) DeleteKeyBackup(ctx context.Context, userID, version string) (bool, error) {
+	return a.DB.DeleteKeyBackup(ctx, userID, version)
+}
+
 func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) error {
-	// Delete metadata
-	if req.DeleteBackup {
-		if req.Version == "" {
-			res.BadInput = true
-			res.Error = "must specify a version to delete"
-			return nil
-		}
-		exists, err := a.DB.DeleteKeyBackup(ctx, req.UserID, req.Version)
-		if err != nil {
-			res.Error = fmt.Sprintf("failed to delete backup: %s", err)
-		}
-		res.Exists = exists
-		res.Version = req.Version
-		return nil
-	}
 	// Create metadata
 	if req.Version == "" {
 		version, err := a.DB.CreateKeyBackup(ctx, req.UserID, req.Algorithm, req.AuthData)

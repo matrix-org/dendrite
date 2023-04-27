@@ -87,6 +87,7 @@ type ClientUserAPI interface {
 	UserLoginAPI
 	ClientKeyAPI
 	ProfileAPI
+	KeyBackupAPI
 	QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
@@ -105,13 +106,17 @@ type ClientUserAPI interface {
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
-	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
-	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) error
 
 	QueryThreePIDsForLocalpart(ctx context.Context, req *QueryThreePIDsForLocalpartRequest, res *QueryThreePIDsForLocalpartResponse) error
 	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
 	PerformForgetThreePID(ctx context.Context, req *PerformForgetThreePIDRequest, res *struct{}) error
 	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
+}
+
+type KeyBackupAPI interface {
+	DeleteKeyBackup(ctx context.Context, userID, version string) (bool, error)
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) error
 }
 
 type ProfileAPI interface {
@@ -135,11 +140,10 @@ type UserLoginAPI interface {
 }
 
 type PerformKeyBackupRequest struct {
-	UserID       string
-	Version      string // optional if modifying a key backup
-	AuthData     json.RawMessage
-	Algorithm    string
-	DeleteBackup bool // if true will delete the backup based on 'Version'.
+	UserID    string
+	Version   string // optional if modifying a key backup
+	AuthData  json.RawMessage
+	Algorithm string
 
 	// The keys to upload, if any. If blank, creates/updates/deletes key version metadata only.
 	Keys struct {

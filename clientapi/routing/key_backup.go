@@ -71,12 +71,6 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 		return jsonerror.InternalServerError()
 	}
 	if performKeyBackupResp.Error != "" {
-		if performKeyBackupResp.BadInput {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
-			}
-		}
 		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
 	}
 	return util.JSONResponse{
@@ -162,35 +156,19 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUse
 // Delete a version of key backup. Version must not be empty. If the key backup was previously deleted, will return 200 OK.
 // Implements DELETE  /_matrix/client/r0/room_keys/version/{version}
 func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
-	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
-		UserID:       device.UserID,
-		Version:      version,
-		DeleteBackup: true,
-	}, &performKeyBackupResp); err != nil {
-		return jsonerror.InternalServerError()
+	exists, err := userAPI.DeleteKeyBackup(req.Context(), device.UserID, version)
+	if err != nil {
+		return util.ErrorResponse(fmt.Errorf("DeleteKeyBackup: %s", err))
 	}
-	if performKeyBackupResp.Error != "" {
-		if performKeyBackupResp.BadInput {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
-			}
-		}
-		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
-	}
-	if !performKeyBackupResp.Exists {
+	if !exists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound("backup version not found"),
 		}
 	}
-	// Unclear what the 200 body should be
 	return util.JSONResponse{
 		Code: 200,
-		JSON: keyBackupVersionCreateResponse{
-			Version: performKeyBackupResp.Version,
-		},
+		JSON: struct{}{},
 	}
 }
 
