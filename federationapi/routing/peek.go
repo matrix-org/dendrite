@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -87,10 +88,10 @@ func Peek(
 	}
 
 	respPeek := fclient.RespPeek{
-		StateEvents:     gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.StateEvents),
-		AuthEvents:      gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
+		StateEvents:     types.NewEventJSONsFromHeaderedEvents(response.StateEvents),
+		AuthEvents:      types.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		RoomVersion:     response.RoomVersion,
-		LatestEvent:     response.LatestEvent.Unwrap(),
+		LatestEvent:     response.LatestEvent.Event,
 		RenewalInterval: renewalInterval,
 	}
 

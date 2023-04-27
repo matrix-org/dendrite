@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -196,11 +197,11 @@ func processInvite(
 	)
 
 	// Add the invite event to the roomserver.
-	inviteEvent := signedEvent.Headered(roomVer)
+	inviteEvent := &types.HeaderedEvent{Event: &signedEvent}
 	request := &api.PerformInviteRequest{
 		Event:           inviteEvent,
 		InviteRoomState: strippedState,
-		RoomVersion:     inviteEvent.RoomVersion,
+		RoomVersion:     inviteEvent.Version(),
 		SendAsServer:    string(api.DoNotSendToOtherServers),
 		TransactionID:   nil,
 	}

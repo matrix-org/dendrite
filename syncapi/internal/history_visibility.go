@@ -26,6 +26,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 )
 
@@ -98,16 +99,16 @@ func (ev eventVisibility) allowed() (allowed bool) {
 	}
 }
 
-// ApplyHistoryVisibilityFilter applies the room history visibility filter on gomatrixserverlib.HeaderedEvents.
+// ApplyHistoryVisibilityFilter applies the room history visibility filter on types.HeaderedEvents.
 // Returns the filtered events and an error, if any.
 func ApplyHistoryVisibilityFilter(
 	ctx context.Context,
 	syncDB storage.DatabaseTransaction,
 	rsAPI api.SyncRoomserverAPI,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*types.HeaderedEvent,
 	alwaysIncludeEventIDs map[string]struct{},
 	userID, endpoint string,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
+) ([]*types.HeaderedEvent, error) {
 	if len(events) == 0 {
 		return events, nil
 	}
@@ -120,7 +121,7 @@ func ApplyHistoryVisibilityFilter(
 	}
 
 	// Get the mapping from eventID -> eventVisibility
-	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	eventsFiltered := make([]*types.HeaderedEvent, 0, len(events))
 	visibilities := visibilityForEvents(ctx, rsAPI, events, userID, events[0].RoomID())
 	for _, ev := range events {
 		evVis := visibilities[ev.EventID()]
@@ -170,7 +171,7 @@ func ApplyHistoryVisibilityFilter(
 func visibilityForEvents(
 	ctx context.Context,
 	rsAPI api.SyncRoomserverAPI,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*types.HeaderedEvent,
 	userID, roomID string,
 ) map[string]eventVisibility {
 	eventIDs := make([]string, len(events))

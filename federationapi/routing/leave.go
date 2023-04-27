@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -101,7 +102,7 @@ func MakeLeave(
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: map[string]interface{}{
-					"room_version": event.RoomVersion,
+					"room_version": event.Version(),
 					"event":        state,
 				},
 			}
@@ -124,7 +125,7 @@ func MakeLeave(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"room_version": event.RoomVersion,
+			"room_version": event.Version(),
 			"event":        builder,
 		},
 	}
@@ -312,7 +313,7 @@ func SendLeave(
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
-				Event:         event.Headered(roomVersion),
+				Event:         &types.HeaderedEvent{Event: event},
 				SendAsServer:  string(cfg.Matrix.ServerName),
 				TransactionID: nil,
 			},

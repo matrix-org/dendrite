@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -266,7 +267,7 @@ func OnIncomingStateTypeRequest(
 		"state_at_event": !wantLatestState,
 	}).Info("Fetching state")
 
-	var event *gomatrixserverlib.HeaderedEvent
+	var event *types.HeaderedEvent
 	if wantLatestState {
 		// If we are happy to use the latest state, either because the user is
 		// still in the room, or because the room is world-readable, then just

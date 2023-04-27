@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -346,15 +347,15 @@ func (r *Admin) PerformAdminDownloadState(
 		}
 	}
 
-	authEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(authEventMap))
-	stateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(stateEventMap))
+	authEvents := make([]*types.HeaderedEvent, 0, len(authEventMap))
+	stateEvents := make([]*types.HeaderedEvent, 0, len(stateEventMap))
 	stateIDs := make([]string, 0, len(stateEventMap))
 
 	for _, authEvent := range authEventMap {
-		authEvents = append(authEvents, authEvent.Headered(roomInfo.RoomVersion))
+		authEvents = append(authEvents, &types.HeaderedEvent{Event: authEvent})
 	}
 	for _, stateEvent := range stateEventMap {
-		stateEvents = append(stateEvents, stateEvent.Headered(roomInfo.RoomVersion))
+		stateEvents = append(stateEvents, &types.HeaderedEvent{Event: stateEvent})
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 

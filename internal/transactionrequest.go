@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -182,8 +183,8 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			ctx,
 			t.rsAPI,
 			api.KindNew,
-			[]*gomatrixserverlib.HeaderedEvent{
-				event.Headered(roomVersion),
+			[]*rstypes.HeaderedEvent{
+				{Event: event},
 			},
 			t.Destination,
 			t.Origin,

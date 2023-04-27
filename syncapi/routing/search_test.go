@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -215,7 +216,7 @@ func TestSearch(t *testing.T) {
 		// store the events in the database
 		var sp types.StreamPosition
 		for _, x := range room.Events() {
-			var stateEvents []*gomatrixserverlib.HeaderedEvent
+			var stateEvents []*rstypes.HeaderedEvent
 			var stateEventIDs []string
 			if x.Type() == spec.MRoomMember {
 				stateEvents = append(stateEvents, x)

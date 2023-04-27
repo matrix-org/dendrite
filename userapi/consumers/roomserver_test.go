@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
@@ -34,13 +35,13 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 	}
 }
 
-func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {
+func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 	t.Helper()
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
-	return ev.Headered(gomatrixserverlib.RoomVersionV10)
+	return &types.HeaderedEvent{Event: ev}
 }
 
 func Test_evaluatePushRules(t *testing.T) {

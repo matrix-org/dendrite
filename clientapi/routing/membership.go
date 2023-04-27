@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -91,7 +92,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
 		roomserverAPI.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{event},
+		[]*types.HeaderedEvent{event},
 		device.UserDomain(),
 		serverName,
 		serverName,
@@ -268,7 +269,7 @@ func sendInvite(
 	if err := rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
 		Event:           event,
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
-		RoomVersion:     event.RoomVersion,
+		RoomVersion:     event.Version(),
 		SendAsServer:    string(device.UserDomain()),
 	}, &inviteRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
@@ -294,7 +295,7 @@ func buildMembershipEvent(
 	membership, roomID string, isDirect bool,
 	cfg *config.ClientAPI, evTime time.Time,
 	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*types.HeaderedEvent, error) {
 	profile, err := loadProfile(ctx, targetUserID, cfg, profileAPI, asAPI)
 	if err != nil {
 		return nil, err

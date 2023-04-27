@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -347,8 +348,8 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 }
 
 // nolint:gocyclo
-func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, userID, roomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
-	state := make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent, len(oldRoom.StateEvents))
+func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, userID, roomID, newVersion string, tombstoneEvent *types.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
+	state := make(map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent, len(oldRoom.StateEvents))
 	for _, event := range oldRoom.StateEvents {
 		if event.StateKey() == nil {
 			// This shouldn't ever happen, but better to be safe than sorry.
@@ -507,7 +508,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 
 func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID string, userDomain spec.ServerName, newRoomID, newVersion string, eventsToMake []fledglingEvent) *api.PerformError {
 	var err error
-	var builtEvents []*gomatrixserverlib.HeaderedEvent
+	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
@@ -543,7 +544,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, event.Headered(gomatrixserverlib.RoomVersion(newVersion)))
+		builtEvents = append(builtEvents, &types.HeaderedEvent{Event: event})
 		err = authEvents.AddEvent(event)
 		if err != nil {
 			return &api.PerformError{
@@ -573,7 +574,7 @@ func (r *Upgrader) makeTombstoneEvent(
 	ctx context.Context,
 	evTime time.Time,
 	userID, roomID, newRoomID string,
-) (*gomatrixserverlib.HeaderedEvent, *api.PerformError) {
+) (*types.HeaderedEvent, *api.PerformError) {
 	content := map[string]interface{}{
 		"body":             "This room has been replaced",
 		"replacement_room": newRoomID,
@@ -585,7 +586,7 @@ func (r *Upgrader) makeTombstoneEvent(
 	return r.makeHeaderedEvent(ctx, evTime, userID, roomID, event)
 }
 
-func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, userID, roomID string, event fledglingEvent) (*gomatrixserverlib.HeaderedEvent, *api.PerformError) {
+func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, userID, roomID string, event fledglingEvent) (*types.HeaderedEvent, *api.PerformError) {
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
 		RoomID:   roomID,
@@ -692,7 +693,7 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 func (r *Upgrader) sendHeaderedEvent(
 	ctx context.Context,
 	serverName spec.ServerName,
-	headeredEvent *gomatrixserverlib.HeaderedEvent,
+	headeredEvent *types.HeaderedEvent,
 	sendAsServer string,
 ) *api.PerformError {
 	var inputs []api.InputRoomEvent

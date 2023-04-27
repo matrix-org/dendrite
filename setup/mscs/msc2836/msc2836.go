@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -112,7 +113,7 @@ func Enable(
 	}
 	hooks.Enable()
 	hooks.Attach(hooks.KindNewEventPersisted, func(headeredEvent interface{}) {
-		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
+		he := headeredEvent.(*types.HeaderedEvent)
 		hookErr := db.StoreRelation(context.Background(), he)
 		if hookErr != nil {
 			util.GetLogger(context.Background()).WithError(hookErr).WithField("event_id", he.EventID()).Error(
@@ -255,7 +256,7 @@ func federatedEventRelationship(
 
 func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONResponse) {
 	var res MSC2836EventRelationshipsResponse
-	var returnEvents []*gomatrixserverlib.HeaderedEvent
+	var returnEvents []*types.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
 	event := rc.getLocalEvent(rc.req.RoomID, rc.req.EventID)
 	if event == nil {
@@ -299,7 +300,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 		for _, ev := range returnEvents {
 			included[ev.EventID()] = true
 		}
-		var events []*gomatrixserverlib.HeaderedEvent
+		var events []*types.HeaderedEvent
 		events, walkLimited = walkThread(
 			rc.ctx, rc.db, rc, included, remaining,
 		)
@@ -309,7 +310,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 	for i, ev := range returnEvents {
 		// for each event, extract the children_count | hash and add it as unsigned data.
 		rc.addChildMetadata(ev)
-		res.ParsedEvents[i] = ev.Unwrap()
+		res.ParsedEvents[i] = ev.Event
 	}
 	res.Limited = remaining == 0 || walkLimited
 	return &res, nil
@@ -318,7 +319,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 // fetchUnknownEvent retrieves an unknown event from the room specified. This server must
 // be joined to the room in question. This has the side effect of injecting surround threaded
 // events into the roomserver.
-func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent {
 	if rc.isFederatedRequest || roomID == "" {
 		// we don't do fed hits for fed requests, and we can't ask servers without a room ID!
 		return nil
@@ -372,7 +373,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.H
 		rc.injectResponseToRoomserver(res)
 		for _, ev := range res.ParsedEvents {
 			if ev.EventID() == eventID {
-				return ev.Headered(ev.Version())
+				return &types.HeaderedEvent{Event: ev}
 			}
 		}
 	}
@@ -382,7 +383,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.H
 
 // If include_parent: true and there is a valid m.relationship field in the event,
 // retrieve the referenced event. Apply history visibility check to that event and if it passes, add it to the response array.
-func (rc *reqCtx) includeParent(childEvent *gomatrixserverlib.HeaderedEvent) (parent *gomatrixserverlib.HeaderedEvent) {
+func (rc *reqCtx) includeParent(childEvent *types.HeaderedEvent) (parent *types.HeaderedEvent) {
 	parentID, _, _ := parentChildEventIDs(childEvent)
 	if parentID == "" {
 		return nil
@@ -393,7 +394,7 @@ func (rc *reqCtx) includeParent(childEvent *gomatrixserverlib.HeaderedEvent) (pa
 // If include_children: true, lookup all events which have event_id as an m.relationship
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
-func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recentFirst bool) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
+func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recentFirst bool) ([]*types.HeaderedEvent, *util.JSONResponse) {
 	if rc.hasUnexploredChildren(parentID) {
 		// we need to do a remote request to pull in the children as we are missing them locally.
 		serversToQuery := rc.getServersForEventID(parentID)
@@ -430,7 +431,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
-	var childEvents []*gomatrixserverlib.HeaderedEvent
+	var childEvents []*types.HeaderedEvent
 	for _, child := range children {
 		childEvent := rc.lookForEvent(child.EventID)
 		if childEvent != nil {
@@ -447,8 +448,8 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 // honouring the limit, max_depth and max_breadth values according to the following rules
 func walkThread(
 	ctx context.Context, db Database, rc *reqCtx, included map[string]bool, limit int,
-) ([]*gomatrixserverlib.HeaderedEvent, bool) {
-	var result []*gomatrixserverlib.HeaderedEvent
+) ([]*types.HeaderedEvent, bool) {
+	var result []*types.HeaderedEvent
 	eventWalker := walker{
 		ctx: ctx,
 		req: rc.req,
@@ -510,7 +511,7 @@ func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv spec.ServerName,
 
 // authorisedToSeeEvent checks that the user or server is allowed to see this event. Returns true if allowed to
 // see this request. This only needs to be done once per room at present as we just check for joined status.
-func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) bool {
+func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 	if rc.isFederatedRequest {
 		// make sure the server is in this room
 		var res fs.QueryJoinedHostServerNamesInRoomResponse
@@ -593,7 +594,7 @@ func (rc *reqCtx) remoteEventRelationships(eventID string) *MSC2836EventRelation
 
 // lookForEvent returns the event for the event ID given, by trying to query remote servers
 // if the event ID is unknown via /event_relationships.
-func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) lookForEvent(eventID string) *types.HeaderedEvent {
 	event := rc.getLocalEvent(rc.req.RoomID, eventID)
 	if event == nil {
 		queryRes := rc.remoteEventRelationships(eventID)
@@ -602,7 +603,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent 
 			rc.injectResponseToRoomserver(queryRes)
 			for _, ev := range queryRes.ParsedEvents {
 				if ev.EventID() == eventID && rc.req.RoomID == ev.RoomID() {
-					return ev.Headered(ev.Version())
+					return &types.HeaderedEvent{Event: ev}
 				}
 			}
 		}
@@ -624,7 +625,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent 
 	return nil
 }
 
-func (rc *reqCtx) getLocalEvent(roomID, eventID string) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) getLocalEvent(roomID, eventID string) *types.HeaderedEvent {
 	var queryEventsRes roomserver.QueryEventsByIDResponse
 	err := rc.rsAPI.QueryEventsByID(rc.ctx, &roomserver.QueryEventsByIDRequest{
 		RoomID:   roomID,
@@ -664,7 +665,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 	for _, outlier := range append(eventsInOrder, messageEvents...) {
 		ires = append(ires, roomserver.InputRoomEvent{
 			Kind:  roomserver.KindOutlier,
-			Event: outlier.Headered(outlier.Version()),
+			Event: &types.HeaderedEvent{Event: outlier},
 		})
 	}
 	// we've got the data by this point so use a background context
@@ -683,7 +684,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 	}
 }
 
-func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
+func (rc *reqCtx) addChildMetadata(ev *types.HeaderedEvent) {
 	count, hash := rc.getChildMetadata(ev.EventID())
 	if count == 0 {
 		return

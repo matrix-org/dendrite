@@ -151,8 +151,8 @@ type Database interface {
 	// GetStateEvent returns the state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
-	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
-	GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*gomatrixserverlib.HeaderedEvent, error)
+	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
+	GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*types.HeaderedEvent, error)
 	// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
 	GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error)
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
@@ -181,7 +181,7 @@ type Database interface {
 	// a membership of "leave" when calculating history visibility.
 	GetMembershipForHistoryVisibility(
 		ctx context.Context, userNID types.EventStateKeyNID, info *types.RoomInfo, eventIDs ...string,
-	) (map[string]*gomatrixserverlib.HeaderedEvent, error)
+	) (map[string]*types.HeaderedEvent, error)
 	GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (*types.RoomInfo, error)
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
@@ -210,7 +210,7 @@ type RoomDatabase interface {
 	GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (*types.RoomInfo, error)
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
-	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
 }
 
 type EventDatabase interface {

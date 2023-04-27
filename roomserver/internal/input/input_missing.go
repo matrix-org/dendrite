@@ -106,7 +106,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		for _, newEvent := range newEvents {
 			err = t.inputer.processRoomEvent(ctx, t.virtualHost, &api.InputRoomEvent{
 				Kind:         api.KindOld,
-				Event:        newEvent.Headered(roomVersion),
+				Event:        &types.HeaderedEvent{Event: newEvent},
 				Origin:       t.origin,
 				SendAsServer: api.DoNotSendToOtherServers,
 			})
@@ -155,7 +155,7 @@ func (t *missingStateReq) processEventWithMissingState(
 			}
 			outlierRoomEvents = append(outlierRoomEvents, api.InputRoomEvent{
 				Kind:   api.KindOutlier,
-				Event:  outlier.Headered(roomVersion),
+				Event:  &types.HeaderedEvent{Event: outlier},
 				Origin: t.origin,
 			})
 		}
@@ -185,7 +185,7 @@ func (t *missingStateReq) processEventWithMissingState(
 
 	err = t.inputer.processRoomEvent(ctx, t.virtualHost, &api.InputRoomEvent{
 		Kind:          api.KindOld,
-		Event:         backwardsExtremity.Headered(roomVersion),
+		Event:         &types.HeaderedEvent{Event: backwardsExtremity},
 		Origin:        t.origin,
 		HasState:      true,
 		StateEventIDs: stateIDs,
@@ -204,7 +204,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	for _, newEvent := range newEvents {
 		err = t.inputer.processRoomEvent(ctx, t.virtualHost, &api.InputRoomEvent{
 			Kind:         api.KindOld,
-			Event:        newEvent.Headered(roomVersion),
+			Event:        &types.HeaderedEvent{Event: newEvent},
 			Origin:       t.origin,
 			SendAsServer: api.DoNotSendToOtherServers,
 		})

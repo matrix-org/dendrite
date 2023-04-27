@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -32,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -263,10 +263,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 func contextEvents(
 	ctx context.Context,
 	snapshot storage.DatabaseTransaction,
-	event *gomatrixserverlib.HeaderedEvent,
+	event *types.HeaderedEvent,
 	roomFilter *synctypes.RoomEventFilter,
 	searchReq SearchRequest,
-) ([]*gomatrixserverlib.HeaderedEvent, []*gomatrixserverlib.HeaderedEvent, error) {
+) ([]*types.HeaderedEvent, []*types.HeaderedEvent, error) {
 	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID(), event.EventID())
 	if err != nil {
 		logrus.WithError(err).Error("failed to query context event")

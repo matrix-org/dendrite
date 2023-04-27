@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/internal"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -137,10 +138,10 @@ func (f *fedClient) SendJoin(ctx context.Context, origin, s spec.ServerName, eve
 	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
 		if r.ID == event.RoomID() {
-			r.InsertEvent(f.t, event.Headered(r.Version))
+			r.InsertEvent(f.t, &types.HeaderedEvent{Event: event})
 			f.t.Logf("Join event: %v", event.EventID())
-			res.StateEvents = gomatrixserverlib.NewEventJSONsFromHeaderedEvents(r.CurrentState())
-			res.AuthEvents = gomatrixserverlib.NewEventJSONsFromHeaderedEvents(r.Events())
+			res.StateEvents = types.NewEventJSONsFromHeaderedEvents(r.CurrentState())
+			res.AuthEvents = types.NewEventJSONsFromHeaderedEvents(r.Events())
 		}
 	}
 	return
@@ -327,8 +328,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to parse event: %s", err)
 		}
-		he := ev.Headered(tc.roomVer)
-		invReq, err := fclient.NewInviteV2Request(he, nil)
+		invReq, err := fclient.NewInviteV2Request(ev, nil)
 		if err != nil {
 			t.Errorf("failed to create invite v2 request: %s", err)
 			continue

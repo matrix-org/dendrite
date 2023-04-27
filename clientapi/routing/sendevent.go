@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -183,8 +184,8 @@ func SendEvent(
 	if err := api.SendEvents(
 		req.Context(), rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			e.Headered(roomVersion),
+		[]*types.HeaderedEvent{
+			&types.HeaderedEvent{Event: e},
 		},
 		device.UserDomain(),
 		domain,

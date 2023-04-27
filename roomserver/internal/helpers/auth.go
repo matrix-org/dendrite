@@ -34,7 +34,7 @@ func CheckForSoftFail(
 	ctx context.Context,
 	db storage.RoomDatabase,
 	roomInfo *types.RoomInfo,
-	event *gomatrixserverlib.HeaderedEvent,
+	event *types.HeaderedEvent,
 	stateEventIDs []string,
 ) (bool, error) {
 	rewritesState := len(stateEventIDs) > 1
@@ -65,7 +65,7 @@ func CheckForSoftFail(
 	}
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Event})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
@@ -87,7 +87,7 @@ func CheckAuthEvents(
 	ctx context.Context,
 	db storage.RoomDatabase,
 	roomInfo *types.RoomInfo,
-	event *gomatrixserverlib.HeaderedEvent,
+	event *types.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
@@ -98,7 +98,7 @@ func CheckAuthEvents(
 	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Event})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)

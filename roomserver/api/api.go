@@ -102,7 +102,7 @@ type SyncRoomserverAPI interface {
 	) error
 
 	// QueryMembershipAtEvent queries the memberships at the given events.
-	// Returns a map from eventID to a slice of gomatrixserverlib.HeaderedEvent.
+	// Returns a map from eventID to a slice of types.HeaderedEvent.
 	QueryMembershipAtEvent(
 		ctx context.Context,
 		request *QueryMembershipAtEventRequest,

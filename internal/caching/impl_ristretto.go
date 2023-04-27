@@ -131,8 +131,8 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Prefix: eventTypeNIDCache,
 			MaxAge: maxAge,
 		},
-		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{ // queue NID -> PDU
-			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
+		FederationPDUs: &RistrettoCostedCachePartition[int64, *types.HeaderedEvent]{ // queue NID -> PDU
+			&RistrettoCachePartition[int64, *types.HeaderedEvent]{
 				cache:   cache,
 				Prefix:  federationPDUsCache,
 				Mutable: true,

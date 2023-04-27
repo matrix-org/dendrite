@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -84,7 +84,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForNotificationData(ctx context.C
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilterPart, excludeEventIDs)
 }
 
@@ -161,7 +161,7 @@ func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID st
 	return d.Topology.SelectPositionInTopology(ctx, d.txn, eventID)
 }
 
-func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
+func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*rstypes.HeaderedEvent, map[string]*rstypes.HeaderedEvent, types.StreamPosition, error) {
 	return d.Invites.SelectInviteEventsInRange(ctx, d.txn, targetUserID, r)
 }
 
@@ -178,7 +178,7 @@ func (d *DatabaseTransaction) RoomReceiptsAfter(ctx context.Context, roomIDs []s
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	streamEvents, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
@@ -207,13 +207,13 @@ func (d *DatabaseTransaction) SharedUsers(ctx context.Context, userID string, ot
 
 func (d *DatabaseTransaction) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*rstypes.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectStateEvent(ctx, d.txn, roomID, evType, stateKey)
 }
 
 func (d *DatabaseTransaction) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *synctypes.StateFilter,
-) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
+) (stateEvents []*rstypes.HeaderedEvent, err error) {
 	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilter, nil)
 	return
 }
@@ -302,7 +302,7 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 // oldest event in the room's topology.
 func (d *DatabaseTransaction) GetBackwardTopologyPos(
 	ctx context.Context,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*rstypes.HeaderedEvent,
 ) (types.TopologyToken, error) {
 	zeroToken := types.TopologyToken{}
 	if len(events) == 0 {

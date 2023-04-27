@@ -205,19 +205,19 @@ func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 
 func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
 	ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
-) (map[string]*gomatrixserverlib.HeaderedEvent, error) {
+) (map[string]*types.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.bulktSelectMembershipForHistoryVisibilityStmt)
 	rows, err := stmt.QueryContext(ctx, userNID, pq.Array(eventIDs), roomInfo.RoomNID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-	result := make(map[string]*gomatrixserverlib.HeaderedEvent, len(eventIDs))
+	result := make(map[string]*types.HeaderedEvent, len(eventIDs))
 	var evJson []byte
 	var eventID string
 	var membershipEventID string
 
-	knownEvents := make(map[string]*gomatrixserverlib.HeaderedEvent, len(eventIDs))
+	knownEvents := make(map[string]*types.HeaderedEvent, len(eventIDs))
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
 	if err != nil {
 		return nil, err
@@ -228,7 +228,7 @@ func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
 			return nil, err
 		}
 		if len(evJson) == 0 {
-			result[eventID] = &gomatrixserverlib.HeaderedEvent{}
+			result[eventID] = &types.HeaderedEvent{}
 			continue
 		}
 		// If we already know this event, don't try to marshal the json again
@@ -238,11 +238,11 @@ func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
 		}
 		event, err := verImpl.NewEventFromTrustedJSON(evJson, false)
 		if err != nil {
-			result[eventID] = &gomatrixserverlib.HeaderedEvent{}
+			result[eventID] = &types.HeaderedEvent{}
 			// not fatal
 			continue
 		}
-		he := event.Headered(roomInfo.RoomVersion)
+		he := &types.HeaderedEvent{Event: event}
 		result[eventID] = he
 		knownEvents[membershipEventID] = he
 	}

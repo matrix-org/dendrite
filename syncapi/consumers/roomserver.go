@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -31,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -318,7 +318,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		ev,
-		[]*gomatrixserverlib.HeaderedEvent{},
+		[]*rstypes.HeaderedEvent{},
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
@@ -362,7 +362,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
+func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rstypes.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
 	if ev.Type() != spec.MRoomMember {
 		return sp, nil
 	}
@@ -496,7 +496,7 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 	}
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent) (*rstypes.HeaderedEvent, error) {
 	if event.StateKey() == nil {
 		return event, nil
 	}
@@ -531,7 +531,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	return event, err
 }
 
-func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, pduPosition types.StreamPosition) error {
+func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPosition types.StreamPosition) error {
 	if !s.cfg.Fulltext.Enabled {
 		return nil
 	}

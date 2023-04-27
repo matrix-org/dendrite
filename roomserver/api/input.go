@@ -18,6 +18,7 @@ package api
 import (
 	"fmt"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -67,7 +68,7 @@ type InputRoomEvent struct {
 	// This controls how the event is processed.
 	Kind Kind `json:"kind"`
 	// The event JSON for the event to add.
-	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *types.HeaderedEvent `json:"event"`
 	// Which server told us about this event.
 	Origin spec.ServerName `json:"origin"`
 	// Whether the state is supplied as a list of event IDs or whether it
