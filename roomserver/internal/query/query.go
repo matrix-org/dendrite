@@ -588,11 +588,11 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	if request.ResolveState {
-		stateEventsPDU, err := gomatrixserverlib.ResolveConflicts(
+		stateEventsPDU, err2 := gomatrixserverlib.ResolveConflicts(
 			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
 		)
-		if err != nil {
-			return err
+		if err2 != nil {
+			return err2
 		}
 		stateEvents = gomatrixserverlib.TempCastToEvents(stateEventsPDU)
 	}
