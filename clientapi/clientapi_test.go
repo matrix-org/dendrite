@@ -13,19 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/pushrules"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/stretchr/testify/assert"
-	"github.com/tidwall/gjson"
-
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -37,6 +31,15 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
+	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/crypto"
+	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 )
 
 type userDevice struct {
@@ -1629,4 +1632,110 @@ func TestPushRules(t *testing.T) {
 			})
 		}
 	})
+}
+
+// Tests the `/keys` endpoints.
+// Note that this only tests the happy path.
+func TestKeys(t *testing.T) {
+	alice := test.NewUser(t)
+
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		srv := httptest.NewTLSServer(routers.Client)
+		defer srv.Close()
+
+		cl, err := mautrix.NewClient(srv.URL, id.UserID(alice.ID), accessTokens[alice].accessToken)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cl.Client = srv.Client()
+		cl.DeviceID = id.DeviceID(accessTokens[alice].deviceID)
+
+		cs := crypto.NewMemoryStore(nil)
+
+		oc := crypto.NewOlmMachine(cl, nil, cs, dummyStore{})
+		if err = oc.Load(); err != nil {
+			t.Fatal(err)
+		}
+
+		// tests `/keys/upload`
+		if err = oc.ShareKeys(ctx, 0); err != nil {
+			t.Fatal(err)
+		}
+
+		// tests `/keys/device_signing/upload`
+		_, err = oc.GenerateAndUploadCrossSigningKeys(accessTokens[alice].password, "passphrase")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// tests `/keys/query`
+		dev, err := oc.GetOrFetchDevice(ctx, id.UserID(alice.ID), id.DeviceID(accessTokens[alice].deviceID))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// tests `/keys/signatures/upload`
+		if err = oc.SignOwnMasterKey(); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("Dev: %#v", dev)
+
+		otks := make(map[string]map[string]string)
+		otks[alice.ID] = map[string]string{
+			accessTokens[alice].deviceID: string(id.KeyAlgorithmSignedCurve25519),
+		}
+
+		data, _ := json.Marshal(claimKeysRequest{OneTimeKeys: otks})
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/_matrix/client/v3/keys/claim", bytes.NewBuffer(data))
+		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%s", string(respBody))
+	})
+}
+
+type claimKeysRequest struct {
+	//  The keys to be claimed. A map from user ID, to a map from device ID to algorithm name.
+	OneTimeKeys map[string]map[string]string `json:"one_time_keys"`
+}
+
+type dummyStore struct{}
+
+func (d dummyStore) IsEncrypted(roomID id.RoomID) bool {
+	return true
+}
+
+func (d dummyStore) GetEncryptionEvent(roomID id.RoomID) *event.EncryptionEventContent {
+	return &event.EncryptionEventContent{}
+}
+
+func (d dummyStore) FindSharedRooms(userID id.UserID) []id.RoomID {
+	return []id.RoomID{}
 }
