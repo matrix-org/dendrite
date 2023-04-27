@@ -325,10 +325,8 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.H
 	}
 	logger := util.GetLogger(rc.ctx).WithField("room_id", roomID)
 	// if they supplied a room_id, check the room exists.
-	var queryVerRes roomserver.QueryRoomVersionForRoomResponse
-	err := rc.rsAPI.QueryRoomVersionForRoom(rc.ctx, &roomserver.QueryRoomVersionForRoomRequest{
-		RoomID: roomID,
-	}, &queryVerRes)
+
+	roomVersion, err := rc.rsAPI.QueryRoomVersionForRoom(rc.ctx, roomID)
 	if err != nil {
 		logger.WithError(err).Warn("failed to query room version for room, does this room exist?")
 		return nil
@@ -367,7 +365,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.H
 	// Inject the response into the roomserver to remember the event across multiple calls and to set
 	// unexplored flags correctly.
 	for _, srv := range serversToQuery {
-		res, err := rc.MSC2836EventRelationships(eventID, srv, queryVerRes.RoomVersion)
+		res, err := rc.MSC2836EventRelationships(eventID, srv, roomVersion)
 		if err != nil {
 			continue
 		}

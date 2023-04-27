@@ -140,21 +140,20 @@ func SendLeave(
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
 		}
 	}
 
-	verImpl, err := gomatrixserverlib.GetRoomVersion(verRes.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", verRes.RoomVersion),
+				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", roomVersion),
 			),
 		}
 	}
@@ -313,7 +312,7 @@ func SendLeave(
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
-				Event:         event.Headered(verRes.RoomVersion),
+				Event:         event.Headered(roomVersion),
 				SendAsServer:  string(cfg.Matrix.ServerName),
 				TransactionID: nil,
 			},

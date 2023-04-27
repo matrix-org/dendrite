@@ -106,7 +106,9 @@ func (f *fedClient) GetServerKeys(ctx context.Context, matrixServer spec.ServerN
 	return keys, nil
 }
 
-func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res fclient.RespMakeJoin, err error) {
+func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roomID, userID string) (res fclient.RespMakeJoin, err error) {
+	f.fedClientMutex.Lock()
+	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
 		if r.ID == roomID {
 			res.RoomVersion = r.Version

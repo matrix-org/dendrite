@@ -76,9 +76,8 @@ func SendEvent(
 	rsAPI api.ClientRoomserverAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(req.Context(), roomID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -185,7 +184,7 @@ func SendEvent(
 		req.Context(), rsAPI,
 		api.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{
-			e.Headered(verRes.RoomVersion),
+			e.Headered(roomVersion),
 		},
 		device.UserDomain(),
 		domain,
@@ -200,7 +199,7 @@ func SendEvent(
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
 		"room_id":      roomID,
-		"room_version": verRes.RoomVersion,
+		"room_version": roomVersion,
 	}).Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
