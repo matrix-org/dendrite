@@ -658,7 +658,7 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 }
 
 // GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
-func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (roomInfo *types.RoomInfo, err error) {
+func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserverlib.PDU) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
 	// then we will use our configured default to create the room.
 	// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
@@ -725,7 +725,7 @@ func (d *Database) GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKe
 }
 
 func (d *EventDatabase) StoreEvent(
-	ctx context.Context, event *gomatrixserverlib.Event,
+	ctx context.Context, event gomatrixserverlib.PDU,
 	roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.StateAtEvent, error) {
@@ -909,7 +909,7 @@ func (d *EventDatabase) assignStateKeyNID(
 	return eventStateKeyNID, err
 }
 
-func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
+func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 	gomatrixserverlib.RoomVersion, error,
 ) {
 	var err error

@@ -121,10 +121,13 @@ func (r *Queryer) QueryStateAfterEvents(
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
 
-		stateEvents, err = gomatrixserverlib.ResolveConflicts(info.RoomVersion, stateEvents, authEvents)
+		stateEventsPDU, err := gomatrixserverlib.ResolveConflicts(
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
+		)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
 		}
+		stateEvents = gomatrixserverlib.TempCastToEvents(stateEventsPDU)
 	}
 
 	for _, event := range stateEvents {
@@ -585,11 +588,13 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	if request.ResolveState {
-		if stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, stateEvents, authEvents,
-		); err != nil {
+		stateEventsPDU, err := gomatrixserverlib.ResolveConflicts(
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
+		)
+		if err != nil {
 			return err
 		}
+		stateEvents = gomatrixserverlib.TempCastToEvents(stateEventsPDU)
 	}
 
 	for _, event := range stateEvents {

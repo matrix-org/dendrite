@@ -114,7 +114,7 @@ func Backfill(
 
 	eventJSONs := []json.RawMessage{}
 	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(
-		evs,
+		gomatrixserverlib.ToPDUs(evs),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	) {
 		eventJSONs = append(eventJSONs, e.JSON())

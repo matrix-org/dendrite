@@ -65,7 +65,9 @@ func CheckForSoftFail(
 	}
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Event})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth(
+		gomatrixserverlib.ToPDUs([]*gomatrixserverlib.Event{event.Event}),
+	)
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
@@ -98,7 +100,7 @@ func CheckAuthEvents(
 	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Event})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event.Event})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
@@ -132,31 +134,31 @@ func (ae *authEvents) Valid() bool {
 }
 
 // Create implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) Create() (*gomatrixserverlib.Event, error) {
+func (ae *authEvents) Create() (gomatrixserverlib.PDU, error) {
 	return ae.lookupEventWithEmptyStateKey(types.MRoomCreateNID), nil
 }
 
 // PowerLevels implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) PowerLevels() (*gomatrixserverlib.Event, error) {
+func (ae *authEvents) PowerLevels() (gomatrixserverlib.PDU, error) {
 	return ae.lookupEventWithEmptyStateKey(types.MRoomPowerLevelsNID), nil
 }
 
 // JoinRules implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) JoinRules() (*gomatrixserverlib.Event, error) {
+func (ae *authEvents) JoinRules() (gomatrixserverlib.PDU, error) {
 	return ae.lookupEventWithEmptyStateKey(types.MRoomJoinRulesNID), nil
 }
 
 // Memmber implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) Member(stateKey string) (*gomatrixserverlib.Event, error) {
+func (ae *authEvents) Member(stateKey string) (gomatrixserverlib.PDU, error) {
 	return ae.lookupEvent(types.MRoomMemberNID, stateKey), nil
 }
 
 // ThirdPartyInvite implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) ThirdPartyInvite(stateKey string) (*gomatrixserverlib.Event, error) {
+func (ae *authEvents) ThirdPartyInvite(stateKey string) (gomatrixserverlib.PDU, error) {
 	return ae.lookupEvent(types.MRoomThirdPartyInviteNID, stateKey), nil
 }
 
-func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *gomatrixserverlib.Event {
+func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) gomatrixserverlib.PDU {
 	eventNID, ok := ae.state.lookup(types.StateKeyTuple{
 		EventTypeNID:     typeNID,
 		EventStateKeyNID: types.EmptyStateKeyNID,
@@ -171,7 +173,7 @@ func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *
 	return event.Event
 }
 
-func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *gomatrixserverlib.Event {
+func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) gomatrixserverlib.PDU {
 	stateKeyNID, ok := ae.stateKeyNIDMap[stateKey]
 	if !ok {
 		return nil
