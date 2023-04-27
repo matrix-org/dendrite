@@ -545,7 +545,7 @@ func (r *Inputer) processStateBefore(
 		// will include the history visibility here even though we don't
 		// actually need it for auth, because we want to send it in the
 		// output events.
-		tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
+		tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event}).Tuples()
 		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
 			EventType: spec.MRoomHistoryVisibility,
 			StateKey:  "",
@@ -576,7 +576,9 @@ func (r *Inputer) processStateBefore(
 	// At this point, stateBeforeEvent should be populated either by
 	// the supplied state in the input request, or from the prev events.
 	// Check whether the event is allowed or not.
-	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
+	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(
+		gomatrixserverlib.ToPDUs(stateBeforeEvent),
+	)
 	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
 		rejectionErr = fmt.Errorf("Allowed() failed for stateBeforeEvent: %w", rejectionErr)
 		return
@@ -675,7 +677,7 @@ func (r *Inputer) fetchAuthEvents(
 	isRejected := false
 nextAuthEvent:
 	for _, authEvent := range gomatrixserverlib.ReverseTopologicalOrdering(
-		res.AuthEvents.UntrustedEvents(event.Version()),
+		gomatrixserverlib.ToPDUs(res.AuthEvents.UntrustedEvents(event.Version())),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	) {
 		// If we already know about this event from the database then we don't
@@ -688,7 +690,7 @@ nextAuthEvent:
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
-		if err := authEvent.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
+		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing()); err != nil {
 			continue nextAuthEvent
 		}
 
@@ -743,7 +745,7 @@ nextAuthEvent:
 		// Now we know about this event, it was stored and the signatures were OK.
 		known[authEvent.EventID()] = &types.Event{
 			EventNID: eventNID,
-			Event:    authEvent,
+			Event:    authEvent.(*gomatrixserverlib.Event),
 		}
 	}
 

@@ -168,7 +168,7 @@ func MakeJoin(
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
 
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

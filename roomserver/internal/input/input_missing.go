@@ -26,7 +26,7 @@ type parsedRespState struct {
 	StateEvents []*gomatrixserverlib.Event
 }
 
-func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
+func (p *parsedRespState) Events() []gomatrixserverlib.PDU {
 	eventsByID := make(map[string]*gomatrixserverlib.Event, len(p.AuthEvents)+len(p.StateEvents))
 	for i, event := range p.AuthEvents {
 		eventsByID[event.EventID()] = p.AuthEvents[i]
@@ -38,7 +38,8 @@ func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
 	for _, event := range eventsByID {
 		allEvents = append(allEvents, event)
 	}
-	return gomatrixserverlib.ReverseTopologicalOrdering(allEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
+	return gomatrixserverlib.ReverseTopologicalOrdering(
+		gomatrixserverlib.ToPDUs(allEvents), gomatrixserverlib.TopologicalOrderByAuthEvents)
 }
 
 type missingStateReq struct {
@@ -155,7 +156,7 @@ func (t *missingStateReq) processEventWithMissingState(
 			}
 			outlierRoomEvents = append(outlierRoomEvents, api.InputRoomEvent{
 				Kind:   api.KindOutlier,
-				Event:  &types.HeaderedEvent{Event: outlier},
+				Event:  &types.HeaderedEvent{Event: outlier.(*gomatrixserverlib.Event)},
 				Origin: t.origin,
 			})
 		}
@@ -468,7 +469,9 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 		authEventList = append(authEventList, state.AuthEvents...)
 		stateEventList = append(stateEventList, state.StateEvents...)
 	}
-	resolvedStateEvents, err := gomatrixserverlib.ResolveConflicts(roomVersion, stateEventList, authEventList)
+	resolvedStateEvents, err := gomatrixserverlib.ResolveConflicts(
+		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +485,7 @@ retryAllowedState:
 			case verifySigError:
 				return &parsedRespState{
 					AuthEvents:  authEventList,
-					StateEvents: resolvedStateEvents,
+					StateEvents: gomatrixserverlib.TempCastToEvents(resolvedStateEvents),
 				}, nil
 			case nil:
 				// do nothing
@@ -498,7 +501,7 @@ retryAllowedState:
 	}
 	return &parsedRespState{
 		AuthEvents:  authEventList,
-		StateEvents: resolvedStateEvents,
+		StateEvents: gomatrixserverlib.TempCastToEvents(resolvedStateEvents),
 	}, nil
 }
 
@@ -559,7 +562,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	// will be added and duplicates will be removed.
 	missingEvents := make([]*gomatrixserverlib.Event, 0, len(missingResp.Events))
 	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
-		if err = ev.VerifyEventSignatures(ctx, t.keys); err != nil {
+		if err = gomatrixserverlib.VerifyEventSignatures(ctx, ev, t.keys); err != nil {
 			continue
 		}
 		missingEvents = append(missingEvents, t.cacheAndReturn(ev))
@@ -567,7 +570,9 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	logger.Debugf("get_missing_events returned %d events (%d passed signature checks)", len(missingResp.Events), len(missingEvents))
 
 	// topologically sort and sanity check that we are making forward progress
-	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(missingEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
+	newEventsPDUs := gomatrixserverlib.ReverseTopologicalOrdering(
+		gomatrixserverlib.ToPDUs(missingEvents), gomatrixserverlib.TopologicalOrderByPrevEvents)
+	newEvents = gomatrixserverlib.TempCastToEvents(newEventsPDUs)
 	shouldHaveSomeEventIDs := e.PrevEventIDs()
 	hasPrevEvent := false
 Event:
@@ -882,14 +887,14 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		t.log.WithField("missing_event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
-	if err := event.VerifyEventSignatures(ctx, t.keys); err != nil {
+	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys); err != nil {
 		t.log.WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
 	return t.cacheAndReturn(event), nil
 }
 
-func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserverlib.Event) error {
+func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []gomatrixserverlib.PDU) error {
 	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range stateEvents {
 		err := authUsingState.AddEvent(stateEvents[i])

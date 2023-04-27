@@ -634,13 +634,13 @@ func federatedEventProvider(
 ) gomatrixserverlib.EventProvider {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
-	retries := map[string][]*gomatrixserverlib.Event{}
+	retries := map[string][]gomatrixserverlib.PDU{}
 
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
-		returning := []*gomatrixserverlib.Event{}
+	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
+		returning := []gomatrixserverlib.PDU{}
 		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 		if err != nil {
 			return nil, err
@@ -680,7 +680,7 @@ func federatedEventProvider(
 				}
 
 				// Check the signatures of the event.
-				if err := ev.VerifyEventSignatures(ctx, keyRing); err != nil {
+				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
 				}
 
