@@ -254,12 +254,8 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// some dummy entries to validate after purging
-		publishResp := &api.PerformPublishResponse{}
-		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: spec.Public}); err != nil {
 			t.Fatal(err)
-		}
-		if publishResp.Error != nil {
-			t.Fatal(publishResp.Error)
 		}
 
 		isPublished, err := db.GetPublishedRoom(ctx, room.ID)
@@ -328,8 +324,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// purge the room from the database
-		purgeResp := &api.PerformAdminPurgeRoomResponse{}
-		if err = rsAPI.PerformAdminPurgeRoom(ctx, &api.PerformAdminPurgeRoomRequest{RoomID: room.ID}, purgeResp); err != nil {
+		if err = rsAPI.PerformAdminPurgeRoom(ctx, room.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -926,7 +921,7 @@ func TestUpgrade(t *testing.T) {
 				if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{
 					RoomID:     r.ID,
 					Visibility: spec.Public,
-				}, &api.PerformPublishResponse{}); err != nil {
+				}); err != nil {
 					t.Fatal(err)
 				}
 
@@ -1070,25 +1065,19 @@ func TestUpgrade(t *testing.T) {
 				}
 				roomID := tc.roomFunc(rsAPI)
 
-				upgradeReq := api.PerformRoomUpgradeRequest{
-					RoomID:      roomID,
-					UserID:      tc.upgradeUser,
-					RoomVersion: version.DefaultRoomVersion(), // always upgrade to the latest version
-				}
-				upgradeRes := api.PerformRoomUpgradeResponse{}
-
-				if err := rsAPI.PerformRoomUpgrade(processCtx.Context(), &upgradeReq, &upgradeRes); err != nil {
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, tc.upgradeUser, version.DefaultRoomVersion())
+				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}
 
-				if tc.wantNewRoom && upgradeRes.NewRoomID == "" {
+				if tc.wantNewRoom && newRoomID == "" {
 					t.Fatalf("expected a new room, but the upgrade failed")
 				}
-				if !tc.wantNewRoom && upgradeRes.NewRoomID != "" {
+				if !tc.wantNewRoom && newRoomID != "" {
 					t.Fatalf("expected no new room, but the upgrade succeeded")
 				}
 				if tc.validateFunc != nil {
-					tc.validateFunc(t, roomID, upgradeRes.NewRoomID, rsAPI)
+					tc.validateFunc(t, roomID, newRoomID, rsAPI)
 				}
 			})
 		}
