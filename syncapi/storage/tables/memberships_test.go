@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
@@ -47,7 +47,7 @@ func TestMembershipsTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	// Create users
-	var userEvents []*gomatrixserverlib.HeaderedEvent
+	var userEvents []*rstypes.HeaderedEvent
 	users := []string{alice.ID}
 	for _, x := range room.CurrentState() {
 		if x.StateKeyEquals(alice.ID) {
@@ -114,7 +114,7 @@ func testMembershipCount(t *testing.T, ctx context.Context, table tables.Members
 	})
 }
 
-func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, membershipEvent *gomatrixserverlib.HeaderedEvent, user *test.User, room *test.Room) {
+func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, membershipEvent *rstypes.HeaderedEvent, user *test.User, room *test.Room) {
 	t.Run("upserting works as expected", func(t *testing.T) {
 		if err := table.UpsertMembership(ctx, nil, membershipEvent, 1, 1); err != nil {
 			t.Fatalf("failed to upsert membership: %s", err)

@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -367,8 +368,8 @@ func emit3PIDInviteEvent(
 	return api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			event.Headered(queryRes.RoomVersion),
+		[]*types.HeaderedEvent{
+			event,
 		},
 		device.UserDomain(),
 		cfg.Matrix.ServerName,

@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	log "github.com/sirupsen/logrus"
 )
@@ -87,7 +87,7 @@ func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
 // Typically a consumer supplies a posUpdate with the latest sync position for the
 // event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
-	ev *gomatrixserverlib.HeaderedEvent, roomID string, userIDs []string,
+	ev *rstypes.HeaderedEvent, roomID string, userIDs []string,
 	posUpdate types.StreamingToken,
 ) {
 	// update the current position then notify relevant /sync streams.

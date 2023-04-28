@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
@@ -56,7 +56,7 @@ func (d *Database) GetPendingPDUs(
 	serverName spec.ServerName,
 	limit int,
 ) (
-	events map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent,
+	events map[*receipt.Receipt]*types.HeaderedEvent,
 	err error,
 ) {
 	// Strictly speaking this doesn't need to be using the writer
@@ -64,7 +64,7 @@ func (d *Database) GetPendingPDUs(
 	// a guarantee of transactional isolation, it's actually useful
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
-	events = make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent)
+	events = make(map[*receipt.Receipt]*types.HeaderedEvent)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
 		if err != nil {
@@ -87,7 +87,7 @@ func (d *Database) GetPendingPDUs(
 		}
 
 		for nid, blob := range blobs {
-			var event gomatrixserverlib.HeaderedEvent
+			var event types.HeaderedEvent
 			if err := json.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}

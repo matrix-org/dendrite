@@ -393,7 +393,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:             u.event.Headered(u.roomInfo.RoomVersion),
+		Event:             &types.HeaderedEvent{Event: u.event},
 		RewritesState:     u.rewritesState,
 		LastSentEventID:   u.lastEventIDSent,
 		LatestEventIDs:    latestEventIDs,

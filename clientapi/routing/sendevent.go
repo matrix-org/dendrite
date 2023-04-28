@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -183,8 +184,8 @@ func SendEvent(
 	if err := api.SendEvents(
 		req.Context(), rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			e.Headered(roomVersion),
+		[]*types.HeaderedEvent{
+			&types.HeaderedEvent{Event: e},
 		},
 		device.UserDomain(),
 		domain,
@@ -316,7 +317,7 @@ func generateSendEvent(
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err = gomatrixserverlib.Allowed(e.Event, &provider); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,

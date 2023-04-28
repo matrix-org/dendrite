@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -78,7 +79,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	var senderDomain spec.ServerName
 	var eventsNeeded gomatrixserverlib.StateNeeded
 	var identity *fclient.SigningIdentity
-	var event *gomatrixserverlib.HeaderedEvent
+	var event *types.HeaderedEvent
 	for _, memberEvent := range memberEvents {
 		if memberEvent.StateKey() == nil {
 			continue
@@ -257,28 +258,28 @@ func (r *Admin) PerformAdminDownloadState(
 			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity.EventID, err)
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			authEventMap[authEvent.EventID()] = authEvent
 		}
 		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = stateEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			stateEventMap[stateEvent.EventID()] = stateEvent
 		}
 	}
 
-	authEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(authEventMap))
-	stateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(stateEventMap))
+	authEvents := make([]*types.HeaderedEvent, 0, len(authEventMap))
+	stateEvents := make([]*types.HeaderedEvent, 0, len(stateEventMap))
 	stateIDs := make([]string, 0, len(stateEventMap))
 
 	for _, authEvent := range authEventMap {
-		authEvents = append(authEvents, authEvent.Headered(roomInfo.RoomVersion))
+		authEvents = append(authEvents, &types.HeaderedEvent{Event: authEvent})
 	}
 	for _, stateEvent := range stateEventMap {
-		stateEvents = append(stateEvents, stateEvent.Headered(roomInfo.RoomVersion))
+		stateEvents = append(stateEvents, &types.HeaderedEvent{Event: stateEvent})
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 

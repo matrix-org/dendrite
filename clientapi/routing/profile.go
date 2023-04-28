@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -334,15 +335,10 @@ func buildMembershipEvents(
 	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
 	evTime time.Time, rsAPI api.ClientRoomserverAPI,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	evs := []*gomatrixserverlib.HeaderedEvent{}
+) ([]*types.HeaderedEvent, error) {
+	evs := []*types.HeaderedEvent{}
 
 	for _, roomID := range roomIDs {
-		roomVersion, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
-		if err != nil {
-			return nil, err
-		}
-
 		builder := gomatrixserverlib.EventBuilder{
 			Sender:   userID,
 			RoomID:   roomID,
@@ -357,7 +353,7 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err = builder.SetContent(content); err != nil {
+		if err := builder.SetContent(content); err != nil {
 			return nil, err
 		}
 
@@ -371,7 +367,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		evs = append(evs, event.Headered(roomVersion))
+		evs = append(evs, event)
 	}
 
 	return evs, nil

@@ -63,7 +63,7 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 
 func (d *Database) GetMembershipForHistoryVisibility(
 	ctx context.Context, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
-) (map[string]*gomatrixserverlib.HeaderedEvent, error) {
+) (map[string]*types.HeaderedEvent, error) {
 	return d.StateSnapshotTable.BulkSelectMembershipForHistoryVisibility(ctx, nil, userNID, roomInfo, eventIDs...)
 }
 
@@ -658,7 +658,7 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 }
 
 // GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
-func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (roomInfo *types.RoomInfo, err error) {
+func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserverlib.PDU) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
 	// then we will use our configured default to create the room.
 	// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
@@ -725,7 +725,7 @@ func (d *Database) GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKe
 }
 
 func (d *EventDatabase) StoreEvent(
-	ctx context.Context, event *gomatrixserverlib.Event,
+	ctx context.Context, event gomatrixserverlib.PDU,
 	roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.StateAtEvent, error) {
@@ -909,7 +909,7 @@ func (d *EventDatabase) assignStateKeyNID(
 	return eventStateKeyNID, err
 }
 
-func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
+func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 	gomatrixserverlib.RoomVersion, error,
 ) {
 	var err error
@@ -1156,7 +1156,7 @@ func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *type
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
-func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error) {
 	roomInfo, err := d.roomInfo(ctx, nil, roomID)
 	if err != nil {
 		return nil, err
@@ -1207,7 +1207,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
 			cachedEvent, ok := d.Cache.GetRoomServerEvent(e.EventNID)
 			if ok {
-				return cachedEvent.Headered(roomInfo.RoomVersion), nil
+				return &types.HeaderedEvent{Event: cachedEvent}, nil
 			}
 			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{e.EventNID})
 			if err != nil {
@@ -1220,7 +1220,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if err != nil {
 				return nil, err
 			}
-			return ev.Headered(roomInfo.RoomVersion), nil
+			return &types.HeaderedEvent{Event: ev}, nil
 		}
 	}
 
@@ -1229,7 +1229,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 
 // Same as GetStateEvent but returns all matching state events with this event type. Returns no error
 // if there are no events with this event type.
-func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*types.HeaderedEvent, error) {
 	roomInfo, err := d.roomInfo(ctx, nil, roomID)
 	if err != nil {
 		return nil, err
@@ -1275,13 +1275,13 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if err != nil {
 		return nil, err
 	}
-	var result []*gomatrixserverlib.HeaderedEvent
+	var result []*types.HeaderedEvent
 	for _, pair := range eventPairs {
 		ev, err := verImpl.NewEventFromTrustedJSONWithEventID(eventIDs[pair.EventNID], pair.EventJSON, false)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, ev.Headered(roomInfo.RoomVersion))
+		result = append(result, &types.HeaderedEvent{Event: ev})
 	}
 
 	return result, nil
@@ -1409,7 +1409,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			EventType:    ev.Type(),
 			RoomID:       ev.RoomID(),
 			StateKey:     *ev.StateKey(),
-			ContentValue: tables.ExtractContentValue(ev.Headered(roomVer)),
+			ContentValue: tables.ExtractContentValue(&types.HeaderedEvent{Event: ev}),
 		}
 	}
 

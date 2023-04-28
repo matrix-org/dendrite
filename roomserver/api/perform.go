@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -27,11 +28,11 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion    `json:"room_version"`
-	Event           *gomatrixserverlib.HeaderedEvent `json:"event"`
-	InviteRoomState []fclient.InviteV2StrippedState  `json:"invite_room_state"`
-	SendAsServer    string                           `json:"send_as_server"`
-	TransactionID   *TransactionID                   `json:"transaction_id"`
+	RoomVersion     gomatrixserverlib.RoomVersion   `json:"room_version"`
+	Event           *types.HeaderedEvent            `json:"event"`
+	InviteRoomState []fclient.InviteV2StrippedState `json:"invite_room_state"`
+	SendAsServer    string                          `json:"send_as_server"`
+	TransactionID   *TransactionID                  `json:"transaction_id"`
 }
 
 type PerformPeekRequest struct {
@@ -68,7 +69,7 @@ func (r *PerformBackfillRequest) PrevEventIDs() []string {
 // PerformBackfillResponse is a response to PerformBackfill.
 type PerformBackfillResponse struct {
 	// Missing events, arbritrary order.
-	Events            []*gomatrixserverlib.HeaderedEvent  `json:"events"`
+	Events            []*types.HeaderedEvent              `json:"events"`
 	HistoryVisibility gomatrixserverlib.HistoryVisibility `json:"history_visibility"`
 }
 
@@ -95,10 +96,10 @@ type PerformInboundPeekResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The current state and auth chain events.
 	// The lists will be in an arbitrary order.
-	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
-	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	StateEvents     []*types.HeaderedEvent `json:"state_events"`
+	AuthChainEvents []*types.HeaderedEvent `json:"auth_chain_events"`
 	// The event at which this state was captured
-	LatestEvent *gomatrixserverlib.HeaderedEvent `json:"latest_event"`
+	LatestEvent *types.HeaderedEvent `json:"latest_event"`
 }
 
 // PerformForgetRequest is a request to PerformForget

@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -248,7 +249,7 @@ func (r *Joiner) performJoinRoomByID(
 
 	// If a guest is trying to join a room, check that the room has a m.room.guest_access event
 	if req.IsGuest {
-		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
+		var guestAccessEvent *types.HeaderedEvent
 		guestAccess := "forbidden"
 		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
 		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
@@ -306,7 +307,7 @@ func (r *Joiner) performJoinRoomByID(
 				InputRoomEvents: []rsAPI.InputRoomEvent{
 					{
 						Kind:         rsAPI.KindNew,
-						Event:        event.Headered(buildRes.RoomVersion),
+						Event:        event,
 						SendAsServer: string(userDomain),
 					},
 				},

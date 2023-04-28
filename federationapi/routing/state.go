@@ -19,7 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
@@ -42,8 +42,8 @@ func GetState(
 	}
 
 	return util.JSONResponse{Code: http.StatusOK, JSON: &fclient.RespState{
-		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
-		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
+		AuthEvents:  types.NewEventJSONsFromHeaderedEvents(authChain),
+		StateEvents: types.NewEventJSONsFromHeaderedEvents(stateEvents),
 	}}
 }
 
@@ -101,7 +101,7 @@ func getState(
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
-) (stateEvents, authEvents []*gomatrixserverlib.HeaderedEvent, errRes *util.JSONResponse) {
+) (stateEvents, authEvents []*types.HeaderedEvent, errRes *util.JSONResponse) {
 	// If we don't think we belong to this room then don't waste the effort
 	// responding to expensive requests for it.
 	if err := ErrorIfLocalServerNotInRoom(ctx, rsAPI, roomID); err != nil {
@@ -157,7 +157,7 @@ func getState(
 	return response.StateEvents, response.AuthChainEvents, nil
 }
 
-func getIDsFromEvent(events []*gomatrixserverlib.HeaderedEvent) []string {
+func getIDsFromEvent(events []*types.HeaderedEvent) []string {
 	IDs := make([]string, len(events))
 	for i := range events {
 		IDs[i] = events[i].EventID()

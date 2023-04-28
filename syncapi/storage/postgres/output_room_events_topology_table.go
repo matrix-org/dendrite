@@ -18,10 +18,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -105,7 +104,7 @@ func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
 // InsertEventInTopology inserts the given event in the room's topology, based
 // on the event's depth.
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
-	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent, pos types.StreamPosition,
 ) (topoPos types.StreamPosition, err error) {
 	err = sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).QueryRowContext(
 		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,

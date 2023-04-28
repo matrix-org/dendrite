@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -167,7 +168,7 @@ func MakeJoin(
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
 
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -413,7 +414,7 @@ func SendJoin(
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
-					Event:         signed.Headered(stateAndAuthChainResponse.RoomVersion),
+					Event:         &types.HeaderedEvent{Event: &signed},
 					SendAsServer:  string(cfg.Matrix.ServerName),
 					TransactionID: nil,
 				},
@@ -443,8 +444,8 @@ func SendJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: fclient.RespSendJoin{
-			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
-			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
+			StateEvents: types.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
+			AuthEvents:  types.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
 			Event:       signed.JSON(),
 		},
@@ -519,7 +520,7 @@ func checkRestrictedJoin(
 	}
 }
 
-type eventsByDepth []*gomatrixserverlib.HeaderedEvent
+type eventsByDepth []*types.HeaderedEvent
 
 func (e eventsByDepth) Len() int {
 	return len(e)

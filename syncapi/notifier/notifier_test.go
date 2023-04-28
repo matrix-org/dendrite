@@ -22,16 +22,16 @@ import (
 	"testing"
 	"time"
 
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 var (
-	randomMessageEvent  gomatrixserverlib.HeaderedEvent
-	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
-	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
+	randomMessageEvent  rstypes.HeaderedEvent
+	aliceInviteBobEvent rstypes.HeaderedEvent
+	bobLeaveEvent       rstypes.HeaderedEvent
 	syncPositionVeryOld = types.StreamingToken{PDUPosition: 5}
 	syncPositionBefore  = types.StreamingToken{PDUPosition: 11}
 	syncPositionAfter   = types.StreamingToken{PDUPosition: 12}

@@ -996,7 +996,7 @@ func (v *StateResolution) resolveConflictsV2(
 	// For each conflicted event, we will add a new set of auth events. Auth
 	// events may be duplicated across these sets but that's OK.
 	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
-	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
+	authEvents := make([]gomatrixserverlib.PDU, 0, estimate*3)
 	gotAuthEvents := make(map[string]struct{}, estimate*3)
 	knownAuthEvents := make(map[string]types.Event, estimate*3)
 
@@ -1046,7 +1046,7 @@ func (v *StateResolution) resolveConflictsV2(
 	gotAuthEvents = nil // nolint:ineffassign
 
 	// Resolve the conflicts.
-	resolvedEvents := func() []*gomatrixserverlib.Event {
+	resolvedEvents := func() []gomatrixserverlib.PDU {
 		resolvedTrace, _ := internal.StartRegion(ctx, "StateResolution.ResolveStateConflictsV2")
 		defer resolvedTrace.EndRegion()
 
@@ -1119,11 +1119,11 @@ func (v *StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.E
 // Returns an error if there was a problem talking to the database.
 func (v *StateResolution) loadStateEvents(
 	ctx context.Context, entries []types.StateEntry,
-) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
+) ([]gomatrixserverlib.PDU, map[string]types.StateEntry, error) {
 	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateEvents")
 	defer trace.EndRegion()
 
-	result := make([]*gomatrixserverlib.Event, 0, len(entries))
+	result := make([]gomatrixserverlib.PDU, 0, len(entries))
 	eventEntries := make([]types.StateEntry, 0, len(entries))
 	eventNIDs := make(types.EventNIDs, 0, len(entries))
 	for _, entry := range entries {
@@ -1163,7 +1163,7 @@ type authEventLoader struct {
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
 func (l *authEventLoader) loadAuthEvents(
-	ctx context.Context, roomInfo *types.RoomInfo, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
+	ctx context.Context, roomInfo *types.RoomInfo, event gomatrixserverlib.PDU, eventMap map[string]types.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()

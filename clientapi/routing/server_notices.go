@@ -22,12 +22,12 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -227,8 +227,8 @@ func SendServerNotice(
 	if err := api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			e.Headered(roomVersion),
+		[]*types.HeaderedEvent{
+			&types.HeaderedEvent{Event: e},
 		},
 		device.UserDomain(),
 		cfgClient.Matrix.ServerName,

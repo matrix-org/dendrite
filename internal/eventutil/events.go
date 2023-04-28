@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -43,7 +44,7 @@ func QueryAndBuildEvent(
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*types.HeaderedEvent, error) {
 	if queryRes == nil {
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
@@ -63,7 +64,7 @@ func BuildEvent(
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	eventsNeeded *gomatrixserverlib.StateNeeded, queryRes *api.QueryLatestEventsAndStateResponse,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*types.HeaderedEvent, error) {
 	if err := addPrevEventsToEvent(builder, eventsNeeded, queryRes); err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func BuildEvent(
 		return nil, err
 	}
 
-	return event.Headered(queryRes.RoomVersion), nil
+	return &types.HeaderedEvent{Event: event}, nil
 }
 
 // queryRequiredEventsForBuilder queries the roomserver for auth/prev events needed for this builder.

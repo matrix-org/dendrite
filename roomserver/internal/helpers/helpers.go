@@ -45,7 +45,7 @@ func UpdateToInviteMembership(
 		updates = append(updates, api.OutputEvent{
 			Type: api.OutputTypeNewInviteEvent,
 			NewInviteEvent: &api.OutputNewInviteEvent{
-				Event:       add.Headered(roomVersion),
+				Event:       &types.HeaderedEvent{Event: add.Event},
 				RoomVersion: roomVersion,
 			},
 		})
@@ -479,7 +479,7 @@ func QueryLatestEventsAndState(
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, event.Headered(roomInfo.RoomVersion))
+		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{Event: event})
 	}
 
 	return nil

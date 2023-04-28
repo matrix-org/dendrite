@@ -187,7 +187,12 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 		addsStateEvents = append(addsStateEvents, eventsRes.Events...)
 	}
 
-	addsJoinedHosts, err := JoinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(addsStateEvents))
+	evs := make([]*gomatrixserverlib.Event, len(addsStateEvents))
+	for i := range evs {
+		evs[i] = addsStateEvents[i].Event
+	}
+
+	addsJoinedHosts, err := JoinedHostsFromEvents(evs)
 	if err != nil {
 		return err
 	}

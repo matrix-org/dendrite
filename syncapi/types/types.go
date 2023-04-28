@@ -26,6 +26,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
@@ -38,7 +39,7 @@ var (
 
 type StateDelta struct {
 	RoomID      string
-	StateEvents []*gomatrixserverlib.HeaderedEvent
+	StateEvents []*types.HeaderedEvent
 	NewlyJoined bool
 	Membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
@@ -59,7 +60,7 @@ func NewStreamPositionFromString(s string) (StreamPosition, error) {
 
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
-	*gomatrixserverlib.HeaderedEvent
+	*types.HeaderedEvent
 	StreamPosition  StreamPosition
 	TransactionID   *api.TransactionID
 	ExcludeFromSync bool
@@ -538,7 +539,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
+func NewInviteResponse(event *types.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -551,7 +552,7 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := synctypes.ToClientEvent(event.Unwrap(), synctypes.FormatSync)
+	inviteEvent := synctypes.ToClientEvent(event.Event, synctypes.FormatSync)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)

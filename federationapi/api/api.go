@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/federationapi/types"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 )
 
 // FederationInternalAPI is used to query information from the federation sender.
@@ -189,13 +190,13 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion    `json:"room_version"`
-	Event           *gomatrixserverlib.HeaderedEvent `json:"event"`
-	InviteRoomState []fclient.InviteV2StrippedState  `json:"invite_room_state"`
+	RoomVersion     gomatrixserverlib.RoomVersion   `json:"room_version"`
+	Event           *rstypes.HeaderedEvent          `json:"event"`
+	InviteRoomState []fclient.InviteV2StrippedState `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {
-	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *rstypes.HeaderedEvent `json:"event"`
 }
 
 // QueryJoinedHostServerNamesInRoomRequest is a request to QueryJoinedHostServerNames

@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type Preset int
@@ -47,8 +48,8 @@ type Room struct {
 	creator      *User
 
 	authEvents   gomatrixserverlib.AuthEvents
-	currentState map[string]*gomatrixserverlib.HeaderedEvent
-	events       []*gomatrixserverlib.HeaderedEvent
+	currentState map[string]*rstypes.HeaderedEvent
+	events       []*rstypes.HeaderedEvent
 }
 
 // Create a new test room. Automatically creates the initial create events.
@@ -64,7 +65,7 @@ func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 		authEvents:   gomatrixserverlib.NewAuthEvents(nil),
 		preset:       PresetPublicChat,
 		Version:      gomatrixserverlib.RoomVersionV9,
-		currentState: make(map[string]*gomatrixserverlib.HeaderedEvent),
+		currentState: make(map[string]*rstypes.HeaderedEvent),
 		visibility:   gomatrixserverlib.HistoryVisibilityShared,
 	}
 	for _, m := range modifiers {
@@ -130,7 +131,7 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 }
 
 // Create an event in this room but do not insert it. Does not modify the room in any way (depth, fwd extremities, etc) so is thread-safe.
-func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, content interface{}, mods ...eventModifier) *gomatrixserverlib.HeaderedEvent {
+func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, content interface{}, mods ...eventModifier) *rstypes.HeaderedEvent {
 	t.Helper()
 	depth := 1 + len(r.events) // depth starts at 1
 
@@ -203,18 +204,18 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err = gomatrixserverlib.Allowed(ev, &r.authEvents); err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
-	headeredEvent := ev.Headered(r.Version)
+	headeredEvent := &rstypes.HeaderedEvent{Event: ev}
 	headeredEvent.Visibility = r.visibility
 	return headeredEvent
 }
 
 // Add a new event to this room DAG. Not thread-safe.
-func (r *Room) InsertEvent(t *testing.T, he *gomatrixserverlib.HeaderedEvent) {
+func (r *Room) InsertEvent(t *testing.T, he *rstypes.HeaderedEvent) {
 	t.Helper()
 	// Add the event to the list of auth/state events
 	r.events = append(r.events, he)
 	if he.StateKey() != nil {
-		err := r.authEvents.AddEvent(he.Unwrap())
+		err := r.authEvents.AddEvent(he.Event)
 		if err != nil {
 			t.Fatalf("InsertEvent: failed to add event to auth events: %s", err)
 		}
@@ -222,12 +223,12 @@ func (r *Room) InsertEvent(t *testing.T, he *gomatrixserverlib.HeaderedEvent) {
 	}
 }
 
-func (r *Room) Events() []*gomatrixserverlib.HeaderedEvent {
+func (r *Room) Events() []*rstypes.HeaderedEvent {
 	return r.events
 }
 
-func (r *Room) CurrentState() []*gomatrixserverlib.HeaderedEvent {
-	events := make([]*gomatrixserverlib.HeaderedEvent, len(r.currentState))
+func (r *Room) CurrentState() []*rstypes.HeaderedEvent {
+	events := make([]*rstypes.HeaderedEvent, len(r.currentState))
 	i := 0
 	for _, e := range r.currentState {
 		events[i] = e
@@ -236,7 +237,7 @@ func (r *Room) CurrentState() []*gomatrixserverlib.HeaderedEvent {
 	return events
 }
 
-func (r *Room) CreateAndInsert(t *testing.T, creator *User, eventType string, content interface{}, mods ...eventModifier) *gomatrixserverlib.HeaderedEvent {
+func (r *Room) CreateAndInsert(t *testing.T, creator *User, eventType string, content interface{}, mods ...eventModifier) *rstypes.HeaderedEvent {
 	t.Helper()
 	he := r.CreateEvent(t, creator, eventType, content, mods...)
 	r.InsertEvent(t, he)

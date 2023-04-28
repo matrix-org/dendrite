@@ -1,14 +1,15 @@
 package caching
 
 import (
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // FederationCache contains the subset of functions needed for
 // a federation event cache.
 type FederationCache interface {
-	GetFederationQueuedPDU(eventNID int64) (event *gomatrixserverlib.HeaderedEvent, ok bool)
-	StoreFederationQueuedPDU(eventNID int64, event *gomatrixserverlib.HeaderedEvent)
+	GetFederationQueuedPDU(eventNID int64) (event *types.HeaderedEvent, ok bool)
+	StoreFederationQueuedPDU(eventNID int64, event *types.HeaderedEvent)
 	EvictFederationQueuedPDU(eventNID int64)
 
 	GetFederationQueuedEDU(eventNID int64) (event *gomatrixserverlib.EDU, ok bool)
@@ -16,11 +17,11 @@ type FederationCache interface {
 	EvictFederationQueuedEDU(eventNID int64)
 }
 
-func (c Caches) GetFederationQueuedPDU(eventNID int64) (*gomatrixserverlib.HeaderedEvent, bool) {
+func (c Caches) GetFederationQueuedPDU(eventNID int64) (*types.HeaderedEvent, bool) {
 	return c.FederationPDUs.Get(eventNID)
 }
 
-func (c Caches) StoreFederationQueuedPDU(eventNID int64, event *gomatrixserverlib.HeaderedEvent) {
+func (c Caches) StoreFederationQueuedPDU(eventNID int64, event *types.HeaderedEvent) {
 	c.FederationPDUs.Set(eventNID, event)
 }
 

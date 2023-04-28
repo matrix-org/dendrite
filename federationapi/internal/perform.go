@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
@@ -149,10 +150,14 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if err != nil {
 		return err
 	}
+	room, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
 
 	joinInput := gomatrixserverlib.PerformJoinInput{
 		UserID:        user,
-		RoomID:        roomID,
+		RoomID:        room,
 		ServerName:    serverName,
 		Content:       content,
 		Unsigned:      unsigned,
@@ -199,7 +204,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		user.Domain(),
 		roomserverAPI.KindNew,
 		response.StateSnapshot,
-		response.JoinEvent.Headered(response.JoinEvent.Version()),
+		&types.HeaderedEvent{Event: response.JoinEvent},
 		serverName,
 		nil,
 		false,
@@ -384,7 +389,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromEvents(stateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromEvents(authEvents),
 		},
-		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
+		&types.HeaderedEvent{Event: respPeek.LatestEvent},
 		serverName,
 		nil,
 		false,
@@ -531,7 +536,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := fclient.NewInviteV2Request(request.Event, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(request.Event.Event, request.InviteRoomState)
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
@@ -549,7 +554,7 @@ func (r *FederationInternalAPI) PerformInvite(
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
-	response.Event = inviteEvent.Headered(request.RoomVersion)
+	response.Event = &types.HeaderedEvent{Event: inviteEvent}
 	return nil
 }
 
@@ -633,13 +638,13 @@ func federatedEventProvider(
 ) gomatrixserverlib.EventProvider {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
-	retries := map[string][]*gomatrixserverlib.Event{}
+	retries := map[string][]gomatrixserverlib.PDU{}
 
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
-		returning := []*gomatrixserverlib.Event{}
+	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
+		returning := []gomatrixserverlib.PDU{}
 		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 		if err != nil {
 			return nil, err
@@ -679,7 +684,7 @@ func federatedEventProvider(
 				}
 
 				// Check the signatures of the event.
-				if err := ev.VerifyEventSignatures(ctx, keyRing); err != nil {
+				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
 				}
 

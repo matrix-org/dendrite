@@ -30,6 +30,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -104,7 +105,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 	ctx context.Context, state *appserviceState, msgs []*nats.Msg,
 ) bool {
 	log.WithField("appservice", state.ID).Tracef("Appservice worker received %d message(s) from roomserver", len(msgs))
-	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(msgs))
+	events := make([]*types.HeaderedEvent, 0, len(msgs))
 	for _, msg := range msgs {
 		// Only handle events we care about
 		receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
@@ -174,7 +175,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 // endpoint. It will block for the backoff period if necessary.
 func (s *OutputRoomEventConsumer) sendEvents(
 	ctx context.Context, state *appserviceState,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*types.HeaderedEvent,
 	txnID string,
 ) error {
 	// Create the transaction body.
@@ -231,7 +232,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 // event falls within one of a given application service's namespaces.
 //
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice *config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
 	switch {
 	case appservice.URL == "":
 		return false
@@ -269,7 +270,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 
 // appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
-func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice *config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
 	// TODO: This is only checking the current room state, not the state at
 	// the event in question. Pretty sure this is what Synapse does too, but
 	// until we have a lighter way of checking the state before the event that

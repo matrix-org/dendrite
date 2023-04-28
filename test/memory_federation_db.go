@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/federationapi/types"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -36,7 +37,7 @@ type InMemoryFederationDatabase struct {
 	pendingEDUServers  map[spec.ServerName]struct{}
 	blacklistedServers map[spec.ServerName]struct{}
 	assumedOffline     map[spec.ServerName]struct{}
-	pendingPDUs        map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent
+	pendingPDUs        map[*receipt.Receipt]*rstypes.HeaderedEvent
 	pendingEDUs        map[*receipt.Receipt]*gomatrixserverlib.EDU
 	associatedPDUs     map[spec.ServerName]map[*receipt.Receipt]struct{}
 	associatedEDUs     map[spec.ServerName]map[*receipt.Receipt]struct{}
@@ -49,7 +50,7 @@ func NewInMemoryFederationDatabase() *InMemoryFederationDatabase {
 		pendingEDUServers:  make(map[spec.ServerName]struct{}),
 		blacklistedServers: make(map[spec.ServerName]struct{}),
 		assumedOffline:     make(map[spec.ServerName]struct{}),
-		pendingPDUs:        make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent),
+		pendingPDUs:        make(map[*receipt.Receipt]*rstypes.HeaderedEvent),
 		pendingEDUs:        make(map[*receipt.Receipt]*gomatrixserverlib.EDU),
 		associatedPDUs:     make(map[spec.ServerName]map[*receipt.Receipt]struct{}),
 		associatedEDUs:     make(map[spec.ServerName]map[*receipt.Receipt]struct{}),
@@ -64,7 +65,7 @@ func (d *InMemoryFederationDatabase) StoreJSON(
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	var event gomatrixserverlib.HeaderedEvent
+	var event rstypes.HeaderedEvent
 	if err := json.Unmarshal([]byte(js), &event); err == nil {
 		nidMutex.Lock()
 		defer nidMutex.Unlock()
@@ -91,12 +92,12 @@ func (d *InMemoryFederationDatabase) GetPendingPDUs(
 	ctx context.Context,
 	serverName spec.ServerName,
 	limit int,
-) (pdus map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent, err error) {
+) (pdus map[*receipt.Receipt]*rstypes.HeaderedEvent, err error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
 	pduCount := 0
-	pdus = make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent)
+	pdus = make(map[*receipt.Receipt]*rstypes.HeaderedEvent)
 	if receipts, ok := d.associatedPDUs[serverName]; ok {
 		for dbReceipt := range receipts {
 			if event, ok := d.pendingPDUs[dbReceipt]; ok {
