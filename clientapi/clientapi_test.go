@@ -2090,6 +2090,15 @@ func TestKeyBackup(t *testing.T) {
 				handleResponseCode(t, rec, http.StatusOK)
 			},
 		},
+		{
+			name: "deleting an empty version doesn't work", // make sure we can't delete an empty backup version. Handled at the router level
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusNotFound)
+			},
+		},
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
