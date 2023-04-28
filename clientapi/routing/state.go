@@ -134,7 +134,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				synctypes.HeaderedToClientEvent(ev, synctypes.FormatAll),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll),
 			)
 		}
 	} else {
@@ -153,7 +153,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateAfterRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				synctypes.HeaderedToClientEvent(ev, synctypes.FormatAll),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll),
 			)
 		}
 	}
@@ -312,7 +312,7 @@ func OnIncomingStateTypeRequest(
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: synctypes.HeaderedToClientEvent(event, synctypes.FormatAll),
+		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll),
 	}
 
 	var res interface{}

@@ -181,7 +181,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	// Create the transaction body.
 	transaction, err := json.Marshal(
 		ApplicationServiceTransaction{
-			Events: synctypes.HeaderedToClientEvents(events, synctypes.FormatAll),
+			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll),
 		},
 	)
 	if err != nil {

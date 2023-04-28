@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -134,6 +135,6 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.HeaderedToClientEvents(result, synctypes.FormatAll)},
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll)},
 	}
 }

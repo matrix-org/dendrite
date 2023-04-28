@@ -279,7 +279,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		hisVisMap[re.EventID()] = re.Visibility
 	}
 	recEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		gomatrixserverlib.ToPDUs(toEvents(snapshot.StreamEventsToEvents(device, recentStreamEvents))),
+		gomatrixserverlib.ToPDUs(snapshot.StreamEventsToEvents(device, recentStreamEvents)),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
 	recentEvents := make([]*rstypes.HeaderedEvent, len(recEvents))
@@ -358,7 +358,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		hisVisMap[re.EventID()] = re.Visibility
 	}
 	sEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		gomatrixserverlib.ToPDUs(toEvents(removeDuplicates(delta.StateEvents, events))),
+		gomatrixserverlib.ToPDUs(removeDuplicates(delta.StateEvents, events)),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	)
 	delta.StateEvents = make([]*rstypes.HeaderedEvent, len(sEvents))
@@ -390,20 +390,20 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			}
 		}
 		jr.Timeline.PrevBatch = &prevBatch
-		jr.Timeline.Events = synctypes.HeaderedToClientEvents(events, synctypes.FormatSync)
+		jr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatSync)
 		// If we are limited by the filter AND the history visibility filter
 		// didn't "remove" events, return that the response is limited.
 		jr.Timeline.Limited = (limited && len(events) == len(recentEvents)) || delta.NewlyJoined
-		jr.State.Events = synctypes.HeaderedToClientEvents(delta.StateEvents, synctypes.FormatSync)
+		jr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(delta.StateEvents), synctypes.FormatSync)
 		req.Response.Rooms.Join[delta.RoomID] = jr
 
 	case spec.Peek:
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = &prevBatch
 		// TODO: Apply history visibility on peeked rooms
-		jr.Timeline.Events = synctypes.HeaderedToClientEvents(recentEvents, synctypes.FormatSync)
+		jr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(recentEvents), synctypes.FormatSync)
 		jr.Timeline.Limited = limited
-		jr.State.Events = synctypes.HeaderedToClientEvents(delta.StateEvents, synctypes.FormatSync)
+		jr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(delta.StateEvents), synctypes.FormatSync)
 		req.Response.Rooms.Peek[delta.RoomID] = jr
 
 	case spec.Leave:
@@ -412,11 +412,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	case spec.Ban:
 		lr := types.NewLeaveResponse()
 		lr.Timeline.PrevBatch = &prevBatch
-		lr.Timeline.Events = synctypes.HeaderedToClientEvents(events, synctypes.FormatSync)
+		lr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatSync)
 		// If we are limited by the filter AND the history visibility filter
 		// didn't "remove" events, return that the response is limited.
 		lr.Timeline.Limited = limited && len(events) == len(recentEvents)
-		lr.State.Events = synctypes.HeaderedToClientEvents(delta.StateEvents, synctypes.FormatSync)
+		lr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(delta.StateEvents), synctypes.FormatSync)
 		req.Response.Rooms.Leave[delta.RoomID] = lr
 	}
 
@@ -566,11 +566,11 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	}
 
 	jr.Timeline.PrevBatch = prevBatch
-	jr.Timeline.Events = synctypes.HeaderedToClientEvents(events, synctypes.FormatSync)
+	jr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatSync)
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	jr.Timeline.Limited = limited && len(events) == len(recentEvents)
-	jr.State.Events = synctypes.HeaderedToClientEvents(stateEvents, synctypes.FormatSync)
+	jr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(stateEvents), synctypes.FormatSync)
 	return jr, nil
 }
 
@@ -656,7 +656,7 @@ func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, snapsho
 	return nil
 }
 
-func removeDuplicates(stateEvents, recentEvents []*rstypes.HeaderedEvent) []*rstypes.HeaderedEvent {
+func removeDuplicates[T gomatrixserverlib.PDU](stateEvents, recentEvents []T) []T {
 	for _, recentEv := range recentEvents {
 		if recentEv.StateKey() == nil {
 			continue // not a state event
@@ -676,12 +676,4 @@ func removeDuplicates(stateEvents, recentEvents []*rstypes.HeaderedEvent) []*rst
 		}
 	}
 	return stateEvents
-}
-
-func toEvents(events []*rstypes.HeaderedEvent) []*gomatrixserverlib.Event {
-	result := make([]*gomatrixserverlib.Event, len(events))
-	for i := range events {
-		result[i] = events[i].Event
-	}
-	return result
 }

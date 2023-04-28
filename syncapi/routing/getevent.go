@@ -97,6 +97,6 @@ func GetEvent(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: synctypes.HeaderedToClientEvent(events[0], synctypes.FormatAll),
+		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll),
 	}
 }

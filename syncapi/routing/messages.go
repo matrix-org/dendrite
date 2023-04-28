@@ -256,7 +256,7 @@ func OnIncomingMessagesRequest(
 			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
 			return jsonerror.InternalServerError()
 		}
-		res.State = append(res.State, synctypes.HeaderedToClientEvents(membershipEvents, synctypes.FormatAll)...)
+		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll)...)
 	}
 
 	// If we didn't return any events, set the end to an empty string, so it will be omitted
@@ -365,7 +365,7 @@ func (r *messagesReq) retrieveEvents() (
 		"events_before": len(events),
 		"events_after":  len(filteredEvents),
 	}).Debug("applied history visibility (messages)")
-	return synctypes.HeaderedToClientEvents(filteredEvents, synctypes.FormatAll), start, end, err
+	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll), start, end, err
 }
 
 func (r *messagesReq) getStartEnd(events []*rstypes.HeaderedEvent) (start, end types.TopologyToken, err error) {

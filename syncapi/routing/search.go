@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -206,12 +207,12 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			Context: SearchContextResponse{
 				Start:        startToken.String(),
 				End:          endToken.String(),
-				EventsAfter:  synctypes.HeaderedToClientEvents(eventsAfter, synctypes.FormatSync),
-				EventsBefore: synctypes.HeaderedToClientEvents(eventsBefore, synctypes.FormatSync),
+				EventsAfter:  synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync),
+				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync),
 				ProfileInfo:  profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.HeaderedToClientEvent(event, synctypes.FormatAll),
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
@@ -223,7 +224,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				logrus.WithError(err).Error("unable to get current state")
 				return jsonerror.InternalServerError()
 			}
-			stateForRooms[event.RoomID()] = synctypes.HeaderedToClientEvents(state, synctypes.FormatSync)
+			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync)
 		}
 	}
 
