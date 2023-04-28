@@ -115,8 +115,9 @@ type ClientUserAPI interface {
 
 type KeyBackupAPI interface {
 	DeleteKeyBackup(ctx context.Context, userID, version string) (bool, error)
-	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
-	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) error
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest) (string, error)
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest) (*QueryKeyBackupResponse, error)
+	UpdateBackupKeyAuthData(ctx context.Context, req *PerformKeyBackupRequest) (*PerformKeyBackupResponse, error)
 }
 
 type ProfileAPI interface {
@@ -184,9 +185,6 @@ type InternalKeyBackupSession struct {
 }
 
 type PerformKeyBackupResponse struct {
-	Error    string // set if there was a problem performing the request
-	BadInput bool   // if set, the Error was due to bad input (HTTP 400)
-
 	Exists  bool   // set to true if the Version exists
 	Version string // the newly created version
 
@@ -204,7 +202,6 @@ type QueryKeyBackupRequest struct {
 }
 
 type QueryKeyBackupResponse struct {
-	Error  string
 	Exists bool
 
 	Algorithm string          `json:"algorithm"`
