@@ -29,7 +29,7 @@ func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 		Name    string
 		RuleSet RuleSet
 		Want    *Rule
-		Event   *gomatrixserverlib.Event
+		Event   gomatrixserverlib.PDU
 	}{
 		{"empty", RuleSet{}, nil, ev},
 		{"defaultCanWin", RuleSet{Override: []*Rule{defaultEnabled}}, defaultEnabled, ev},
@@ -188,7 +188,7 @@ func TestPatternMatches(t *testing.T) {
 	}
 }
 
-func mustEventFromJSON(t *testing.T, json string) *gomatrixserverlib.Event {
+func mustEventFromJSON(t *testing.T, json string) gomatrixserverlib.PDU {
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV7).NewEventFromTrustedJSON([]byte(json), false)
 	if err != nil {
 		t.Fatal(err)

@@ -95,7 +95,7 @@ type MSC2836EventRelationshipsResponse struct {
 
 func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events:    synctypes.ToClientEvents(res.ParsedEvents, synctypes.FormatAll),
+		Events:    synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(res.ParsedEvents), synctypes.FormatAll),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,
 	}

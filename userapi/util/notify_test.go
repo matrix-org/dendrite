@@ -100,7 +100,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 
 		// Insert a dummy event
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
-			Event: synctypes.HeaderedToClientEvent(dummyEvent, synctypes.FormatAll),
+			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll),
 		}); err != nil {
 			t.Error(err)
 		}
