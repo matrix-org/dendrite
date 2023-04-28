@@ -150,10 +150,14 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if err != nil {
 		return err
 	}
+	room, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
 
 	joinInput := gomatrixserverlib.PerformJoinInput{
 		UserID:        user,
-		RoomID:        roomID,
+		RoomID:        room,
 		ServerName:    serverName,
 		Content:       content,
 		Unsigned:      unsigned,
