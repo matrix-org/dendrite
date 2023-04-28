@@ -334,13 +334,13 @@ func (r *Admin) PerformAdminDownloadState(
 			return nil
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			authEventMap[authEvent.EventID()] = authEvent
 		}
 		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = stateEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			stateEventMap[stateEvent.EventID()] = stateEvent

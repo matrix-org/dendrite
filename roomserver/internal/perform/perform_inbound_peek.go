@@ -68,7 +68,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	var sortedLatestEvents []*gomatrixserverlib.Event
+	var sortedLatestEvents []gomatrixserverlib.PDU
 	for _, ev := range latestEvents {
 		sortedLatestEvents = append(sortedLatestEvents, ev.Event)
 	}
@@ -76,7 +76,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 		sortedLatestEvents,
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
-	response.LatestEvent = &types.HeaderedEvent{Event: sortedLatestEvents[0]}
+	response.LatestEvent = &types.HeaderedEvent{Event: sortedLatestEvents[0].(*gomatrixserverlib.Event)}
 
 	// XXX: do we actually need to do a state resolution here?
 	roomState := state.NewStateResolution(r.DB, info)

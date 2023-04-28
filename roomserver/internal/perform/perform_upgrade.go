@@ -642,7 +642,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err = gomatrixserverlib.Allowed(headeredEvent.Event, &provider); err != nil {
 		return nil, &api.PerformError{
 			Code: api.PerformErrorNotAllowed,

@@ -183,8 +183,8 @@ func main() {
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion),
-		events,
-		authEvents,
+		gomatrixserverlib.ToPDUs(events),
+		gomatrixserverlib.ToPDUs(authEvents),
 	)
 	if err != nil {
 		panic(err)
@@ -208,7 +208,7 @@ func main() {
 	fmt.Println("Returned", count, "state events after filtering")
 }
 
-type Events []*gomatrixserverlib.Event
+type Events []gomatrixserverlib.PDU
 
 func (e Events) Len() int {
 	return len(e)

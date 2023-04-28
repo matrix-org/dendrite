@@ -646,7 +646,7 @@ func (rc *reqCtx) getLocalEvent(roomID, eventID string) *types.HeaderedEvent {
 // into the roomserver as KindOutlier, with auth chains.
 func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsResponse) {
 	var stateEvents gomatrixserverlib.EventJSONs
-	var messageEvents []*gomatrixserverlib.Event
+	var messageEvents []gomatrixserverlib.PDU
 	for _, ev := range res.ParsedEvents {
 		if ev.StateKey() != nil {
 			stateEvents = append(stateEvents, ev.JSON())
@@ -665,7 +665,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 	for _, outlier := range append(eventsInOrder, messageEvents...) {
 		ires = append(ires, roomserver.InputRoomEvent{
 			Kind:  roomserver.KindOutlier,
-			Event: &types.HeaderedEvent{Event: outlier},
+			Event: &types.HeaderedEvent{Event: outlier.(*gomatrixserverlib.Event)},
 		})
 	}
 	// we've got the data by this point so use a background context

@@ -279,13 +279,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		hisVisMap[re.EventID()] = re.Visibility
 	}
 	recEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		toEvents(snapshot.StreamEventsToEvents(device, recentStreamEvents)),
+		gomatrixserverlib.ToPDUs(toEvents(snapshot.StreamEventsToEvents(device, recentStreamEvents))),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
 	recentEvents := make([]*rstypes.HeaderedEvent, len(recEvents))
 	for i := range recEvents {
 		recentEvents[i] = &rstypes.HeaderedEvent{
-			Event:      recEvents[i],
+			Event:      recEvents[i].(*gomatrixserverlib.Event),
 			Visibility: hisVisMap[recEvents[i].EventID()],
 		}
 	}
@@ -358,13 +358,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		hisVisMap[re.EventID()] = re.Visibility
 	}
 	sEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		toEvents(removeDuplicates(delta.StateEvents, events)),
+		gomatrixserverlib.ToPDUs(toEvents(removeDuplicates(delta.StateEvents, events))),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	)
 	delta.StateEvents = make([]*rstypes.HeaderedEvent, len(sEvents))
 	for i := range sEvents {
 		delta.StateEvents[i] = &rstypes.HeaderedEvent{
-			Event:      sEvents[i],
+			Event:      sEvents[i].(*gomatrixserverlib.Event),
 			Visibility: hisVisMap[sEvents[i].EventID()],
 		}
 	}
