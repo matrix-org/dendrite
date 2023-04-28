@@ -1990,7 +1990,7 @@ func TestKeyBackup(t *testing.T) {
 			request: func(t *testing.T) *http.Request {
 				reqBody := test.WithJSONBody(t, uapi.KeyBackupSession{
 					FirstMessageIndex: 1,
-					SessionData:       json.RawMessage("{asd}"),
+					SessionData:       json.RawMessage("{}"),
 					IsVerified:        true,
 					ForwardedCount:    0,
 				})
