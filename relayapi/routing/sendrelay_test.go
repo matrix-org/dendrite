@@ -52,7 +52,7 @@ func createFederationRequest(
 	content interface{},
 ) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
-	path := federationPathPrefixV1 + "/send_relay/" + string(txnID) + "/" + userID.Raw()
+	path := federationPathPrefixV1 + "/send_relay/" + string(txnID) + "/" + userID.String()
 	request := fclient.NewFederationRequest("PUT", origin, destination, path)
 	request.SetContent(content)
 
