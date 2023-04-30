@@ -153,7 +153,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 
 	var account *api.Account
 	if t.Config.Ldap.Enabled {
-		isAdmin, err := t.authenticateLdap(localpart, r.Password)
+		isAdmin, err := t.authenticateLdap(username, r.Password)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +179,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 
 func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string, domain gomatrixserverlib.ServerName, password string) (*api.Account, *util.JSONResponse) {
 	res := &api.QueryAccountByPasswordResponse{}
-	err := t.UserAPI.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+	err := t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 		Localpart:         strings.ToLower(localpart),
 		ServerName:        domain,
 		PlaintextPassword: password,
@@ -310,10 +310,10 @@ func (t *LoginTypePassword) isLdapAdmin(conn *ldap.Conn, username string) (bool,
 	return true, nil
 }
 
-func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, username string, domain gomatrixserverlib.ServerName, admin bool) (*api.Account, *util.JSONResponse) {
+func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart string, domain gomatrixserverlib.ServerName, admin bool) (*api.Account, *util.JSONResponse) {
 	var existing api.QueryAccountByLocalpartResponse
 	err := t.UserAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
-		Localpart:  username,
+		Localpart:  localpart,
 		ServerName: domain,
 	}, &existing)
 
@@ -334,7 +334,7 @@ func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, username str
 	var created api.PerformAccountCreationResponse
 	err = t.UserAPI.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
 		AppServiceID: "ldap",
-		Localpart:    username,
+		Localpart:    localpart,
 		Password:     uuid.New().String(),
 		AccountType:  accountType,
 		OnConflict:   api.ConflictAbort,
