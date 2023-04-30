@@ -63,7 +63,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 			Config:        cfg,
 			Rt:            rt,
 			InhibitDevice: header.InhibitDevice,
-			UserAPI:       useraccountAPI,
+			UserLoginAPI:  useraccountAPI,
 		}
 	case authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{

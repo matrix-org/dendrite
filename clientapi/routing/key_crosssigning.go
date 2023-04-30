@@ -62,9 +62,9 @@ func UploadCrossSigningDeviceKeys(
 		}
 	}
 	typePassword := auth.LoginTypePassword{
-		UserApi: accountAPI,
-		UserAPI: accountAPI,
-		Config:  cfg,
+		UserApi:      accountAPI,
+		UserLoginAPI: accountAPI,
+		Config:       cfg,
 	}
 	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {
 		return *authErr

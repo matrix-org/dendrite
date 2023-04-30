@@ -114,9 +114,9 @@ type UserInteractive struct {
 
 func NewUserInteractive(userAccountAPI api.ClientUserAPI, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
-		UserApi: userAccountAPI,
-		UserAPI: userAccountAPI,
-		Config:  cfg,
+		UserApi:      userAccountAPI,
+		UserLoginAPI: userAccountAPI,
+		Config:       cfg,
 	}
 	return &UserInteractive{
 		Flows: []userInteractiveFlow{
