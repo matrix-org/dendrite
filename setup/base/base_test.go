@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,8 +32,10 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	b, _, _ := testrig.Base(nil)
-	defer b.Close()
+	processCtx := process.NewProcessContext()
+	routers := httputil.NewRouters()
+	cfg := config.Dendrite{}
+	cfg.Defaults(config.DefaultOpts{Generate: true, SingleDatabase: true})
 
 	// hack: create a server and close it immediately, just to get a random port assigned
 	s := httptest.NewServer(nil)
@@ -40,7 +44,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	// start base with the listener and wait for it to be started
 	address, err := config.HTTPAddress(s.URL)
 	assert.NoError(t, err)
-	go b.SetupAndServeHTTP(address, nil, nil)
+	go basepkg.SetupAndServeHTTP(processCtx, &cfg, routers, address, nil, nil)
 	time.Sleep(time.Millisecond * 10)
 
 	// When hitting /, we should be redirected to /_matrix/static, which should contain the landing page
@@ -70,15 +74,17 @@ func TestLandingPage_UnixSocket(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	b, _, _ := testrig.Base(nil)
-	defer b.Close()
+	processCtx := process.NewProcessContext()
+	routers := httputil.NewRouters()
+	cfg := config.Dendrite{}
+	cfg.Defaults(config.DefaultOpts{Generate: true, SingleDatabase: true})
 
 	tempDir := t.TempDir()
 	socket := path.Join(tempDir, "socket")
 	// start base with the listener and wait for it to be started
-	address := config.UnixSocketAddress(socket, 0755)
+	address, err := config.UnixSocketAddress(socket, "755")
 	assert.NoError(t, err)
-	go b.SetupAndServeHTTP(address, nil, nil)
+	go basepkg.SetupAndServeHTTP(processCtx, &cfg, routers, address, nil, nil)
 	time.Sleep(time.Millisecond * 100)
 
 	client := &http.Client{

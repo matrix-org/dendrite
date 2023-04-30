@@ -16,8 +16,13 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strings"
+
+	"github.com/go-ldap/ldap/v3"
+	"github.com/google/uuid"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -28,8 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
-
-type GetAccountByPassword func(ctx context.Context, req *api.QueryAccountByPasswordRequest, res *api.QueryAccountByPasswordResponse) error
 
 type PasswordRequest struct {
 	Login
@@ -46,6 +49,7 @@ type LoginTypePassword struct {
 	Config        *config.ClientAPI
 	Rt            *ratelimit.RtFailedLogin
 	InhibitDevice bool
+	UserAPI       api.UserLoginAPI
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -123,6 +127,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.InvalidUsername("The server name is not known."),
 		}
 	}
+
 	// Squash username to all lowercase letters
 	res := &api.QueryAccountByPasswordResponse{}
 	if t.Rt != nil {
@@ -146,13 +151,53 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 	}
 
+	var account *api.Account
+	if t.Config.Ldap.Enabled {
+		isAdmin, err := t.authenticateLdap(localpart, r.Password)
+		if err != nil {
+			return nil, err
+		}
+		acc, err := t.getOrCreateAccount(ctx, localpart, domain, isAdmin)
+		if err != nil {
+			return nil, err
+		}
+		account = acc
+	} else {
+		acc, err := t.authenticateDb(ctx, localpart, domain, r.Password)
+		if err != nil {
+			return nil, err
+		}
+		account = acc
+	}
+
+	// Set the user, so login.Username() can do the right thing
+	r.Identifier.User = account.UserID
+	r.User = account.UserID
+	r.Login.User = username
+	return &r.Login, nil
+}
+
+func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string, domain gomatrixserverlib.ServerName, password string) (*api.Account, *util.JSONResponse) {
+	res := &api.QueryAccountByPasswordResponse{}
+	err := t.UserAPI.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+		Localpart:         strings.ToLower(localpart),
+		ServerName:        domain,
+		PlaintextPassword: password,
+	}, res)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("Unable to fetch account by password."),
+		}
+	}
+
 	// If we couldn't find the user by the lower cased localpart, try the provided
 	// localpart as is.
 	if !res.Exists {
-		err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+		err = t.UserAPI.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
 			ServerName:        domain,
-			PlaintextPassword: r.Password,
+			PlaintextPassword: password,
 		}, res)
 		if err != nil {
 			return nil, &util.JSONResponse{
@@ -163,18 +208,149 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
 		if !res.Exists {
-			if t.Rt != nil {
-				t.Rt.Act(localpart)
-			}
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("Invalid username or password"),
+				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	}
-	// Set the user, so login.Username() can do the right thing
-	r.Identifier.User = res.Account.UserID
-	r.User = res.Account.UserID
-	r.Login.User = username
-	return &r.Login, nil
+	return res.Account, nil
+}
+
+func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *util.JSONResponse) {
+	var conn *ldap.Conn
+	conn, err := ldap.DialURL(t.Config.Ldap.Uri)
+	if err != nil {
+		return false, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("unable to connect to ldap: " + err.Error()),
+		}
+	}
+	defer conn.Close()
+
+	if t.Config.Ldap.AdminBindEnabled {
+		err = conn.Bind(t.Config.Ldap.AdminBindDn, t.Config.Ldap.AdminBindPassword)
+		if err != nil {
+			return false, &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("unable to bind to ldap: " + err.Error()),
+			}
+		}
+		filter := strings.ReplaceAll(t.Config.Ldap.SearchFilter, "{username}", username)
+		searchRequest := ldap.NewSearchRequest(
+			t.Config.Ldap.BaseDn, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases,
+			0, 0, false, filter, []string{t.Config.Ldap.SearchAttribute}, nil,
+		)
+		var result *ldap.SearchResult
+		result, err = conn.Search(searchRequest)
+		if err != nil {
+			return false, &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("unable to bind to search ldap: " + err.Error()),
+			}
+		}
+		if len(result.Entries) > 1 {
+			return false, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.BadJSON("'user' must be duplicated."),
+			}
+		}
+		if len(result.Entries) < 1 {
+			return false, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.BadJSON("'user' not found."),
+			}
+		}
+
+		userDN := result.Entries[0].DN
+		err = conn.Bind(userDN, password)
+		if err != nil {
+			return false, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+	} else {
+		bindDn := strings.ReplaceAll(t.Config.Ldap.UserBindDn, "{username}", username)
+		err = conn.Bind(bindDn, password)
+		if err != nil {
+			return false, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+	}
+
+	isAdmin, err := t.isLdapAdmin(conn, username)
+	if err != nil {
+		return false, &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.InvalidUsername(err.Error()),
+		}
+	}
+	return isAdmin, nil
+}
+
+func (t *LoginTypePassword) isLdapAdmin(conn *ldap.Conn, username string) (bool, error) {
+	searchRequest := ldap.NewSearchRequest(
+		t.Config.Ldap.AdminGroupDn,
+		ldap.ScopeWholeSubtree, ldap.DerefAlways, 0, 0, false,
+		strings.ReplaceAll(t.Config.Ldap.AdminGroupFilter, "{username}", username),
+		[]string{t.Config.Ldap.AdminGroupAttribute},
+		nil)
+
+	sr, err := conn.Search(searchRequest)
+	if err != nil {
+		return false, err
+	}
+
+	if len(sr.Entries) < 1 {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, username string, domain gomatrixserverlib.ServerName, admin bool) (*api.Account, *util.JSONResponse) {
+	var existing api.QueryAccountByLocalpartResponse
+	err := t.UserAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
+		Localpart:  username,
+		ServerName: domain,
+	}, &existing)
+
+	if err == nil {
+		return existing.Account, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.InvalidUsername(err.Error()),
+		}
+	}
+
+	accountType := api.AccountTypeUser
+	if admin {
+		accountType = api.AccountTypeAdmin
+	}
+	var created api.PerformAccountCreationResponse
+	err = t.UserAPI.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
+		AppServiceID: "ldap",
+		Localpart:    username,
+		Password:     uuid.New().String(),
+		AccountType:  accountType,
+		OnConflict:   api.ConflictAbort,
+	}, &created)
+
+	if err != nil {
+		if _, ok := err.(*api.ErrorConflict); ok {
+			return nil, &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+			}
+		}
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+		}
+	}
+	return created.Account, nil
 }

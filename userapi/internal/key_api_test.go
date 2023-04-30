@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -16,15 +16,14 @@ import (
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	base, _, _ := testrig.Base(nil)
-	db, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
 	return db, func() {
-		base.Close()
 		close()
 	}
 }

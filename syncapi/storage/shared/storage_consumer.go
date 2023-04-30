@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/mrd"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -334,13 +335,13 @@ func (d *Database) updateRoomState(
 }
 
 func (d *Database) GetFilter(
-	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+	ctx context.Context, target *synctypes.Filter, localpart string, filterID string,
 ) error {
 	return d.Filter.SelectFilter(ctx, nil, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
-	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
+	ctx context.Context, localpart string, filter *synctypes.Filter,
 ) (string, error) {
 	var filterID string
 	var err error
@@ -534,10 +535,10 @@ func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID strin
 	return d.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
 }
 
-func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	return d.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
 }
-func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return d.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
 
@@ -626,7 +627,7 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 	return d.Presence.GetMaxPresenceID(ctx, nil)
 }
 
-func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter synctypes.EventFilter) (map[string]*types.PresenceInternal, error) {
 	return d.Presence.GetPresenceAfter(ctx, nil, after, filter)
 }
 

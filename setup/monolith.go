@@ -20,14 +20,19 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/federationapi"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/mediaapi"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Monolith represents an instantiation of all dependencies required to build
@@ -35,8 +40,8 @@ import (
 type Monolith struct {
 	Config    *config.Dendrite
 	KeyRing   *gomatrixserverlib.KeyRing
-	Client    *gomatrixserverlib.Client
-	FedClient *gomatrixserverlib.FederationClient
+	Client    *fclient.Client
+	FedClient *fclient.FederationClient
 
 	AppserviceAPI appserviceAPI.AppServiceInternalAPI
 	FederationAPI federationAPI.FederationInternalAPI
@@ -49,20 +54,28 @@ type Monolith struct {
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
-func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
+func (m *Monolith) AddAllPublicRoutes(
+	processCtx *process.ProcessContext,
+	cfg *config.Dendrite,
+	routers httputil.Routers,
+	cm sqlutil.Connections,
+	natsInstance *jetstream.NATSInstance,
+	caches *caching.Caches,
+	enableMetrics bool,
+) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
 	if userDirectoryProvider == nil {
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		base, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		processCtx, routers, cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
-		m.ExtPublicRoomsProvider,
+		m.ExtPublicRoomsProvider, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
-		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil,
+		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil, enableMetrics,
 	)
-	mediaapi.AddPublicRoutes(base, m.UserAPI, m.Client)
-	syncapi.AddPublicRoutes(base, m.UserAPI, m.RoomserverAPI)
+	mediaapi.AddPublicRoutes(routers.Media, cm, cfg, m.UserAPI, m.Client)
+	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 }

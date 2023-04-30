@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -85,7 +86,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 
 		lr := types.NewLeaveResponse()
 		h := sha256.Sum256(append([]byte(roomID), []byte(strconv.FormatInt(int64(to), 10))...))
-		lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{
+		lr.Timeline.Events = append(lr.Timeline.Events, synctypes.ClientEvent{
 			// fake event ID which muxes in the to position
 			EventID:        "$" + base64.RawURLEncoding.EncodeToString(h[:]),
 			OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -18,12 +18,10 @@ import (
 
 func TestCollect(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		b, _, _ := testrig.Base(nil)
-		connStr, closeDB := test.PrepareDBConnectionString(t, dbType)
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
 		defer closeDB()
-		db, err := storage.NewUserDatabase(b, &config.DatabaseOptions{
-			ConnectionString: config.DataSource(connStr),
-		}, "localhost", bcrypt.MinCost, 1000, 1000, "")
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 1000, 1000, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -62,12 +60,12 @@ func TestCollect(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		b.Cfg.Global.ReportStats.Endpoint = srv.URL
+		cfg.Global.ReportStats.Endpoint = srv.URL
 		stats := phoneHomeStats{
 			prevData:   timestampToRUUsage{},
 			serverName: "localhost",
 			startTime:  time.Now(),
-			cfg:        b.Cfg,
+			cfg:        cfg,
 			db:         db,
 			isMonolith: false,
 			client:     &http.Client{Timeout: time.Second},

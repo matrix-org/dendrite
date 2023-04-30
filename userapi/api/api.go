@@ -21,8 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -58,7 +60,7 @@ type MediaUserAPI interface {
 type FederationUserAPI interface {
 	UploadDeviceKeysAPI
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
-	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
+	QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error)
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
 	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse) error
@@ -83,9 +85,9 @@ type ClientUserAPI interface {
 	LoginTokenInternalAPI
 	UserLoginAPI
 	ClientKeyAPI
+	ProfileAPI
 	QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
-	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
@@ -100,8 +102,6 @@ type ClientUserAPI interface {
 	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
-	SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error
-	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *PerformUpdateDisplayNameResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
@@ -111,6 +111,12 @@ type ClientUserAPI interface {
 	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
 	PerformForgetThreePID(ctx context.Context, req *PerformForgetThreePIDRequest, res *struct{}) error
 	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
+}
+
+type ProfileAPI interface {
+	QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error)
+	SetAvatarURL(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, avatarURL string) (*authtypes.Profile, bool, error)
+	SetDisplayName(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, displayName string) (*authtypes.Profile, bool, error)
 }
 
 // custom api functions required by pinecone / p2p demos
@@ -125,6 +131,8 @@ type QueryAcccessTokenAPI interface {
 
 type UserLoginAPI interface {
 	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
+	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) error
+	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -224,7 +232,6 @@ type PerformDeviceUpdateRequest struct {
 }
 type PerformDeviceUpdateResponse struct {
 	DeviceExists bool
-	Forbidden    bool
 }
 
 type PerformDeviceDeletionRequest struct {
@@ -289,22 +296,6 @@ type QueryDevicesRequest struct {
 type QueryDevicesResponse struct {
 	UserExists bool
 	Devices    []Device
-}
-
-// QueryProfileRequest is the request for QueryProfile
-type QueryProfileRequest struct {
-	// The user ID to query
-	UserID string
-}
-
-// QueryProfileResponse is the response for QueryProfile
-type QueryProfileResponse struct {
-	// True if the user exists. Querying for a profile does not create them.
-	UserExists bool
-	// The current display name if set.
-	DisplayName string
-	// The current avatar URL if set.
-	AvatarURL string
 }
 
 // QuerySearchProfilesRequest is the request for QueryProfile
@@ -593,22 +584,12 @@ type QueryNotificationsResponse struct {
 }
 
 type Notification struct {
-	Actions    []*pushrules.Action           `json:"actions"`     // Required.
-	Event      gomatrixserverlib.ClientEvent `json:"event"`       // Required.
-	ProfileTag string                        `json:"profile_tag"` // Required by Sytest, but actually optional.
-	Read       bool                          `json:"read"`        // Required.
-	RoomID     string                        `json:"room_id"`     // Required.
-	TS         gomatrixserverlib.Timestamp   `json:"ts"`          // Required.
-}
-
-type PerformSetAvatarURLRequest struct {
-	Localpart  string
-	ServerName gomatrixserverlib.ServerName
-	AvatarURL  string
-}
-type PerformSetAvatarURLResponse struct {
-	Profile *authtypes.Profile `json:"profile"`
-	Changed bool               `json:"changed"`
+	Actions    []*pushrules.Action         `json:"actions"`     // Required.
+	Event      synctypes.ClientEvent       `json:"event"`       // Required.
+	ProfileTag string                      `json:"profile_tag"` // Required by Sytest, but actually optional.
+	Read       bool                        `json:"read"`        // Required.
+	RoomID     string                      `json:"room_id"`     // Required.
+	TS         gomatrixserverlib.Timestamp `json:"ts"`          // Required.
 }
 
 type QueryNumericLocalpartRequest struct {
@@ -637,17 +618,6 @@ type QueryAccountByPasswordRequest struct {
 type QueryAccountByPasswordResponse struct {
 	Account *Account
 	Exists  bool
-}
-
-type PerformUpdateDisplayNameRequest struct {
-	Localpart   string
-	ServerName  gomatrixserverlib.ServerName
-	DisplayName string
-}
-
-type PerformUpdateDisplayNameResponse struct {
-	Profile *authtypes.Profile `json:"profile"`
-	Changed bool               `json:"changed"`
 }
 
 type QueryLocalpartForThreePIDRequest struct {
@@ -752,9 +722,9 @@ type OutputCrossSigningKeyUpdate struct {
 }
 
 type CrossSigningKeyUpdate struct {
-	MasterKey      *gomatrixserverlib.CrossSigningKey `json:"master_key,omitempty"`
-	SelfSigningKey *gomatrixserverlib.CrossSigningKey `json:"self_signing_key,omitempty"`
-	UserID         string                             `json:"user_id"`
+	MasterKey      *fclient.CrossSigningKey `json:"master_key,omitempty"`
+	SelfSigningKey *fclient.CrossSigningKey `json:"self_signing_key,omitempty"`
+	UserID         string                   `json:"user_id"`
 }
 
 // DeviceKeysEqual returns true if the device keys updates contain the
@@ -887,7 +857,7 @@ type PerformClaimKeysResponse struct {
 }
 
 type PerformUploadDeviceKeysRequest struct {
-	gomatrixserverlib.CrossSigningKeys
+	fclient.CrossSigningKeys
 	// The user that uploaded the key, should be populated by the clientapi.
 	UserID string
 }
@@ -897,7 +867,7 @@ type PerformUploadDeviceKeysResponse struct {
 }
 
 type PerformUploadDeviceSignaturesRequest struct {
-	Signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice
+	Signatures map[string]map[gomatrixserverlib.KeyID]fclient.CrossSigningForKeyOrDevice
 	// The user that uploaded the sig, should be populated by the clientapi.
 	UserID string
 }
@@ -921,9 +891,9 @@ type QueryKeysResponse struct {
 	// Map of user_id to device_id to device_key
 	DeviceKeys map[string]map[string]json.RawMessage
 	// Maps of user_id to cross signing key
-	MasterKeys      map[string]gomatrixserverlib.CrossSigningKey
-	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
-	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	MasterKeys      map[string]fclient.CrossSigningKey
+	SelfSigningKeys map[string]fclient.CrossSigningKey
+	UserSigningKeys map[string]fclient.CrossSigningKey
 	// Set if there was a fatal error processing this query
 	Error *KeyError
 }
@@ -978,11 +948,11 @@ type QuerySignaturesResponse struct {
 	// A map of target user ID -> target key/device ID -> origin user ID -> origin key/device ID -> signatures
 	Signatures map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap
 	// A map of target user ID -> cross-signing master key
-	MasterKeys map[string]gomatrixserverlib.CrossSigningKey
+	MasterKeys map[string]fclient.CrossSigningKey
 	// A map of target user ID -> cross-signing self-signing key
-	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	SelfSigningKeys map[string]fclient.CrossSigningKey
 	// A map of target user ID -> cross-signing user-signing key
-	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	UserSigningKeys map[string]fclient.CrossSigningKey
 	// The request error, if any
 	Error *KeyError
 }

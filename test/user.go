@@ -17,6 +17,7 @@ package test
 import (
 	"crypto/ed25519"
 	"fmt"
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -47,6 +48,7 @@ var (
 
 type User struct {
 	ID          string
+	Localpart   string
 	AccountType api.AccountType
 	// key ID and private key of the server who has this user, if known.
 	keyID   gomatrixserverlib.KeyID
@@ -81,6 +83,7 @@ func NewUser(t *testing.T, opts ...UserOpt) *User {
 		WithSigningServer(serverName, keyID, privateKey)(&u)
 	}
 	u.ID = fmt.Sprintf("@%d:%s", counter, u.srvName)
+	u.Localpart = strconv.Itoa(int(counter))
 	t.Logf("NewUser: created user %s", u.ID)
 	return &u
 }

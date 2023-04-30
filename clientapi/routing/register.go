@@ -734,7 +734,7 @@ func handleRegistrationFlow(
 			bound bool
 			err   error
 		)
-		bound, threePid.Address, threePid.Medium, err = threepid.CheckAssociation(req.Context(), r.Auth.ThreePidCreds, cfg)
+		bound, threePid.Address, threePid.Medium, err = threepid.CheckAssociation(req.Context(), r.Auth.ThreePidCreds, cfg, nil)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
 			return jsonerror.InternalServerError()
@@ -930,13 +930,7 @@ func completeRegistration(
 	}
 
 	if displayName != "" {
-		nameReq := userapi.PerformUpdateDisplayNameRequest{
-			Localpart:   username,
-			ServerName:  serverName,
-			DisplayName: displayName,
-		}
-		var nameRes userapi.PerformUpdateDisplayNameResponse
-		err = userAPI.SetDisplayName(ctx, &nameReq, &nameRes)
+		_, _, err = userAPI.SetDisplayName(ctx, username, serverName, displayName)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,

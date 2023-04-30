@@ -15,7 +15,10 @@
 package httputil
 
 import (
+	"net/http"
 	"net/url"
+
+	"github.com/gorilla/mux"
 )
 
 // URLDecodeMapValues is a function that iterates through each of the items in a
@@ -32,4 +35,53 @@ func URLDecodeMapValues(vmap map[string]string) (map[string]string, error) {
 	}
 
 	return decoded, nil
+}
+
+type Routers struct {
+	Client        *mux.Router
+	Federation    *mux.Router
+	Keys          *mux.Router
+	Media         *mux.Router
+	WellKnown     *mux.Router
+	Static        *mux.Router
+	DendriteAdmin *mux.Router
+	SynapseAdmin  *mux.Router
+}
+
+func NewRouters() Routers {
+	r := Routers{
+		Client:        mux.NewRouter().SkipClean(true).PathPrefix(PublicClientPathPrefix).Subrouter().UseEncodedPath(),
+		Federation:    mux.NewRouter().SkipClean(true).PathPrefix(PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
+		Keys:          mux.NewRouter().SkipClean(true).PathPrefix(PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
+		Media:         mux.NewRouter().SkipClean(true).PathPrefix(PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
+		WellKnown:     mux.NewRouter().SkipClean(true).PathPrefix(PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
+		Static:        mux.NewRouter().SkipClean(true).PathPrefix(PublicStaticPath).Subrouter().UseEncodedPath(),
+		DendriteAdmin: mux.NewRouter().SkipClean(true).PathPrefix(DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
+		SynapseAdmin:  mux.NewRouter().SkipClean(true).PathPrefix(SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+	}
+	r.configureHTTPErrors()
+	return r
+}
+
+var NotAllowedHandler = WrapHandlerInCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusMethodNotAllowed)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+}))
+
+var NotFoundCORSHandler = WrapHandlerInCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+}))
+
+func (r *Routers) configureHTTPErrors() {
+	for _, router := range []*mux.Router{
+		r.Client, r.Federation, r.Keys,
+		r.Media, r.WellKnown, r.Static,
+		r.DendriteAdmin, r.SynapseAdmin,
+	} {
+		router.NotFoundHandler = NotFoundCORSHandler
+		router.MethodNotAllowedHandler = NotAllowedHandler
+	}
 }

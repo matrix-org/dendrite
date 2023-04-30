@@ -52,13 +52,11 @@ func NewPostgresIgnoresTable(db *sql.DB) (tables.Ignores, error) {
 		return nil, err
 	}
 	s := &ignoresStatements{}
-	if s.selectIgnoresStmt, err = db.Prepare(selectIgnoresSQL); err != nil {
-		return nil, err
-	}
-	if s.upsertIgnoresStmt, err = db.Prepare(upsertIgnoresSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+
+	return s, sqlutil.StatementList{
+		{&s.selectIgnoresStmt, selectIgnoresSQL},
+		{&s.upsertIgnoresStmt, upsertIgnoresSQL},
+	}.Prepare(db)
 }
 
 func (s *ignoresStatements) SelectIgnores(

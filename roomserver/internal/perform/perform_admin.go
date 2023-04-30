@@ -227,6 +227,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 			}
 			return nil
 		}
+		res.Affected = append(res.Affected, roomID)
 		if len(outputEvents) == 0 {
 			continue
 		}
@@ -237,8 +238,6 @@ func (r *Admin) PerformAdminEvacuateUser(
 			}
 			return nil
 		}
-
-		res.Affected = append(res.Affected, roomID)
 	}
 	return nil
 }
@@ -323,7 +322,7 @@ func (r *Admin) PerformAdminDownloadState(
 	stateEventMap := map[string]*gomatrixserverlib.Event{}
 
 	for _, fwdExtremity := range fwdExtremities {
-		var state gomatrixserverlib.RespState
+		var state gomatrixserverlib.StateResponse
 		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
 		if err != nil {
 			res.Error = &api.PerformError{
@@ -332,13 +331,13 @@ func (r *Admin) PerformAdminDownloadState(
 			}
 			return nil
 		}
-		for _, authEvent := range state.AuthEvents.UntrustedEvents(roomInfo.RoomVersion) {
+		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			authEventMap[authEvent.EventID()] = authEvent
 		}
-		for _, stateEvent := range state.StateEvents.UntrustedEvents(roomInfo.RoomVersion) {
+		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = stateEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
 				continue
 			}

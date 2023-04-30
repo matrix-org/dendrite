@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -255,7 +256,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// waste the effort.
 	// TODO: Can we expand Check here to return a list of missing auth
 	// events rather than failing one at a time?
-	var respState *gomatrixserverlib.RespState
+	var respState *fclient.RespState
 	respState, err = respSendJoin.Check(
 		context.Background(),
 		respMakeJoin.RoomVersion,

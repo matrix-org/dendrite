@@ -16,12 +16,12 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/mrd"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
@@ -37,10 +37,10 @@ type SyncServerDatasource struct {
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
-	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
+	if d.db, d.writer, err = cm.Connection(dbProperties); err != nil {
 		return nil, err
 	}
 	accountData, err := NewPostgresAccountDataTable(d.db)
@@ -117,7 +117,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 			Up:      deltas.UpSetHistoryVisibility, // Requires current_room_state and output_room_events to be created.
 		},
 	)
-	err = m.Up(base.Context())
+	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

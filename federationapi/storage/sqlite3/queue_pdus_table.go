@@ -87,25 +87,13 @@ func NewSQLiteQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	if err != nil {
 		return
 	}
-	if s.insertQueuePDUStmt, err = db.Prepare(insertQueuePDUSQL); err != nil {
-		return
-	}
-	//if s.deleteQueuePDUsStmt, err = db.Prepare(deleteQueuePDUsSQL); err != nil {
-	//	return
-	//}
-	if s.selectQueueNextTransactionIDStmt, err = db.Prepare(selectQueueNextTransactionIDSQL); err != nil {
-		return
-	}
-	if s.selectQueuePDUsStmt, err = db.Prepare(selectQueuePDUsSQL); err != nil {
-		return
-	}
-	if s.selectQueueReferenceJSONCountStmt, err = db.Prepare(selectQueuePDUsReferenceJSONCountSQL); err != nil {
-		return
-	}
-	if s.selectQueueServerNamesStmt, err = db.Prepare(selectQueuePDUsServerNamesSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertQueuePDUStmt, insertQueuePDUSQL},
+		{&s.selectQueueNextTransactionIDStmt, selectQueueNextTransactionIDSQL},
+		{&s.selectQueuePDUsStmt, selectQueuePDUsSQL},
+		{&s.selectQueueReferenceJSONCountStmt, selectQueuePDUsReferenceJSONCountSQL},
+		{&s.selectQueueServerNamesStmt, selectQueuePDUsServerNamesSQL},
+	}.Prepare(db)
 }
 
 func (s *queuePDUsStatements) InsertQueuePDU(

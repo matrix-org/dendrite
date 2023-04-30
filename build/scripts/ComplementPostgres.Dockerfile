@@ -1,19 +1,19 @@
 #syntax=docker/dockerfile:1.2
 
-FROM golang:1.18-stretch as build
+FROM golang:1.20-bullseye as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
 # No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/9.6/main/pg_hba.conf && \
+RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/13/main/pg_hba.conf && \
     # Bump up max conns for moar concurrency
-    sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/9.6/main/postgresql.conf
+    sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/13/main/postgresql.conf
 
 # This entry script starts postgres, waits for it to be up then starts dendrite
 RUN echo '\
     #!/bin/bash -eu \n\
     pg_lsclusters \n\
-    pg_ctlcluster 9.6 main start \n\
+    pg_ctlcluster 13 main start \n\
     \n\
     until pg_isready \n\
     do \n\
@@ -35,7 +35,7 @@ RUN --mount=target=. \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
     CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/dendrite && \
-    CGO_ENABLED=${CGO} go test -c -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
+    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /dendrite

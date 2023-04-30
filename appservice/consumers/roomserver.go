@@ -32,15 +32,21 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// ApplicationServiceTransaction is the transaction that is sent off to an
+// application service.
+type ApplicationServiceTransaction struct {
+	Events []synctypes.ClientEvent `json:"events"`
+}
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	ctx       context.Context
 	cfg       *config.AppServiceAPI
-	client    *http.Client
 	jetstream nats.JetStreamContext
 	topic     string
 	rsAPI     api.AppserviceRoomserverAPI
@@ -56,14 +62,12 @@ type appserviceState struct {
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.AppServiceAPI,
-	client *http.Client,
 	js nats.JetStreamContext,
 	rsAPI api.AppserviceRoomserverAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:       process.Context(),
 		cfg:       cfg,
-		client:    client,
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		rsAPI:     rsAPI,
@@ -140,12 +144,6 @@ func (s *OutputRoomEventConsumer) onMessage(
 				}
 			}
 
-		case api.OutputTypeNewInviteEvent:
-			if output.NewInviteEvent == nil || !s.appserviceIsInterestedInEvent(ctx, output.NewInviteEvent.Event, state.ApplicationService) {
-				continue
-			}
-			events = append(events, output.NewInviteEvent.Event)
-
 		default:
 			continue
 		}
@@ -180,8 +178,8 @@ func (s *OutputRoomEventConsumer) sendEvents(
 ) error {
 	// Create the transaction body.
 	transaction, err := json.Marshal(
-		gomatrixserverlib.ApplicationServiceTransaction{
-			Events: gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll),
+		ApplicationServiceTransaction{
+			Events: synctypes.HeaderedToClientEvents(events, synctypes.FormatAll),
 		},
 	)
 	if err != nil {
@@ -195,13 +193,13 @@ func (s *OutputRoomEventConsumer) sendEvents(
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
-	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
+	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.RequestUrl(), txnID, url.QueryEscape(state.HSToken))
 	req, err := http.NewRequestWithContext(ctx, "PUT", address, bytes.NewBuffer(transaction))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.client.Do(req)
+	resp, err := state.HTTPClient.Do(req)
 	if err != nil {
 		return state.backoffAndPause(err)
 	}
@@ -212,7 +210,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	case http.StatusOK:
 		state.backoff = 0
 	default:
-		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice", resp.StatusCode))
+		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice url %s", resp.StatusCode, address))
 	}
 	return nil
 }

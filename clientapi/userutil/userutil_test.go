@@ -17,6 +17,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 // TestGoodUserID checks that correct localpart is returned for a valid user ID.
 func TestGoodUserID(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	}
@@ -49,7 +50,7 @@ func TestGoodUserID(t *testing.T) {
 // TestWithLocalpartOnly checks that localpart is returned when usernameParam contains only localpart.
 func TestWithLocalpartOnly(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	}
@@ -68,7 +69,7 @@ func TestWithLocalpartOnly(t *testing.T) {
 // TestIncorrectDomain checks for error when there's server name mismatch.
 func TestIncorrectDomain(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: invalidServerName,
 		},
 	}
@@ -83,7 +84,7 @@ func TestIncorrectDomain(t *testing.T) {
 // TestBadUserID checks that ParseUsernameParam fails for invalid user ID
 func TestBadUserID(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	}

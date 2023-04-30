@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func platformSanityChecks() {
+func PlatformSanityChecks() {
 	// Dendrite needs a relatively high number of file descriptors in order
 	// to function properly, particularly when federating with lots of servers.
 	// If we run out of file descriptors, we might run into problems accessing

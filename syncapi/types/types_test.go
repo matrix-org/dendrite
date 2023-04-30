@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -125,7 +126,7 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 		{
 			name: "unread notifications are NOT removed, if state is set",
 			fields: fields{
-				State:               &ClientEvents{Events: []gomatrixserverlib.ClientEvent{{Content: []byte("{}")}}},
+				State:               &ClientEvents{Events: []synctypes.ClientEvent{{Content: []byte("{}")}}},
 				UnreadNotifications: &UnreadNotifications{NotificationCount: 1},
 			},
 			want: []byte(`{"state":{"events":[{"content":{},"type":""}]},"unread_notifications":{"highlight_count":0,"notification_count":1}}`),
@@ -134,7 +135,7 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 			name: "roomID is removed from EDUs",
 			fields: fields{
 				Ephemeral: &ClientEvents{
-					Events: []gomatrixserverlib.ClientEvent{
+					Events: []synctypes.ClientEvent{
 						{RoomID: "!someRandomRoomID:test", Content: []byte("{}")},
 					},
 				},

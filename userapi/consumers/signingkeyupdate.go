@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -86,7 +87,7 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		return true
 	}
 
-	keys := gomatrixserverlib.CrossSigningKeys{}
+	keys := fclient.CrossSigningKeys{}
 	if updatePayload.MasterKey != nil {
 		keys.MasterKey = *updatePayload.MasterKey
 	}

@@ -209,24 +209,17 @@ func queryIDServerStoreInvite(
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
-	localpart, serverName, err := gomatrixserverlib.SplitID('@', device.UserID)
+	_, serverName, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	var profile *authtypes.Profile
 	if cfg.Matrix.IsLocalServerName(serverName) {
-		res := &userapi.QueryProfileResponse{}
-		err = userAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
+		profile, err = userAPI.QueryProfile(ctx, device.UserID)
 		if err != nil {
 			return nil, err
 		}
-		profile = &authtypes.Profile{
-			Localpart:   localpart,
-			DisplayName: res.DisplayName,
-			AvatarURL:   res.AvatarURL,
-		}
-
 	} else {
 		profile = &authtypes.Profile{}
 	}
