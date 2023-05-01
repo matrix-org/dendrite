@@ -73,7 +73,7 @@ func Login(
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: loginResponse{
-					UserID:      userutil.MakeUserID(login.Username(), cfg.Matrix.ServerName),
+					UserID:      login.User,
 					AccessToken: "",
 					HomeServer:  cfg.Matrix.ServerName,
 					DeviceID:    "",

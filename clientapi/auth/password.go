@@ -92,7 +92,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			resp := jsonerror.InternalServerError()
 			return nil, &resp
 		}
-		username = res.Localpart
+		username = "@" + res.Localpart + ":" + string(t.Config.Matrix.ServerName)
 		if username == "" {
 			return nil, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
