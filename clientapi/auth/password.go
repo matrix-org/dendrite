@@ -208,6 +208,9 @@ func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
 		if !res.Exists {
+			if t.Rt != nil {
+				t.Rt.Act(localpart)
+			}
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
