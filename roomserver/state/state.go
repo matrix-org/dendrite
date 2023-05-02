@@ -48,14 +48,14 @@ type StateResolutionStorage interface {
 type StateResolution struct {
 	db       StateResolutionStorage
 	roomInfo *types.RoomInfo
-	events   map[types.EventNID]*gomatrixserverlib.Event
+	events   map[types.EventNID]gomatrixserverlib.PDU
 }
 
 func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) StateResolution {
 	return StateResolution{
 		db:       db,
 		roomInfo: roomInfo,
-		events:   make(map[types.EventNID]*gomatrixserverlib.Event),
+		events:   make(map[types.EventNID]gomatrixserverlib.PDU),
 	}
 }
 
@@ -702,7 +702,7 @@ func init() {
 // Returns a numeric ID for the snapshot of the state before the event.
 func (v *StateResolution) CalculateAndStoreStateBeforeEvent(
 	ctx context.Context,
-	event *gomatrixserverlib.Event,
+	event gomatrixserverlib.PDU,
 	isRejected bool,
 ) (types.StateSnapshotNID, error) {
 	trace, ctx := internal.StartRegion(ctx, "StateResolution.CalculateAndStoreStateBeforeEvent")
@@ -995,7 +995,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// For each conflicted event, we will add a new set of auth events. Auth
 	// events may be duplicated across these sets but that's OK.
-	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
+	authSets := make(map[string][]gomatrixserverlib.PDU, len(conflicted))
 	authEvents := make([]gomatrixserverlib.PDU, 0, estimate*3)
 	gotAuthEvents := make(map[string]struct{}, estimate*3)
 	knownAuthEvents := make(map[string]types.Event, estimate*3)
@@ -1144,9 +1144,9 @@ func (v *StateResolution) loadStateEvents(
 		if !ok {
 			panic(fmt.Errorf("corrupt DB: Missing event numeric ID %d", entry.EventNID))
 		}
-		result = append(result, event.Event)
-		eventIDMap[event.Event.EventID()] = entry
-		v.events[entry.EventNID] = event.Event
+		result = append(result, event.PDU)
+		eventIDMap[event.PDU.EventID()] = entry
+		v.events[entry.EventNID] = event.PDU
 	}
 	return result, eventIDMap, nil
 }
@@ -1164,7 +1164,7 @@ type authEventLoader struct {
 // along with a map that contains state entries for all of the auth events.
 func (l *authEventLoader) loadAuthEvents(
 	ctx context.Context, roomInfo *types.RoomInfo, event gomatrixserverlib.PDU, eventMap map[string]types.Event,
-) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
+) ([]gomatrixserverlib.PDU, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()
 	authEvents := []types.Event{}     // our returned list
@@ -1265,9 +1265,9 @@ func (l *authEventLoader) loadAuthEvents(
 			},
 		}
 	}
-	nakedEvents := make([]*gomatrixserverlib.Event, 0, len(authEvents))
+	nakedEvents := make([]gomatrixserverlib.PDU, 0, len(authEvents))
 	for _, authEvent := range authEvents {
-		nakedEvents = append(nakedEvents, authEvent.Event)
+		nakedEvents = append(nakedEvents, authEvent.PDU)
 	}
 	return nakedEvents, stateEntryMap, nil
 }

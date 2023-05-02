@@ -56,7 +56,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
-	var stateEvents []*gomatrixserverlib.Event
+	var stateEvents []gomatrixserverlib.PDU
 
 	var currentStateSnapshotNID types.StateSnapshotNID
 	latestEventRefs, currentStateSnapshotNID, _, err :=
@@ -70,13 +70,13 @@ func (r *InboundPeeker) PerformInboundPeek(
 	}
 	var sortedLatestEvents []gomatrixserverlib.PDU
 	for _, ev := range latestEvents {
-		sortedLatestEvents = append(sortedLatestEvents, ev.Event)
+		sortedLatestEvents = append(sortedLatestEvents, ev.PDU)
 	}
 	sortedLatestEvents = gomatrixserverlib.ReverseTopologicalOrdering(
 		sortedLatestEvents,
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
-	response.LatestEvent = &types.HeaderedEvent{Event: sortedLatestEvents[0].(*gomatrixserverlib.Event)}
+	response.LatestEvent = &types.HeaderedEvent{PDU: sortedLatestEvents[0]}
 
 	// XXX: do we actually need to do a state resolution here?
 	roomState := state.NewStateResolution(r.DB, info)
@@ -106,11 +106,11 @@ func (r *InboundPeeker) PerformInboundPeek(
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{Event: event})
+		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{PDU: event})
 	}
 
 	for _, event := range authEvents {
-		response.AuthChainEvents = append(response.AuthChainEvents, &types.HeaderedEvent{Event: event})
+		response.AuthChainEvents = append(response.AuthChainEvents, &types.HeaderedEvent{PDU: event})
 	}
 
 	err = r.Inputer.OutputProducer.ProduceRoomEvents(request.RoomID, []api.OutputEvent{

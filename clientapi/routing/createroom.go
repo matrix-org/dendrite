@@ -465,7 +465,7 @@ func createRoom(
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, &types.HeaderedEvent{Event: ev})
+		builtEvents = append(builtEvents, &types.HeaderedEvent{PDU: ev})
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("authEvents.AddEvent failed")
@@ -535,7 +535,7 @@ func createRoom(
 			case spec.MRoomMember:
 				fallthrough
 			case spec.MRoomJoinRules:
-				ev := event.Event
+				ev := event.PDU
 				globalStrippedState = append(
 					globalStrippedState,
 					fclient.NewInviteV2StrippedState(ev),
@@ -556,7 +556,7 @@ func createRoom(
 			}
 			inviteStrippedState := append(
 				globalStrippedState,
-				fclient.NewInviteV2StrippedState(inviteEvent.Event),
+				fclient.NewInviteV2StrippedState(inviteEvent.PDU),
 			)
 			// Send the invite event to the roomserver.
 			var inviteRes roomserverAPI.PerformInviteResponse

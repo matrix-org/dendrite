@@ -228,7 +228,7 @@ func SendServerNotice(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{Event: e},
+			&types.HeaderedEvent{PDU: e},
 		},
 		device.UserDomain(),
 		cfgClient.Matrix.ServerName,

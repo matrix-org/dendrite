@@ -526,7 +526,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		PrevSender:    prevEvent.Sender(),
 	}
 
-	event.Event, err = event.SetUnsigned(prev)
+	event.PDU, err = event.SetUnsigned(prev)
 	succeeded = true
 	return event, err
 }

@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -48,11 +49,12 @@ func GetAliases(
 	visibility := gomatrixserverlib.HistoryVisibilityInvited
 	if historyVisEvent, ok := stateRes.StateEvents[stateTuple]; ok {
 		var err error
-		visibility, err = historyVisEvent.HistoryVisibility()
-		if err != nil {
+		var content gomatrixserverlib.HistoryVisibilityContent
+		if err = json.Unmarshal(historyVisEvent.Content(), &content); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("historyVisEvent.HistoryVisibility failed")
 			return util.ErrorResponse(fmt.Errorf("historyVisEvent.HistoryVisibility: %w", err))
 		}
+		visibility = content.HistoryVisibility
 	}
 	if visibility != spec.WorldReadable {
 		queryReq := api.QueryMembershipForUserRequest{

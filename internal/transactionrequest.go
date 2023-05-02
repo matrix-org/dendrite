@@ -184,7 +184,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			t.rsAPI,
 			api.KindNew,
 			[]*rstypes.HeaderedEvent{
-				{Event: event},
+				{PDU: event},
 			},
 			t.Destination,
 			t.Origin,

@@ -41,7 +41,7 @@ type Database interface {
 	) (types.StateSnapshotNID, error)
 
 	MissingAuthPrevEvents(
-		ctx context.Context, e *gomatrixserverlib.Event,
+		ctx context.Context, e gomatrixserverlib.PDU,
 	) (missingAuth, missingPrev []string, err error)
 
 	// Look up the state of a room at each event for a list of string event IDs.
@@ -171,7 +171,7 @@ type Database interface {
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
 	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
 
-	GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error)
+	GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]gomatrixserverlib.PDU, error)
 	GetLeftUsers(ctx context.Context, userIDs []string) ([]string, error)
 	PurgeRoom(ctx context.Context, roomID string) error
 	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
@@ -186,8 +186,8 @@ type Database interface {
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
 	MaybeRedactEvent(
-		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event, plResolver state.PowerLevelResolver,
-	) (*gomatrixserverlib.Event, *gomatrixserverlib.Event, error)
+		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 }
 
 type RoomDatabase interface {
@@ -197,7 +197,7 @@ type RoomDatabase interface {
 	RoomInfoByNID(ctx context.Context, roomNID types.RoomNID) (*types.RoomInfo, error)
 	// IsEventRejected returns true if the event is known and rejected.
 	IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (rejected bool, err error)
-	MissingAuthPrevEvents(ctx context.Context, e *gomatrixserverlib.Event) (missingAuth, missingPrev []string, err error)
+	MissingAuthPrevEvents(ctx context.Context, e gomatrixserverlib.PDU) (missingAuth, missingPrev []string, err error)
 	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
 	GetRoomUpdater(ctx context.Context, roomInfo *types.RoomInfo) (*shared.RoomUpdater, error)
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool) ([]types.EventNID, error)
@@ -228,7 +228,7 @@ type EventDatabase interface {
 	// MaybeRedactEvent returns the redaction event and the redacted event if this call resulted in a redaction, else an error
 	// (nil if there was nothing to do)
 	MaybeRedactEvent(
-		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event, plResolver state.PowerLevelResolver,
-	) (*gomatrixserverlib.Event, *gomatrixserverlib.Event, error)
+		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 	StoreEvent(ctx context.Context, event gomatrixserverlib.PDU, roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.StateAtEvent, error)
 }

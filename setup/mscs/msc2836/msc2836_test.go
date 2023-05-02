@@ -602,6 +602,6 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := &types.HeaderedEvent{Event: signedEvent}
+	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h
 }

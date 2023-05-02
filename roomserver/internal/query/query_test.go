@@ -84,7 +84,7 @@ func (db *getEventDB) EventsFromIDs(ctx context.Context, roomInfo *types.RoomInf
 	for _, evID := range eventIDs {
 		res = append(res, types.Event{
 			EventNID: 0,
-			Event:    db.eventMap[evID],
+			PDU:      db.eventMap[evID],
 		})
 	}
 

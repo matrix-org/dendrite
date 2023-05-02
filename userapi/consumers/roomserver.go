@@ -650,7 +650,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
-	rule, err := eval.MatchEvent(event.Event)
+	rule, err := eval.MatchEvent(event.PDU)
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +698,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 			continue
 		}
 
-		plc, err := gomatrixserverlib.NewPowerLevelContentFromEvent(ev.Event)
+		plc, err := gomatrixserverlib.NewPowerLevelContentFromEvent(ev.PDU)
 		if err != nil {
 			return false, err
 		}

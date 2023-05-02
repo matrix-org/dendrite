@@ -106,7 +106,7 @@ func InviteV1(
 func processInvite(
 	ctx context.Context,
 	isInviteV2 bool,
-	event *gomatrixserverlib.Event,
+	event gomatrixserverlib.PDU,
 	roomVer gomatrixserverlib.RoomVersion,
 	strippedState []fclient.InviteV2StrippedState,
 	roomID string,
@@ -197,7 +197,7 @@ func processInvite(
 	)
 
 	// Add the invite event to the roomserver.
-	inviteEvent := &types.HeaderedEvent{Event: &signedEvent}
+	inviteEvent := &types.HeaderedEvent{PDU: signedEvent}
 	request := &api.PerformInviteRequest{
 		Event:           inviteEvent,
 		InviteRoomState: strippedState,

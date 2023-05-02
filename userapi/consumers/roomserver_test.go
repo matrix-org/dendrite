@@ -41,7 +41,7 @@ func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
-	return &types.HeaderedEvent{Event: ev}
+	return &types.HeaderedEvent{PDU: ev}
 }
 
 func Test_evaluatePushRules(t *testing.T) {

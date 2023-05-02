@@ -64,7 +64,7 @@ func SendEventWithState(
 		}
 		ires = append(ires, InputRoomEvent{
 			Kind:   KindOutlier,
-			Event:  &types.HeaderedEvent{Event: outlier},
+			Event:  &types.HeaderedEvent{PDU: outlier},
 			Origin: origin,
 		})
 	}

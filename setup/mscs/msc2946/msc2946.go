@@ -693,7 +693,7 @@ func (w *walker) childReferences(roomID string) ([]fclient.MSC2946StrippedEvent,
 		// else we'll incorrectly walk redacted events (as the link
 		// is in the state_key)
 		if content.Get("via").Exists() {
-			strip := stripped(ev.Event)
+			strip := stripped(ev.PDU)
 			if strip == nil {
 				continue
 			}
@@ -723,7 +723,7 @@ func (s set) isSet(val string) bool {
 	return ok
 }
 
-func stripped(ev *gomatrixserverlib.Event) *fclient.MSC2946StrippedEvent {
+func stripped(ev gomatrixserverlib.PDU) *fclient.MSC2946StrippedEvent {
 	if ev.StateKey() == nil {
 		return nil
 	}

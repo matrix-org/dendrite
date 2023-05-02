@@ -86,7 +86,7 @@ func (r *Backfiller) PerformBackfill(
 
 	// Retrieve events from the list that was filled previously. If we fail to get
 	// events from the database then attempt once to get them from federation instead.
-	var loadedEvents []*gomatrixserverlib.Event
+	var loadedEvents []gomatrixserverlib.PDU
 	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, info, resultNIDs)
 	if err != nil {
 		if _, ok := err.(types.MissingEventError); ok {
@@ -99,7 +99,7 @@ func (r *Backfiller) PerformBackfill(
 		if _, ok := redactEventIDs[event.EventID()]; ok {
 			event.Redact()
 		}
-		response.Events = append(response.Events, &types.HeaderedEvent{Event: event})
+		response.Events = append(response.Events, &types.HeaderedEvent{PDU: event})
 	}
 
 	return err
@@ -133,7 +133,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	logrus.WithError(err).WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
 
 	// persist these new events - auth checks have already been done
-	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, gomatrixserverlib.TempCastToEvents(events))
+	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
 
 	for _, ev := range backfilledEventMap {
 		// now add state for these events
@@ -170,7 +170,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 
 	res.Events = make([]*types.HeaderedEvent, len(events))
 	for i := range events {
-		res.Events[i] = &types.HeaderedEvent{Event: events[i].(*gomatrixserverlib.Event)}
+		res.Events[i] = &types.HeaderedEvent{PDU: events[i]}
 	}
 	res.HistoryVisibility = requester.historyVisiblity
 	return nil
@@ -230,15 +230,15 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 					logger.WithError(err).Warn("event failed PDU checks")
 					continue
 				}
-				missingMap[id] = &types.HeaderedEvent{Event: res.Event.(*gomatrixserverlib.Event)}
+				missingMap[id] = &types.HeaderedEvent{PDU: res.Event}
 			}
 		}
 	}
 
-	var newEvents []*gomatrixserverlib.Event
+	var newEvents []gomatrixserverlib.PDU
 	for _, ev := range missingMap {
 		if ev != nil {
-			newEvents = append(newEvents, ev.Event)
+			newEvents = append(newEvents, ev.PDU)
 		}
 	}
 	util.GetLogger(ctx).Infof("Persisting %d new events", len(newEvents))
@@ -540,7 +540,7 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 	}
 	events := make([]gomatrixserverlib.PDU, len(eventsWithNids))
 	for i := range eventsWithNids {
-		events[i] = eventsWithNids[i].Event
+		events[i] = eventsWithNids[i].PDU
 	}
 	return events, nil
 }
@@ -569,9 +569,9 @@ func joinEventsFromHistoryVisibility(
 		// feels more secure here.
 		return nil, gomatrixserverlib.HistoryVisibilityJoined, err
 	}
-	events := make([]*gomatrixserverlib.Event, len(stateEvents))
+	events := make([]gomatrixserverlib.PDU, len(stateEvents))
 	for i := range stateEvents {
-		events[i] = stateEvents[i].Event
+		events[i] = stateEvents[i].PDU
 	}
 
 	// Can we see events in the room?
@@ -590,7 +590,7 @@ func joinEventsFromHistoryVisibility(
 	return evs, visibility, err
 }
 
-func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixserverlib.Event) (types.RoomNID, map[string]types.Event) {
+func persistEvents(ctx context.Context, db storage.Database, events []gomatrixserverlib.PDU) (types.RoomNID, map[string]types.Event) {
 	var roomNID types.RoomNID
 	var eventNID types.EventNID
 	backfilledEventMap := make(map[string]types.Event)
@@ -648,7 +648,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{
 			EventNID: eventNID,
-			Event:    ev,
+			PDU:      ev,
 		}
 	}
 	return roomNID, backfilledEventMap

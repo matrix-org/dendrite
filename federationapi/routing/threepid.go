@@ -86,7 +86,7 @@ func CreateInvitesFrom3PIDInvites(
 			return jsonerror.InternalServerError()
 		}
 		if event != nil {
-			evs = append(evs, &types.HeaderedEvent{Event: event})
+			evs = append(evs, &types.HeaderedEvent{PDU: event})
 		}
 	}
 
@@ -210,7 +210,7 @@ func ExchangeThirdPartyInvite(
 		httpReq.Context(), rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			{Event: inviteEvent},
+			{PDU: inviteEvent},
 		},
 		request.Destination(),
 		request.Origin(),
@@ -325,7 +325,7 @@ func buildMembershipEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(queryRes.StateEvents[i].Event)
+		err = authEvents.AddEvent(queryRes.StateEvents[i].PDU)
 		if err != nil {
 			return nil, err
 		}

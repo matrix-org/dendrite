@@ -320,8 +320,8 @@ func (r *Admin) PerformAdminDownloadState(
 		return nil
 	}
 
-	authEventMap := map[string]*gomatrixserverlib.Event{}
-	stateEventMap := map[string]*gomatrixserverlib.Event{}
+	authEventMap := map[string]gomatrixserverlib.PDU{}
+	stateEventMap := map[string]gomatrixserverlib.PDU{}
 
 	for _, fwdExtremity := range fwdExtremities {
 		var state gomatrixserverlib.StateResponse
@@ -352,10 +352,10 @@ func (r *Admin) PerformAdminDownloadState(
 	stateIDs := make([]string, 0, len(stateEventMap))
 
 	for _, authEvent := range authEventMap {
-		authEvents = append(authEvents, &types.HeaderedEvent{Event: authEvent})
+		authEvents = append(authEvents, &types.HeaderedEvent{PDU: authEvent})
 	}
 	for _, stateEvent := range stateEventMap {
-		stateEvents = append(stateEvents, &types.HeaderedEvent{Event: stateEvent})
+		stateEvents = append(stateEvents, &types.HeaderedEvent{PDU: stateEvent})
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 

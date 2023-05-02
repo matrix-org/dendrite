@@ -103,18 +103,18 @@ func Backfill(
 	}
 
 	// Filter any event that's not from the requested room out.
-	evs := make([]*gomatrixserverlib.Event, 0)
+	evs := make([]gomatrixserverlib.PDU, 0)
 
 	var ev *types.HeaderedEvent
 	for _, ev = range res.Events {
 		if ev.RoomID() == roomID {
-			evs = append(evs, ev.Event)
+			evs = append(evs, ev.PDU)
 		}
 	}
 
 	eventJSONs := []json.RawMessage{}
 	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(
-		gomatrixserverlib.ToPDUs(evs),
+		evs,
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	) {
 		eventJSONs = append(eventJSONs, e.JSON())
