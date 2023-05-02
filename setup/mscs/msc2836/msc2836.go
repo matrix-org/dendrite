@@ -89,8 +89,8 @@ type EventRelationshipResponse struct {
 
 type MSC2836EventRelationshipsResponse struct {
 	fclient.MSC2836EventRelationshipsResponse
-	ParsedEvents    []*gomatrixserverlib.Event
-	ParsedAuthChain []*gomatrixserverlib.Event
+	ParsedEvents    []gomatrixserverlib.PDU
+	ParsedAuthChain []gomatrixserverlib.PDU
 }
 
 func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
@@ -306,11 +306,11 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 		)
 		returnEvents = append(returnEvents, events...)
 	}
-	res.ParsedEvents = make([]*gomatrixserverlib.Event, len(returnEvents))
+	res.ParsedEvents = make([]gomatrixserverlib.PDU, len(returnEvents))
 	for i, ev := range returnEvents {
 		// for each event, extract the children_count | hash and add it as unsigned data.
 		rc.addChildMetadata(ev)
-		res.ParsedEvents[i] = ev.Event
+		res.ParsedEvents[i] = ev.PDU
 	}
 	res.Limited = remaining == 0 || walkLimited
 	return &res, nil
@@ -373,7 +373,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent
 		rc.injectResponseToRoomserver(res)
 		for _, ev := range res.ParsedEvents {
 			if ev.EventID() == eventID {
-				return &types.HeaderedEvent{Event: ev}
+				return &types.HeaderedEvent{PDU: ev}
 			}
 		}
 	}
@@ -603,7 +603,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *types.HeaderedEvent {
 			rc.injectResponseToRoomserver(queryRes)
 			for _, ev := range queryRes.ParsedEvents {
 				if ev.EventID() == eventID && rc.req.RoomID == ev.RoomID() {
-					return &types.HeaderedEvent{Event: ev}
+					return &types.HeaderedEvent{PDU: ev}
 				}
 			}
 		}
@@ -665,7 +665,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 	for _, outlier := range append(eventsInOrder, messageEvents...) {
 		ires = append(ires, roomserver.InputRoomEvent{
 			Kind:  roomserver.KindOutlier,
-			Event: &types.HeaderedEvent{Event: outlier.(*gomatrixserverlib.Event)},
+			Event: &types.HeaderedEvent{PDU: outlier},
 		})
 	}
 	// we've got the data by this point so use a background context

@@ -421,7 +421,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := &types.HeaderedEvent{Event: signedEvent}
+	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h
 }
 
@@ -534,7 +534,7 @@ func TestRedaction(t *testing.T) {
 				}
 
 				for _, ev := range room.Events() {
-					roomInfo, err = db.GetOrCreateRoomInfo(ctx, ev.Event)
+					roomInfo, err = db.GetOrCreateRoomInfo(ctx, ev.PDU)
 					assert.NoError(t, err)
 					assert.NotNil(t, roomInfo)
 					evTypeNID, err := db.GetOrCreateEventTypeNID(ctx, ev.Type())
@@ -543,7 +543,7 @@ func TestRedaction(t *testing.T) {
 					stateKeyNID, err := db.GetOrCreateEventStateKeyNID(ctx, ev.StateKey())
 					assert.NoError(t, err)
 
-					eventNID, stateAtEvent, err := db.StoreEvent(ctx, ev.Event, roomInfo, evTypeNID, stateKeyNID, authEvents, false)
+					eventNID, stateAtEvent, err := db.StoreEvent(ctx, ev.PDU, roomInfo, evTypeNID, stateKeyNID, authEvents, false)
 					assert.NoError(t, err)
 					if ev.StateKey() != nil {
 						authEvents = append(authEvents, eventNID)
@@ -551,7 +551,7 @@ func TestRedaction(t *testing.T) {
 
 					// Calculate the snapshotNID etc.
 					plResolver := state.NewStateResolution(db, roomInfo)
-					stateAtEvent.BeforeStateSnapshotNID, err = plResolver.CalculateAndStoreStateBeforeEvent(ctx, ev.Event, false)
+					stateAtEvent.BeforeStateSnapshotNID, err = plResolver.CalculateAndStoreStateBeforeEvent(ctx, ev.PDU, false)
 					assert.NoError(t, err)
 
 					// Update the room
@@ -562,7 +562,7 @@ func TestRedaction(t *testing.T) {
 					err = updater.Commit()
 					assert.NoError(t, err)
 
-					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Event, &plResolver)
+					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.PDU, &plResolver)
 					assert.NoError(t, err)
 					if redactedEvent != nil {
 						assert.Equal(t, ev.Redacts(), redactedEvent.EventID())

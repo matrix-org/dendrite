@@ -397,7 +397,7 @@ func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2836.EventRelatio
 func runServer(t *testing.T, router *mux.Router) func() {
 	t.Helper()
 	externalServ := &http.Server{
-		Addr:         string(":8009"),
+		Addr:         string("127.0.0.1:8009"),
 		WriteTimeout: 60 * time.Second,
 		Handler:      router,
 	}
@@ -602,6 +602,6 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := &types.HeaderedEvent{Event: signedEvent}
+	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h
 }

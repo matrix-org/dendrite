@@ -291,7 +291,7 @@ func SetVisibility(
 	}
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
-	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
 	if power.UserLevel(dev.UserID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

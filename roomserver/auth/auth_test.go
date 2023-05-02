@@ -72,9 +72,9 @@ func TestIsServerAllowed(t *testing.T) {
 			if tt.roomFunc == nil {
 				t.Fatalf("missing roomFunc")
 			}
-			var authEvents []*gomatrixserverlib.Event
+			var authEvents []gomatrixserverlib.PDU
 			for _, ev := range tt.roomFunc().Events() {
-				authEvents = append(authEvents, ev.Event)
+				authEvents = append(authEvents, ev.PDU)
 			}
 
 			if got := IsServerAllowed(tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {

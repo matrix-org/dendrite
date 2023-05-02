@@ -242,7 +242,7 @@ func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
 			// not fatal
 			continue
 		}
-		he := &types.HeaderedEvent{Event: event}
+		he := &types.HeaderedEvent{PDU: event}
 		result[eventID] = he
 		knownEvents[membershipEventID] = he
 	}

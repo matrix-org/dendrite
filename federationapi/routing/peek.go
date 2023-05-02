@@ -91,7 +91,7 @@ func Peek(
 		StateEvents:     types.NewEventJSONsFromHeaderedEvents(response.StateEvents),
 		AuthEvents:      types.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		RoomVersion:     response.RoomVersion,
-		LatestEvent:     response.LatestEvent.Event,
+		LatestEvent:     response.LatestEvent.PDU,
 		RenewalInterval: renewalInterval,
 	}
 

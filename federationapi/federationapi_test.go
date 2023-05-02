@@ -133,12 +133,12 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 	}
 	return
 }
-func (f *fedClient) SendJoin(ctx context.Context, origin, s spec.ServerName, event *gomatrixserverlib.Event) (res fclient.RespSendJoin, err error) {
+func (f *fedClient) SendJoin(ctx context.Context, origin, s spec.ServerName, event gomatrixserverlib.PDU) (res fclient.RespSendJoin, err error) {
 	f.fedClientMutex.Lock()
 	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
 		if r.ID == event.RoomID() {
-			r.InsertEvent(f.t, &types.HeaderedEvent{Event: event})
+			r.InsertEvent(f.t, &types.HeaderedEvent{PDU: event})
 			f.t.Logf("Join event: %v", event.EventID())
 			res.StateEvents = types.NewEventJSONsFromHeaderedEvents(r.CurrentState())
 			res.AuthEvents = types.NewEventJSONsFromHeaderedEvents(r.Events())

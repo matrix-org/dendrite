@@ -80,7 +80,7 @@ func allowedToSeeEvent(
 }
 
 // fetchEvent fetches the event without auth checks. Returns an error if the event cannot be found.
-func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, roomID, eventID string) (*gomatrixserverlib.Event, *util.JSONResponse) {
+func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, roomID, eventID string) (gomatrixserverlib.PDU, *util.JSONResponse) {
 	var eventsResponse api.QueryEventsByIDResponse
 	err := rsAPI.QueryEventsByID(
 		ctx,
@@ -99,5 +99,5 @@ func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, roomID, 
 		}
 	}
 
-	return eventsResponse.Events[0].Event, nil
+	return eventsResponse.Events[0].PDU, nil
 }

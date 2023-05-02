@@ -204,7 +204,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		user.Domain(),
 		roomserverAPI.KindNew,
 		response.StateSnapshot,
-		&types.HeaderedEvent{Event: response.JoinEvent},
+		&types.HeaderedEvent{PDU: response.JoinEvent},
 		serverName,
 		nil,
 		false,
@@ -389,7 +389,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromEvents(stateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromEvents(authEvents),
 		},
-		&types.HeaderedEvent{Event: respPeek.LatestEvent},
+		&types.HeaderedEvent{PDU: respPeek.LatestEvent},
 		serverName,
 		nil,
 		false,
@@ -536,7 +536,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := fclient.NewInviteV2Request(request.Event.Event, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(request.Event.PDU, request.InviteRoomState)
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
@@ -554,7 +554,7 @@ func (r *FederationInternalAPI) PerformInvite(
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
-	response.Event = &types.HeaderedEvent{Event: inviteEvent}
+	response.Event = &types.HeaderedEvent{PDU: inviteEvent}
 	return nil
 }
 
@@ -603,7 +603,7 @@ func (r *FederationInternalAPI) MarkServersAlive(destinations []spec.ServerName)
 	}
 }
 
-func checkEventsContainCreateEvent(events []*gomatrixserverlib.Event) error {
+func checkEventsContainCreateEvent(events []gomatrixserverlib.PDU) error {
 	// sanity check we have a create event and it has a known room version
 	for _, ev := range events {
 		if ev.Type() == spec.MRoomCreate && ev.StateKeyEquals("") {

@@ -15,18 +15,28 @@
 package types
 
 import (
+	"unsafe"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // HeaderedEvent is an Event which serialises to the headered form, which includes
 // _room_version and _event_id fields.
 type HeaderedEvent struct {
-	*gomatrixserverlib.Event
+	gomatrixserverlib.PDU
 	Visibility gomatrixserverlib.HistoryVisibility
 }
 
+func (h *HeaderedEvent) CacheCost() int {
+	return int(unsafe.Sizeof(*h)) +
+		len(h.EventID()) +
+		(cap(h.JSON()) * 2) +
+		len(h.Version()) +
+		1 // redacted bool
+}
+
 func (h *HeaderedEvent) MarshalJSON() ([]byte, error) {
-	return h.Event.ToHeaderedJSON()
+	return h.PDU.ToHeaderedJSON()
 }
 
 func (j *HeaderedEvent) UnmarshalJSON(data []byte) error {
@@ -34,7 +44,7 @@ func (j *HeaderedEvent) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	j.Event = ev
+	j.PDU = ev
 	return nil
 }
 

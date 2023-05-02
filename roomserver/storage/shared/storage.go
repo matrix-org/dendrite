@@ -562,7 +562,7 @@ func (d *EventDatabase) events(
 			}
 			results = append(results, types.Event{
 				EventNID: nid,
-				Event:    event,
+				PDU:      event,
 			})
 		}
 		if !redactionsArePermanent {
@@ -604,7 +604,7 @@ func (d *EventDatabase) events(
 		}
 		results = append(results, types.Event{
 			EventNID: nid,
-			Event:    event,
+			PDU:      event,
 		})
 	}
 	if !redactionsArePermanent {
@@ -817,7 +817,7 @@ func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, incl
 }
 
 func (d *Database) MissingAuthPrevEvents(
-	ctx context.Context, e *gomatrixserverlib.Event,
+	ctx context.Context, e gomatrixserverlib.PDU,
 ) (missingAuth, missingPrev []string, err error) {
 	authEventNIDs, err := d.EventNIDs(ctx, e.AuthEventIDs())
 	if err != nil {
@@ -949,8 +949,8 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 //
 // Returns the redaction event and the redacted event if this call resulted in a redaction.
 func (d *EventDatabase) MaybeRedactEvent(
-	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event, plResolver state.PowerLevelResolver,
-) (*gomatrixserverlib.Event, *gomatrixserverlib.Event, error) {
+	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error) {
 	var (
 		redactionEvent, redactedEvent *types.Event
 		err                           error
@@ -1044,12 +1044,12 @@ func (d *EventDatabase) MaybeRedactEvent(
 	if ignoreRedaction || redactionEvent == nil || redactedEvent == nil {
 		return nil, nil, nil
 	}
-	return redactionEvent.Event, redactedEvent.Event, nil
+	return redactionEvent.PDU, redactedEvent.PDU, nil
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
 func (d *EventDatabase) loadRedactionPair(
-	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU,
 ) (*types.Event, *types.Event, bool, error) {
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
@@ -1061,13 +1061,13 @@ func (d *EventDatabase) loadRedactionPair(
 		eventBeingRedacted = event.Redacts()
 		redactionEvent = &types.Event{
 			EventNID: eventNID,
-			Event:    event,
+			PDU:      event,
 		}
 	} else {
 		eventBeingRedacted = event.EventID() // maybe, we'll see if we have info
 		redactedEvent = &types.Event{
 			EventNID: eventNID,
-			Event:    event,
+			PDU:      event,
 		}
 	}
 
@@ -1117,7 +1117,7 @@ func (d *EventDatabase) loadEvent(ctx context.Context, roomInfo *types.RoomInfo,
 	return &evs[0]
 }
 
-func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error) {
+func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]gomatrixserverlib.PDU, error) {
 	eventStates, err := d.EventsTable.BulkSelectStateAtEventByID(ctx, nil, []string{eventID})
 	if err != nil {
 		return nil, err
@@ -1138,7 +1138,7 @@ func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *type
 	if err != nil {
 		return nil, err
 	}
-	events := make([]*gomatrixserverlib.Event, 0, len(eventNIDs))
+	events := make([]gomatrixserverlib.PDU, 0, len(eventNIDs))
 	for _, eventNID := range eventNIDs {
 		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{eventNID})
 		if err != nil {
@@ -1207,7 +1207,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
 			cachedEvent, ok := d.Cache.GetRoomServerEvent(e.EventNID)
 			if ok {
-				return &types.HeaderedEvent{Event: cachedEvent}, nil
+				return &types.HeaderedEvent{PDU: cachedEvent}, nil
 			}
 			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{e.EventNID})
 			if err != nil {
@@ -1220,7 +1220,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if err != nil {
 				return nil, err
 			}
-			return &types.HeaderedEvent{Event: ev}, nil
+			return &types.HeaderedEvent{PDU: ev}, nil
 		}
 	}
 
@@ -1281,7 +1281,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, &types.HeaderedEvent{Event: ev})
+		result = append(result, &types.HeaderedEvent{PDU: ev})
 	}
 
 	return result, nil
@@ -1409,7 +1409,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			EventType:    ev.Type(),
 			RoomID:       ev.RoomID(),
 			StateKey:     *ev.StateKey(),
-			ContentValue: tables.ExtractContentValue(&types.HeaderedEvent{Event: ev}),
+			ContentValue: tables.ExtractContentValue(&types.HeaderedEvent{PDU: ev}),
 		}
 	}
 

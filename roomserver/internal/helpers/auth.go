@@ -66,7 +66,7 @@ func CheckForSoftFail(
 
 	// Work out which of the state events we actually need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth(
-		gomatrixserverlib.ToPDUs([]*gomatrixserverlib.Event{event.Event}),
+		[]gomatrixserverlib.PDU{event.PDU},
 	)
 
 	// Load the actual auth events from the database.
@@ -76,7 +76,7 @@ func CheckForSoftFail(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents); err != nil {
 		// return true, nil
 		return true, err
 	}
@@ -100,7 +100,7 @@ func CheckAuthEvents(
 	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event.Event})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event.PDU})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
@@ -109,7 +109,7 @@ func CheckAuthEvents(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents); err != nil {
 		return nil, err
 	}
 
@@ -170,7 +170,7 @@ func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) g
 	if !ok {
 		return nil
 	}
-	return event.Event
+	return event.PDU
 }
 
 func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) gomatrixserverlib.PDU {
@@ -189,7 +189,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) g
 	if !ok {
 		return nil
 	}
-	return event.Event
+	return event.PDU
 }
 
 // loadAuthEvents loads the events needed for authentication from the supplied room state.

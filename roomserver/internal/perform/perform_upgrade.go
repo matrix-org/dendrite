@@ -485,7 +485,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, &types.HeaderedEvent{Event: event})
+		builtEvents = append(builtEvents, &types.HeaderedEvent{PDU: event})
 		err = authEvents.AddEvent(event)
 		if err != nil {
 			return fmt.Errorf("failed to add new %q event to auth set: %w", builder.Type, err)
@@ -555,12 +555,12 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 		return nil, fmt.Errorf("failed to build new %q event: %w", builder.Type, err)
 	}
 	// check to see if this user can perform this operation
-	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
+	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
-	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(headeredEvent.Event, &provider); err != nil {
+	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider); err != nil {
 		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", builder.Type, err)} // TODO: Is this error string comprehensible to the client?
 	}
 

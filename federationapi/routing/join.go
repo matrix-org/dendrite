@@ -163,13 +163,13 @@ func MakeJoin(
 	}
 
 	// Check that the join is allowed or not
-	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
+	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 
-	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
+	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	if err = gomatrixserverlib.Allowed(event.PDU, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),
@@ -414,7 +414,7 @@ func SendJoin(
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
-					Event:         &types.HeaderedEvent{Event: &signed},
+					Event:         &types.HeaderedEvent{PDU: signed},
 					SendAsServer:  string(cfg.Matrix.ServerName),
 					TransactionID: nil,
 				},
