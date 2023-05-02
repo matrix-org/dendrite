@@ -745,7 +745,7 @@ nextAuthEvent:
 		// Now we know about this event, it was stored and the signatures were OK.
 		known[authEvent.EventID()] = &types.Event{
 			EventNID: eventNID,
-			PDU:      authEvent.(*gomatrixserverlib.Event),
+			PDU:      authEvent,
 		}
 	}
 

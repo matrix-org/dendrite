@@ -507,7 +507,7 @@ retryAllowedState:
 
 // get missing events for `e`. If `isGapFilled`=true then `newEvents` contains all the events to inject,
 // without `e`. If `isGapFilled=false` then `newEvents` contains the response to /get_missing_events
-func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.PDU, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, isGapFilled, prevStateKnown bool, err error) {
+func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.PDU, roomVersion gomatrixserverlib.RoomVersion) (newEvents []gomatrixserverlib.PDU, isGapFilled, prevStateKnown bool, err error) {
 	trace, ctx := internal.StartRegion(ctx, "getMissingEvents")
 	defer trace.EndRegion()
 
@@ -570,9 +570,8 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	logger.Debugf("get_missing_events returned %d events (%d passed signature checks)", len(missingResp.Events), len(missingEvents))
 
 	// topologically sort and sanity check that we are making forward progress
-	newEventsPDUs := gomatrixserverlib.ReverseTopologicalOrdering(
+	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(
 		gomatrixserverlib.ToPDUs(missingEvents), gomatrixserverlib.TopologicalOrderByPrevEvents)
-	newEvents = gomatrixserverlib.TempCastToEvents(newEventsPDUs)
 	shouldHaveSomeEventIDs := e.PrevEventIDs()
 	hasPrevEvent := false
 Event:
