@@ -36,7 +36,7 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing send_relay for %s", userID.String())
+	logrus.Infof("Processing send_relay for %s", userID.Raw())
 
 	var txnEvents fclient.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {

@@ -101,11 +101,11 @@ func (r *RelayInternalAPI) QueryTransactions(
 	userID spec.UserID,
 	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
-	logrus.Infof("QueryTransactions for %s", userID.String())
+	logrus.Infof("QueryTransactions for %s", userID.Raw())
 	if previousEntry.EntryID > 0 {
 		logrus.Infof("Cleaning previous entry (%v) from db for %s",
 			previousEntry.EntryID,
-			userID.String(),
+			userID.Raw(),
 		)
 		prevReceipt := receipt.NewReceipt(previousEntry.EntryID)
 		err := r.db.CleanTransactions(ctx, userID, []*receipt.Receipt{&prevReceipt})
@@ -123,12 +123,12 @@ func (r *RelayInternalAPI) QueryTransactions(
 
 	response := api.QueryRelayTransactionsResponse{}
 	if transaction != nil && receipt != nil {
-		logrus.Infof("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
+		logrus.Infof("Obtained transaction (%v) for %s", transaction.TransactionID, userID.Raw())
 		response.Transaction = *transaction
 		response.EntryID = receipt.GetNID()
 		response.EntriesQueued = true
 	} else {
-		logrus.Infof("No more entries in the queue for %s", userID.String())
+		logrus.Infof("No more entries in the queue for %s", userID.Raw())
 		response.EntryID = 0
 		response.EntriesQueued = false
 	}
