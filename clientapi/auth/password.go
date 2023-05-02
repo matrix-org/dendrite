@@ -268,18 +268,40 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 		userDN := result.Entries[0].DN
 		err = conn.Bind(userDN, password)
 		if err != nil {
+			var localpart string
+			localpart, _, err = userutil.ParseUsernameParam(username, t.Config.Matrix)
+			if err != nil {
+				return false, &util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.InvalidUsername(err.Error()),
+				}
+			}
+			if t.Rt != nil {
+				t.Rt.Act(localpart)
+			}
 			return false, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.InvalidUsername(err.Error()),
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	} else {
 		bindDn := strings.ReplaceAll(t.Config.Ldap.UserBindDn, "{username}", username)
 		err = conn.Bind(bindDn, password)
 		if err != nil {
+			var localpart string
+			localpart, _, err = userutil.ParseUsernameParam(username, t.Config.Matrix)
+			if err != nil {
+				return false, &util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.InvalidUsername(err.Error()),
+				}
+			}
+			if t.Rt != nil {
+				t.Rt.Act(localpart)
+			}
 			return false, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.InvalidUsername(err.Error()),
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	}
