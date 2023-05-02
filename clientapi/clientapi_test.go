@@ -1758,3 +1758,377 @@ func (d dummyStore) GetEncryptionEvent(roomID id.RoomID) *event.EncryptionEventC
 func (d dummyStore) FindSharedRooms(userID id.UserID) []id.RoomID {
 	return []id.RoomID{}
 }
+
+func TestKeyBackup(t *testing.T) {
+	alice := test.NewUser(t)
+
+	handleResponseCode := func(t *testing.T, rec *httptest.ResponseRecorder, expectedCode int) {
+		t.Helper()
+		if rec.Code != expectedCode {
+			t.Fatalf("expected HTTP %d, but got %d: %s", expectedCode, rec.Code, rec.Body.String())
+		}
+	}
+
+	testCases := []struct {
+		name     string
+		request  func(t *testing.T) *http.Request
+		validate func(t *testing.T, rec *httptest.ResponseRecorder)
+	}{
+		{
+			name: "can not create backup with invalid JSON",
+			request: func(t *testing.T) *http.Request {
+				reqBody := strings.NewReader(`{"algorithm":"m.megolm_backup.v1"`) // missing closing braces
+				return httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/room_keys/version", reqBody)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusBadRequest)
+			},
+		},
+		{
+			name: "can not create backup with missing auth_data", // as this would result in MarshalJSON errors when querying again
+			request: func(t *testing.T) *http.Request {
+				reqBody := strings.NewReader(`{"algorithm":"m.megolm_backup.v1"}`)
+				return httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/room_keys/version", reqBody)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusBadRequest)
+			},
+		},
+		{
+			name: "can create backup",
+			request: func(t *testing.T) *http.Request {
+				reqBody := strings.NewReader(`{"algorithm":"m.megolm_backup.v1","auth_data":{"data":"random"}}`)
+				return httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/room_keys/version", reqBody)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				wantVersion := "1"
+				if gotVersion := gjson.GetBytes(rec.Body.Bytes(), "version").Str; gotVersion != wantVersion {
+					t.Fatalf("expected version '%s', got '%s'", wantVersion, gotVersion)
+				}
+			},
+		},
+		{
+			name: "can not query backup for invalid version",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/room_keys/version/1337", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusNotFound)
+			},
+		},
+		{
+			name: "can not query backup for invalid version string",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/room_keys/version/notanumber", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusNotFound)
+			},
+		},
+		{
+			name: "can query backup",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/room_keys/version", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				wantVersion := "1"
+				if gotVersion := gjson.GetBytes(rec.Body.Bytes(), "version").Str; gotVersion != wantVersion {
+					t.Fatalf("expected version '%s', got '%s'", wantVersion, gotVersion)
+				}
+			},
+		},
+		{
+			name: "can query backup without returning rooms",
+			request: func(t *testing.T) *http.Request {
+				req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/room_keys/keys", test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				if gotRooms := gjson.GetBytes(rec.Body.Bytes(), "rooms").Map(); len(gotRooms) > 0 {
+					t.Fatalf("expected no rooms in version, but got %#v", gotRooms)
+				}
+			},
+		},
+		{
+			name: "can query backup for invalid room",
+			request: func(t *testing.T) *http.Request {
+				req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/room_keys/keys/!abc:test", test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				if gotSessions := gjson.GetBytes(rec.Body.Bytes(), "sessions").Map(); len(gotSessions) > 0 {
+					t.Fatalf("expected no sessions in version, but got %#v", gotSessions)
+				}
+			},
+		},
+		{
+			name: "can not query backup for invalid session",
+			request: func(t *testing.T) *http.Request {
+				req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/room_keys/keys/!abc:test/doesnotexist", test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusNotFound)
+			},
+		},
+		{
+			name: "can not update backup with missing version",
+			request: func(t *testing.T) *http.Request {
+				return test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/keys")
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusBadRequest)
+			},
+		},
+		{
+			name: "can not update backup with invalid data",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, "")
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/keys", reqBody, test.WithQueryParams(map[string]string{
+					"version": "0",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusBadRequest)
+			},
+		},
+		{
+			name: "can not update backup with wrong version",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, map[string]interface{}{
+					"rooms": map[string]interface{}{
+						"!testroom:test": map[string]interface{}{
+							"sessions": map[string]uapi.KeyBackupSession{},
+						},
+					},
+				})
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/keys", reqBody, test.WithQueryParams(map[string]string{
+					"version": "5",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusForbidden)
+			},
+		},
+		{
+			name: "can update backup with correct version",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, map[string]interface{}{
+					"rooms": map[string]interface{}{
+						"!testroom:test": map[string]interface{}{
+							"sessions": map[string]uapi.KeyBackupSession{
+								"dummySession": {
+									FirstMessageIndex: 1,
+								},
+							},
+						},
+					},
+				})
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/keys", reqBody, test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+			},
+		},
+		{
+			name: "can update backup with correct version for specific room",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, map[string]interface{}{
+					"sessions": map[string]uapi.KeyBackupSession{
+						"dummySession": {
+							FirstMessageIndex: 1,
+							IsVerified:        true,
+							SessionData:       json.RawMessage("{}"),
+						},
+					},
+				})
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/keys/!testroom:test", reqBody, test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				t.Logf("%#v", rec.Body.String())
+			},
+		},
+		{
+			name: "can update backup with correct version for specific room and session",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, uapi.KeyBackupSession{
+					FirstMessageIndex: 1,
+					SessionData:       json.RawMessage("{}"),
+					IsVerified:        true,
+					ForwardedCount:    0,
+				})
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/keys/!testroom:test/dummySession", reqBody, test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+			},
+		},
+		{
+			name: "can update backup by version",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, uapi.KeyBackupSession{
+					FirstMessageIndex: 1,
+					SessionData:       json.RawMessage("{}"),
+					IsVerified:        true,
+					ForwardedCount:    0,
+				})
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/version/1", reqBody, test.WithQueryParams(map[string]string{"version": "1"}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				t.Logf("%#v", rec.Body.String())
+			},
+		},
+		{
+			name: "can not update backup by version for invalid version",
+			request: func(t *testing.T) *http.Request {
+				reqBody := test.WithJSONBody(t, uapi.KeyBackupSession{
+					FirstMessageIndex: 1,
+					SessionData:       json.RawMessage("{}"),
+					IsVerified:        true,
+					ForwardedCount:    0,
+				})
+				req := test.NewRequest(t, http.MethodPut, "/_matrix/client/v3/room_keys/version/2", reqBody, test.WithQueryParams(map[string]string{"version": "1"}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+			},
+		},
+		{
+			name: "can query backup sessions",
+			request: func(t *testing.T) *http.Request {
+				req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/room_keys/keys", test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				if gotRooms := gjson.GetBytes(rec.Body.Bytes(), "rooms").Map(); len(gotRooms) != 1 {
+					t.Fatalf("expected one room in response, but got %#v", rec.Body.String())
+				}
+			},
+		},
+		{
+			name: "can query backup sessions by room",
+			request: func(t *testing.T) *http.Request {
+				req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/room_keys/keys/!testroom:test", test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				if gotRooms := gjson.GetBytes(rec.Body.Bytes(), "sessions").Map(); len(gotRooms) != 1 {
+					t.Fatalf("expected one session in response, but got %#v", rec.Body.String())
+				}
+			},
+		},
+		{
+			name: "can query backup sessions by room and sessionID",
+			request: func(t *testing.T) *http.Request {
+				req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/room_keys/keys/!testroom:test/dummySession", test.WithQueryParams(map[string]string{
+					"version": "1",
+				}))
+				return req
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+				if !gjson.GetBytes(rec.Body.Bytes(), "is_verified").Bool() {
+					t.Fatalf("expected session to be verified, but wasn't: %#v", rec.Body.String())
+				}
+			},
+		},
+		{
+			name: "can not delete invalid version backup",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/2", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusNotFound)
+			},
+		},
+		{
+			name: "can delete version backup",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/1", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+			},
+		},
+		{
+			name: "deleting the same backup version twice doesn't error",
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/1", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusOK)
+			},
+		},
+		{
+			name: "deleting an empty version doesn't work", // make sure we can't delete an empty backup version. Handled at the router level
+			request: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodDelete, "/_matrix/client/v3/room_keys/version/", nil)
+			},
+			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				handleResponseCode(t, rec, http.StatusNotFound)
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				req := tc.request(t)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+				routers.Client.ServeHTTP(rec, req)
+				tc.validate(t, rec)
+			})
+		}
+	})
+}

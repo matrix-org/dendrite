@@ -34,7 +34,7 @@ func GetTransactionFromRelay(
 	relayAPI api.RelayInternalAPI,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing relay_txn for %s", userID.Raw())
+	logrus.Infof("Processing relay_txn for %s", userID.String())
 
 	var previousEntry fclient.RelayEntry
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {

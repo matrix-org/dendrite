@@ -304,16 +304,12 @@ func SetVisibility(
 		return *reqErr
 	}
 
-	var publishRes roomserverAPI.PerformPublishResponse
-	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+	if err = rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
 		RoomID:     roomID,
 		Visibility: v.Visibility,
-	}, &publishRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if publishRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
-		return publishRes.Error.JSONResponse()
+	}); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("failed to publish room")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -342,18 +338,14 @@ func SetVisibilityAS(
 			return *reqErr
 		}
 	}
-	var publishRes roomserverAPI.PerformPublishResponse
 	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
 		RoomID:       roomID,
 		Visibility:   v.Visibility,
 		NetworkID:    networkID,
 		AppserviceID: dev.AppserviceID,
-	}, &publishRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if publishRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
-		return publishRes.Error.JSONResponse()
+	}); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("failed to publish room")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

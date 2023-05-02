@@ -171,6 +171,23 @@ func LeaveServerNoticeError() *MatrixError {
 	}
 }
 
+// ErrRoomKeysVersion is an error returned by `PUT /room_keys/keys`
+type ErrRoomKeysVersion struct {
+	MatrixError
+	CurrentVersion string `json:"current_version"`
+}
+
+// WrongBackupVersionError is an error returned by `PUT /room_keys/keys`
+func WrongBackupVersionError(currentVersion string) *ErrRoomKeysVersion {
+	return &ErrRoomKeysVersion{
+		MatrixError: MatrixError{
+			ErrCode: "M_WRONG_ROOM_KEYS_VERSION",
+			Err:     "Wrong backup version.",
+		},
+		CurrentVersion: currentVersion,
+	}
+}
+
 type IncompatibleRoomVersionError struct {
 	RoomVersion string `json:"room_version"`
 	Error       string `json:"error"`

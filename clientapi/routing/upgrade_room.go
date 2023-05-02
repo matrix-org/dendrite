@@ -15,11 +15,13 @@
 package routing
 
 import (
+	"errors"
 	"net/http"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -57,38 +59,28 @@ func UpgradeRoom(
 		}
 	}
 
-	upgradeReq := roomserverAPI.PerformRoomUpgradeRequest{
-		UserID:      device.UserID,
-		RoomID:      roomID,
-		RoomVersion: gomatrixserverlib.RoomVersion(r.NewVersion),
-	}
-	upgradeResp := roomserverAPI.PerformRoomUpgradeResponse{}
-
-	if err := rsAPI.PerformRoomUpgrade(req.Context(), &upgradeReq, &upgradeResp); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-
-	if upgradeResp.Error != nil {
-		if upgradeResp.Error.Code == roomserverAPI.PerformErrorNoRoom {
+	newRoomID, err := rsAPI.PerformRoomUpgrade(req.Context(), roomID, device.UserID, gomatrixserverlib.RoomVersion(r.NewVersion))
+	switch e := err.(type) {
+	case nil:
+	case roomserverAPI.ErrNotAllowed:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(e.Error()),
+		}
+	default:
+		if errors.Is(err, eventutil.ErrRoomNoExists) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("Room does not exist"),
 			}
-		} else if upgradeResp.Error.Code == roomserverAPI.PerformErrorNotAllowed {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(upgradeResp.Error.Msg),
-			}
-		} else {
-			return jsonerror.InternalServerError()
 		}
-
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: upgradeRoomResponse{
-			ReplacementRoom: upgradeResp.NewRoomID,
+			ReplacementRoom: newRoomID,
 		},
 	}
 }

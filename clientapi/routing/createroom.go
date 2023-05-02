@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -544,9 +545,10 @@ func createRoom(
 		}
 
 		// Process the invites.
+		var inviteEvent *types.HeaderedEvent
 		for _, invitee := range r.Invite {
 			// Build the invite event.
-			inviteEvent, err := buildMembershipEvent(
+			inviteEvent, err = buildMembershipEvent(
 				ctx, invitee, "", profileAPI, device, spec.Invite,
 				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
 			)
@@ -559,38 +561,44 @@ func createRoom(
 				fclient.NewInviteV2StrippedState(inviteEvent.PDU),
 			)
 			// Send the invite event to the roomserver.
-			var inviteRes roomserverAPI.PerformInviteResponse
 			event := inviteEvent
-			if err := rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
+			err = rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
 				RoomVersion:     event.Version(),
 				SendAsServer:    string(userDomain),
-			}, &inviteRes); err != nil {
+			})
+			switch e := err.(type) {
+			case roomserverAPI.ErrInvalidID:
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.Unknown(e.Error()),
+				}
+			case roomserverAPI.ErrNotAllowed:
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden(e.Error()),
+				}
+			case nil:
+			default:
 				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+				sentry.CaptureException(err)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: jsonerror.InternalServerError(),
 				}
 			}
-			if inviteRes.Error != nil {
-				return inviteRes.Error.JSONResponse()
-			}
 		}
 	}
 
-	if r.Visibility == "public" {
+	if r.Visibility == spec.Public {
 		// expose this room in the published room list
-		var pubRes roomserverAPI.PerformPublishResponse
-		if err := rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
+		if err = rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
 			RoomID:     roomID,
-			Visibility: "public",
-		}, &pubRes); err != nil {
-			return jsonerror.InternalAPIError(ctx, err)
-		}
-		if pubRes.Error != nil {
-			// treat as non-fatal since the room is already made by this point
-			util.GetLogger(ctx).WithError(pubRes.Error).Error("failed to visibility:public")
+			Visibility: spec.Public,
+		}); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("failed to publish room")
+			return jsonerror.InternalServerError()
 		}
 	}
 

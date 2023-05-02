@@ -1,81 +1,11 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
-
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/roomserver/types"
-)
-
-type PerformErrorCode int
-
-type PerformError struct {
-	Msg        string
-	RemoteCode int // remote HTTP status code, for PerformErrRemote
-	Code       PerformErrorCode
-}
-
-func (p *PerformError) Error() string {
-	return fmt.Sprintf("%d : %s", p.Code, p.Msg)
-}
-
-// JSONResponse maps error codes to suitable HTTP error codes, defaulting to 500.
-func (p *PerformError) JSONResponse() util.JSONResponse {
-	switch p.Code {
-	case PerformErrorBadRequest:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(p.Msg),
-		}
-	case PerformErrorNoRoom:
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(p.Msg),
-		}
-	case PerformErrorNotAllowed:
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(p.Msg),
-		}
-	case PerformErrorNoOperation:
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(p.Msg),
-		}
-	case PerformErrRemote:
-		// if the code is 0 then something bad happened and it isn't
-		// a remote HTTP error being encapsulated, e.g network error to remote.
-		if p.RemoteCode == 0 {
-			return util.ErrorResponse(fmt.Errorf("%s", p.Msg))
-		}
-		return util.JSONResponse{
-			Code: p.RemoteCode,
-			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
-			JSON: json.RawMessage(p.Msg),
-		}
-	default:
-		return util.ErrorResponse(p)
-	}
-}
-
-const (
-	// PerformErrorNotAllowed means the user is not allowed to invite/join/etc this room (e.g join_rule:invite or banned)
-	PerformErrorNotAllowed PerformErrorCode = 1
-	// PerformErrorBadRequest means the request was wrong in some way (invalid user ID, wrong server, etc)
-	PerformErrorBadRequest PerformErrorCode = 2
-	// PerformErrorNoRoom means that the room being joined doesn't exist.
-	PerformErrorNoRoom PerformErrorCode = 3
-	// PerformErrorNoOperation means that the request resulted in nothing happening e.g invite->invite or leave->leave.
-	PerformErrorNoOperation PerformErrorCode = 4
-	// PerformErrRemote means that the request failed and the PerformError.Msg is the raw remote JSON error response
-	PerformErrRemote PerformErrorCode = 5
 )
 
 type PerformJoinRequest struct {
@@ -85,14 +15,6 @@ type PerformJoinRequest struct {
 	Content       map[string]interface{} `json:"content"`
 	ServerNames   []spec.ServerName      `json:"server_names"`
 	Unsigned      map[string]interface{} `json:"unsigned"`
-}
-
-type PerformJoinResponse struct {
-	// The room ID, populated on success.
-	RoomID    string `json:"room_id"`
-	JoinedVia spec.ServerName
-	// If non-nil, the join request failed. Contains more information why it failed.
-	Error *PerformError
 }
 
 type PerformLeaveRequest struct {
@@ -113,33 +35,11 @@ type PerformInviteRequest struct {
 	TransactionID   *TransactionID                  `json:"transaction_id"`
 }
 
-type PerformInviteResponse struct {
-	Error *PerformError
-}
-
 type PerformPeekRequest struct {
 	RoomIDOrAlias string            `json:"room_id_or_alias"`
 	UserID        string            `json:"user_id"`
 	DeviceID      string            `json:"device_id"`
 	ServerNames   []spec.ServerName `json:"server_names"`
-}
-
-type PerformPeekResponse struct {
-	// The room ID, populated on success.
-	RoomID string `json:"room_id"`
-	// If non-nil, the join request failed. Contains more information why it failed.
-	Error *PerformError
-}
-
-type PerformUnpeekRequest struct {
-	RoomID   string `json:"room_id"`
-	UserID   string `json:"user_id"`
-	DeviceID string `json:"device_id"`
-}
-
-type PerformUnpeekResponse struct {
-	// If non-nil, the join request failed. Contains more information why it failed.
-	Error *PerformError
 }
 
 // PerformBackfillRequest is a request to PerformBackfill.
@@ -180,11 +80,6 @@ type PerformPublishRequest struct {
 	NetworkID    string
 }
 
-type PerformPublishResponse struct {
-	// If non-nil, the publish request failed. Contains more information why it failed.
-	Error *PerformError
-}
-
 type PerformInboundPeekRequest struct {
 	UserID          string          `json:"user_id"`
 	RoomID          string          `json:"room_id"`
@@ -214,50 +109,3 @@ type PerformForgetRequest struct {
 }
 
 type PerformForgetResponse struct{}
-
-type PerformRoomUpgradeRequest struct {
-	RoomID      string                        `json:"room_id"`
-	UserID      string                        `json:"user_id"`
-	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
-}
-
-type PerformRoomUpgradeResponse struct {
-	NewRoomID string
-	Error     *PerformError
-}
-
-type PerformAdminEvacuateRoomRequest struct {
-	RoomID string `json:"room_id"`
-}
-
-type PerformAdminEvacuateRoomResponse struct {
-	Affected []string `json:"affected"`
-	Error    *PerformError
-}
-
-type PerformAdminEvacuateUserRequest struct {
-	UserID string `json:"user_id"`
-}
-
-type PerformAdminEvacuateUserResponse struct {
-	Affected []string `json:"affected"`
-	Error    *PerformError
-}
-
-type PerformAdminPurgeRoomRequest struct {
-	RoomID string `json:"room_id"`
-}
-
-type PerformAdminPurgeRoomResponse struct {
-	Error *PerformError `json:"error,omitempty"`
-}
-
-type PerformAdminDownloadStateRequest struct {
-	RoomID     string          `json:"room_id"`
-	UserID     string          `json:"user_id"`
-	ServerName spec.ServerName `json:"server_name"`
-}
-
-type PerformAdminDownloadStateResponse struct {
-	Error *PerformError `json:"error,omitempty"`
-}
