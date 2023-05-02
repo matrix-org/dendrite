@@ -45,7 +45,6 @@ type Inviter struct {
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-	res *api.PerformInviteResponse,
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
 	event := req.Event
@@ -66,20 +65,12 @@ func (r *Inviter) PerformInvite(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("The user ID %q is invalid!", targetUserID),
-		}
-		return nil, nil
+		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", targetUserID)}
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
 	isOriginLocal := r.Cfg.Matrix.IsLocalServerName(senderDomain)
 	if !isOriginLocal && !isTargetLocal {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  "The invite must be either from or to a local user",
-		}
-		return nil, nil
+		return nil, api.ErrInvalidID{Err: fmt.Errorf("the invite must be either from or to a local user")}
 	}
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
@@ -119,8 +110,8 @@ func (r *Inviter) PerformInvite(
 		}
 		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 			EventNID: 0,
-			Event:    event.Unwrap(),
-		}, outputUpdates, req.Event.RoomVersion)
+			Event:    event.Event,
+		}, outputUpdates, req.Event.Version())
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
@@ -175,12 +166,8 @@ func (r *Inviter) PerformInvite(
 		// For now we will implement option 2. Since in the abesence of a retry
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorNotAllowed,
-			Msg:  "User is already joined to room",
-		}
 		logger.Debugf("user already joined")
-		return nil, nil
+		return nil, api.ErrNotAllowed{Err: fmt.Errorf("user is already joined to room")}
 	}
 
 	// If the invite originated remotely then we can't send an
@@ -201,11 +188,7 @@ func (r *Inviter) PerformInvite(
 		logger.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 			"processInviteEvent.checkAuthEvents failed for event",
 		)
-		res.Error = &api.PerformError{
-			Msg:  err.Error(),
-			Code: api.PerformErrorNotAllowed,
-		}
-		return nil, nil
+		return nil, api.ErrNotAllowed{Err: err}
 	}
 
 	// If the invite originated from us and the target isn't local then we
@@ -220,12 +203,8 @@ func (r *Inviter) PerformInvite(
 		}
 		fsRes := &federationAPI.PerformInviteResponse{}
 		if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
-			res.Error = &api.PerformError{
-				Msg:  err.Error(),
-				Code: api.PerformErrorNotAllowed,
-			}
 			logger.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
-			return nil, nil
+			return nil, api.ErrNotAllowed{Err: err}
 		}
 		event = fsRes.Event
 		logger.Debugf("Federated PerformInvite success with event ID %s", event.EventID())
@@ -251,11 +230,8 @@ func (r *Inviter) PerformInvite(
 		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
 	}
 	if err = inputRes.Err(); err != nil {
-		res.Error = &api.PerformError{
-			Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
-			Code: api.PerformErrorNotAllowed,
-		}
 		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		return nil, api.ErrNotAllowed{Err: err}
 	}
 
 	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
@@ -300,7 +276,7 @@ func buildInviteStrippedState(
 	inviteState := []fclient.InviteV2StrippedState{
 		fclient.NewInviteV2StrippedState(input.Event.Event),
 	}
-	stateEvents = append(stateEvents, types.Event{Event: input.Event.Unwrap()})
+	stateEvents = append(stateEvents, types.Event{Event: input.Event.Event})
 	for _, event := range stateEvents {
 		inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.Event))
 	}

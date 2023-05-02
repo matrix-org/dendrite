@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -292,7 +293,7 @@ func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRo
 	return s.db.SaveAccountData(ctx, localpart, serverName, newRoomID, "m.tag", tag)
 }
 
-func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, streamPos uint64) error {
+func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rstypes.HeaderedEvent, streamPos uint64) error {
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
@@ -300,7 +301,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 
 	switch {
 	case event.Type() == spec.MRoomMember:
-		cevent := synctypes.HeaderedToClientEvent(event, synctypes.FormatAll)
+		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll)
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
@@ -436,7 +437,7 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 // looks it up in roomserver. If there is no name,
 // m.room.canonical_alias is consulted. Returns an empty string if the
 // room has no name.
-func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) (string, error) {
+func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *rstypes.HeaderedEvent) (string, error) {
 	if event.Type() == spec.MRoomName {
 		name, err := unmarshalRoomName(event)
 		if err != nil {
@@ -485,7 +486,7 @@ var (
 	roomNameTuple       = gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomName}
 )
 
-func unmarshalRoomName(event *gomatrixserverlib.HeaderedEvent) (string, error) {
+func unmarshalRoomName(event *rstypes.HeaderedEvent) (string, error) {
 	var nc eventutil.NameContent
 	if err := json.Unmarshal(event.Content(), &nc); err != nil {
 		return "", fmt.Errorf("unmarshaling NameContent: %w", err)
@@ -494,7 +495,7 @@ func unmarshalRoomName(event *gomatrixserverlib.HeaderedEvent) (string, error) {
 	return nc.Name, nil
 }
 
-func unmarshalCanonicalAlias(event *gomatrixserverlib.HeaderedEvent) (string, error) {
+func unmarshalCanonicalAlias(event *rstypes.HeaderedEvent) (string, error) {
 	var cac eventutil.CanonicalAliasContent
 	if err := json.Unmarshal(event.Content(), &cac); err != nil {
 		return "", fmt.Errorf("unmarshaling CanonicalAliasContent: %w", err)
@@ -504,7 +505,7 @@ func unmarshalCanonicalAlias(event *gomatrixserverlib.HeaderedEvent) (string, er
 }
 
 // notifyLocal finds the right push actions for a local user, given an event.
-func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int, roomName string, streamPos uint64) error {
+func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int, roomName string, streamPos uint64) error {
 	actions, err := s.evaluatePushRules(ctx, event, mem, roomSize)
 	if err != nil {
 		return fmt.Errorf("s.evaluatePushRules: %w", err)
@@ -533,7 +534,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.HeaderedToClientEvent(event, synctypes.FormatSync),
+		Event: synctypes.ToClientEvent(event, synctypes.FormatSync),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it
@@ -613,7 +614,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
-func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
+func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
 	if event.Sender() == mem.UserID {
 		// SPEC: Homeservers MUST NOT notify the Push Gateway for
 		// events that the user has sent themselves.
@@ -732,7 +733,7 @@ func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpar
 }
 
 // notifyHTTP performs a notificatation to a Push Gateway.
-func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
+func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
 	logger := log.WithFields(log.Fields{
 		"event_id":    event.EventID(),
 		"url":         url,

@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -91,7 +93,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
 		roomserverAPI.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{event},
+		[]*types.HeaderedEvent{event},
 		device.UserDomain(),
 		serverName,
 		serverName,
@@ -264,21 +266,32 @@ func sendInvite(
 		return jsonerror.InternalServerError(), err
 	}
 
-	var inviteRes api.PerformInviteResponse
-	if err := rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
+	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
 		Event:           event,
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
-		RoomVersion:     event.RoomVersion,
+		RoomVersion:     event.Version(),
 		SendAsServer:    string(device.UserDomain()),
-	}, &inviteRes); err != nil {
+	})
+
+	switch e := err.(type) {
+	case roomserverAPI.ErrInvalidID:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown(e.Error()),
+		}, e
+	case roomserverAPI.ErrNotAllowed:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(e.Error()),
+		}, e
+	case nil:
+	default:
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+		sentry.CaptureException(err)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
 		}, err
-	}
-	if inviteRes.Error != nil {
-		return inviteRes.Error.JSONResponse(), inviteRes.Error
 	}
 
 	return util.JSONResponse{
@@ -294,7 +307,7 @@ func buildMembershipEvent(
 	membership, roomID string, isDirect bool,
 	cfg *config.ClientAPI, evTime time.Time,
 	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*types.HeaderedEvent, error) {
 	profile, err := loadProfile(ctx, targetUserID, cfg, profileAPI, asAPI)
 	if err != nil {
 		return nil, err

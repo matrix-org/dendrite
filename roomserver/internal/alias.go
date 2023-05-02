@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
@@ -140,7 +141,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	}
 
 	if creatorID != request.UserID {
-		var plEvent *gomatrixserverlib.HeaderedEvent
+		var plEvent *types.HeaderedEvent
 		var pls *gomatrixserverlib.PowerLevelContent
 
 		plEvent, err = r.DB.GetStateEvent(ctx, roomID, spec.MRoomPowerLevels, "")
@@ -212,7 +213,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r, api.KindNew, []*types.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}

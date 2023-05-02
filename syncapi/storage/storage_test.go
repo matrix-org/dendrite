@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -34,9 +35,9 @@ func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	return db, close
 }
 
-func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
+func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.HeaderedEvent) (positions []types.StreamPosition) {
 	for _, ev := range events {
-		var addStateEvents []*gomatrixserverlib.HeaderedEvent
+		var addStateEvents []*rstypes.HeaderedEvent
 		var addStateEventIDs []string
 		var removeStateEventIDs []string
 		if ev.StateKey() != nil {
@@ -106,7 +107,7 @@ func TestRecentEventsPDU(t *testing.T) {
 			To           types.StreamPosition
 			Limit        int
 			ReverseOrder bool
-			WantEvents   []*gomatrixserverlib.HeaderedEvent
+			WantEvents   []*rstypes.HeaderedEvent
 			WantLimited  bool
 		}{
 			// The purpose of this test is to make sure that incremental syncs are including up to the latest events.
@@ -316,7 +317,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	t.Parallel()
 	db := MustCreateDatabase(t)
 
-	var events []*gomatrixserverlib.HeaderedEvent
+	var events []*types.HeaderedEvent
 	events = append(events, MustCreateEvent(t, testRoomID, nil, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, testUserIDA)),
 		Type:     "m.room.create",
@@ -324,7 +325,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Sender:   testUserIDA,
 		Depth:    int64(len(events) + 1),
 	}))
-	events = append(events, MustCreateEvent(t, testRoomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+	events = append(events, MustCreateEvent(t, testRoomID, []*types.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &testUserIDA,
@@ -332,7 +333,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Depth:    int64(len(events) + 1),
 	}))
 	// fork the dag into three, same prev_events and depth
-	parent := []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}
+	parent := []*types.HeaderedEvent{events[len(events)-1]}
 	depth := int64(len(events) + 1)
 	for i := 0; i < 3; i++ {
 		events = append(events, MustCreateEvent(t, testRoomID, parent, &gomatrixserverlib.EventBuilder{
@@ -365,7 +366,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Name  string
 		From  types.TopologyToken
 		Limit int
-		Wants []*gomatrixserverlib.HeaderedEvent
+		Wants []*types.HeaderedEvent
 	}{
 		{
 			Name:  "Pagination over the whole fork",
@@ -406,7 +407,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 	t.Parallel()
 	db := MustCreateDatabase(t)
 
-	makeEvents := func(roomID string) (events []*gomatrixserverlib.HeaderedEvent) {
+	makeEvents := func(roomID string) (events []*types.HeaderedEvent) {
 		events = append(events, MustCreateEvent(t, roomID, nil, &gomatrixserverlib.EventBuilder{
 			Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, testUserIDA)),
 			Type:     "m.room.create",
@@ -414,7 +415,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 			Sender:   testUserIDA,
 			Depth:    int64(len(events) + 1),
 		}))
-		events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+		events = append(events, MustCreateEvent(t, roomID, []*types.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 			Content:  []byte(`{"membership":"join"}`),
 			Type:     "m.room.member",
 			StateKey: &testUserIDA,
@@ -460,14 +461,14 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 
 	// "federation" join
 	userC := fmt.Sprintf("@radiance:%s", testOrigin)
-	joinEvent := MustCreateEvent(t, testRoomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+	joinEvent := MustCreateEvent(t, testRoomID, []*types.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userC,
 		Sender:   userC,
 		Depth:    int64(len(events) + 1),
 	})
-	MustWriteEvents(t, db, []*gomatrixserverlib.HeaderedEvent{joinEvent})
+	MustWriteEvents(t, db, []*types.HeaderedEvent{joinEvent})
 
 	// Sync will return this for the prev_batch
 	from := topologyTokenBefore(t, db, joinEvent.EventID())
@@ -638,7 +639,7 @@ func TestInviteBehaviour(t *testing.T) {
 		StateKey: &testUserIDA,
 		Sender:   "@inviteUser2:somewhere",
 	})
-	for _, ev := range []*gomatrixserverlib.HeaderedEvent{inviteEvent1, inviteEvent2} {
+	for _, ev := range []*types.HeaderedEvent{inviteEvent1, inviteEvent2} {
 		_, err := db.AddInviteEvent(ctx, ev)
 		if err != nil {
 			t.Fatalf("Failed to AddInviteEvent: %s", err)
@@ -695,7 +696,7 @@ func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
 	}
 }
 
-func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []*gomatrixserverlib.HeaderedEvent) {
+func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []*types.HeaderedEvent) {
 	t.Helper()
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))

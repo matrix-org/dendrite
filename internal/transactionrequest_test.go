@@ -31,6 +31,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -59,8 +60,8 @@ var (
 	}
 	testEvent       = []byte(`{"auth_events":["$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg","$BcEcbZnlFLB5rxSNSZNBn6fO3jU/TKAJ79wfKyCQLiU"],"content":{"body":"Test Message"},"depth":3917,"hashes":{"sha256":"cNAWtlHIegrji0mMA6x1rhpYCccY8W1NsWZqSpJFhjs"},"origin":"localhost","origin_server_ts":0,"prev_events":["$4GDB0bVjkWwS3G4noUZCq5oLWzpBYpwzdMcf7gj24CI"],"room_id":"!roomid:localhost","sender":"@userid:localhost","signatures":{"localhost":{"ed25519:auto":"NKym6Kcy3u9mGUr21Hjfe3h7DfDilDhN5PqztT0QZ4NTZ+8Y7owseLolQVXp+TvNjecvzdDywsXXVvGiuQiWAQ"}},"type":"m.room.message"}`)
 	testRoomVersion = gomatrixserverlib.RoomVersionV1
-	testEvents      = []*gomatrixserverlib.HeaderedEvent{}
-	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
+	testEvents      = []*rstypes.HeaderedEvent{}
+	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*rstypes.HeaderedEvent)
 )
 
 type FakeRsAPI struct {
@@ -72,14 +73,12 @@ type FakeRsAPI struct {
 
 func (r *FakeRsAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
-	req *rsAPI.QueryRoomVersionForRoomRequest,
-	res *rsAPI.QueryRoomVersionForRoomResponse,
-) error {
+	roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
 	if r.shouldFailQuery {
-		return fmt.Errorf("Failure")
+		return "", fmt.Errorf("Failure")
 	}
-	res.RoomVersion = gomatrixserverlib.RoomVersionV10
-	return nil
+	return gomatrixserverlib.RoomVersionV10, nil
 }
 
 func (r *FakeRsAPI) QueryServerBannedFromRoom(
@@ -637,7 +636,7 @@ func init() {
 		if err != nil {
 			panic("cannot load test data: " + err.Error())
 		}
-		h := e.Headered(testRoomVersion)
+		h := &rstypes.HeaderedEvent{Event: e}
 		testEvents = append(testEvents, h)
 		if e.StateKey() != nil {
 			testStateEvents[gomatrixserverlib.StateKeyTuple{
@@ -722,11 +721,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 // Asks for the room version for a given room.
 func (t *testRoomserverAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
-	request *rsAPI.QueryRoomVersionForRoomRequest,
-	response *rsAPI.QueryRoomVersionForRoomResponse,
-) error {
-	response.RoomVersion = testRoomVersion
-	return nil
+	roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	return testRoomVersion, nil
 }
 
 func (t *testRoomserverAPI) QueryServerBannedFromRoom(
@@ -781,7 +778,7 @@ NextPDU:
 	}
 }
 
-func assertInputRoomEvents(t *testing.T, got []rsAPI.InputRoomEvent, want []*gomatrixserverlib.HeaderedEvent) {
+func assertInputRoomEvents(t *testing.T, got []rsAPI.InputRoomEvent, want []*rstypes.HeaderedEvent) {
 	for _, g := range got {
 		fmt.Println("GOT ", g.Event.EventID())
 	}
@@ -805,7 +802,7 @@ func TestBasicTransaction(t *testing.T) {
 	}
 	txn := mustCreateTransaction(rsAPI, pdus)
 	mustProcessTransaction(t, txn, nil)
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*rstypes.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
 
 // The purpose of this test is to check that if the event received fails auth checks the event is still sent to the roomserver
@@ -818,5 +815,5 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 	txn := mustCreateTransaction(rsAPI, pdus)
 	mustProcessTransaction(t, txn, []string{})
 	// expect message to be sent to the roomserver
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*rstypes.HeaderedEvent{testEvents[len(testEvents)-1]})
 }

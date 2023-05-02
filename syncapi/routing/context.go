@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -122,7 +123,7 @@ func Context(
 
 	// verify the user is allowed to see the context for this room/event
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
@@ -169,14 +170,14 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeClient := synctypes.HeaderedToClientEvents(eventsBeforeFiltered, synctypes.FormatAll)
-	eventsAfterClient := synctypes.HeaderedToClientEvents(eventsAfterFiltered, synctypes.FormatAll)
+	eventsBeforeClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBeforeFiltered), synctypes.FormatAll)
+	eventsAfterClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfterFiltered), synctypes.FormatAll)
 
 	newState := state
 	if filter.LazyLoadMembers {
 		allEvents := append(eventsBeforeFiltered, eventsAfterFiltered...)
 		allEvents = append(allEvents, &requestedEvent)
-		evs := synctypes.HeaderedToClientEvents(allEvents, synctypes.FormatAll)
+		evs := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(allEvents), synctypes.FormatAll)
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
 			logrus.WithError(err).Error("unable to load membership events")
@@ -184,12 +185,12 @@ func Context(
 		}
 	}
 
-	ev := synctypes.HeaderedToClientEvent(&requestedEvent, synctypes.FormatAll)
+	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll)
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,
 		EventsBefore: eventsBeforeClient,
-		State:        synctypes.HeaderedToClientEvents(newState, synctypes.FormatAll),
+		State:        synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(newState), synctypes.FormatAll),
 	}
 
 	if len(response.State) > filter.Limit {
@@ -212,9 +213,9 @@ func Context(
 // and an error, if any.
 func applyHistoryVisibilityOnContextEvents(
 	ctx context.Context, snapshot storage.DatabaseTransaction, rsAPI roomserver.SyncRoomserverAPI,
-	eventsBefore, eventsAfter []*gomatrixserverlib.HeaderedEvent,
+	eventsBefore, eventsAfter []*rstypes.HeaderedEvent,
 	userID string,
-) (filteredBefore, filteredAfter []*gomatrixserverlib.HeaderedEvent, err error) {
+) (filteredBefore, filteredAfter []*rstypes.HeaderedEvent, err error) {
 	eventIDsBefore := make(map[string]struct{}, len(eventsBefore))
 	eventIDsAfter := make(map[string]struct{}, len(eventsAfter))
 
@@ -245,7 +246,7 @@ func applyHistoryVisibilityOnContextEvents(
 	return filteredBefore, filteredAfter, nil
 }
 
-func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, startEvents, endEvents []*rstypes.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if len(startEvents) > 0 {
 		start, err = snapshot.EventPositionInTopology(ctx, startEvents[0].EventID())
 		if err != nil {
@@ -265,7 +266,7 @@ func applyLazyLoadMembers(
 	roomID string,
 	events []synctypes.ClientEvent,
 	lazyLoadCache caching.LazyLoadCache,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
+) ([]*rstypes.HeaderedEvent, error) {
 	eventSenders := make(map[string]struct{})
 	// get members who actually send an event
 	for _, e := range events {

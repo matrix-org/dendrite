@@ -44,7 +44,7 @@ type ClientEvent struct {
 }
 
 // ToClientEvents converts server events to client events.
-func ToClientEvents(serverEvs []*gomatrixserverlib.Event, format ClientEventFormat) []ClientEvent {
+func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat) []ClientEvent {
 	evs := make([]ClientEvent, 0, len(serverEvs))
 	for _, se := range serverEvs {
 		if se == nil {
@@ -55,20 +55,8 @@ func ToClientEvents(serverEvs []*gomatrixserverlib.Event, format ClientEventForm
 	return evs
 }
 
-// HeaderedToClientEvents converts headered server events to client events.
-func HeaderedToClientEvents(serverEvs []*gomatrixserverlib.HeaderedEvent, format ClientEventFormat) []ClientEvent {
-	evs := make([]ClientEvent, 0, len(serverEvs))
-	for _, se := range serverEvs {
-		if se == nil {
-			continue // TODO: shouldn't happen?
-		}
-		evs = append(evs, HeaderedToClientEvent(se, format))
-	}
-	return evs
-}
-
 // ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se *gomatrixserverlib.Event, format ClientEventFormat) ClientEvent {
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat) ClientEvent {
 	ce := ClientEvent{
 		Content:        spec.RawJSON(se.Content()),
 		Sender:         se.Sender(),
@@ -83,9 +71,4 @@ func ToClientEvent(se *gomatrixserverlib.Event, format ClientEventFormat) Client
 		ce.RoomID = se.RoomID()
 	}
 	return ce
-}
-
-// HeaderedToClientEvent converts a single headered server event to a client event.
-func HeaderedToClientEvent(se *gomatrixserverlib.HeaderedEvent, format ClientEventFormat) ClientEvent {
-	return ToClientEvent(se.Event, format)
 }

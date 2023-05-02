@@ -15,13 +15,16 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 func PeekRoomByIDOrAlias(
@@ -41,8 +44,6 @@ func PeekRoomByIDOrAlias(
 		UserID:        device.UserID,
 		DeviceID:      device.ID,
 	}
-	peekRes := roomserverAPI.PerformPeekResponse{}
-
 	// Check to see if any ?server_name= query parameters were
 	// given in the request.
 	if serverNames, ok := req.URL.Query()["server_name"]; ok {
@@ -55,11 +56,27 @@ func PeekRoomByIDOrAlias(
 	}
 
 	// Ask the roomserver to perform the peek.
-	if err := rsAPI.PerformPeek(req.Context(), &peekReq, &peekRes); err != nil {
-		return util.ErrorResponse(err)
-	}
-	if peekRes.Error != nil {
-		return peekRes.Error.JSONResponse()
+	roomID, err := rsAPI.PerformPeek(req.Context(), &peekReq)
+	switch e := err.(type) {
+	case roomserverAPI.ErrInvalidID:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown(e.Error()),
+		}
+	case roomserverAPI.ErrNotAllowed:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(e.Error()),
+		}
+	case *gomatrix.HTTPError:
+		return util.JSONResponse{
+			Code: e.Code,
+			JSON: json.RawMessage(e.Message),
+		}
+	case nil:
+	default:
+		logrus.WithError(err).WithField("roomID", roomIDOrAlias).Errorf("Failed to peek room")
+		return jsonerror.InternalServerError()
 	}
 
 	// if this user is already joined to the room, we let them peek anyway
@@ -75,7 +92,7 @@ func PeekRoomByIDOrAlias(
 		// TODO: Put the response struct somewhere internal.
 		JSON: struct {
 			RoomID string `json:"room_id"`
-		}{peekRes.RoomID},
+		}{roomID},
 	}
 }
 
@@ -85,18 +102,17 @@ func UnpeekRoomByID(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
-	unpeekReq := roomserverAPI.PerformUnpeekRequest{
-		RoomID:   roomID,
-		UserID:   device.UserID,
-		DeviceID: device.ID,
-	}
-	unpeekRes := roomserverAPI.PerformUnpeekResponse{}
-
-	if err := rsAPI.PerformUnpeek(req.Context(), &unpeekReq, &unpeekRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if unpeekRes.Error != nil {
-		return unpeekRes.Error.JSONResponse()
+	err := rsAPI.PerformUnpeek(req.Context(), roomID, device.UserID, device.ID)
+	switch e := err.(type) {
+	case roomserverAPI.ErrInvalidID:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown(e.Error()),
+		}
+	case nil:
+	default:
+		logrus.WithError(err).WithField("roomID", roomID).Errorf("Failed to un-peek room")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

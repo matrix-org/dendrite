@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -206,12 +207,12 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			Context: SearchContextResponse{
 				Start:        startToken.String(),
 				End:          endToken.String(),
-				EventsAfter:  synctypes.HeaderedToClientEvents(eventsAfter, synctypes.FormatSync),
-				EventsBefore: synctypes.HeaderedToClientEvents(eventsBefore, synctypes.FormatSync),
+				EventsAfter:  synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync),
+				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync),
 				ProfileInfo:  profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.HeaderedToClientEvent(event, synctypes.FormatAll),
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
@@ -223,7 +224,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				logrus.WithError(err).Error("unable to get current state")
 				return jsonerror.InternalServerError()
 			}
-			stateForRooms[event.RoomID()] = synctypes.HeaderedToClientEvents(state, synctypes.FormatSync)
+			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync)
 		}
 	}
 
@@ -263,10 +264,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 func contextEvents(
 	ctx context.Context,
 	snapshot storage.DatabaseTransaction,
-	event *gomatrixserverlib.HeaderedEvent,
+	event *types.HeaderedEvent,
 	roomFilter *synctypes.RoomEventFilter,
 	searchReq SearchRequest,
-) ([]*gomatrixserverlib.HeaderedEvent, []*gomatrixserverlib.HeaderedEvent, error) {
+) ([]*types.HeaderedEvent, []*types.HeaderedEvent, error) {
 	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID(), event.EventID())
 	if err != nil {
 		logrus.WithError(err).Error("failed to query context event")

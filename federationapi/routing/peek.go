@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -35,10 +36,8 @@ func Peek(
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
 	// TODO: check if we're just refreshing an existing peek by querying the federationapi
-
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -50,7 +49,7 @@ func Peek(
 	// the peek URL.
 	remoteSupportsVersion := false
 	for _, v := range remoteVersions {
-		if v == verRes.RoomVersion {
+		if v == roomVersion {
 			remoteSupportsVersion = true
 			break
 		}
@@ -59,7 +58,7 @@ func Peek(
 	if !remoteSupportsVersion {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.IncompatibleRoomVersion(verRes.RoomVersion),
+			JSON: jsonerror.IncompatibleRoomVersion(roomVersion),
 		}
 	}
 
@@ -69,7 +68,7 @@ func Peek(
 	renewalInterval := int64(60 * 60 * 1000 * 1000)
 
 	var response api.PerformInboundPeekResponse
-	err := rsAPI.PerformInboundPeek(
+	err = rsAPI.PerformInboundPeek(
 		httpReq.Context(),
 		&api.PerformInboundPeekRequest{
 			RoomID:          roomID,
@@ -89,10 +88,10 @@ func Peek(
 	}
 
 	respPeek := fclient.RespPeek{
-		StateEvents:     gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.StateEvents),
-		AuthEvents:      gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
+		StateEvents:     types.NewEventJSONsFromHeaderedEvents(response.StateEvents),
+		AuthEvents:      types.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		RoomVersion:     response.RoomVersion,
-		LatestEvent:     response.LatestEvent.Unwrap(),
+		LatestEvent:     response.LatestEvent.Event,
 		RenewalInterval: renewalInterval,
 	}
 

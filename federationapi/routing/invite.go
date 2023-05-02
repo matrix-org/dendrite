@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -196,25 +198,44 @@ func processInvite(
 	)
 
 	// Add the invite event to the roomserver.
-	inviteEvent := signedEvent.Headered(roomVer)
+	inviteEvent := &types.HeaderedEvent{Event: &signedEvent}
 	request := &api.PerformInviteRequest{
 		Event:           inviteEvent,
 		InviteRoomState: strippedState,
-		RoomVersion:     inviteEvent.RoomVersion,
+		RoomVersion:     inviteEvent.Version(),
 		SendAsServer:    string(api.DoNotSendToOtherServers),
 		TransactionID:   nil,
 	}
-	response := &api.PerformInviteResponse{}
-	if err := rsAPI.PerformInvite(ctx, request, response); err != nil {
+
+	if err = rsAPI.PerformInvite(ctx, request); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
-	if response.Error != nil {
-		return response.Error.JSONResponse()
+
+	switch e := err.(type) {
+	case api.ErrInvalidID:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown(e.Error()),
+		}
+	case api.ErrNotAllowed:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(e.Error()),
+		}
+	case nil:
+	default:
+		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+		sentry.CaptureException(err)
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
 	}
+
 	// Return the signed event to the originating server, it should then tell
 	// the other servers in the room that we have been invited.
 	if isInviteV2 {

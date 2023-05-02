@@ -209,11 +209,9 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-	res *api.PerformInviteResponse,
 ) error {
-	outputEvents, err := r.Inviter.PerformInvite(ctx, req, res)
+	outputEvents, err := r.Inviter.PerformInvite(ctx, req)
 	if err != nil {
-		sentry.CaptureException(err)
 		return err
 	}
 	if len(outputEvents) == 0 {

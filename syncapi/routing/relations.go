@@ -18,13 +18,13 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -96,7 +96,7 @@ func Relations(
 		return util.ErrorResponse(err)
 	}
 
-	headeredEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	headeredEvents := make([]*rstypes.HeaderedEvent, 0, len(events))
 	for _, event := range events {
 		headeredEvents = append(headeredEvents, event.HeaderedEvent)
 	}

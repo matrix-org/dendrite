@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -115,14 +116,13 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if v, ok := roomVersions[roomID]; ok {
 			return v
 		}
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := t.rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
-			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", verReq.RoomID)
+		roomVersion, err := t.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
 			return ""
 		}
-		roomVersions[roomID] = verRes.RoomVersion
-		return verRes.RoomVersion
+		roomVersions[roomID] = roomVersion
+		return roomVersion
 	}
 
 	for _, pdu := range t.PDUs {
@@ -168,7 +168,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			}
 			continue
 		}
-		if err = event.VerifyEventSignatures(ctx, t.keys); err != nil {
+		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys); err != nil {
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
@@ -183,8 +183,8 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			ctx,
 			t.rsAPI,
 			api.KindNew,
-			[]*gomatrixserverlib.HeaderedEvent{
-				event.Headered(roomVersion),
+			[]*rstypes.HeaderedEvent{
+				{Event: event},
 			},
 			t.Destination,
 			t.Origin,

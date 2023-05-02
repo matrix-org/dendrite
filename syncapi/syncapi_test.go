@@ -19,6 +19,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/tidwall/gjson"
 
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -490,7 +491,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
 				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
 
-				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
@@ -523,7 +524,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 	}
 }
 
-func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []synctypes.ClientEvent) {
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *rstypes.HeaderedEvent, chunk []synctypes.ClientEvent) {
 	t.Helper()
 	if wantVisible {
 		for _, ev := range chunk {
@@ -1228,7 +1229,7 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
+func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string

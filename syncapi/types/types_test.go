@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -55,7 +56,7 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := NewInviteResponse(ev.Headered(gomatrixserverlib.RoomVersionV5))
+	res := NewInviteResponse(&types.HeaderedEvent{Event: ev})
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)

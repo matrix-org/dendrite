@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -104,7 +105,7 @@ func Backfill(
 	// Filter any event that's not from the requested room out.
 	evs := make([]*gomatrixserverlib.Event, 0)
 
-	var ev *gomatrixserverlib.HeaderedEvent
+	var ev *types.HeaderedEvent
 	for _, ev = range res.Events {
 		if ev.RoomID() == roomID {
 			evs = append(evs, ev.Event)
@@ -113,7 +114,7 @@ func Backfill(
 
 	eventJSONs := []json.RawMessage{}
 	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(
-		evs,
+		gomatrixserverlib.ToPDUs(evs),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	) {
 		eventJSONs = append(eventJSONs, e.JSON())

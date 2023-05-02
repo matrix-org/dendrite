@@ -35,7 +35,7 @@ func createQuery(
 	prevEntry fclient.RelayEntry,
 ) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
-	path := federationPathPrefixV1 + "/relay_txn/" + userID.Raw()
+	path := federationPathPrefixV1 + "/relay_txn/" + userID.String()
 	request := fclient.NewFederationRequest("GET", userID.Domain(), "relay", path)
 	request.SetContent(prevEntry)
 

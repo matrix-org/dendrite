@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -76,9 +77,8 @@ func SendEvent(
 	rsAPI api.ClientRoomserverAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(req.Context(), roomID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -184,8 +184,8 @@ func SendEvent(
 	if err := api.SendEvents(
 		req.Context(), rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			e.Headered(verRes.RoomVersion),
+		[]*types.HeaderedEvent{
+			&types.HeaderedEvent{Event: e},
 		},
 		device.UserDomain(),
 		domain,
@@ -200,7 +200,7 @@ func SendEvent(
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
 		"room_id":      roomID,
-		"room_version": verRes.RoomVersion,
+		"room_version": roomVersion,
 	}).Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
@@ -317,7 +317,7 @@ func generateSendEvent(
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err = gomatrixserverlib.Allowed(e.Event, &provider); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,

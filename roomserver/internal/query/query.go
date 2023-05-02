@@ -121,14 +121,17 @@ func (r *Queryer) QueryStateAfterEvents(
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
 
-		stateEvents, err = gomatrixserverlib.ResolveConflicts(info.RoomVersion, stateEvents, authEvents)
+		stateEventsPDU, err := gomatrixserverlib.ResolveConflicts(
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
+		)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
 		}
+		stateEvents = gomatrixserverlib.TempCastToEvents(stateEventsPDU)
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, event.Headered(info.RoomVersion))
+		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{Event: event})
 	}
 
 	return nil
@@ -173,7 +176,7 @@ func (r *Queryer) QueryEventsByID(
 	}
 
 	for _, event := range events {
-		response.Events = append(response.Events, event.Headered(roomInfo.RoomVersion))
+		response.Events = append(response.Events, &types.HeaderedEvent{Event: event.Event})
 	}
 
 	return nil
@@ -231,7 +234,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 	request *api.QueryMembershipAtEventRequest,
 	response *api.QueryMembershipAtEventResponse,
 ) error {
-	response.Membership = make(map[string]*gomatrixserverlib.HeaderedEvent)
+	response.Membership = make(map[string]*types.HeaderedEvent)
 
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
@@ -259,7 +262,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return err
 	}
 
-	response.Membership = make(map[string]*gomatrixserverlib.HeaderedEvent)
+	response.Membership = make(map[string]*types.HeaderedEvent)
 	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, nil, request.EventIDs, stateKeyNIDs[request.UserID])
 	if err != nil {
 		return fmt.Errorf("unable to get state before event: %w", err)
@@ -307,7 +310,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 		for i := range memberships {
 			ev := memberships[i]
 			if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(request.UserID) {
-				response.Membership[eventID] = ev.Event.Headered(info.RoomVersion)
+				response.Membership[eventID] = &types.HeaderedEvent{Event: ev.Event}
 			}
 		}
 	}
@@ -518,17 +521,13 @@ func (r *Queryer) QueryMissingEvents(
 		return err
 	}
 
-	response.Events = make([]*gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
+	response.Events = make([]*types.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
-			roomVersion, verr := r.roomVersion(event.RoomID())
-			if verr != nil {
-				return verr
-			}
 			if _, ok := redactEventIDs[event.EventID()]; ok {
 				event.Redact()
 			}
-			response.Events = append(response.Events, event.Headered(roomVersion))
+			response.Events = append(response.Events, &types.HeaderedEvent{Event: event})
 		}
 	}
 
@@ -561,7 +560,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 			return err
 		}
 		for _, event := range authEvents {
-			response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
+			response.AuthChainEvents = append(response.AuthChainEvents, &types.HeaderedEvent{Event: event})
 		}
 		return nil
 	}
@@ -589,19 +588,21 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	if request.ResolveState {
-		if stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, stateEvents, authEvents,
-		); err != nil {
-			return err
+		stateEventsPDU, err2 := gomatrixserverlib.ResolveConflicts(
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
+		)
+		if err2 != nil {
+			return err2
 		}
+		stateEvents = gomatrixserverlib.TempCastToEvents(stateEventsPDU)
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, event.Headered(info.RoomVersion))
+		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{Event: event})
 	}
 
 	for _, event := range authEvents {
-		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
+		response.AuthChainEvents = append(response.AuthChainEvents, &types.HeaderedEvent{Event: event})
 	}
 
 	return err
@@ -696,34 +697,20 @@ func GetAuthChain(
 }
 
 // QueryRoomVersionForRoom implements api.RoomserverInternalAPI
-func (r *Queryer) QueryRoomVersionForRoom(
-	ctx context.Context,
-	request *api.QueryRoomVersionForRoomRequest,
-	response *api.QueryRoomVersionForRoomResponse,
-) error {
-	if roomVersion, ok := r.Cache.GetRoomVersion(request.RoomID); ok {
-		response.RoomVersion = roomVersion
-		return nil
+func (r *Queryer) QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
+	if roomVersion, ok := r.Cache.GetRoomVersion(roomID); ok {
+		return roomVersion, nil
 	}
 
-	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if info == nil {
-		return fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", request.RoomID)
+		return "", fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", roomID)
 	}
-	response.RoomVersion = info.RoomVersion
-	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
-	return nil
-}
-
-func (r *Queryer) roomVersion(roomID string) (gomatrixserverlib.RoomVersion, error) {
-	var res api.QueryRoomVersionForRoomResponse
-	err := r.QueryRoomVersionForRoom(context.Background(), &api.QueryRoomVersionForRoomRequest{
-		RoomID: roomID,
-	}, &res)
-	return res.RoomVersion, err
+	r.Cache.StoreRoomVersion(roomID, info.RoomVersion)
+	return info.RoomVersion, nil
 }
 
 func (r *Queryer) QueryPublishedRooms(
@@ -748,7 +735,7 @@ func (r *Queryer) QueryPublishedRooms(
 }
 
 func (r *Queryer) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
-	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
+	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent)
 	for _, tuple := range req.StateTuples {
 		if tuple.StateKey == "*" && req.AllowWildcards {
 			events, err := r.DB.GetStateEventsWithEventType(ctx, req.RoomID, tuple.EventType)
@@ -865,9 +852,9 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	if err != nil {
 		return err
 	}
-	hchain := make([]*gomatrixserverlib.HeaderedEvent, len(chain))
+	hchain := make([]*types.HeaderedEvent, len(chain))
 	for i := range chain {
-		hchain[i] = chain[i].Headered(chain[i].Version())
+		hchain[i] = &types.HeaderedEvent{Event: chain[i]}
 	}
 	res.AuthChain = hchain
 	return nil
@@ -910,8 +897,8 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
 		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
-	// If the join rule isn't "restricted" then there's nothing more to do.
-	res.Restricted = joinRules.JoinRule == spec.Restricted
+	// If the join rule isn't "restricted" or "knock_restricted" then there's nothing more to do.
+	res.Restricted = joinRules.JoinRule == spec.Restricted || joinRules.JoinRule == spec.KnockRestricted
 	if !res.Restricted {
 		return nil
 	}
@@ -932,9 +919,9 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 	}
-	var powerLevels gomatrixserverlib.PowerLevelContent
-	if err = json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
-		return fmt.Errorf("json.Unmarshal: %w", err)
+	powerLevels, err := powerLevelsEvent.PowerLevels()
+	if err != nil {
+		return fmt.Errorf("unable to get powerlevels: %w", err)
 	}
 	// Step through the join rules and see if the user matches any of them.
 	for _, rule := range joinRules.Allow {

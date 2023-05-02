@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -171,7 +172,7 @@ func TestMSC2836(t *testing.T) {
 			bob:     {roomID},
 			charlie: {roomID},
 		},
-		events: map[string]*gomatrixserverlib.HeaderedEvent{
+		events: map[string]*types.HeaderedEvent{
 			eventA.EventID(): eventA,
 			eventB.EventID(): eventB,
 			eventC.EventID(): eventC,
@@ -182,7 +183,7 @@ func TestMSC2836(t *testing.T) {
 			eventH.EventID(): eventH,
 		},
 	}
-	router := injectEvents(t, nopUserAPI, nopRsAPI, []*gomatrixserverlib.HeaderedEvent{
+	router := injectEvents(t, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
 		eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
 	})
 	cancel := runServer(t, router)
@@ -521,7 +522,7 @@ type testRoomserverAPI struct {
 	// We'll override the functions we care about.
 	roomserver.RoomserverInternalAPI
 	userToJoinedRooms map[string][]string
-	events            map[string]*gomatrixserverlib.HeaderedEvent
+	events            map[string]*types.HeaderedEvent
 }
 
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
@@ -547,7 +548,7 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 	return nil
 }
 
-func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*gomatrixserverlib.HeaderedEvent) *mux.Router {
+func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
@@ -579,7 +580,7 @@ type fledglingEvent struct {
 	RoomID   string
 }
 
-func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEvent) {
 	t.Helper()
 	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
@@ -601,6 +602,6 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := signedEvent.Headered(roomVer)
+	h := &types.HeaderedEvent{Event: signedEvent}
 	return h
 }

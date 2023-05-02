@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
@@ -101,7 +102,7 @@ func MakeLeave(
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: map[string]interface{}{
-					"room_version": event.RoomVersion,
+					"room_version": event.Version(),
 					"event":        state,
 				},
 			}
@@ -113,7 +114,7 @@ func MakeLeave(
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -124,7 +125,7 @@ func MakeLeave(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"room_version": event.RoomVersion,
+			"room_version": event.Version(),
 			"event":        builder,
 		},
 	}
@@ -140,21 +141,20 @@ func SendLeave(
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
 		}
 	}
 
-	verImpl, err := gomatrixserverlib.GetRoomVersion(verRes.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", verRes.RoomVersion),
+				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", roomVersion),
 			),
 		}
 	}
@@ -313,7 +313,7 @@ func SendLeave(
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
-				Event:         event.Headered(verRes.RoomVersion),
+				Event:         &types.HeaderedEvent{Event: event},
 				SendAsServer:  string(cfg.Matrix.ServerName),
 				TransactionID: nil,
 			},

@@ -24,6 +24,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -274,7 +275,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *synctypes.StateFilter,
 	excludeEventIDs []string,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
+) ([]*rstypes.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
 	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	// We're going to query members later, so remove them from this request
@@ -320,7 +321,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
 
 func (s *currentRoomStateStatements) UpsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event *gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition,
+	event *rstypes.HeaderedEvent, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
@@ -378,8 +379,8 @@ func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, er
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 
@@ -394,8 +395,8 @@ func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, er
 	return events, nil
 }
 
-func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	result := []*gomatrixserverlib.HeaderedEvent{}
+func rowsToEvents(rows *sql.Rows) ([]*rstypes.HeaderedEvent, error) {
+	result := []*rstypes.HeaderedEvent{}
 	for rows.Next() {
 		var eventID string
 		var eventBytes []byte
@@ -403,8 +404,8 @@ func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result = append(result, &ev)
@@ -414,7 +415,7 @@ func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
 
 func (s *currentRoomStateStatements) SelectStateEvent(
 	ctx context.Context, txn *sql.Tx, roomID, evType, stateKey string,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*rstypes.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectStateEventStmt)
 	var res []byte
 	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
@@ -424,7 +425,7 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 	if err != nil {
 		return nil, err
 	}
-	var ev gomatrixserverlib.HeaderedEvent
+	var ev rstypes.HeaderedEvent
 	if err = json.Unmarshal(res, &ev); err != nil {
 		return nil, err
 	}

@@ -18,7 +18,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 )
@@ -69,7 +69,7 @@ func GetMissingEvents(
 	eventsResponse.Events = filterEvents(eventsResponse.Events, roomID)
 
 	resp := fclient.RespMissingEvents{
-		Events: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(eventsResponse.Events),
+		Events: types.NewEventJSONsFromHeaderedEvents(eventsResponse.Events),
 	}
 
 	return util.JSONResponse{
@@ -80,8 +80,8 @@ func GetMissingEvents(
 
 // filterEvents returns only those events with matching roomID
 func filterEvents(
-	events []*gomatrixserverlib.HeaderedEvent, roomID string,
-) []*gomatrixserverlib.HeaderedEvent {
+	events []*types.HeaderedEvent, roomID string,
+) []*types.HeaderedEvent {
 	ref := events[:0]
 	for _, ev := range events {
 		if ev.RoomID() == roomID {

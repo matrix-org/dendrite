@@ -162,13 +162,13 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
 		httputil.MakeAdminAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateUser(req, cfg, rsAPI)
+			return AdminEvacuateUser(req, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/purgeRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_purge_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminPurgeRoom(req, cfg, device, rsAPI)
+			return AdminPurgeRoom(req, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -180,7 +180,7 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/downloadState/{serverName}/{roomID}",
 		httputil.MakeAdminAPI("admin_download_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminDownloadState(req, cfg, device, rsAPI)
+			return AdminDownloadState(req, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

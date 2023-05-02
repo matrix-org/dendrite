@@ -8,10 +8,13 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -136,7 +139,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 
 	// revoke guest access
 	revokeEvent := room.CreateAndInsert(t, alice, spec.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
 		t.Errorf("failed to send events: %v", err)
 	}
 
@@ -242,8 +245,8 @@ func TestPurgeRoom(t *testing.T) {
 
 		// this starts the JetStream consumers
 		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
-		federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
-		rsAPI.SetFederationAPI(nil, nil)
+		fsAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
+		rsAPI.SetFederationAPI(fsAPI, nil)
 
 		// Create the room
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -251,12 +254,8 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// some dummy entries to validate after purging
-		publishResp := &api.PerformPublishResponse{}
-		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+		if err = rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: spec.Public}); err != nil {
 			t.Fatal(err)
-		}
-		if publishResp.Error != nil {
-			t.Fatal(publishResp.Error)
 		}
 
 		isPublished, err := db.GetPublishedRoom(ctx, room.ID)
@@ -325,8 +324,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		// purge the room from the database
-		purgeResp := &api.PerformAdminPurgeRoomResponse{}
-		if err = rsAPI.PerformAdminPurgeRoom(ctx, &api.PerformAdminPurgeRoomRequest{RoomID: room.ID}, purgeResp); err != nil {
+		if err = rsAPI.PerformAdminPurgeRoom(ctx, room.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -401,7 +399,7 @@ type fledglingEvent struct {
 	PrevEvents []interface{}
 }
 
-func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEvent) {
 	t.Helper()
 	roomVer := gomatrixserverlib.RoomVersionV9
 	seed := make([]byte, ed25519.SeedSize) // zero seed
@@ -423,7 +421,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := signedEvent.Headered(roomVer)
+	h := &types.HeaderedEvent{Event: signedEvent}
 	return h
 }
 
@@ -451,7 +449,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 		{
@@ -468,7 +466,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 		{
@@ -485,7 +483,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 		{
@@ -501,7 +499,7 @@ func TestRedaction(t *testing.T) {
 					Depth:      redactedEvent.Depth() + 1,
 					PrevEvents: []interface{}{redactedEvent.EventID()},
 				})
-				room.InsertEvent(t, builderEv.Headered(gomatrixserverlib.RoomVersionV9))
+				room.InsertEvent(t, builderEv)
 			},
 		},
 	}
@@ -577,6 +575,509 @@ func TestRedaction(t *testing.T) {
 						assert.Equal(t, 1, len(evs))
 						assert.Equal(t, tc.wantRedacted, evs[0].Redacted())
 					}
+				}
+			})
+		}
+	})
+}
+
+func TestQueryRestrictedJoinAllowed(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+
+	// a room we don't create in the database
+	allowedByRoomNotExists := test.NewRoom(t, alice)
+
+	// a room we create in the database, used for authorisation
+	allowedByRoomExists := test.NewRoom(t, alice)
+	allowedByRoomExists.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+		"membership": spec.Join,
+	}, test.WithStateKey(bob.ID))
+
+	testCases := []struct {
+		name            string
+		prepareRoomFunc func(t *testing.T) *test.Room
+		wantResponse    api.QueryRestrictedJoinAllowedResponse
+	}{
+		{
+			name: "public room unrestricted",
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				return test.NewRoom(t, alice)
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident: true,
+			},
+		},
+		{
+			name: "room version without restrictions",
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				return test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV7))
+			},
+		},
+		{
+			name: "restricted only", // bob is not allowed to join
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV8))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.Restricted,
+				}, test.WithStateKey(""))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:   true,
+				Restricted: true,
+			},
+		},
+		{
+			name: "knock_restricted",
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV8))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.KnockRestricted,
+				}, test.WithStateKey(""))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:   true,
+				Restricted: true,
+			},
+		},
+		{
+			name: "restricted with pending invite", // bob should be allowed to join
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV8))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.Restricted,
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
+					"membership": spec.Invite,
+				}, test.WithStateKey(bob.ID))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:   true,
+				Restricted: true,
+				Allowed:    true,
+			},
+		},
+		{
+			name: "restricted with allowed room_id, but missing room", // bob should not be allowed to join, as we don't know about the room
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV10))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.KnockRestricted,
+					"allow": []map[string]interface{}{
+						{
+							"room_id": allowedByRoomNotExists.ID,
+							"type":    spec.MRoomMembership,
+						},
+					},
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+					"membership":                       spec.Join,
+					"join_authorised_via_users_server": alice.ID,
+				}, test.WithStateKey(bob.ID))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Restricted: true,
+			},
+		},
+		{
+			name: "restricted with allowed room_id", // bob should be allowed to join, as we know about the room
+			prepareRoomFunc: func(t *testing.T) *test.Room {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV10))
+				r.CreateAndInsert(t, alice, spec.MRoomJoinRules, map[string]interface{}{
+					"join_rule": spec.KnockRestricted,
+					"allow": []map[string]interface{}{
+						{
+							"room_id": allowedByRoomExists.ID,
+							"type":    spec.MRoomMembership,
+						},
+					},
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+					"membership":                       spec.Join,
+					"join_authorised_via_users_server": alice.ID,
+				}, test.WithStateKey(bob.ID))
+				return r
+			},
+			wantResponse: api.QueryRestrictedJoinAllowedResponse{
+				Resident:      true,
+				Restricted:    true,
+				Allowed:       true,
+				AuthorisedVia: alice.ID,
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if tc.prepareRoomFunc == nil {
+					t.Fatal("missing prepareRoomFunc")
+				}
+				testRoom := tc.prepareRoomFunc(t)
+				// Create the room
+				if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, testRoom.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+
+				if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, allowedByRoomExists.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+
+				req := api.QueryRestrictedJoinAllowedRequest{
+					UserID: bob.ID,
+					RoomID: testRoom.ID,
+				}
+				res := api.QueryRestrictedJoinAllowedResponse{}
+				if err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), &req, &res); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(tc.wantResponse, res) {
+					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, res)
+				}
+			})
+		}
+	})
+}
+
+func TestUpgrade(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	charlie := test.NewUser(t)
+	ctx := context.Background()
+
+	spaceChild := test.NewRoom(t, alice)
+	validateTuples := []gomatrixserverlib.StateKeyTuple{
+		{EventType: spec.MRoomCreate},
+		{EventType: spec.MRoomPowerLevels},
+		{EventType: spec.MRoomJoinRules},
+		{EventType: spec.MRoomName},
+		{EventType: spec.MRoomCanonicalAlias},
+		{EventType: "m.room.tombstone"},
+		{EventType: "m.custom.event"},
+		{EventType: "m.space.child", StateKey: spaceChild.ID},
+		{EventType: "m.custom.event", StateKey: alice.ID},
+		{EventType: spec.MRoomMember, StateKey: charlie.ID}, // ban should be transferred
+	}
+
+	validate := func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
+
+		oldRoomState := &api.QueryCurrentStateResponse{}
+		if err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
+			RoomID:      oldRoomID,
+			StateTuples: validateTuples,
+		}, oldRoomState); err != nil {
+			t.Fatal(err)
+		}
+
+		newRoomState := &api.QueryCurrentStateResponse{}
+		if err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
+			RoomID:      newRoomID,
+			StateTuples: validateTuples,
+		}, newRoomState); err != nil {
+			t.Fatal(err)
+		}
+
+		// the old room should have a tombstone event
+		ev := oldRoomState.StateEvents[gomatrixserverlib.StateKeyTuple{EventType: "m.room.tombstone"}]
+		replacementRoom := gjson.GetBytes(ev.Content(), "replacement_room").Str
+		if replacementRoom != newRoomID {
+			t.Fatalf("tombstone event has replacement_room '%s', expected '%s'", replacementRoom, newRoomID)
+		}
+
+		// the new room should have a predecessor equal to the old room
+		ev = newRoomState.StateEvents[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCreate}]
+		predecessor := gjson.GetBytes(ev.Content(), "predecessor.room_id").Str
+		if predecessor != oldRoomID {
+			t.Fatalf("got predecessor room '%s', expected '%s'", predecessor, oldRoomID)
+		}
+
+		for _, tuple := range validateTuples {
+			// Skip create and powerlevel event (new room has e.g. predecessor event, old room has restricted powerlevels)
+			switch tuple.EventType {
+			case spec.MRoomCreate, spec.MRoomPowerLevels, spec.MRoomCanonicalAlias:
+				continue
+			}
+			oldEv, ok := oldRoomState.StateEvents[tuple]
+			if !ok {
+				t.Logf("skipping tuple %#v as it doesn't exist in the old room", tuple)
+				continue
+			}
+			newEv, ok := newRoomState.StateEvents[tuple]
+			if !ok {
+				t.Logf("skipping tuple %#v as it doesn't exist in the new room", tuple)
+				continue
+			}
+
+			if !reflect.DeepEqual(oldEv.Content(), newEv.Content()) {
+				t.Logf("OldEvent QueryCurrentState: %s", string(oldEv.Content()))
+				t.Logf("NewEvent QueryCurrentState: %s", string(newEv.Content()))
+				t.Errorf("event content mismatch")
+			}
+		}
+	}
+
+	testCases := []struct {
+		name         string
+		upgradeUser  string
+		roomFunc     func(rsAPI api.RoomserverInternalAPI) string
+		validateFunc func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI)
+		wantNewRoom  bool
+	}{
+		{
+			name:        "invalid userID",
+			upgradeUser: "!notvalid:test",
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				room := test.NewRoom(t, alice)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return room.ID
+			},
+		},
+		{
+			name:        "invalid roomID",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				return "!doesnotexist:test"
+			},
+		},
+		{
+			name:        "powerlevel too low",
+			upgradeUser: bob.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				room := test.NewRoom(t, alice)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return room.ID
+			},
+		},
+		{
+			name:        "successful upgrade on new room",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				room := test.NewRoom(t, alice)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return room.ID
+			},
+			wantNewRoom:  true,
+			validateFunc: validate,
+		},
+		{
+			name:        "successful upgrade on new room with other state events",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice)
+				r.CreateAndInsert(t, alice, spec.MRoomName, map[string]interface{}{
+					"name": "my new name",
+				}, test.WithStateKey(""))
+				r.CreateAndInsert(t, alice, spec.MRoomCanonicalAlias, eventutil.CanonicalAliasContent{
+					Alias: "#myalias:test",
+				}, test.WithStateKey(""))
+
+				// this will be transferred
+				r.CreateAndInsert(t, alice, "m.custom.event", map[string]interface{}{
+					"random": "i should exist",
+				}, test.WithStateKey(""))
+
+				// the following will be ignored
+				r.CreateAndInsert(t, alice, "m.custom.event", map[string]interface{}{
+					"random": "i will be ignored",
+				}, test.WithStateKey(alice.ID))
+
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return r.ID
+			},
+			wantNewRoom:  true,
+			validateFunc: validate,
+		},
+		{
+			name:        "with published room",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+
+				if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{
+					RoomID:     r.ID,
+					Visibility: spec.Public,
+				}); err != nil {
+					t.Fatal(err)
+				}
+
+				return r.ID
+			},
+			wantNewRoom: true,
+			validateFunc: func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
+				validate(t, oldRoomID, newRoomID, rsAPI)
+				// check that the new room is published
+				res := &api.QueryPublishedRoomsResponse{}
+				if err := rsAPI.QueryPublishedRooms(ctx, &api.QueryPublishedRoomsRequest{RoomID: newRoomID}, res); err != nil {
+					t.Fatal(err)
+				}
+				if len(res.RoomIDs) == 0 {
+					t.Fatalf("expected room to be published, but wasn't: %#v", res.RoomIDs)
+				}
+			},
+		},
+		{
+			name:        "with alias",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+
+				if err := rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{
+					RoomID: r.ID,
+					Alias:  "#myroomalias:test",
+				}, &api.SetRoomAliasResponse{}); err != nil {
+					t.Fatal(err)
+				}
+
+				return r.ID
+			},
+			wantNewRoom: true,
+			validateFunc: func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
+				validate(t, oldRoomID, newRoomID, rsAPI)
+				// check that the old room has no aliases
+				res := &api.GetAliasesForRoomIDResponse{}
+				if err := rsAPI.GetAliasesForRoomID(ctx, &api.GetAliasesForRoomIDRequest{RoomID: oldRoomID}, res); err != nil {
+					t.Fatal(err)
+				}
+				if len(res.Aliases) != 0 {
+					t.Fatalf("expected old room aliases to be empty, but wasn't: %#v", res.Aliases)
+				}
+
+				// check that the new room has aliases
+				if err := rsAPI.GetAliasesForRoomID(ctx, &api.GetAliasesForRoomIDRequest{RoomID: newRoomID}, res); err != nil {
+					t.Fatal(err)
+				}
+				if len(res.Aliases) == 0 {
+					t.Fatalf("expected room aliases to be transferred, but wasn't: %#v", res.Aliases)
+				}
+			},
+		},
+		{
+			name:        "bans are transferred",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice)
+				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
+					"membership": spec.Ban,
+				}, test.WithStateKey(charlie.ID))
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return r.ID
+			},
+			wantNewRoom:  true,
+			validateFunc: validate,
+		},
+		{
+			name:        "space childs are transferred",
+			upgradeUser: alice.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice)
+
+				r.CreateAndInsert(t, alice, "m.space.child", map[string]interface{}{}, test.WithStateKey(spaceChild.ID))
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return r.ID
+			},
+			wantNewRoom:  true,
+			validateFunc: validate,
+		},
+		{
+			name:        "custom state is not taken to the new room", // https://github.com/matrix-org/dendrite/issues/2912
+			upgradeUser: charlie.ID,
+			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV6))
+				// Bob and Charlie join
+				r.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{"membership": spec.Join}, test.WithStateKey(bob.ID))
+				r.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]interface{}{"membership": spec.Join}, test.WithStateKey(charlie.ID))
+
+				// make Charlie an admin so the room can be upgraded
+				r.CreateAndInsert(t, alice, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
+					Users: map[string]int64{
+						charlie.ID: 100,
+					},
+				}, test.WithStateKey(""))
+
+				// Alice creates a custom event
+				r.CreateAndInsert(t, alice, "m.custom.event", map[string]interface{}{
+					"random": "data",
+				}, test.WithStateKey(alice.ID))
+				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{"membership": spec.Leave}, test.WithStateKey(alice.ID))
+
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Errorf("failed to send events: %v", err)
+				}
+				return r.ID
+			},
+			wantNewRoom:  true,
+			validateFunc: validate,
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		natsInstance := jetstream.NATSInstance{}
+		defer close()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		rsAPI.SetFederationAPI(nil, nil)
+		rsAPI.SetUserAPI(userAPI)
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				if tc.roomFunc == nil {
+					t.Fatalf("missing roomFunc")
+				}
+				if tc.upgradeUser == "" {
+					tc.upgradeUser = alice.ID
+				}
+				roomID := tc.roomFunc(rsAPI)
+
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, tc.upgradeUser, version.DefaultRoomVersion())
+				if err != nil && tc.wantNewRoom {
+					t.Fatal(err)
+				}
+
+				if tc.wantNewRoom && newRoomID == "" {
+					t.Fatalf("expected a new room, but the upgrade failed")
+				}
+				if !tc.wantNewRoom && newRoomID != "" {
+					t.Fatalf("expected no new room, but the upgrade succeeded")
+				}
+				if tc.validateFunc != nil {
+					tc.validateFunc(t, roomID, newRoomID, rsAPI)
 				}
 			})
 		}

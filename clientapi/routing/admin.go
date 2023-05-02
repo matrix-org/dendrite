@@ -3,12 +3,14 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -28,88 +30,60 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
-	if err := rsAPI.PerformAdminEvacuateRoom(
-		req.Context(),
-		&roomserverAPI.PerformAdminEvacuateRoomRequest{
-			RoomID: vars["roomID"],
-		},
-		res,
-	); err != nil {
+
+	affected, err := rsAPI.PerformAdminEvacuateRoom(req.Context(), vars["roomID"])
+	switch err {
+	case nil:
+	case eventutil.ErrRoomNoExists:
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	default:
+		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
 		return util.ErrorResponse(err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
 	}
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
-			"affected": res.Affected,
+			"affected": affected,
 		},
 	}
 }
 
-func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	userID := vars["userID"]
 
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
+		logrus.WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
-	if !cfg.Matrix.IsLocalServerName(domain) {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("User ID must belong to this server."),
-		}
-	}
-	res := &roomserverAPI.PerformAdminEvacuateUserResponse{}
-	if err := rsAPI.PerformAdminEvacuateUser(
-		req.Context(),
-		&roomserverAPI.PerformAdminEvacuateUserRequest{
-			UserID: userID,
-		},
-		res,
-	); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
-	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
-			"affected": res.Affected,
+			"affected": affected,
 		},
 	}
 }
 
-func AdminPurgeRoom(req *http.Request, cfg *config.ClientAPI, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminPurgeRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	roomID := vars["roomID"]
 
-	res := &roomserverAPI.PerformAdminPurgeRoomResponse{}
-	if err := rsAPI.PerformAdminPurgeRoom(
-		context.Background(),
-		&roomserverAPI.PerformAdminPurgeRoomRequest{
-			RoomID: roomID,
-		},
-		res,
-	); err != nil {
+	if err = rsAPI.PerformAdminPurgeRoom(context.Background(), vars["roomID"]); err != nil {
 		return util.ErrorResponse(err)
 	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
-	}
+
 	return util.JSONResponse{
 		Code: 200,
-		JSON: res,
+		JSON: struct{}{},
 	}
 }
 
@@ -238,7 +212,7 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI api.Clien
 	}
 }
 
-func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -257,23 +231,22 @@ func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *api.De
 			JSON: jsonerror.MissingArgument("Expecting remote server name."),
 		}
 	}
-	res := &roomserverAPI.PerformAdminDownloadStateResponse{}
-	if err := rsAPI.PerformAdminDownloadState(
-		req.Context(),
-		&roomserverAPI.PerformAdminDownloadStateRequest{
-			UserID:     device.UserID,
-			RoomID:     roomID,
-			ServerName: spec.ServerName(serverName),
-		},
-		res,
-	); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
+	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {
+		if errors.Is(err, eventutil.ErrRoomNoExists) {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: jsonerror.NotFound(eventutil.ErrRoomNoExists.Error()),
+			}
+		}
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"userID":     device.UserID,
+			"serverName": serverName,
+			"roomID":     roomID,
+		}).Error("failed to download state")
+		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
 		Code: 200,
-		JSON: map[string]interface{}{},
+		JSON: struct{}{},
 	}
 }

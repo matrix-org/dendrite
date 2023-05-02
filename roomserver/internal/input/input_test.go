@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -44,7 +45,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		}
 		in := api.InputRoomEvent{
 			Kind:  api.KindOutlier, // don't panic if we generate an output event
-			Event: event.Headered(gomatrixserverlib.RoomVersionV6),
+			Event: &types.HeaderedEvent{Event: event},
 		}
 
 		inputter := &input.Inputer{
