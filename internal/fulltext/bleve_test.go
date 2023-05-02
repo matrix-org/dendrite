@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -25,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func mustOpenIndex(t *testing.T, tempDir string) *fulltext.Search {
+func mustOpenIndex(t *testing.T, tempDir string) (*fulltext.Search, *process.ProcessContext) {
 	t.Helper()
 	cfg := config.Fulltext{
 		Enabled:  true,
@@ -36,11 +37,12 @@ func mustOpenIndex(t *testing.T, tempDir string) *fulltext.Search {
 		cfg.IndexPath = config.Path(tempDir)
 		cfg.InMemory = false
 	}
-	fts, err := fulltext.New(cfg)
+	ctx := process.NewProcessContext()
+	fts, err := fulltext.New(ctx, cfg)
 	if err != nil {
 		t.Fatal("failed to open fulltext index:", err)
 	}
-	return fts
+	return fts, ctx
 }
 
 func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (eventIDs, roomIDs []string) {
@@ -93,19 +95,17 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 
 func TestOpen(t *testing.T) {
 	dataDir := t.TempDir()
-	fts := mustOpenIndex(t, dataDir)
-	if err := fts.Close(); err != nil {
-		t.Fatal("unable to close fulltext index", err)
-	}
+	_, ctx := mustOpenIndex(t, dataDir)
+	ctx.ShutdownDendrite()
 
 	// open existing index
-	fts = mustOpenIndex(t, dataDir)
-	defer fts.Close()
+	_, ctx = mustOpenIndex(t, dataDir)
+	ctx.ShutdownDendrite()
 }
 
 func TestIndex(t *testing.T) {
-	fts := mustOpenIndex(t, "")
-	defer fts.Close()
+	fts, ctx := mustOpenIndex(t, "")
+	defer ctx.ShutdownDendrite()
 
 	// add some data
 	var streamPos int64 = 1
@@ -128,8 +128,8 @@ func TestIndex(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	fts := mustOpenIndex(t, "")
-	defer fts.Close()
+	fts, ctx := mustOpenIndex(t, "")
+	defer ctx.ShutdownDendrite()
 	eventIDs, roomIDs := mustAddTestData(t, fts, 0)
 	res1, err := fts.Search("lorem", roomIDs[:1], nil, 50, 0, false)
 	if err != nil {
@@ -160,14 +160,16 @@ func TestSearch(t *testing.T) {
 		roomIndex        []int
 	}
 	tests := []struct {
-		name      string
-		args      args
-		wantCount int
-		wantErr   bool
+		name           string
+		args           args
+		wantCount      int
+		wantErr        bool
+		wantHighlights []string
 	}{
 		{
-			name:      "Can search for many results in one room",
-			wantCount: 16,
+			name:           "Can search for many results in one room",
+			wantCount:      16,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:      "lorem",
 				roomIndex: []int{0},
@@ -175,8 +177,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for one result in one room",
-			wantCount: 1,
+			name:           "Can search for one result in one room",
+			wantCount:      1,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:      "lorem",
 				roomIndex: []int{16},
@@ -184,8 +187,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for many results in multiple rooms",
-			wantCount: 17,
+			name:           "Can search for many results in multiple rooms",
+			wantCount:      17,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:      "lorem",
 				roomIndex: []int{0, 16},
@@ -193,8 +197,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for many results in all rooms, reversed",
-			wantCount: 30,
+			name:           "Can search for many results in all rooms, reversed",
+			wantCount:      30,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:             "lorem",
 				limit:            30,
@@ -202,8 +207,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for specific search room name",
-			wantCount: 1,
+			name:           "Can search for specific search room name",
+			wantCount:      1,
+			wantHighlights: []string{"testing"},
 			args: args{
 				term:      "testing",
 				roomIndex: []int{},
@@ -212,8 +218,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for specific search room topic",
-			wantCount: 1,
+			name:           "Can search for specific search room topic",
+			wantCount:      1,
+			wantHighlights: []string{"fulltext"},
 			args: args{
 				term:      "fulltext",
 				roomIndex: []int{},
@@ -222,9 +229,11 @@ func TestSearch(t *testing.T) {
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := mustOpenIndex(t, "")
+			f, ctx := mustOpenIndex(t, "")
+			defer ctx.ShutdownDendrite()
 			eventIDs, roomIDs := mustAddTestData(t, f, 0)
 			var searchRooms []string
 			for _, x := range tt.args.roomIndex {
@@ -237,6 +246,12 @@ func TestSearch(t *testing.T) {
 				t.Errorf("Search() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			highlights := f.GetHighlights(got)
+			if !reflect.DeepEqual(highlights, tt.wantHighlights) {
+				t.Errorf("Search() got highligts = %v, want %v", highlights, tt.wantHighlights)
+			}
+
 			if !reflect.DeepEqual(len(got.Hits), tt.wantCount) {
 				t.Errorf("Search() got = %v, want %v", len(got.Hits), tt.wantCount)
 			}

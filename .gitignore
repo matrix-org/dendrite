@@ -80,3 +80,4 @@ media_store/
 __debug_bin
 
 cmd/dendrite-monolith-server/dendrite-monolith-server
+build

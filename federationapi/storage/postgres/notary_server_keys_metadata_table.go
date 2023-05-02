@@ -22,6 +22,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/federationapi/storage/tables"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -91,22 +92,13 @@ func NewPostgresNotaryServerKeysMetadataTable(db *sql.DB) (s *notaryServerKeysMe
 		return
 	}
 
-	if s.upsertServerKeysStmt, err = db.Prepare(upsertServerKeysSQL); err != nil {
-		return
-	}
-	if s.selectNotaryKeyResponsesStmt, err = db.Prepare(selectNotaryKeyResponsesSQL); err != nil {
-		return
-	}
-	if s.selectNotaryKeyResponsesWithKeyIDsStmt, err = db.Prepare(selectNotaryKeyResponsesWithKeyIDsSQL); err != nil {
-		return
-	}
-	if s.selectNotaryKeyMetadataStmt, err = db.Prepare(selectNotaryKeyMetadataSQL); err != nil {
-		return
-	}
-	if s.deleteUnusedServerKeysJSONStmt, err = db.Prepare(deleteUnusedServerKeysJSONSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.upsertServerKeysStmt, upsertServerKeysSQL},
+		{&s.selectNotaryKeyResponsesStmt, selectNotaryKeyResponsesSQL},
+		{&s.selectNotaryKeyResponsesWithKeyIDsStmt, selectNotaryKeyResponsesWithKeyIDsSQL},
+		{&s.selectNotaryKeyMetadataStmt, selectNotaryKeyMetadataSQL},
+		{&s.deleteUnusedServerKeysJSONStmt, deleteUnusedServerKeysJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *notaryServerKeysMetadataStatements) UpsertKey(

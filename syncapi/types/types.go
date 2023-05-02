@@ -26,6 +26,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 var (
@@ -464,13 +465,13 @@ type UnreadNotifications struct {
 }
 
 type ClientEvents struct {
-	Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	Events []synctypes.ClientEvent `json:"events,omitempty"`
 }
 
 type Timeline struct {
-	Events    []gomatrixserverlib.ClientEvent `json:"events"`
-	Limited   bool                            `json:"limited"`
-	PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
+	Events    []synctypes.ClientEvent `json:"events"`
+	Limited   bool                    `json:"limited"`
+	PrevBatch *TopologyToken          `json:"prev_batch,omitempty"`
 }
 
 type Summary struct {
@@ -562,7 +563,7 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), gomatrixserverlib.FormatSync)
+	inviteEvent := synctypes.ToClientEvent(event.Unwrap(), synctypes.FormatSync)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)

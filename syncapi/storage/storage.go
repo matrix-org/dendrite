@@ -18,9 +18,10 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/mrd"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
@@ -28,14 +29,13 @@ import (
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (Database, *mrd.Queries, error) {
+func NewSyncServerDatasource(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, *mrd.Queries, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		ds, err := sqlite3.NewDatabase(base, dbProperties)
+		ds, err := sqlite3.NewDatabase(ctx, conMan, dbProperties)
 		return ds, nil, err
-
 	case dbProperties.ConnectionString.IsPostgres():
-		ds, err := postgres.NewDatabase(base, dbProperties)
+		ds, err := postgres.NewDatabase(ctx, conMan, dbProperties)
 		if err != nil {
 			return nil, nil, err
 		}

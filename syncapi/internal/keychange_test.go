@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -159,7 +160,7 @@ func assertCatchup(t *testing.T, hasNew bool, syncResponse *types.Response, want
 
 func joinResponseWithRooms(syncResponse *types.Response, userID string, roomIDs []string) *types.Response {
 	for _, roomID := range roomIDs {
-		roomEvents := []gomatrixserverlib.ClientEvent{
+		roomEvents := []synctypes.ClientEvent{
 			{
 				Type:     "m.room.member",
 				StateKey: &userID,
@@ -182,7 +183,7 @@ func joinResponseWithRooms(syncResponse *types.Response, userID string, roomIDs 
 
 func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs []string) *types.Response {
 	for _, roomID := range roomIDs {
-		roomEvents := []gomatrixserverlib.ClientEvent{
+		roomEvents := []synctypes.ClientEvent{
 			{
 				Type:     "m.room.member",
 				StateKey: &userID,
@@ -299,7 +300,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	roomID := "!TestKeyChangeCatchupNoNewJoinsButMessages:bar"
 	syncResponse := types.NewResponse()
 	empty := ""
-	roomStateEvents := []gomatrixserverlib.ClientEvent{
+	roomStateEvents := []synctypes.ClientEvent{
 		{
 			Type:     "m.room.name",
 			StateKey: &empty,
@@ -309,7 +310,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 			Content:  []byte(`{"name":"The Room Name"}`),
 		},
 	}
-	roomTimelineEvents := []gomatrixserverlib.ClientEvent{
+	roomTimelineEvents := []synctypes.ClientEvent{
 		{
 			Type:    "m.room.message",
 			EventID: "$something1:here",
@@ -402,7 +403,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	newShareUser2 := "@bobby:localhost"
 	roomID := "!join:bar"
 	syncResponse := types.NewResponse()
-	roomEvents := []gomatrixserverlib.ClientEvent{
+	roomEvents := []synctypes.ClientEvent{
 		{
 			Type:     "m.room.member",
 			StateKey: &syncingUser,

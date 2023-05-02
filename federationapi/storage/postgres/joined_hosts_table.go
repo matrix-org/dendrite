@@ -90,28 +90,15 @@ func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err erro
 	if err != nil {
 		return
 	}
-	if s.insertJoinedHostsStmt, err = s.db.Prepare(insertJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.deleteJoinedHostsStmt, err = s.db.Prepare(deleteJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.deleteJoinedHostsForRoomStmt, err = s.db.Prepare(deleteJoinedHostsForRoomSQL); err != nil {
-		return
-	}
-	if s.selectJoinedHostsStmt, err = s.db.Prepare(selectJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.selectAllJoinedHostsStmt, err = s.db.Prepare(selectAllJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.selectJoinedHostsForRoomsStmt, err = s.db.Prepare(selectJoinedHostsForRoomsSQL); err != nil {
-		return
-	}
-	if s.selectJoinedHostsForRoomsExcludingBlacklistedStmt, err = s.db.Prepare(selectJoinedHostsForRoomsExcludingBlacklistedSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertJoinedHostsStmt, insertJoinedHostsSQL},
+		{&s.deleteJoinedHostsStmt, deleteJoinedHostsSQL},
+		{&s.deleteJoinedHostsForRoomStmt, deleteJoinedHostsForRoomSQL},
+		{&s.selectJoinedHostsStmt, selectJoinedHostsSQL},
+		{&s.selectAllJoinedHostsStmt, selectAllJoinedHostsSQL},
+		{&s.selectJoinedHostsForRoomsStmt, selectJoinedHostsForRoomsSQL},
+		{&s.selectJoinedHostsForRoomsExcludingBlacklistedStmt, selectJoinedHostsForRoomsExcludingBlacklistedSQL},
+	}.Prepare(db)
 }
 
 func (s *joinedHostsStatements) InsertJoinedHosts(

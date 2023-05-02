@@ -8,6 +8,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -36,7 +37,7 @@ func (d dummyDB) GetPresences(ctx context.Context, userID []string) ([]*types.Pr
 	return []*types.PresenceInternal{}, nil
 }
 
-func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition, filter synctypes.EventFilter) (map[string]*types.PresenceInternal, error) {
 	return map[string]*types.PresenceInternal{}, nil
 }
 

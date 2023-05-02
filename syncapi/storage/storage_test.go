@@ -9,27 +9,28 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
 
 var ctx = context.Background()
 
-func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func(), func()) {
+func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	base, closeBase := testrig.CreateBaseDendrite(t, dbType)
-	db, _, err := storage.NewSyncServerDatasource(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	db, _, err := storage.NewSyncServerDatasource(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, close, closeBase
+	return db, close
 }
 
 func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
@@ -55,9 +56,8 @@ func TestWriteEvents(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		MustWriteEvents(t, db, r.Events())
 	})
 }
@@ -76,9 +76,8 @@ func WithSnapshot(t *testing.T, db storage.Database, f func(snapshot storage.Dat
 // These tests assert basic functionality of RecentEvents for PDUs
 func TestRecentEventsPDU(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		alice := test.NewUser(t)
 		// dummy room to make sure SQL queries are filtering on room ID
 		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
@@ -155,7 +154,7 @@ func TestRecentEventsPDU(t *testing.T) {
 		for i := range testCases {
 			tc := testCases[i]
 			t.Run(tc.Name, func(st *testing.T) {
-				var filter gomatrixserverlib.RoomEventFilter
+				var filter synctypes.RoomEventFilter
 				var gotEvents map[string]types.RecentEvents
 				var limited bool
 				filter.Limit = tc.Limit
@@ -191,9 +190,8 @@ func TestRecentEventsPDU(t *testing.T) {
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
 func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		for i := 0; i < 10; i++ {
@@ -209,7 +207,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			to := types.TopologyToken{}
 
 			// backpaginate 5 messages starting at the latest position.
-			filter := &gomatrixserverlib.RoomEventFilter{Limit: 5}
+			filter := &synctypes.RoomEventFilter{Limit: 5}
 			paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 			if err != nil {
 				t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
@@ -276,9 +274,8 @@ func TestStreamToTopologicalPosition(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 
 		txn, err := db.NewDatabaseTransaction(ctx)
 		if err != nil {
@@ -514,9 +511,8 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	bob := test.NewUser(t)
 	deviceID := "one"
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		// At this point there should be no messages. We haven't sent anything
 		// yet.
 
@@ -899,9 +895,8 @@ func TestRoomSummary(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -938,12 +933,9 @@ func TestRecentEvents(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		filter := gomatrixserverlib.DefaultRoomEventFilter()
-		db, close, closeBase := MustCreateDatabase(t, dbType)
-		t.Cleanup(func() {
-			close()
-			closeBase()
-		})
+		filter := synctypes.DefaultRoomEventFilter()
+		db, close := MustCreateDatabase(t, dbType)
+		t.Cleanup(close)
 
 		MustWriteEvents(t, db, room1.Events())
 		MustWriteEvents(t, db, room2.Events())

@@ -18,12 +18,12 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/setup/base"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,25 +51,27 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	base *base.BaseDendrite,
-	cfg *config.ClientAPI,
+	routers httputil.Routers,
+	dendriteCfg *config.Dendrite,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation *fclient.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	mscCfg *config.MSCs, natsClient *nats.Conn,
+	natsClient *nats.Conn, enableMetrics bool,
 ) {
-	publicAPIMux := base.PublicClientAPIMux
-	wkMux := base.PublicWellKnownAPIMux
-	synapseAdminRouter := base.SynapseAdminMux
-	dendriteAdminRouter := base.DendriteAdminMux
+	cfg := &dendriteCfg.ClientAPI
+	mscCfg := &dendriteCfg.MSCs
+	publicAPIMux := routers.Client
+	wkMux := routers.WellKnown
+	synapseAdminRouter := routers.SynapseAdmin
+	dendriteAdminRouter := routers.DendriteAdmin
 
-	if base.EnableMetrics {
+	if enableMetrics {
 		prometheus.MustRegister(amtRegUsers, sendEventDuration)
 	}
 
@@ -156,15 +158,15 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateRoom(req, cfg, device, rsAPI)
+			return AdminEvacuateRoom(req, rsAPI)
 		}),
-	).Methods(http.MethodGet, http.MethodOptions)
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
 		httputil.MakeAdminAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateUser(req, cfg, device, rsAPI)
+			return AdminEvacuateUser(req, cfg, rsAPI)
 		}),
-	).Methods(http.MethodGet, http.MethodOptions)
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/purgeRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_purge_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -199,18 +201,13 @@ func Setup(
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		var serverNotificationSender *userapi.Device
-		var err error
-		notificationSenderOnce := &sync.Once{}
+		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				notificationSenderOnce.Do(func() {
-					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-					if err != nil {
-						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-					}
-				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
@@ -232,12 +229,6 @@ func Setup(
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				notificationSenderOnce.Do(func() {
-					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-					if err != nil {
-						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-					}
-				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
@@ -669,7 +660,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/auth/{authType}/fallback/web",
-		httputil.MakeHTMLAPI("auth_fallback", base.EnableMetrics, func(w http.ResponseWriter, req *http.Request) {
+		httputil.MakeHTMLAPI("auth_fallback", enableMetrics, func(w http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 			AuthFallback(w, req, vars["authType"], cfg)
 		}),
@@ -873,6 +864,8 @@ func Setup(
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
+	threePIDClient := base.CreateClient(dendriteCfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
+
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetAssociated3PIDs(req, userAPI, device)
@@ -881,11 +874,11 @@ func Setup(
 
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return CheckAndSave3PIDAssociation(req, userAPI, device, cfg)
+			return CheckAndSave3PIDAssociation(req, userAPI, device, cfg, threePIDClient)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	unstableMux.Handle("/account/3pid/delete",
+	v3mux.Handle("/account/3pid/delete",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return Forget3PID(req, userAPI)
 		}),
@@ -893,7 +886,7 @@ func Setup(
 
 	v3mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
 		httputil.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
-			return RequestEmailToken(req, userAPI, cfg)
+			return RequestEmailToken(req, userAPI, cfg, threePIDClient)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -1127,7 +1120,7 @@ func Setup(
 
 	v3mux.Handle("/delete_devices",
 		httputil.MakeAuthAPI("delete_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return DeleteDevices(req, userAPI, device)
+			return DeleteDevices(req, userInteractiveAuth, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -1206,7 +1199,7 @@ func Setup(
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
-			return GetCapabilities(req, rsAPI)
+			return GetCapabilities()
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -1383,7 +1376,7 @@ func Setup(
 	// Cross-signing device keys
 
 	postDeviceSigningKeys := httputil.MakeAuthAPI("post_device_signing_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-		return UploadCrossSigningDeviceKeys(req, userInteractiveAuth, userAPI, device, userAPI, cfg)
+		return UploadCrossSigningDeviceKeys(req, userAPI, device, userAPI, cfg)
 	})
 
 	postDeviceSigningSignatures := httputil.MakeAuthAPI("post_device_signing_signatures", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

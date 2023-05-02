@@ -8,6 +8,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -51,7 +52,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 					typingUsers = append(typingUsers, users[i])
 				}
 			}
-			ev := gomatrixserverlib.ClientEvent{
+			ev := synctypes.ClientEvent{
 				Type: gomatrixserverlib.MTyping,
 			}
 			ev.Content, err = json.Marshal(map[string]interface{}{

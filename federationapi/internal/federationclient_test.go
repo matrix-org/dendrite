@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,20 +34,20 @@ const (
 	FailuresUntilBlacklist      = 8
 )
 
-func (t *testFedClient) QueryKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string) (gomatrixserverlib.RespQueryKeys, error) {
+func (t *testFedClient) QueryKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string) (fclient.RespQueryKeys, error) {
 	t.queryKeysCalled = true
 	if t.shouldFail {
-		return gomatrixserverlib.RespQueryKeys{}, fmt.Errorf("Failure")
+		return fclient.RespQueryKeys{}, fmt.Errorf("Failure")
 	}
-	return gomatrixserverlib.RespQueryKeys{}, nil
+	return fclient.RespQueryKeys{}, nil
 }
 
-func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (gomatrixserverlib.RespClaimKeys, error) {
+func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (fclient.RespClaimKeys, error) {
 	t.claimKeysCalled = true
 	if t.shouldFail {
-		return gomatrixserverlib.RespClaimKeys{}, fmt.Errorf("Failure")
+		return fclient.RespClaimKeys{}, fmt.Errorf("Failure")
 	}
-	return gomatrixserverlib.RespClaimKeys{}, nil
+	return fclient.RespClaimKeys{}, nil
 }
 
 func TestFederationClientQueryKeys(t *testing.T) {
@@ -54,7 +55,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
 		},
@@ -85,7 +86,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
 		},
@@ -115,7 +116,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
 		},
@@ -145,7 +146,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
 		},
@@ -176,7 +177,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
 		},

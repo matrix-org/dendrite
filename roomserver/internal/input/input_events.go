@@ -27,6 +27,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -646,7 +647,7 @@ func (r *Inputer) fetchAuthEvents(
 	}
 
 	var err error
-	var res gomatrixserverlib.RespEventAuth
+	var res fclient.RespEventAuth
 	var found bool
 	for _, serverName := range servers {
 		// Request the entire auth chain for the event in question. This should

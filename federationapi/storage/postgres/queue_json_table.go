@@ -65,16 +65,11 @@ func NewPostgresQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = s.db.Prepare(insertJSONSQL); err != nil {
-		return
-	}
-	if s.deleteJSONStmt, err = s.db.Prepare(deleteJSONSQL); err != nil {
-		return
-	}
-	if s.selectJSONStmt, err = s.db.Prepare(selectJSONSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertJSONStmt, insertJSONSQL},
+		{&s.deleteJSONStmt, deleteJSONSQL},
+		{&s.selectJSONStmt, selectJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *queueJSONStatements) InsertQueueJSON(

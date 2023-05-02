@@ -15,14 +15,21 @@
 package config
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
+
+const UnixSocketPrefix = "unix://"
 
 type AppServiceAPI struct {
 	Matrix  *Global  `yaml:"-"`
@@ -79,7 +86,41 @@ type ApplicationService struct {
 	// Whether rate limiting is applied to each application service user
 	RateLimited bool `yaml:"rate_limited"`
 	// Any custom protocols that this application service provides (e.g. IRC)
-	Protocols []string `yaml:"protocols"`
+	Protocols    []string `yaml:"protocols"`
+	HTTPClient   *http.Client
+	isUnixSocket bool
+	unixSocket   string
+}
+
+func (a *ApplicationService) CreateHTTPClient(insecureSkipVerify bool) {
+	client := &http.Client{
+		Timeout: time.Second * 30,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: insecureSkipVerify,
+			},
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
+	if strings.HasPrefix(a.URL, UnixSocketPrefix) {
+		a.isUnixSocket = true
+		a.unixSocket = "http://unix"
+		client.Transport = &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", strings.TrimPrefix(a.URL, UnixSocketPrefix))
+			},
+		}
+	}
+	a.HTTPClient = client
+}
+
+func (a *ApplicationService) RequestUrl() string {
+	if a.isUnixSocket {
+		return a.unixSocket
+	} else {
+		return a.URL
+	}
 }
 
 // IsInterestedInRoomID returns a bool on whether an application service's
@@ -151,7 +192,7 @@ func (a *ApplicationService) IsInterestedInRoomAlias(
 func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 	for _, configPath := range config.ConfigFiles {
 		// Create a new application service with default options
-		appservice := ApplicationService{
+		appservice := &ApplicationService{
 			RateLimited: true,
 		}
 
@@ -168,13 +209,13 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Load the config data into our struct
-		if err = yaml.Unmarshal(configData, &appservice); err != nil {
+		if err = yaml.Unmarshal(configData, appservice); err != nil {
 			return err
 		}
-
+		appservice.CreateHTTPClient(config.DisableTLSValidation)
 		// Append the parsed application service to the global config
 		derived.ApplicationServices = append(
-			derived.ApplicationServices, appservice,
+			derived.ApplicationServices, *appservice,
 		)
 	}
 

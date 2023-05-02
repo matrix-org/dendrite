@@ -65,10 +65,11 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
+          name: Sytest Logs - ${{ job.status }} - (Dendrite ${{ join(matrix.*, ' ') }})
           path: |
             /logs/results.tap
             /logs/**/*.log*
+            /logs/**/covdatafiles/**
 
   sytest-coverage:
     timeout-minutes: 5
@@ -85,16 +86,15 @@ jobs:
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
-      - name: Install gocovmerge
-        run: go install github.com/wadey/gocovmerge@latest
-      - name: Run gocovmerge
+      - name: Collect coverage
         run: |
-          find -name 'integrationcover.log' -printf '"%p"\n' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > sytest.cov
-          go tool cover -func=sytest.cov
+          go tool covdata textfmt -i="$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o sytest.cov
+          grep -Ev 'relayapi|setup/mscs|api_trace' sytest.cov > final.cov
+          go tool covdata func -i="$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./sytest.cov
+          files: ./final.cov
           flags: sytest
           fail_ci_if_error: true
 
@@ -167,7 +167,7 @@ jobs:
           cat <<EOF > /tmp/posttest.sh
           #!/bin/bash
           mkdir -p /tmp/Complement/logs/\$2/\$1/
-          docker cp \$1:/dendrite/complementcover.log /tmp/Complement/logs/\$2/\$1/
+          docker cp \$1:/tmp/covdatafiles/. /tmp/Complement/logs/\$2/\$1/
           EOF
           
           chmod +x /tmp/posttest.sh
@@ -188,9 +188,9 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Complement Logs - (Dendrite, ${{ join(matrix.*, ', ') }})
+          name: Complement Logs - (Dendrite ${{ join(matrix.*, ' ') }})
           path: |
-            /tmp/Complement/**/complementcover.log
+            /tmp/Complement/logs/**
 
   complement-coverage:
     timeout-minutes: 5
@@ -207,20 +207,19 @@ jobs:
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
-      - name: Install gocovmerge
-        run: go install github.com/wadey/gocovmerge@latest
-      - name: Run gocovmerge
+      - name: Collect coverage
         run: |
-          find -name 'complementcover.log' -printf '"%p"\n' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > complement.cov
-          go tool cover -func=complement.cov
+          go tool covdata textfmt -i="$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o complement.cov
+          grep -Ev 'relayapi|setup/mscs|api_trace' complement.cov > final.cov
+          go tool covdata func -i="$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./complement.cov
+          files: ./final.cov
           flags: complement
           fail_ci_if_error: true
 
-  element_web:
+  element-web:
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
@@ -249,6 +248,45 @@ jobs:
       - name: Edit Test Config
         run: |
           sed -i '/HOMESERVER/c\        HOMESERVER: "dendrite",' cypress.config.ts
+      - name: "Run cypress tests"
+        uses: cypress-io/github-action@v4.1.1
+        with:
+          browser: chrome
+          start: npx serve -p 8080 ./element-web/webapp
+          wait-on: 'http://localhost:8080'
+        env:
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
+          TMPDIR: ${{ runner.temp }}
+
+  element-web-pinecone:
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    steps:
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          # Our test suite includes some screenshot tests with unusual diacritics, which are
+          # supposed to be covered by STIXGeneral.
+          tools: fonts-stix
+      - uses: actions/checkout@v2
+        with:
+          repository: matrix-org/matrix-react-sdk
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+      - name: Fetch layered build
+        run: scripts/ci/layered.sh
+      - name: Copy config
+        run: cp element.io/develop/config.json config.json
+        working-directory: ./element-web
+      - name: Build
+        env:
+          CI_PACKAGE: true
+          NODE_OPTIONS: "--openssl-legacy-provider"
+        run: yarn build
+        working-directory: ./element-web
+      - name: Edit Test Config
+        run: |
+          sed -i '/HOMESERVER/c\        HOMESERVER: "dendritePinecone",' cypress.config.ts
       - name: "Run cypress tests"
         uses: cypress-io/github-action@v4.1.1
         with:

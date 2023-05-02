@@ -37,7 +37,8 @@ func Deactivate(
 	} else {
 		userId = deviceAPI.UserID
 	}
-	localpart, _, err := gomatrixserverlib.SplitID('@', userId)
+
+	localpart, serverName, err := gomatrixserverlib.SplitID('@', userId)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
@@ -45,7 +46,8 @@ func Deactivate(
 
 	var res api.PerformAccountDeactivationResponse
 	err = accountAPI.PerformAccountDeactivation(ctx, &api.PerformAccountDeactivationRequest{
-		Localpart: localpart,
+		Localpart:  localpart,
+		ServerName: serverName,
 	}, &res)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")

@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,8 +36,8 @@ type testFedClient struct {
 	shouldFail      bool
 }
 
-func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res gomatrixserverlib.RespDirectory, err error) {
-	return gomatrixserverlib.RespDirectory{}, nil
+func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res fclient.RespDirectory, err error) {
+	return fclient.RespDirectory{}, nil
 }
 
 func TestPerformWakeupServers(t *testing.T) {
@@ -54,7 +55,7 @@ func TestPerformWakeupServers(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 			},
 		},
@@ -96,7 +97,7 @@ func TestQueryRelayServers(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 			},
 		},
@@ -133,7 +134,7 @@ func TestRemoveRelayServers(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 			},
 		},
@@ -169,7 +170,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 			},
 		},
@@ -204,7 +205,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
+			SigningIdentity: fclient.SigningIdentity{
 				ServerName: server,
 			},
 		},

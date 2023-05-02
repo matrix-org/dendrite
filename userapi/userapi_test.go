@@ -22,8 +22,12 @@ import (
 	"testing"
 	"time"
 
+	api2 "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"golang.org/x/crypto/bcrypt"
@@ -67,32 +71,25 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	cfg, ctx, close := testrig.CreateConfig(t, dbType)
 	sName := serverName
 	if opts.serverName != "" {
 		sName = gomatrixserverlib.ServerName(opts.serverName)
 	}
-	accountDB, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
-	}, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+
+	accountDB, err := storage.NewUserDatabase(ctx.Context(), cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
 
-	keyDB, err := storage.NewKeyDatabase(base, &config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
-	})
+	keyDB, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create key DB: %s", err)
 	}
 
-	cfg := &config.UserAPI{
-		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: sName,
-			},
-		},
+	cfg.Global.SigningIdentity = fclient.SigningIdentity{
+		ServerName: sName,
 	}
 
 	if publisher == nil {
@@ -104,12 +101,11 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	return &internal.UserInternalAPI{
 			DB:                accountDB,
 			KeyDatabase:       keyDB,
-			Config:            cfg,
+			Config:            &cfg.UserAPI,
 			SyncProducer:      syncProducer,
 			KeyChangeProducer: keyChangeProducer,
 		}, accountDB, func() {
 			close()
-			baseclose()
 		}
 }
 
@@ -118,33 +114,26 @@ func TestQueryProfile(t *testing.T) {
 	aliceDisplayName := "Alice"
 
 	testCases := []struct {
-		req     api.QueryProfileRequest
-		wantRes api.QueryProfileResponse
+		userID  string
+		wantRes *authtypes.Profile
 		wantErr error
 	}{
 		{
-			req: api.QueryProfileRequest{
-				UserID: fmt.Sprintf("@alice:%s", serverName),
-			},
-			wantRes: api.QueryProfileResponse{
-				UserExists:  true,
-				AvatarURL:   aliceAvatarURL,
+			userID: fmt.Sprintf("@alice:%s", serverName),
+			wantRes: &authtypes.Profile{
+				Localpart:   "alice",
 				DisplayName: aliceDisplayName,
+				AvatarURL:   aliceAvatarURL,
+				ServerName:  string(serverName),
 			},
 		},
 		{
-			req: api.QueryProfileRequest{
-				UserID: fmt.Sprintf("@bob:%s", serverName),
-			},
-			wantRes: api.QueryProfileResponse{
-				UserExists: false,
-			},
+			userID:  fmt.Sprintf("@bob:%s", serverName),
+			wantErr: api2.ErrProfileNotExists,
 		},
 		{
-			req: api.QueryProfileRequest{
-				UserID: "@alice:wrongdomain.com",
-			},
-			wantErr: fmt.Errorf("wrong domain"),
+			userID:  "@alice:wrongdomain.com",
+			wantErr: api2.ErrProfileNotExists,
 		},
 	}
 
@@ -154,14 +143,14 @@ func TestQueryProfile(t *testing.T) {
 			mode = "HTTP"
 		}
 		for _, tc := range testCases {
-			var gotRes api.QueryProfileResponse
-			gotErr := testAPI.QueryProfile(context.TODO(), &tc.req, &gotRes)
+
+			profile, gotErr := testAPI.QueryProfile(context.TODO(), tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
 				t.Errorf("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
 				continue
 			}
-			if !reflect.DeepEqual(tc.wantRes, gotRes) {
-				t.Errorf("QueryProfile %s response got %+v want %+v", mode, gotRes, tc.wantRes)
+			if !reflect.DeepEqual(tc.wantRes, profile) {
+				t.Errorf("QueryProfile %s response got %+v want %+v", mode, profile, tc.wantRes)
 			}
 		}
 	}

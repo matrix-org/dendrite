@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -45,7 +46,7 @@ func GetFilter(
 		return jsonerror.InternalServerError()
 	}
 
-	filter := gomatrixserverlib.DefaultFilter()
+	filter := synctypes.DefaultFilter()
 	if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterID); err != nil {
 		//TODO better error handling. This error message is *probably* right,
 		// but if there are obscure db errors, this will also be returned,
@@ -85,7 +86,7 @@ func PutFilter(
 		return jsonerror.InternalServerError()
 	}
 
-	var filter gomatrixserverlib.Filter
+	var filter synctypes.Filter
 
 	defer req.Body.Close() // nolint:errcheck
 	body, err := io.ReadAll(req.Body)

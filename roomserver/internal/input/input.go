@@ -24,6 +24,7 @@ import (
 	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
@@ -39,7 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -74,14 +74,13 @@ import (
 // or C.
 type Inputer struct {
 	Cfg                 *config.RoomServer
-	Base                *base.BaseDendrite
 	ProcessContext      *process.ProcessContext
 	DB                  storage.RoomDatabase
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
 	ServerName          gomatrixserverlib.ServerName
-	SigningIdentity     *gomatrixserverlib.SigningIdentity
+	SigningIdentity     *fclient.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
@@ -89,8 +88,9 @@ type Inputer struct {
 	OutputProducer      *producers.RoomEventProducer
 	workers             sync.Map // room ID -> *worker
 
-	Queryer *query.Queryer
-	UserAPI userapi.RoomserverUserAPI
+	Queryer       *query.Queryer
+	UserAPI       userapi.RoomserverUserAPI
+	enableMetrics bool
 }
 
 // If a room consumer is inactive for a while then we will allow NATS
@@ -177,7 +177,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
 func (r *Inputer) Start() error {
-	if r.Base.EnableMetrics {
+	if r.enableMetrics {
 		prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
 	}
 	_, err := r.JetStream.Subscribe(

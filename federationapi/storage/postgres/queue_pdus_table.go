@@ -78,22 +78,13 @@ func NewPostgresQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	if err != nil {
 		return
 	}
-	if s.insertQueuePDUStmt, err = s.db.Prepare(insertQueuePDUSQL); err != nil {
-		return
-	}
-	if s.deleteQueuePDUsStmt, err = s.db.Prepare(deleteQueuePDUSQL); err != nil {
-		return
-	}
-	if s.selectQueuePDUsStmt, err = s.db.Prepare(selectQueuePDUsSQL); err != nil {
-		return
-	}
-	if s.selectQueuePDUReferenceJSONCountStmt, err = s.db.Prepare(selectQueuePDUReferenceJSONCountSQL); err != nil {
-		return
-	}
-	if s.selectQueuePDUServerNamesStmt, err = s.db.Prepare(selectQueuePDUServerNamesSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertQueuePDUStmt, insertQueuePDUSQL},
+		{&s.deleteQueuePDUsStmt, deleteQueuePDUSQL},
+		{&s.selectQueuePDUsStmt, selectQueuePDUsSQL},
+		{&s.selectQueuePDUReferenceJSONCountStmt, selectQueuePDUReferenceJSONCountSQL},
+		{&s.selectQueuePDUServerNamesStmt, selectQueuePDUServerNamesSQL},
+	}.Prepare(db)
 }
 
 func (s *queuePDUsStatements) InsertQueuePDU(

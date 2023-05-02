@@ -72,13 +72,10 @@ func NewPostgresServerSigningKeysTable(db *sql.DB) (s *serverSigningKeyStatement
 	if err != nil {
 		return
 	}
-	if s.bulkSelectServerKeysStmt, err = db.Prepare(bulkSelectServerSigningKeysSQL); err != nil {
-		return
-	}
-	if s.upsertServerKeysStmt, err = db.Prepare(upsertServerSigningKeysSQL); err != nil {
-		return
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.bulkSelectServerKeysStmt, bulkSelectServerSigningKeysSQL},
+		{&s.upsertServerKeysStmt, upsertServerSigningKeysSQL},
+	}.Prepare(db)
 }
 
 func (s *serverSigningKeyStatements) BulkSelectServerKeys(

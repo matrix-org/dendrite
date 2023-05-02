@@ -14,10 +14,10 @@
 
 package api
 
-import "github.com/matrix-org/gomatrixserverlib"
+import "github.com/matrix-org/gomatrixserverlib/fclient"
 
 // ExtraPublicRoomsProvider provides a way to inject extra published rooms into /publicRooms requests.
 type ExtraPublicRoomsProvider interface {
 	// Rooms returns the extra rooms. This is called on-demand by clients, so cache appropriately.
-	Rooms() []gomatrixserverlib.PublicRoom
+	Rooms() []fclient.PublicRoom
 }

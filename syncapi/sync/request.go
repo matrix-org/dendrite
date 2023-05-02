@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -49,7 +50,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	}
 
 	// Create a default filter and apply a stored filter on top of it (if specified)
-	filter := gomatrixserverlib.DefaultFilter()
+	filter := synctypes.DefaultFilter()
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {

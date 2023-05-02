@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -33,9 +35,9 @@ var (
 )
 
 func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
-	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserDatabase(base, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
@@ -43,7 +45,6 @@ func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatab
 	}
 	return db, func() {
 		close()
-		baseclose()
 	}
 }
 
@@ -361,12 +362,12 @@ func Test_OpenID(t *testing.T) {
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
 		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
 		assert.NoError(t, err, "unable to create OpenID token")
-		assert.Equal(t, expiresAtMS, expires)
+		assert.InDelta(t, expiresAtMS, expires, 2) // 2ms leeway
 
 		attributes, err := db.GetOpenIDTokenAttributes(ctx, token)
 		assert.NoError(t, err, "unable to get OpenID token attributes")
 		assert.Equal(t, alice.ID, attributes.UserID)
-		assert.Equal(t, expiresAtMS, attributes.ExpiresAtMS)
+		assert.InDelta(t, expiresAtMS, attributes.ExpiresAtMS, 2) // 2ms leeway
 	})
 }
 
@@ -531,7 +532,7 @@ func Test_Notification(t *testing.T) {
 				Actions: []*pushrules.Action{
 					{},
 				},
-				Event: gomatrixserverlib.ClientEvent{
+				Event: synctypes.ClientEvent{
 					Content: gomatrixserverlib.RawJSON("{}"),
 				},
 				Read:   false,
@@ -581,8 +582,9 @@ func Test_Notification(t *testing.T) {
 }
 
 func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewKeyDatabase(base, &base.Cfg.KeyServer.Database)
+	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	db, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}

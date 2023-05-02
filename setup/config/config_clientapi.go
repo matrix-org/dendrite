@@ -60,6 +60,8 @@ type ClientAPI struct {
 	ThreePidDelegate string `yaml:"three_pid_delegate"`
 
 	JwtConfig JwtConfig `yaml:"jwt_config"`
+
+	Ldap Ldap `yaml:"ldap"`
 }
 
 type JwtConfig struct {
@@ -71,7 +73,22 @@ type JwtConfig struct {
 	Audiences []string `yaml:"audiences"`
 }
 
-func (c *ClientAPI) Defaults(opts DefaultOpts) {
+type Ldap struct {
+	Enabled             bool   `yaml:"enabled"`
+	Uri                 string `yaml:"uri"`
+	BaseDn              string `yaml:"base_dn"`
+	SearchFilter        string `yaml:"search_filter"`
+	SearchAttribute     string `yaml:"search_attribute"`
+	AdminBindEnabled    bool   `yaml:"admin_bind_enabled"`
+	AdminBindDn         string `yaml:"admin_bind_dn"`
+	AdminBindPassword   string `yaml:"admin_bind_password"`
+	UserBindDn          string `yaml:"user_bind_dn"`
+	AdminGroupDn        string `yaml:"admin_group_dn"`
+	AdminGroupFilter    string `yaml:"admin_group_filter"`
+	AdminGroupAttribute string `yaml:"admin_group_attribute"`
+}
+
+func (c *ClientAPI) Defaults(_ DefaultOpts) {
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""

@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -35,7 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
 type Queryer struct {
@@ -351,7 +351,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
 		for _, event := range events {
-			clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+			clientEvent := synctypes.ToClientEvent(event.Event, synctypes.FormatAll)
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
 		}
 		return nil
@@ -371,7 +371,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	response.HasBeenInRoom = true
-	response.JoinEvents = []gomatrixserverlib.ClientEvent{}
+	response.JoinEvents = []synctypes.ClientEvent{}
 
 	var events []types.Event
 	var stateEntries []types.StateEntry
@@ -400,7 +400,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	for _, event := range events {
-		clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+		clientEvent := synctypes.ToClientEvent(event.Event, synctypes.FormatAll)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
 
@@ -699,25 +699,7 @@ func GetAuthChain(
 	return authEvents, nil
 }
 
-// QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
-func (r *Queryer) QueryRoomVersionCapabilities(
-	ctx context.Context,
-	request *api.QueryRoomVersionCapabilitiesRequest,
-	response *api.QueryRoomVersionCapabilitiesResponse,
-) error {
-	response.DefaultRoomVersion = version.DefaultRoomVersion()
-	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
-	for v, desc := range version.SupportedRoomVersions() {
-		if desc.Stable {
-			response.AvailableRoomVersions[v] = "stable"
-		} else {
-			response.AvailableRoomVersions[v] = "unstable"
-		}
-	}
-	return nil
-}
-
-// QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
+// QueryRoomVersionForRoom implements api.RoomserverInternalAPI
 func (r *Queryer) QueryRoomVersionForRoom(
 	ctx context.Context,
 	request *api.QueryRoomVersionForRoomRequest,

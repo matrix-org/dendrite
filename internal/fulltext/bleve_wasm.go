@@ -15,8 +15,9 @@
 package fulltext
 
 import (
-	"github.com/matrix-org/dendrite/setup/config"
 	"time"
+
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 type Search struct{}
@@ -26,6 +27,14 @@ type IndexElement struct {
 	Content        string
 	ContentType    string
 	StreamPosition int64
+}
+
+type Indexer interface {
+	Index(elements ...IndexElement) error
+	Delete(eventID string) error
+	Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (SearchResult, error)
+	GetHighlights(result SearchResult) []string
+	Close() error
 }
 
 type SearchResult struct {
@@ -48,7 +57,7 @@ func (f *Search) Close() error {
 	return nil
 }
 
-func (f *Search) Index(e IndexElement) error {
+func (f *Search) Index(e ...IndexElement) error {
 	return nil
 }
 
@@ -62,4 +71,8 @@ func (f *Search) Delete(eventID string) error {
 
 func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (SearchResult, error) {
 	return SearchResult{}, nil
+}
+
+func (f *Search) GetHighlights(result SearchResult) []string {
+	return []string{}
 }

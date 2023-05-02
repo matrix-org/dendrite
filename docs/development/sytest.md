@@ -61,7 +61,6 @@ When debugging, the following Docker `run` options may also be useful:
 * `-e "DENDRITE_TRACE_HTTP=1"`: Adds HTTP tracing to server logs.
 * `-e "DENDRITE_TRACE_INTERNAL=1"`: Adds roomserver internal API tracing to
   server logs.
-* `-e "DENDRITE_TRACE_SQL=1"`: Adds tracing to all SQL statements to server logs.
 
 The docker command also supports a single positional argument for the test file to
 run, so you can run a single `.pl` file rather than the whole test suite. For example:

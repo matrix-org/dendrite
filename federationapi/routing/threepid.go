@@ -256,17 +256,14 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
-	var res userapi.QueryProfileResponse
-	err = userAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{
-		UserID: inv.MXID,
-	}, &res)
+	profile, err := userAPI.QueryProfile(ctx, inv.MXID)
 	if err != nil {
 		return nil, err
 	}
 
 	content := gomatrixserverlib.MemberContent{
-		AvatarURL:   res.AvatarURL,
-		DisplayName: res.DisplayName,
+		AvatarURL:   profile.AvatarURL,
+		DisplayName: profile.DisplayName,
 		Membership:  gomatrixserverlib.Invite,
 		ThirdPartyInvite: &gomatrixserverlib.MemberThirdPartyInvite{
 			Signed: inv.Signed,

@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/federationapi/storage/tables"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -50,10 +51,9 @@ func NewPostgresNotaryServerKeysTable(db *sql.DB) (s *notaryServerKeysStatements
 		return
 	}
 
-	if s.insertServerKeysJSONStmt, err = db.Prepare(insertServerKeysJSONSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertServerKeysJSONStmt, insertServerKeysJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *notaryServerKeysStatements) InsertJSONResponse(
