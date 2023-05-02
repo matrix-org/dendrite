@@ -185,7 +185,7 @@ func SendEvent(
 		req.Context(), rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{Event: e},
+			&types.HeaderedEvent{PDU: e},
 		},
 		device.UserDomain(),
 		domain,
@@ -259,7 +259,7 @@ func generateSendEvent(
 	cfg *config.ClientAPI,
 	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
-) (*gomatrixserverlib.Event, *util.JSONResponse) {
+) (gomatrixserverlib.PDU, *util.JSONResponse) {
 	// parse the incoming http request
 	userID := device.UserID
 
@@ -313,12 +313,12 @@ func generateSendEvent(
 	}
 
 	// check to see if this user can perform this operation
-	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
+	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(e.Event, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(e.PDU, &provider); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
@@ -343,5 +343,5 @@ func generateSendEvent(
 		}
 	}
 
-	return e.Event, nil
+	return e.PDU, nil
 }

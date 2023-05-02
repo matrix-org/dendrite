@@ -63,7 +63,7 @@ func NewServerACLs(db ServerACLDatabase) *ServerACLs {
 			continue
 		}
 		if state != nil {
-			acls.OnServerACLUpdate(state.Event)
+			acls.OnServerACLUpdate(state.PDU)
 		}
 	}
 	return acls
@@ -88,7 +88,7 @@ func compileACLRegex(orig string) (*regexp.Regexp, error) {
 	return regexp.Compile(escaped)
 }
 
-func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
+func (s *ServerACLs) OnServerACLUpdate(state gomatrixserverlib.PDU) {
 	acls := &serverACL{}
 	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
 		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")

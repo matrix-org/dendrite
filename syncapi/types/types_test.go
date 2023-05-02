@@ -56,7 +56,7 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := NewInviteResponse(&types.HeaderedEvent{Event: ev})
+	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev})
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)

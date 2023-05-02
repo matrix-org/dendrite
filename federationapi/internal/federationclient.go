@@ -27,7 +27,7 @@ func (a *FederationInternalAPI) MakeJoin(
 }
 
 func (a *FederationInternalAPI) SendJoin(
-	ctx context.Context, origin, s spec.ServerName, event *gomatrixserverlib.Event,
+	ctx context.Context, origin, s spec.ServerName, event gomatrixserverlib.PDU,
 ) (res gomatrixserverlib.SendJoinResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()

@@ -55,8 +55,7 @@ func SendEventWithState(
 	state gomatrixserverlib.StateResponse, event *types.HeaderedEvent,
 	origin spec.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
-	outliersPDU := gomatrixserverlib.LineariseStateResponse(event.Version(), state)
-	outliers := gomatrixserverlib.TempCastToEvents(outliersPDU)
+	outliers := gomatrixserverlib.LineariseStateResponse(event.Version(), state)
 	ires := make([]InputRoomEvent, 0, len(outliers))
 	for _, outlier := range outliers {
 		if haveEventIDs[outlier.EventID()] {
@@ -64,7 +63,7 @@ func SendEventWithState(
 		}
 		ires = append(ires, InputRoomEvent{
 			Kind:   KindOutlier,
-			Event:  &types.HeaderedEvent{Event: outlier},
+			Event:  &types.HeaderedEvent{PDU: outlier},
 			Origin: origin,
 		})
 	}

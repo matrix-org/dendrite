@@ -45,7 +45,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		}
 		in := api.InputRoomEvent{
 			Kind:  api.KindOutlier, // don't panic if we generate an output event
-			Event: &types.HeaderedEvent{Event: event},
+			Event: &types.HeaderedEvent{PDU: event},
 		}
 
 		inputter := &input.Inputer{

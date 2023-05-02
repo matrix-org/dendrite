@@ -18,21 +18,21 @@ func Test_EventAuth(t *testing.T) {
 	room2 := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
 
 	authEventIDs := make([]string, 0, 4)
-	authEvents := []*gomatrixserverlib.Event{}
+	authEvents := []gomatrixserverlib.PDU{}
 
 	// Add the legal auth events from room2
 	for _, x := range room2.Events() {
 		if x.Type() == spec.MRoomCreate {
 			authEventIDs = append(authEventIDs, x.EventID())
-			authEvents = append(authEvents, x.Event)
+			authEvents = append(authEvents, x.PDU)
 		}
 		if x.Type() == spec.MRoomPowerLevels {
 			authEventIDs = append(authEventIDs, x.EventID())
-			authEvents = append(authEvents, x.Event)
+			authEvents = append(authEvents, x.PDU)
 		}
 		if x.Type() == spec.MRoomJoinRules {
 			authEventIDs = append(authEventIDs, x.EventID())
-			authEvents = append(authEvents, x.Event)
+			authEvents = append(authEvents, x.PDU)
 		}
 	}
 
@@ -40,7 +40,7 @@ func Test_EventAuth(t *testing.T) {
 	for _, x := range room1.Events() {
 		if x.Type() == spec.MRoomMember {
 			authEventIDs = append(authEventIDs, x.EventID())
-			authEvents = append(authEvents, x.Event)
+			authEvents = append(authEvents, x.PDU)
 		}
 	}
 
@@ -58,7 +58,7 @@ func Test_EventAuth(t *testing.T) {
 	}
 
 	// Finally check that the event is NOT allowed
-	if err := gomatrixserverlib.Allowed(ev.Event, &allower); err == nil {
+	if err := gomatrixserverlib.Allowed(ev.PDU, &allower); err == nil {
 		t.Fatalf("event should not be allowed, but it was")
 	}
 }

@@ -352,13 +352,13 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
-	eventToRedact := redactedEvents[0].Event
-	redactionEvent := redactedBecause.Event
+	eventToRedact := redactedEvents[0].PDU
+	redactionEvent := redactedBecause.PDU
 	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
 		return err
 	}
 
-	newEvent := &rstypes.HeaderedEvent{Event: eventToRedact}
+	newEvent := &rstypes.HeaderedEvent{PDU: eventToRedact}
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.OutputEvents.UpdateEventJSON(ctx, txn, newEvent)
 	})
@@ -493,7 +493,7 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) (string, string) {
+func getMembershipFromEvent(ev gomatrixserverlib.PDU, userID string) (string, string) {
 	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
 		return "", ""
 	}

@@ -77,7 +77,7 @@ func BuildEvent(
 		return nil, err
 	}
 
-	return &types.HeaderedEvent{Event: event}, nil
+	return &types.HeaderedEvent{PDU: event}, nil
 }
 
 // queryRequiredEventsForBuilder queries the roomserver for auth/prev events needed for this builder.
@@ -124,7 +124,7 @@ func addPrevEventsToEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(queryRes.StateEvents[i].Event)
+		err = authEvents.AddEvent(queryRes.StateEvents[i].PDU)
 		if err != nil {
 			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
@@ -175,7 +175,7 @@ func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
 
 // RedactEvent redacts the given event and sets the unsigned field appropriately. This should be used by
 // downstream components to the roomserver when an OutputTypeRedactedEvent occurs.
-func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) error {
+func RedactEvent(redactionEvent, redactedEvent gomatrixserverlib.PDU) error {
 	// sanity check
 	if redactionEvent.Type() != spec.MRoomRedaction {
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())

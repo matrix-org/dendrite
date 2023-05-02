@@ -96,9 +96,9 @@ func main() {
 			panic(err)
 		}
 
-		events := make(map[types.EventNID]*gomatrixserverlib.Event, len(eventEntries))
+		events := make(map[types.EventNID]gomatrixserverlib.PDU, len(eventEntries))
 		for _, entry := range eventEntries {
-			events[entry.EventNID] = entry.Event
+			events[entry.EventNID] = entry.PDU
 		}
 
 		if len(removed) > 0 {
@@ -155,9 +155,9 @@ func main() {
 	}
 
 	authEventIDMap := make(map[string]struct{})
-	events := make([]*gomatrixserverlib.Event, len(eventEntries))
+	events := make([]gomatrixserverlib.PDU, len(eventEntries))
 	for i := range eventEntries {
-		events[i] = eventEntries[i].Event
+		events[i] = eventEntries[i].PDU
 		for _, authEventID := range eventEntries[i].AuthEventIDs() {
 			authEventIDMap[authEventID] = struct{}{}
 		}
@@ -174,17 +174,15 @@ func main() {
 		panic(err)
 	}
 
-	authEvents := make([]*gomatrixserverlib.Event, len(authEventEntries))
+	authEvents := make([]gomatrixserverlib.PDU, len(authEventEntries))
 	for i := range authEventEntries {
-		authEvents[i] = authEventEntries[i].Event
+		authEvents[i] = authEventEntries[i].PDU
 	}
 
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
-		gomatrixserverlib.RoomVersion(*roomVersion),
-		gomatrixserverlib.ToPDUs(events),
-		gomatrixserverlib.ToPDUs(authEvents),
+		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents,
 	)
 	if err != nil {
 		panic(err)

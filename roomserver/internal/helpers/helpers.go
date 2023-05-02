@@ -45,7 +45,7 @@ func UpdateToInviteMembership(
 		updates = append(updates, api.OutputEvent{
 			Type: api.OutputTypeNewInviteEvent,
 			NewInviteEvent: &api.OutputNewInviteEvent{
-				Event:       &types.HeaderedEvent{Event: add.Event},
+				Event:       &types.HeaderedEvent{PDU: add.PDU},
 				RoomVersion: roomVersion,
 			},
 		})
@@ -90,9 +90,9 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	if err != nil {
 		return false, err
 	}
-	gmslEvents := make([]*gomatrixserverlib.Event, len(events))
+	gmslEvents := make([]gomatrixserverlib.PDU, len(events))
 	for i := range events {
-		gmslEvents[i] = events[i].Event
+		gmslEvents[i] = events[i].PDU
 	}
 	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, spec.Join), nil
 }
@@ -234,22 +234,22 @@ func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types
 
 func LoadEvents(
 	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, eventNIDs []types.EventNID,
-) ([]*gomatrixserverlib.Event, error) {
+) ([]gomatrixserverlib.PDU, error) {
 	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]*gomatrixserverlib.Event, len(stateEvents))
+	result := make([]gomatrixserverlib.PDU, len(stateEvents))
 	for i := range stateEvents {
-		result[i] = stateEvents[i].Event
+		result[i] = stateEvents[i].PDU
 	}
 	return result, nil
 }
 
 func LoadStateEvents(
 	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
-) ([]*gomatrixserverlib.Event, error) {
+) ([]gomatrixserverlib.PDU, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
 		eventNIDs[i] = stateEntries[i].EventNID
@@ -287,7 +287,7 @@ func CheckServerAllowedToSeeEvent(
 
 func slowGetHistoryVisibilityState(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName,
-) ([]*gomatrixserverlib.Event, error) {
+) ([]gomatrixserverlib.PDU, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
@@ -479,7 +479,7 @@ func QueryLatestEventsAndState(
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{Event: event})
+		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{PDU: event})
 	}
 
 	return nil

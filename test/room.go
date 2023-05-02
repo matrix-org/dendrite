@@ -204,7 +204,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err = gomatrixserverlib.Allowed(ev, &r.authEvents); err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
-	headeredEvent := &rstypes.HeaderedEvent{Event: ev}
+	headeredEvent := &rstypes.HeaderedEvent{PDU: ev}
 	headeredEvent.Visibility = r.visibility
 	return headeredEvent
 }
@@ -215,7 +215,7 @@ func (r *Room) InsertEvent(t *testing.T, he *rstypes.HeaderedEvent) {
 	// Add the event to the list of auth/state events
 	r.events = append(r.events, he)
 	if he.StateKey() != nil {
-		err := r.authEvents.AddEvent(he.Event)
+		err := r.authEvents.AddEvent(he.PDU)
 		if err != nil {
 			t.Fatalf("InsertEvent: failed to add event to auth events: %s", err)
 		}

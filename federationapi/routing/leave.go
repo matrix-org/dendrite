@@ -110,12 +110,12 @@ func MakeLeave(
 	}
 
 	// Check that the leave is allowed or not
-	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
+	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
-	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
+	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	if err = gomatrixserverlib.Allowed(event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),
@@ -313,7 +313,7 @@ func SendLeave(
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
-				Event:         &types.HeaderedEvent{Event: event},
+				Event:         &types.HeaderedEvent{PDU: event},
 				SendAsServer:  string(cfg.Matrix.ServerName),
 				TransactionID: nil,
 			},

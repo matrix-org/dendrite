@@ -636,7 +636,7 @@ func init() {
 		if err != nil {
 			panic("cannot load test data: " + err.Error())
 		}
-		h := &rstypes.HeaderedEvent{Event: e}
+		h := &rstypes.HeaderedEvent{PDU: e}
 		testEvents = append(testEvents, h)
 		if e.StateKey() != nil {
 			testStateEvents[gomatrixserverlib.StateKeyTuple{

@@ -53,7 +53,7 @@ func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
-	event *gomatrixserverlib.Event,
+	event gomatrixserverlib.PDU,
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
@@ -101,7 +101,7 @@ type latestEventsUpdater struct {
 	updater       *shared.RoomUpdater
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
-	event         *gomatrixserverlib.Event
+	event         gomatrixserverlib.PDU
 	transactionID *api.TransactionID
 	rewritesState bool
 	// Which server to send this event as.
@@ -326,7 +326,7 @@ func (u *latestEventsUpdater) latestState() error {
 // true if the new event is included in those extremites, false otherwise.
 func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
-	newEvent *gomatrixserverlib.Event,
+	newEvent gomatrixserverlib.PDU,
 	newStateAndRef types.StateAtEventAndReference,
 ) (bool, error) {
 	trace, _ := internal.StartRegion(u.ctx, "calculateLatest")
@@ -393,7 +393,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:             &types.HeaderedEvent{Event: u.event},
+		Event:             &types.HeaderedEvent{PDU: u.event},
 		RewritesState:     u.rewritesState,
 		LastSentEventID:   u.lastEventIDSent,
 		LatestEventIDs:    latestEventIDs,

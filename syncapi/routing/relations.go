@@ -113,7 +113,7 @@ func Relations(
 	for _, event := range filteredEvents {
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.Event, synctypes.FormatAll),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll),
 		)
 	}
 

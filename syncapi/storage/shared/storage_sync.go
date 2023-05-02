@@ -429,7 +429,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		for _, ev := range stateStreamEvents {
 			// Look for our membership in the state events and skip over any
 			// membership events that are not related to us.
-			membership, prevMembership := getMembershipFromEvent(ev.Event, userID)
+			membership, prevMembership := getMembershipFromEvent(ev.PDU, userID)
 			if membership == "" {
 				continue
 			}
@@ -555,7 +555,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership, _ := getMembershipFromEvent(ev.Event, userID); membership != "" {
+			if membership, _ := getMembershipFromEvent(ev.PDU, userID); membership != "" {
 				if membership != spec.Join { // We've already added full state for all joined rooms above.
 					deltas[roomID] = types.StateDelta{
 						Membership:    membership,

@@ -109,7 +109,7 @@ func mustCreatePDU(t *testing.T) *types.HeaderedEvent {
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
-	return &types.HeaderedEvent{Event: ev}
+	return &types.HeaderedEvent{PDU: ev}
 }
 
 func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
