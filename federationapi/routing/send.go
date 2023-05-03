@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -64,7 +63,6 @@ func Send(
 	keys gomatrixserverlib.JSONVerifier,
 	federation fclient.FederationClient,
 	mu *internal.MutexByRoom,
-	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	// First we should check if this origin has already submitted this

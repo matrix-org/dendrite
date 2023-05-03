@@ -69,7 +69,7 @@ func TestHandleQueryDirectory(t *testing.T) {
 		if !ok {
 			panic("This is a programming error.")
 		}
-		routing.Setup(routers, cfg, nil, r, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, nil, caching.DisableMetrics)
+		routing.Setup(routers, cfg, nil, r, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, caching.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)

@@ -79,7 +79,7 @@ func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
 // OnNewEvent is called when a new event is received from the room server. Must only be
 // called from a single goroutine, to avoid races between updates which could set the
 // current sync position incorrectly.
-// Chooses which user sync streams to update by a provided *gomatrixserverlib.Event
+// Chooses which user sync streams to update by a provided gomatrixserverlib.PDU
 // (based on the users in the event's room),
 // a roomID directly, or a list of user IDs, prioritised by parameter ordering.
 // posUpdate contains the latest position(s) for one or more types of events.

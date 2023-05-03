@@ -53,7 +53,6 @@ func AddPublicRoutes(
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fedAPI federationAPI.FederationInternalAPI,
-	servers federationAPI.ServersInRoomProvider,
 	enableMetrics bool,
 ) {
 	cfg := &dendriteConfig.FederationAPI
@@ -87,7 +86,7 @@ func AddPublicRoutes(
 		dendriteConfig,
 		rsAPI, f, keyRing,
 		federation, userAPI, mscCfg,
-		servers, producer, enableMetrics,
+		producer, enableMetrics,
 	)
 }
 
