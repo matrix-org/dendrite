@@ -103,8 +103,8 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Prefix: roomIDsCache,
 			MaxAge: maxAge,
 		},
-		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{ // event NID -> event
-			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
+		RoomServerEvents: &RistrettoCostedCachePartition[int64, *types.HeaderedEvent]{ // event NID -> event
+			&RistrettoCachePartition[int64, *types.HeaderedEvent]{
 				cache:   cache,
 				Prefix:  roomEventsCache,
 				MaxAge:  maxAge,

@@ -473,7 +473,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
-		var event *gomatrixserverlib.Event
+		var event gomatrixserverlib.PDU
 		event, err = builder.AddAuthEventsAndBuild(userDomain, &authEvents, evTime, newVersion, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to build new %q event: %w", builder.Type, err)

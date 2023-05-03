@@ -313,7 +313,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	natsInstance := jetstream.NATSInstance{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, caching.DisableMetrics)
+	federationapi.AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, caching.DisableMetrics)
 	baseURL, cancel := test.ListenAndServe(t, routers.Federation, true)
 	defer cancel()
 	serverName := spec.ServerName(strings.TrimPrefix(baseURL, "https://"))

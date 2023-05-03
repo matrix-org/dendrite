@@ -237,7 +237,7 @@ func createInviteFrom3PIDInvite(
 	cfg *config.FederationAPI,
 	inv invite, federation fclient.FederationClient,
 	userAPI userapi.FederationUserAPI,
-) (*gomatrixserverlib.Event, error) {
+) (gomatrixserverlib.PDU, error) {
 	_, server, err := gomatrixserverlib.SplitID('@', inv.MXID)
 	if err != nil {
 		return nil, err
@@ -293,7 +293,7 @@ func buildMembershipEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
-) (*gomatrixserverlib.Event, error) {
+) (gomatrixserverlib.PDU, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		return nil, err

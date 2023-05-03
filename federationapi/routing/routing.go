@@ -24,7 +24,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
@@ -64,7 +63,6 @@ func Setup(
 	federation fclient.FederationClient,
 	userAPI userapi.FederationUserAPI,
 	mscCfg *config.MSCs,
-	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer, enableMetrics bool,
 ) {
 	fedMux := routers.Federation
@@ -141,7 +139,7 @@ func Setup(
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, userAPI, keys, federation, mu, servers, producer,
+				cfg, rsAPI, userAPI, keys, federation, mu, producer,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRouteName)
