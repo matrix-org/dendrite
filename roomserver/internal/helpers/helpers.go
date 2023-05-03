@@ -100,7 +100,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 func IsInvitePending(
 	ctx context.Context, db storage.Database,
 	roomID, userID string,
-) (bool, string, string, *gomatrixserverlib.Event, error) {
+) (bool, string, string, gomatrixserverlib.PDU, error) {
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {

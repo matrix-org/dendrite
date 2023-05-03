@@ -856,7 +856,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 			return events[0].PDU, nil
 		}
 	}
-	var event *gomatrixserverlib.Event
+	var event gomatrixserverlib.PDU
 	found := false
 	for _, serverName := range t.servers {
 		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)

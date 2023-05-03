@@ -543,7 +543,7 @@ func (d *EventDatabase) events(
 	}
 
 	sort.Sort(inputEventNIDs)
-	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
+	events := make(map[types.EventNID]gomatrixserverlib.PDU, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
 	for _, nid := range inputEventNIDs {
 		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
@@ -593,7 +593,7 @@ func (d *EventDatabase) events(
 			return nil, err
 		}
 		if event := events[eventJSON.EventNID]; event != nil {
-			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, &types.HeaderedEvent{PDU: event})
 		}
 	}
 	results := make([]types.Event, 0, len(inputEventNIDs))

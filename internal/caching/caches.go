@@ -28,7 +28,7 @@ type Caches struct {
 	ServerKeys              Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
 	RoomServerRoomNIDs      Cache[string, types.RoomNID]                           // room ID -> room NID
 	RoomServerRoomIDs       Cache[types.RoomNID, string]                           // room NID -> room ID
-	RoomServerEvents        Cache[int64, *gomatrixserverlib.Event]                 // event NID -> event
+	RoomServerEvents        Cache[int64, *types.HeaderedEvent]                     // event NID -> event
 	RoomServerStateKeys     Cache[types.EventStateKeyNID, string]                  // eventStateKey NID -> event state key
 	RoomServerStateKeyNIDs  Cache[string, types.EventStateKeyNID]                  // event state key -> eventStateKey NID
 	RoomServerEventTypeNIDs Cache[string, types.EventTypeNID]                      // eventType -> eventType NID

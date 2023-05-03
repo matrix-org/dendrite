@@ -26,12 +26,12 @@ import (
 
 // used to implement RoomserverInternalAPIEventDB to test getAuthChain
 type getEventDB struct {
-	eventMap map[string]*gomatrixserverlib.Event
+	eventMap map[string]gomatrixserverlib.PDU
 }
 
 func createEventDB() *getEventDB {
 	return &getEventDB{
-		eventMap: make(map[string]*gomatrixserverlib.Event),
+		eventMap: make(map[string]gomatrixserverlib.PDU),
 	}
 }
 
