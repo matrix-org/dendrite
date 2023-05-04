@@ -12,7 +12,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.media.capacity }}
-  storageClassName: {{ .Values.persistence.storageClass }}
+  storageClassName: {{ default .Values.persistence.storageClass .Values.persistence.media.storageClass }}
 {{ end }}
 {{ if not .Values.persistence.jetstream.existingClaim }}
 ---
@@ -28,7 +28,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.jetstream.capacity }}
-  storageClassName: {{ .Values.persistence.storageClass }}
+  storageClassName: {{ default .Values.persistence.storageClass .Values.persistence.jetstream.storageClass }}
 {{ end }}
 {{ if not .Values.persistence.search.existingClaim }}
 ---
@@ -44,5 +44,5 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.search.capacity }}
-  storageClassName: {{ .Values.persistence.storageClass }}
+  storageClassName: {{ default .Values.persistence.storageClass .Values.persistence.search.storageClass }}
 {{ end }}

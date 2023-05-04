@@ -24,24 +24,34 @@ resources:
     memory: "4096Mi"
 
 persistence:
-  # -- The storage class to use for volume claims. Defaults to the
-  # cluster default storage class.
+  # -- The storage class to use for volume claims.
+  # Used unless specified at the specific component.
+  # Defaults to the cluster default storage class.
   storageClass: ""
   jetstream:
     # -- Use an existing volume claim for jetstream
     existingClaim: ""
     # -- PVC Storage Request for the jetstream volume
     capacity: "1Gi"
+    # -- The storage class to use for volume claims.
+    # Defaults to persistence.storageClass
+    storageClass: ""
   media:
     # -- Use an existing volume claim for media files
     existingClaim: ""
     # -- PVC Storage Request for the media volume
     capacity: "1Gi"
+    # -- The storage class to use for volume claims.
+    # Defaults to persistence.storageClass
+    storageClass: ""
   search:
     # -- Use an existing volume claim for the fulltext search index
     existingClaim: ""
     # -- PVC Storage Request for the search volume
     capacity: "1Gi"
+    # -- The storage class to use for volume claims.
+    # Defaults to persistence.storageClass
+    storageClass: ""
 
 # -- Add additional volumes to the Dendrite Pod
 extraVolumes: []
