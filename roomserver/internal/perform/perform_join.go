@@ -180,14 +180,14 @@ func (r *Joiner) performJoinRoomByID(
 	if err != nil {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", userID, err)}
 	}
-	eb := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Type:     spec.MRoomMember,
 		Sender:   userID,
 		StateKey: &userID,
 		RoomID:   req.RoomIDOrAlias,
 		Redacts:  "",
 	}
-	if err = eb.SetUnsigned(struct{}{}); err != nil {
+	if err = proto.SetUnsigned(struct{}{}); err != nil {
 		return "", "", fmt.Errorf("eb.SetUnsigned: %w", err)
 	}
 
@@ -203,7 +203,7 @@ func (r *Joiner) performJoinRoomByID(
 	} else if authorisedVia != "" {
 		req.Content["join_authorised_via_users_server"] = authorisedVia
 	}
-	if err = eb.SetContent(req.Content); err != nil {
+	if err = proto.SetContent(req.Content); err != nil {
 		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
 
@@ -284,7 +284,7 @@ func (r *Joiner) performJoinRoomByID(
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &eb, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err {
 	case nil:

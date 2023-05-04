@@ -52,15 +52,15 @@ func MakeLeave(
 	}
 
 	// Try building an event for the server
-	builder := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Sender:   userID,
 		RoomID:   roomID,
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": spec.Leave})
+	err = proto.SetContent(map[string]interface{}{"membership": spec.Leave})
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("proto.SetContent failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -75,7 +75,7 @@ func MakeLeave(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -126,7 +126,7 @@ func MakeLeave(
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
 			"room_version": event.Version(),
-			"event":        builder,
+			"event":        proto,
 		},
 	}
 }

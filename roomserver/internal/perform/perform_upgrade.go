@@ -459,22 +459,32 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
-		builder := gomatrixserverlib.EventBuilder{
+		proto := gomatrixserverlib.ProtoEvent{
 			Sender:   userID,
 			RoomID:   newRoomID,
 			Type:     e.Type,
 			StateKey: &e.StateKey,
 			Depth:    int64(depth),
 		}
-		err = builder.SetContent(e.Content)
+		err = proto.SetContent(e.Content)
 		if err != nil {
-			return fmt.Errorf("failed to set content of new %q event: %w", builder.Type, err)
+			return fmt.Errorf("failed to set content of new %q event: %w", proto.Type, err)
 		}
 		if i > 0 {
-			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
+			proto.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
+
+		verImpl, err := gomatrixserverlib.GetRoomVersion(newVersion)
+		if err != nil {
+			return err
+		}
+		builder := verImpl.NewEventBuilderFromProtoEvent(&proto)
+		if err = builder.AddAuthEvents(&authEvents); err != nil {
+			return err
+		}
+
 		var event gomatrixserverlib.PDU
-		event, err = builder.AddAuthEventsAndBuild(userDomain, &authEvents, evTime, newVersion, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
+		event, err = builder.Build(evTime, userDomain, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to build new %q event: %w", builder.Type, err)
 
@@ -524,27 +534,27 @@ func (r *Upgrader) makeTombstoneEvent(
 }
 
 func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, userID, roomID string, event fledglingEvent) (*types.HeaderedEvent, error) {
-	builder := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Sender:   userID,
 		RoomID:   roomID,
 		Type:     event.Type,
 		StateKey: &event.StateKey,
 	}
-	err := builder.SetContent(event.Content)
+	err := proto.SetContent(event.Content)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set new %q event content: %w", builder.Type, err)
+		return nil, fmt.Errorf("failed to set new %q event content: %w", proto.Type, err)
 	}
 	// Get the sender domain.
-	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', builder.Sender)
+	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', proto.Sender)
 	if serr != nil {
-		return nil, fmt.Errorf("Failed to split user ID %q: %w", builder.Sender, err)
+		return nil, fmt.Errorf("Failed to split user ID %q: %w", proto.Sender, err)
 	}
 	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing identity for %q: %w", senderDomain, err)
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &builder, r.Cfg.Matrix, identity, evTime, r.URSAPI, &queryRes)
+	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, evTime, r.URSAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, err
 	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
@@ -552,7 +562,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	} else if e, ok := err.(gomatrixserverlib.EventValidationError); ok {
 		return nil, e
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to build new %q event: %w", builder.Type, err)
+		return nil, fmt.Errorf("failed to build new %q event: %w", proto.Type, err)
 	}
 	// check to see if this user can perform this operation
 	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
@@ -561,7 +571,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider); err != nil {
-		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", builder.Type, err)} // TODO: Is this error string comprehensible to the client?
+		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", proto.Type, err)} // TODO: Is this error string comprehensible to the client?
 	}
 
 	return headeredEvent, nil

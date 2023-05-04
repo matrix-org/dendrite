@@ -335,7 +335,7 @@ func emit3PIDInviteEvent(
 	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) error {
-	builder := &gomatrixserverlib.EventBuilder{
+	proto := &gomatrixserverlib.ProtoEvent{
 		Sender:   device.UserID,
 		RoomID:   roomID,
 		Type:     "m.room.third_party_invite",
@@ -350,7 +350,7 @@ func emit3PIDInviteEvent(
 		PublicKeys:     res.PublicKeys,
 	}
 
-	if err := builder.SetContent(content); err != nil {
+	if err := proto.SetContent(content); err != nil {
 		return err
 	}
 
@@ -360,7 +360,7 @@ func emit3PIDInviteEvent(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.QueryAndBuildEvent(ctx, builder, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, proto, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}

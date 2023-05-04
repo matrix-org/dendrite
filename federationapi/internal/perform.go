@@ -439,7 +439,7 @@ func (r *FederationInternalAPI) PerformLeave(
 
 		// Work out if we support the room version that has been supplied in
 		// the make_leave response.
-		_, err = gomatrixserverlib.GetRoomVersion(respMakeLeave.RoomVersion)
+		verImpl, err := gomatrixserverlib.GetRoomVersion(respMakeLeave.RoomVersion)
 		if err != nil {
 			return err
 		}
@@ -451,27 +451,28 @@ func (r *FederationInternalAPI) PerformLeave(
 		respMakeLeave.LeaveEvent.StateKey = &request.UserID
 		respMakeLeave.LeaveEvent.RoomID = request.RoomID
 		respMakeLeave.LeaveEvent.Redacts = ""
+		leaveEB := verImpl.NewEventBuilderFromProtoEvent(&respMakeLeave.LeaveEvent)
+
 		if respMakeLeave.LeaveEvent.Content == nil {
 			content := map[string]interface{}{
 				"membership": "leave",
 			}
-			if err = respMakeLeave.LeaveEvent.SetContent(content); err != nil {
+			if err = leaveEB.SetContent(content); err != nil {
 				logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetContent failed")
 				continue
 			}
 		}
-		if err = respMakeLeave.LeaveEvent.SetUnsigned(struct{}{}); err != nil {
+		if err = leaveEB.SetUnsigned(struct{}{}); err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetUnsigned failed")
 			continue
 		}
 
 		// Build the leave event.
-		event, err := respMakeLeave.LeaveEvent.Build(
+		event, err := leaveEB.Build(
 			time.Now(),
 			origin,
 			r.cfg.Matrix.KeyID,
 			r.cfg.Matrix.PrivateKey,
-			respMakeLeave.RoomVersion,
 		)
 		if err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.Build failed")

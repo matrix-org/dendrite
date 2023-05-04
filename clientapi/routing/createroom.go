@@ -433,18 +433,26 @@ func createRoom(
 	// TODO: invite events
 	// TODO: 3pid invite events
 
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("unknown room version"),
+		}
+	}
+
 	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
-		builder := gomatrixserverlib.EventBuilder{
+		builder := verImpl.NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
 			Sender:   userID,
 			RoomID:   roomID,
 			Type:     e.Type,
 			StateKey: &e.StateKey,
 			Depth:    int64(depth),
-		}
+		})
 		err = builder.SetContent(e.Content)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
@@ -454,7 +462,11 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev gomatrixserverlib.PDU
-		ev, err = builder.AddAuthEventsAndBuild(userDomain, &authEvents, evTime, roomVersion, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+		if err = builder.AddAuthEvents(&authEvents); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("AddAuthEvents failed")
+			return jsonerror.InternalServerError()
+		}
+		ev, err = builder.Build(evTime, userDomain, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()

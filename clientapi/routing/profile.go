@@ -339,7 +339,7 @@ func buildMembershipEvents(
 	evs := []*types.HeaderedEvent{}
 
 	for _, roomID := range roomIDs {
-		builder := gomatrixserverlib.EventBuilder{
+		proto := gomatrixserverlib.ProtoEvent{
 			Sender:   userID,
 			RoomID:   roomID,
 			Type:     "m.room.member",
@@ -353,7 +353,7 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err := builder.SetContent(content); err != nil {
+		if err := proto.SetContent(content); err != nil {
 			return nil, err
 		}
 
@@ -362,7 +362,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, nil)
+		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

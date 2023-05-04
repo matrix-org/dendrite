@@ -852,7 +852,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
-		fledglingEvent := &gomatrixserverlib.EventBuilder{
+		fledglingEvent := &gomatrixserverlib.ProtoEvent{
 			RoomID:     event.RoomID(),
 			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
@@ -864,7 +864,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			return err
 		}
 
-		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(fledglingEvent)
 		if err != nil {
 			return err
 		}

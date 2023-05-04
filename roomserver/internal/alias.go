@@ -187,7 +187,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			builder := &gomatrixserverlib.EventBuilder{
+			proto := &gomatrixserverlib.ProtoEvent{
 				Sender:   sender,
 				RoomID:   ev.RoomID(),
 				Type:     ev.Type(),
@@ -195,7 +195,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				Content:  res,
 			}
 
-			eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+			eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
 			if err != nil {
 				return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 			}
@@ -208,7 +208,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			newEvent, err := eventutil.BuildEvent(ctx, builder, &r.Cfg.Global, identity, time.Now(), &eventsNeeded, stateRes)
+			newEvent, err := eventutil.BuildEvent(ctx, proto, &r.Cfg.Global, identity, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}
