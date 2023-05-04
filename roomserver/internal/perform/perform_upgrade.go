@@ -474,7 +474,8 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			proto.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 
-		verImpl, err := gomatrixserverlib.GetRoomVersion(newVersion)
+		var verImpl gomatrixserverlib.IRoomVersion
+		verImpl, err = gomatrixserverlib.GetRoomVersion(newVersion)
 		if err != nil {
 			return err
 		}
