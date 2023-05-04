@@ -165,7 +165,7 @@ func (d *sessionsDict) addCompletedSessionStage(sessionID string, stage authtype
 			return
 		}
 	}
-	d.sessions[sessionID] = append(sessions.sessions[sessionID], stage)
+	d.sessions[sessionID] = append(d.sessions[sessionID], stage)
 }
 
 func (d *sessionsDict) addDeviceToDelete(sessionID, deviceID string) {
