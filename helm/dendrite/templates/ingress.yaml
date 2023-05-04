@@ -1,24 +1,25 @@
 {{- if .Values.ingress.enabled -}}
-  {{- $fullName := include "dendrite.fullname" . -}}
-  {{- $svcPort := .Values.service.port -}}
-  {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
-  {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
-  {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
-  {{- end }}
-  {{- end }}
-  {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+{{- $fullName := include "dendrite.fullname" . -}}
+{{- $serverNameHost := .Values.dendrite_config.global.server_name -}}
+{{- $wellKnownServerHost := default $serverNameHost (regexFind "^[^:]+" .Values.dendrite_config.global.well_known_server_name) -}}
+{{- $wellKnownClientHost := default $serverNameHost (regexFind "^[^:]+" .Values.dendrite_config.global.well_known_client_name) -}}
+{{- $allHosts := list $serverNameHost $wellKnownServerHost $wellKnownClientHost | uniq -}}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1
-  {{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1beta1
-  {{- else -}}
+{{- else -}}
 apiVersion: extensions/v1beta1
-  {{- end }}
+{{- end }}
 kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
     {{- include "dendrite.labels" . | nindent 4 }}
   annotations:
+    {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+    {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -26,7 +27,7 @@ spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
+  {{- if kindIs "slice" .Values.ingress.tls }}
   tls:
     {{- range .Values.ingress.tls }}
     - hosts:
@@ -35,8 +36,16 @@ spec:
         {{- end }}
       secretName: {{ .secretName }}
     {{- end }}
+  {{- else if .Values.ingress.tls.generate }}
+  tls:
+    - hosts:
+        {{- range $allHosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ $fullName }}-ingress-tls
   {{- end }}
   rules:
+    {{- if .Values.ingress.hostName }}
     - host: {{ .Values.ingress.hostName | quote }}
       http:
         paths:
@@ -47,9 +56,60 @@ spec:
               service:
                 name: {{ $fullName }}
                 port:
-                  number: {{ $svcPort }}
+                  name: http
               {{- else }}
               serviceName: {{ $fullName }}
-              servicePort: {{ $svcPort }}
+              servicePort: http
               {{- end }}
-  {{- end }}
+    {{- else }}
+    - host: {{ $serverNameHost | quote }}
+      http:
+        paths:
+          - path: /.well-known/matrix
+            pathType: Prefix
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: http
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: http
+              {{- end }}
+    - host: {{ $wellKnownServerHost | quote }}
+      http:
+        paths:
+          {{- range list "/_matrix/key" "/_matrix/federation" }}
+          - path: {{ . | quote }}
+            pathType: Prefix
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: http
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: http
+              {{- end }}
+          {{- end }}
+    - host: {{ $wellKnownClientHost | quote }}
+      http:
+        paths:
+          {{- range list "/_matrix/client" "/_matrix/media" }}
+          - path: {{ . | quote }}
+            pathType: Prefix
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: http
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: http
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

@@ -19,7 +19,6 @@ signing_key:
 resources:
   requests:
     memory: "512Mi"
-
   limits:
     memory: "4096Mi"
 
@@ -59,7 +58,6 @@ extraVolumes: []
 # - name: extra-config
 #   secret:
 #     secretName: extra-config
-
 
 # -- Configure additional mount points volumes in the Dendrite Pod
 extraVolumeMounts: []
@@ -222,7 +220,6 @@ dendrite_config:
       # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
       # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
-
   app_service_api:
     # -- Disable the validation of TLS certificates of appservices. This is
     # not recommended in production since it may allow appservice traffic
@@ -369,14 +366,18 @@ postgresql:
     enabled: false
 
 ingress:
-  # -- Create an ingress for a monolith deployment
+  # -- Create an ingress for the deployment
   enabled: false
-  hosts: []
+  # -- The ingressClass to use. Will be converted to annotation if not yet supported.
   className: ""
-  hostName: ""
   # -- Extra, custom annotations
   annotations: {}
-
+  # -- The ingress hostname for your matrix server.
+  # Should align with the server_name and well_known_* hosts.
+  # If not set, generated from the dendrite_config values.
+  hostName: ""
+  # -- TLS configuration. Should contain information for the server_name and well-known hosts.
+  # Alternatively, set tls.generate=true to generate defaults based on the dendrite_config.
   tls: []
 
 service:
