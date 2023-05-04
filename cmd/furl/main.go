@@ -28,6 +28,8 @@ var (
 
 	flagMatrixKey string
 	flagOrigin    string
+
+	flagPort int
 )
 
 func init() {
@@ -45,17 +47,20 @@ func init() {
 
 	flag.StringVar(&flagOrigin, "O", "", "The server name that the request should originate from. The remote server will use this to request server keys. There MUST be a TLS listener at the .well-known address for this server name, i.e it needs to be pointing to a real homeserver. If blank, furl will self-host this on a random high numbered port, but only if the target is localhost. Use $PORT in request URLs/bodies to substitute the port number in.")
 	flag.StringVar(&flagOrigin, "origin", "", "The server name that the request should originate from. The remote server will use this to request server keys. There MUST be a TLS listener at the .well-known address for this server name, i.e it needs to be pointing to a real homeserver. If blank, furl will self-host this on a random high numbered port, but only if the target is localhost. Use $PORT in request URLs/bodies to substitute the port number in.")
+
+	flag.IntVar(&flagPort, "p", 0, "Port to self-host on. If set, always self-hosts. Required because sometimes requests need the same origin.")
 }
 
 type args struct {
-	SkipVerify  bool
-	Method      string
-	Data        []byte
-	MatrixKey   ed25519.PrivateKey
-	MatrixKeyID gomatrixserverlib.KeyID
-	Origin      spec.ServerName
-	SelfHostKey bool
-	TargetURL   *url.URL
+	SkipVerify   bool
+	Method       string
+	Data         []byte
+	MatrixKey    ed25519.PrivateKey
+	MatrixKeyID  gomatrixserverlib.KeyID
+	Origin       spec.ServerName
+	SelfHostKey  bool
+	SelfHostPort int
+	TargetURL    *url.URL
 }
 
 func processArgs() (*args, error) {
@@ -91,8 +96,9 @@ func processArgs() (*args, error) {
 	a.SkipVerify = flagSkipVerify
 	a.Method = strings.ToUpper(flagMethod)
 	a.Origin = spec.ServerName(flagOrigin)
+	a.SelfHostPort = flagPort
 	a.TargetURL = targetURL
-	a.SelfHostKey = a.Origin == "" && a.TargetURL.Hostname() == "localhost"
+	a.SelfHostKey = a.SelfHostPort != 0 || (a.Origin == "" && a.TargetURL.Hostname() == "localhost")
 
 	// load data
 	isFile := strings.HasPrefix(flagData, "@")
@@ -119,7 +125,7 @@ func main() {
 
 	if a.SelfHostKey {
 		fmt.Printf("Self-hosting key...")
-		apiURL, cancel := test.ListenAndServe(tt{}, http.DefaultServeMux, true)
+		apiURL, cancel := test.ListenAndServe(tt{}, http.DefaultServeMux, true, a.SelfHostPort)
 		defer cancel()
 		parsedURL, _ := url.Parse(apiURL)
 		a.Origin = spec.ServerName(parsedURL.Host)
@@ -166,6 +172,11 @@ func main() {
 		a.TargetURL, err = url.Parse(strings.ReplaceAll(a.TargetURL.String(), "$PORT", port))
 		if err != nil {
 			panic(err)
+		}
+		if a.Data != nil {
+			data := string(a.Data)
+			data = strings.ReplaceAll(data, "$PORT", port)
+			a.Data = []byte(data)
 		}
 	}
 

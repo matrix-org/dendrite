@@ -59,8 +59,8 @@ type testInterface interface {
 
 // ListenAndServe will listen on a random high-numbered port and attach the given router.
 // Returns the base URL to send requests to. Call `cancel` to shutdown the server, which will block until it has closed.
-func ListenAndServe(t testInterface, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+func ListenAndServe(t testInterface, router http.Handler, withTLS bool, customPort int) (apiURL string, cancel func()) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", customPort))
 	if err != nil {
 		t.Fatalf("failed to listen: %s", err)
 	}
