@@ -49,9 +49,17 @@ func NewRequest(t *testing.T, method, path string, opts ...HTTPRequestOpt) *http
 	return req
 }
 
+// it's a testing.T but implementable for things which don't have one e.g furl
+type testInterface interface {
+	Logf(format string, args ...any)
+	Errorf(format string, args ...any)
+	Fatalf(format string, args ...any)
+	TempDir() string
+}
+
 // ListenAndServe will listen on a random high-numbered port and attach the given router.
 // Returns the base URL to send requests to. Call `cancel` to shutdown the server, which will block until it has closed.
-func ListenAndServe(t *testing.T, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
+func ListenAndServe(t testInterface, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %s", err)
