@@ -92,7 +92,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
-		fledglingEvent := &gomatrixserverlib.EventBuilder{
+		fledglingEvent := &gomatrixserverlib.ProtoEvent{
 			RoomID:     roomID,
 			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
@@ -109,7 +109,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return nil, err
 		}
 
-		eventsNeeded, err = gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		eventsNeeded, err = gomatrixserverlib.StateNeededForProtoEvent(fledglingEvent)
 		if err != nil {
 			return nil, err
 		}
@@ -283,16 +283,16 @@ func (r *Admin) PerformAdminDownloadState(
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 
-	builder := &gomatrixserverlib.EventBuilder{
+	proto := &gomatrixserverlib.ProtoEvent{
 		Type:    "org.matrix.dendrite.state_download",
 		Sender:  userID,
 		RoomID:  roomID,
 		Content: spec.RawJSON("{}"),
 	}
 
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+		return fmt.Errorf("gomatrixserverlib.StateNeededForProtoEvent: %w", err)
 	}
 
 	queryRes := &api.QueryLatestEventsAndStateResponse{
@@ -308,7 +308,7 @@ func (r *Admin) PerformAdminDownloadState(
 		return err
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
+	ev, err := eventutil.BuildEvent(ctx, proto, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
 	if err != nil {
 		return fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}

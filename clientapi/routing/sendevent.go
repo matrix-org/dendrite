@@ -264,15 +264,15 @@ func generateSendEvent(
 	userID := device.UserID
 
 	// create the new event and set all the fields we can
-	builder := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Sender:   userID,
 		RoomID:   roomID,
 		Type:     eventType,
 		StateKey: stateKey,
 	}
-	err := builder.SetContent(r)
+	err := proto.SetContent(r)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
+		util.GetLogger(ctx).WithError(err).Error("proto.SetContent failed")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
@@ -284,7 +284,7 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,

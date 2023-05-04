@@ -154,24 +154,24 @@ func (r *Leaver) performLeaveRoomByID(
 
 	// Prepare the template for the leave event.
 	userID := req.UserID
-	eb := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Type:     spec.MRoomMember,
 		Sender:   userID,
 		StateKey: &userID,
 		RoomID:   req.RoomID,
 		Redacts:  "",
 	}
-	if err = eb.SetContent(map[string]interface{}{"membership": "leave"}); err != nil {
+	if err = proto.SetContent(map[string]interface{}{"membership": "leave"}); err != nil {
 		return nil, fmt.Errorf("eb.SetContent: %w", err)
 	}
-	if err = eb.SetUnsigned(struct{}{}); err != nil {
+	if err = proto.SetUnsigned(struct{}{}); err != nil {
 		return nil, fmt.Errorf("eb.SetUnsigned: %w", err)
 	}
 
 	// Get the sender domain.
-	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', eb.Sender)
+	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', proto.Sender)
 	if serr != nil {
-		return nil, fmt.Errorf("sender %q is invalid", eb.Sender)
+		return nil, fmt.Errorf("sender %q is invalid", proto.Sender)
 	}
 
 	// We know that the user is in the room at this point so let's build
@@ -184,7 +184,7 @@ func (r *Leaver) performLeaveRoomByID(
 	if err != nil {
 		return nil, fmt.Errorf("SigningIdentityFor: %w", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &eb, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
 	if err != nil {
 		return nil, fmt.Errorf("eventutil.QueryAndBuildEvent: %w", err)
 	}

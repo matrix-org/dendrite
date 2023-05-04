@@ -118,7 +118,7 @@ func MakeJoin(
 	}
 
 	// Try building an event for the server
-	builder := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Sender:   userID,
 		RoomID:   roomID,
 		Type:     "m.room.member",
@@ -128,7 +128,7 @@ func MakeJoin(
 		Membership:    spec.Join,
 		AuthorisedVia: authorisedVia,
 	}
-	if err = builder.SetContent(content); err != nil {
+	if err = proto.SetContent(content); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
 		return jsonerror.InternalServerError()
 	}
@@ -146,7 +146,7 @@ func MakeJoin(
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: roomVersion,
 	}
-	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -179,7 +179,7 @@ func MakeJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"event":        builder,
+			"event":        proto,
 			"room_version": roomVersion,
 		},
 	}

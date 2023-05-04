@@ -113,7 +113,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 	for _, r := range f.allowJoins {
 		if r.ID == roomID {
 			res.RoomVersion = r.Version
-			res.JoinEvent = gomatrixserverlib.EventBuilder{
+			res.JoinEvent = gomatrixserverlib.ProtoEvent{
 				Sender:     userID,
 				RoomID:     roomID,
 				Type:       "m.room.member",
@@ -122,7 +122,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 				PrevEvents: r.ForwardExtremities(),
 			}
 			var needed gomatrixserverlib.StateNeeded
-			needed, err = gomatrixserverlib.StateNeededForEventBuilder(&res.JoinEvent)
+			needed, err = gomatrixserverlib.StateNeededForProtoEvent(&res.JoinEvent)
 			if err != nil {
 				f.t.Errorf("StateNeededForEventBuilder: %v", err)
 				return

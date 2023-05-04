@@ -113,15 +113,15 @@ func SendRedaction(
 	}
 
 	// create the new event and set all the fields we can
-	builder := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Sender:  device.UserID,
 		RoomID:  roomID,
 		Type:    spec.MRoomRedaction,
 		Redacts: eventID,
 	}
-	err := builder.SetContent(r)
+	err := proto.SetContent(r)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -131,7 +131,7 @@ func SendRedaction(
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(req.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

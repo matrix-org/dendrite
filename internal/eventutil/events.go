@@ -41,7 +41,7 @@ var ErrRoomNoExists = errors.New("room does not exist")
 // Returns an error if something else went wrong
 func QueryAndBuildEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
+	proto *gomatrixserverlib.ProtoEvent, cfg *config.Global,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*types.HeaderedEvent, error) {
@@ -49,29 +49,35 @@ func QueryAndBuildEvent(
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 
-	eventsNeeded, err := queryRequiredEventsForBuilder(ctx, builder, rsAPI, queryRes)
+	eventsNeeded, err := queryRequiredEventsForBuilder(ctx, proto, rsAPI, queryRes)
 	if err != nil {
 		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
 	}
-	return BuildEvent(ctx, builder, cfg, identity, evTime, eventsNeeded, queryRes)
+	return BuildEvent(ctx, proto, cfg, identity, evTime, eventsNeeded, queryRes)
 }
 
 // BuildEvent builds a Matrix event from the builder and QueryLatestEventsAndStateResponse
 // provided.
 func BuildEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
+	proto *gomatrixserverlib.ProtoEvent, cfg *config.Global,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	eventsNeeded *gomatrixserverlib.StateNeeded, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*types.HeaderedEvent, error) {
-	if err := addPrevEventsToEvent(builder, eventsNeeded, queryRes); err != nil {
+	if err := addPrevEventsToEvent(proto, eventsNeeded, queryRes); err != nil {
 		return nil, err
 	}
 
+	verImpl, err := gomatrixserverlib.GetRoomVersion(queryRes.RoomVersion)
+	if err != nil {
+		return nil, err
+	}
+	builder := verImpl.NewEventBuilderFromProtoEvent(proto)
+
 	event, err := builder.Build(
 		evTime, identity.ServerName, identity.KeyID,
-		identity.PrivateKey, queryRes.RoomVersion,
+		identity.PrivateKey,
 	)
 	if err != nil {
 		return nil, err
@@ -83,12 +89,12 @@ func BuildEvent(
 // queryRequiredEventsForBuilder queries the roomserver for auth/prev events needed for this builder.
 func queryRequiredEventsForBuilder(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder,
+	proto *gomatrixserverlib.ProtoEvent,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.StateNeeded, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
 	if err != nil {
-		return nil, fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.StateNeededForProtoEvent: %w", err)
 	}
 
 	if len(eventsNeeded.Tuples()) == 0 {
@@ -97,7 +103,7 @@ func queryRequiredEventsForBuilder(
 
 	// Ask the roomserver for information about this room
 	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID:       builder.RoomID,
+		RoomID:       proto.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	return &eventsNeeded, rsAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes)
@@ -105,7 +111,7 @@ func queryRequiredEventsForBuilder(
 
 // addPrevEventsToEvent fills out the prev_events and auth_events fields in builder
 func addPrevEventsToEvent(
-	builder *gomatrixserverlib.EventBuilder,
+	builder *gomatrixserverlib.ProtoEvent,
 	eventsNeeded *gomatrixserverlib.StateNeeded,
 	queryRes *api.QueryLatestEventsAndStateResponse,
 ) error {

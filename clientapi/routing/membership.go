@@ -313,7 +313,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	builder := gomatrixserverlib.EventBuilder{
+	proto := gomatrixserverlib.ProtoEvent{
 		Sender:   device.UserID,
 		RoomID:   roomID,
 		Type:     "m.room.member",
@@ -328,7 +328,7 @@ func buildMembershipEvent(
 		IsDirect:    isDirect,
 	}
 
-	if err = builder.SetContent(content); err != nil {
+	if err = proto.SetContent(content); err != nil {
 		return nil, err
 	}
 
@@ -337,7 +337,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, nil)
+	return eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

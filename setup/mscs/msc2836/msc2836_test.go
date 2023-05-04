@@ -585,20 +585,20 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
-	eb := gomatrixserverlib.EventBuilder{
+	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
 		Sender:   ev.Sender,
 		Depth:    999,
 		Type:     ev.Type,
 		StateKey: ev.StateKey,
 		RoomID:   ev.RoomID,
-	}
+	})
 	err := eb.SetContent(ev.Content)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to marshal event content %+v", ev.Content)
 	}
 	// make sure the origin_server_ts changes so we can test recency
 	time.Sleep(1 * time.Millisecond)
-	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key, roomVer)
+	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
