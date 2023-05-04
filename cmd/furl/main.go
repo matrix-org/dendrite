@@ -142,7 +142,8 @@ func main() {
 				},
 			},
 		}
-		serverKeyBytes, err := json.Marshal(serverKey)
+		var serverKeyBytes []byte
+		serverKeyBytes, err = json.Marshal(serverKey)
 		if err != nil {
 			panic(err)
 		}
@@ -198,7 +199,7 @@ func main() {
 	)
 	if a.Data != nil {
 		var jsonData interface{}
-		if err := json.Unmarshal(a.Data, &jsonData); err != nil {
+		if err = json.Unmarshal(a.Data, &jsonData); err != nil {
 			fmt.Printf("Supplied data is not valid json: %s\n", err)
 			os.Exit(1)
 		}
