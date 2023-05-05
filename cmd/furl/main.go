@@ -147,7 +147,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		signedBytes, err := gomatrixserverlib.SignJSON(string(a.Origin), a.MatrixKeyID, a.MatrixKey, serverKeyBytes)
+		var signedBytes []byte
+		signedBytes, err = gomatrixserverlib.SignJSON(string(a.Origin), a.MatrixKeyID, a.MatrixKey, serverKeyBytes)
 		if err != nil {
 			panic(err)
 		}
