@@ -31,31 +31,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-var cfg = &config.ClientAPI{
-	Matrix: &config.Global{
-		SigningIdentity: fclient.SigningIdentity{
-			ServerName: serverName,
-		},
-	},
-	Derived: &config.Derived{
-		ApplicationServices: []config.ApplicationService{
-			{
-				ID:      "anapplicationservice",
-				ASToken: "astoken",
-				NamespaceMap: map[string][]config.ApplicationServiceNamespace{
-					"users": {
-						{
-							Exclusive:    true,
-							Regex:        "@alice:example.com",
-							RegexpObject: regexp.MustCompile("@alice:example.com"),
-						},
-					},
-				},
-			},
-		},
-	},
-}
-
 func TestLoginFromJSONReader(t *testing.T) {
 	ctx := context.Background()
 
@@ -118,6 +93,30 @@ func TestLoginFromJSONReader(t *testing.T) {
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
+			cfg := &config.ClientAPI{
+				Matrix: &config.Global{
+					SigningIdentity: fclient.SigningIdentity{
+						ServerName: serverName,
+					},
+				},
+				Derived: &config.Derived{
+					ApplicationServices: []config.ApplicationService{
+						{
+							ID:      "anapplicationservice",
+							ASToken: "astoken",
+							NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+								"users": {
+									{
+										Exclusive:    true,
+										Regex:        "@alice:example.com",
+										RegexpObject: regexp.MustCompile("@alice:example.com"),
+									},
+								},
+							},
+						},
+					},
+				},
+			}
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tst.Body))
 			if tst.Token != "" {
@@ -238,7 +237,30 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
-
+			cfg := &config.ClientAPI{
+				Matrix: &config.Global{
+					SigningIdentity: fclient.SigningIdentity{
+						ServerName: serverName,
+					},
+				},
+				Derived: &config.Derived{
+					ApplicationServices: []config.ApplicationService{
+						{
+							ID:      "anapplicationservice",
+							ASToken: "astoken",
+							NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+								"users": {
+									{
+										Exclusive:    true,
+										Regex:        "@alice:example.com",
+										RegexpObject: regexp.MustCompile("@alice:example.com"),
+									},
+								},
+							},
+						},
+					},
+				},
+			}
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tst.Body))
 			if tst.Token != "" {
 				req.Header.Add("Authorization", "Bearer "+tst.Token)
