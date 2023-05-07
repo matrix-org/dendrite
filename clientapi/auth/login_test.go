@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -32,7 +33,7 @@ import (
 
 var cfg = &config.ClientAPI{
 	Matrix: &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	},
