@@ -199,7 +199,7 @@ func SendEvent(
 		req.Context(), rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{PDU: e},
+			{PDU: e},
 		},
 		device.UserDomain(),
 		domain,

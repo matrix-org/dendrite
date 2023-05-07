@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
