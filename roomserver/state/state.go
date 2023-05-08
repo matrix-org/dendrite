@@ -86,7 +86,7 @@ func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatri
 	}
 
 	if p.roomInfo == nil {
-		return nil, fmt.Errorf("cannot get events without room info")
+		return nil, types.ErrorInvalidRoomInfo
 	}
 	events, err := p.db.Events(ctx, p.roomInfo.RoomVersion, []types.EventNID{plNID})
 	if err != nil {
@@ -1139,7 +1139,7 @@ func (v *StateResolution) loadStateEvents(
 	}
 
 	if v.roomInfo == nil {
-		return nil, nil, fmt.Errorf("cannot get events without room info")
+		return nil, nil, types.ErrorInvalidRoomInfo
 	}
 	events, err := v.db.Events(ctx, v.roomInfo.RoomVersion, eventNIDs)
 	if err != nil {

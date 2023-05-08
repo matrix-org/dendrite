@@ -221,7 +221,7 @@ func loadAuthEvents(
 	}
 
 	if roomInfo == nil {
-		err = fmt.Errorf("cannot get events without room info")
+		err = types.ErrorInvalidRoomInfo
 		return
 	}
 	if result.events, err = db.Events(ctx, roomInfo.RoomVersion, eventNIDs); err != nil {

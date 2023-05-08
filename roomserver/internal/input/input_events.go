@@ -806,7 +806,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 	}
 
 	if roomInfo == nil {
-		return fmt.Errorf("cannot get events without room info")
+		return types.ErrorInvalidRoomInfo
 	}
 	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomVersion, membershipNIDs)
 	if err != nil {

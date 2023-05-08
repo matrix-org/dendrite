@@ -564,7 +564,7 @@ func joinEventsFromHistoryVisibility(
 
 	// Get all of the events in this state
 	if roomInfo == nil {
-		return nil, gomatrixserverlib.HistoryVisibilityJoined, fmt.Errorf("cannot get events without room info")
+		return nil, gomatrixserverlib.HistoryVisibilityJoined, types.ErrorInvalidRoomInfo
 	}
 	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {

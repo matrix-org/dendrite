@@ -17,6 +17,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -328,3 +329,5 @@ func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
 	r.stateSnapshotNID = r2.stateSnapshotNID
 	r.isStub = r2.isStub
 }
+
+var ErrorInvalidRoomInfo = fmt.Errorf("room info is invalid")

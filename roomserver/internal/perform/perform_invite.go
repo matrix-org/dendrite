@@ -270,7 +270,7 @@ func buildInviteStrippedState(
 		stateNIDs = append(stateNIDs, stateNID.EventNID)
 	}
 	if info == nil {
-		return nil, fmt.Errorf("cannot get events without room info")
+		return nil, types.ErrorInvalidRoomInfo
 	}
 	stateEvents, err := db.Events(ctx, info.RoomVersion, stateNIDs)
 	if err != nil {

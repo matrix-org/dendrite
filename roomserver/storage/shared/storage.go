@@ -393,7 +393,7 @@ func (d *EventDatabase) eventsFromIDs(ctx context.Context, txn *sql.Tx, roomInfo
 	}
 
 	if roomInfo == nil {
-		return nil, fmt.Errorf("cannot get events without room info")
+		return nil, types.ErrorInvalidRoomInfo
 	}
 	return d.events(ctx, txn, roomInfo.RoomVersion, nids)
 }

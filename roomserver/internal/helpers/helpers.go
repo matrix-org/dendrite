@@ -184,7 +184,7 @@ func GetMembershipsAtState(
 
 	// Get all of the events in this state
 	if roomInfo == nil {
-		return nil, fmt.Errorf("cannot get events without room info")
+		return nil, types.ErrorInvalidRoomInfo
 	}
 	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
@@ -239,7 +239,7 @@ func LoadEvents(
 	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, eventNIDs []types.EventNID,
 ) ([]gomatrixserverlib.PDU, error) {
 	if roomInfo == nil {
-		return nil, fmt.Errorf("cannot get events without room info")
+		return nil, types.ErrorInvalidRoomInfo
 	}
 	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
