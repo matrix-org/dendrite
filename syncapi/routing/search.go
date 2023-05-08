@@ -29,13 +29,13 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // nolint:gocyclo

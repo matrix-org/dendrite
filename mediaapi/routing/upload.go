@@ -26,7 +26,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
@@ -34,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )

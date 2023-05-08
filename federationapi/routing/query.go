@@ -18,13 +18,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 )
 

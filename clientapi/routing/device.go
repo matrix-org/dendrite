@@ -22,9 +22,9 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )

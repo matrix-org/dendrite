@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 )
 

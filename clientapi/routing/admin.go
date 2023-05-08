@@ -17,12 +17,12 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {

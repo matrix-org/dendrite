@@ -30,13 +30,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid

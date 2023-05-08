@@ -19,10 +19,10 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 )
 

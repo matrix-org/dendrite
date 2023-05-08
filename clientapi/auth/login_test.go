@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 )
 

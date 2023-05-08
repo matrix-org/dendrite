@@ -19,13 +19,13 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 )
 

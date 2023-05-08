@@ -24,11 +24,11 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 type roomDirectoryResponse struct {

@@ -22,11 +22,11 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )

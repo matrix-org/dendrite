@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"

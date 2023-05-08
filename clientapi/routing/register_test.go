@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -39,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"

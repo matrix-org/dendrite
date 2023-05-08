@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
@@ -30,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 type RelationsResponse struct {

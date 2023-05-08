@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"

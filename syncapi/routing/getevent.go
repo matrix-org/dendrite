@@ -20,13 +20,13 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // GetEvent implements

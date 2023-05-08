@@ -23,11 +23,11 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}

@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"

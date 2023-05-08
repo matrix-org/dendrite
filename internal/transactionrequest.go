@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -30,6 +29,7 @@ import (
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"

@@ -33,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -41,6 +40,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client

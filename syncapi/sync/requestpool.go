@@ -30,7 +30,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -40,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync

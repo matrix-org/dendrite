@@ -21,11 +21,11 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 
 	"github.com/matrix-org/util"
 )

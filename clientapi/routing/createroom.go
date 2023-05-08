@@ -32,10 +32,10 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )

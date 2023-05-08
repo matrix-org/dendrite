@@ -22,12 +22,12 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"

@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
@@ -34,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"

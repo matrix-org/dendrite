@@ -21,12 +21,12 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	relayInternal "github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"

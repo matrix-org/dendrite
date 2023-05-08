@@ -21,8 +21,8 @@ import (
 	"github.com/matrix-org/util"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // Protocols implements

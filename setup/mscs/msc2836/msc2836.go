@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -39,6 +38,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )

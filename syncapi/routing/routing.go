@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -30,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // Setup configures the given mux with sync-server listeners
