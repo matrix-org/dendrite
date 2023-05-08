@@ -91,7 +91,7 @@ func main() {
 		}
 
 		var eventEntries []types.Event
-		eventEntries, err = roomserverDB.Events(ctx, roomInfo, eventNIDs)
+		eventEntries, err = roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 		if err != nil {
 			panic(err)
 		}
@@ -149,7 +149,7 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(eventNIDMap), "state events")
-	eventEntries, err := roomserverDB.Events(ctx, roomInfo, eventNIDs)
+	eventEntries, err := roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		panic(err)
 	}

@@ -41,7 +41,7 @@ type StateResolutionStorage interface {
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error)
+	Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error)
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 }
 
@@ -85,7 +85,10 @@ func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatri
 		return nil, fmt.Errorf("unable to find power level event")
 	}
 
-	events, err := p.db.Events(ctx, p.roomInfo, []types.EventNID{plNID})
+	if p.roomInfo == nil {
+		return nil, fmt.Errorf("cannot get events without room info")
+	}
+	events, err := p.db.Events(ctx, p.roomInfo.RoomVersion, []types.EventNID{plNID})
 	if err != nil {
 		return nil, err
 	}
@@ -1134,7 +1137,11 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	events, err := v.db.Events(ctx, v.roomInfo, eventNIDs)
+
+	if v.roomInfo == nil {
+		return nil, nil, fmt.Errorf("cannot get events without room info")
+	}
+	events, err := v.db.Events(ctx, v.roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}

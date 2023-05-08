@@ -805,7 +805,10 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 		return err
 	}
 
-	memberEvents, err := r.DB.Events(ctx, roomInfo, membershipNIDs)
+	if roomInfo == nil {
+		return fmt.Errorf("cannot get events without room info")
+	}
+	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomVersion, membershipNIDs)
 	if err != nil {
 		return err
 	}

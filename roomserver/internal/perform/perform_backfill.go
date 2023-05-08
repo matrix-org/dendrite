@@ -533,7 +533,7 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 			roomNID = nid.RoomNID
 		}
 	}
-	eventsWithNids, err := b.db.Events(ctx, &b.roomInfo, eventNIDs)
+	eventsWithNids, err := b.db.Events(ctx, b.roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_nids", eventNIDs).Error("Failed to load events")
 		return nil, err
@@ -563,7 +563,10 @@ func joinEventsFromHistoryVisibility(
 	}
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
+	if roomInfo == nil {
+		return nil, gomatrixserverlib.HistoryVisibilityJoined, fmt.Errorf("cannot get events without room info")
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		// even though the default should be shared, restricting the visibility to joined
 		// feels more secure here.
@@ -586,7 +589,7 @@ func joinEventsFromHistoryVisibility(
 	if err != nil {
 		return nil, visibility, err
 	}
-	evs, err := db.Events(ctx, roomInfo, joinEventNIDs)
+	evs, err := db.Events(ctx, roomInfo.RoomVersion, joinEventNIDs)
 	return evs, visibility, err
 }
 

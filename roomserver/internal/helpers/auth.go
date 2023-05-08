@@ -219,7 +219,12 @@ func loadAuthEvents(
 			eventNIDs = append(eventNIDs, eventNID)
 		}
 	}
-	if result.events, err = db.Events(ctx, roomInfo, eventNIDs); err != nil {
+
+	if roomInfo == nil {
+		err = fmt.Errorf("cannot get events without room info")
+		return
+	}
+	if result.events, err = db.Events(ctx, roomInfo.RoomVersion, eventNIDs); err != nil {
 		return
 	}
 	roomID := ""

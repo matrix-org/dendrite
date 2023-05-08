@@ -86,7 +86,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 		return false, err
 	}
 
-	events, err := db.Events(ctx, info, eventNIDs)
+	events, err := db.Events(ctx, info.RoomVersion, eventNIDs)
 	if err != nil {
 		return false, err
 	}
@@ -183,7 +183,10 @@ func GetMembershipsAtState(
 	util.Unique(eventNIDs)
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
+	if roomInfo == nil {
+		return nil, fmt.Errorf("cannot get events without room info")
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +238,10 @@ func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types
 func LoadEvents(
 	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, eventNIDs []types.EventNID,
 ) ([]gomatrixserverlib.PDU, error) {
-	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
+	if roomInfo == nil {
+		return nil, fmt.Errorf("cannot get events without room info")
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, err
 	}

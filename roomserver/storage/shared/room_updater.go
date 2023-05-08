@@ -116,8 +116,11 @@ func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEvent
 	})
 }
 
-func (u *RoomUpdater) Events(ctx context.Context, _ *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error) {
-	return u.d.events(ctx, u.txn, u.roomInfo, eventNIDs)
+func (u *RoomUpdater) Events(ctx context.Context, _ gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error) {
+	if u.roomInfo == nil {
+		return nil, fmt.Errorf("cannot get events without room info")
+	}
+	return u.d.events(ctx, u.txn, u.roomInfo.RoomVersion, eventNIDs)
 }
 
 func (u *RoomUpdater) SnapshotNIDFromEventID(

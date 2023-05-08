@@ -392,7 +392,10 @@ func (d *EventDatabase) eventsFromIDs(ctx context.Context, txn *sql.Tx, roomInfo
 		nids = append(nids, nid.EventNID)
 	}
 
-	return d.events(ctx, txn, roomInfo, nids)
+	if roomInfo == nil {
+		return nil, fmt.Errorf("cannot get events without room info")
+	}
+	return d.events(ctx, txn, roomInfo.RoomVersion, nids)
 }
 
 func (d *Database) LatestEventIDs(
@@ -531,17 +534,13 @@ func (d *Database) GetInvitesForUser(
 	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 }
 
-func (d *EventDatabase) Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error) {
-	return d.events(ctx, nil, roomInfo, eventNIDs)
+func (d *EventDatabase) Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error) {
+	return d.events(ctx, nil, roomVersion, eventNIDs)
 }
 
 func (d *EventDatabase) events(
-	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, inputEventNIDs types.EventNIDs,
+	ctx context.Context, txn *sql.Tx, roomVersion gomatrixserverlib.RoomVersion, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
-	if roomInfo == nil { // this should never happen
-		return nil, fmt.Errorf("unable to parse events without roomInfo")
-	}
-
 	sort.Sort(inputEventNIDs)
 	events := make(map[types.EventNID]gomatrixserverlib.PDU, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
@@ -579,7 +578,7 @@ func (d *EventDatabase) events(
 		eventIDs = map[types.EventNID]string{}
 	}
 
-	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -1107,7 +1106,10 @@ func (d *EventDatabase) loadEvent(ctx context.Context, roomInfo *types.RoomInfo,
 	if len(nids) == 0 {
 		return nil
 	}
-	evs, err := d.Events(ctx, roomInfo, []types.EventNID{nids[eventID].EventNID})
+	if roomInfo == nil {
+		return nil
+	}
+	evs, err := d.Events(ctx, roomInfo.RoomVersion, []types.EventNID{nids[eventID].EventNID})
 	if err != nil {
 		return nil
 	}

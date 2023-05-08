@@ -571,7 +571,7 @@ func TestRedaction(t *testing.T) {
 					if ev.Type() == spec.MRoomRedaction {
 						nids, err := db.EventNIDs(ctx, []string{ev.Redacts()})
 						assert.NoError(t, err)
-						evs, err := db.Events(ctx, roomInfo, []types.EventNID{nids[ev.Redacts()].EventNID})
+						evs, err := db.Events(ctx, roomInfo.RoomVersion, []types.EventNID{nids[ev.Redacts()].EventNID})
 						assert.NoError(t, err)
 						assert.Equal(t, 1, len(evs))
 						assert.Equal(t, tc.wantRedacted, evs[0].Redacted())
