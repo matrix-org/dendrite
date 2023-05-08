@@ -232,6 +232,7 @@ type PerformDeviceUpdateRequest struct {
 }
 type PerformDeviceUpdateResponse struct {
 	DeviceExists bool
+	Forbidden    bool
 }
 
 type PerformDeviceDeletionRequest struct {

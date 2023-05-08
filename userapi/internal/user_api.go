@@ -388,6 +388,11 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	}
 	res.DeviceExists = true
 
+	if dev.UserID != req.RequestingUserID {
+		res.Forbidden = true
+		return nil
+	}
+
 	err = a.DB.UpdateDevice(ctx, localpart, domain, req.DeviceID, req.DisplayName)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
