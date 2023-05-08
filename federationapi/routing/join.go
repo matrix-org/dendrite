@@ -35,11 +35,11 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-type RoomQuerier struct {
+type JoinRoomQuerier struct {
 	roomserver api.FederationRoomserverAPI
 }
 
-func (rq *RoomQuerier) RoomInfo(ctx context.Context, roomID *spec.RoomID) (*gomatrixserverlib.RoomInfo, error) {
+func (rq *JoinRoomQuerier) RoomInfo(ctx context.Context, roomID *spec.RoomID) (*gomatrixserverlib.RoomInfo, error) {
 	roomInfo, err := rq.roomserver.QueryRoomInfo(ctx, roomID)
 	var result *gomatrixserverlib.RoomInfo
 	if roomInfo != nil && !roomInfo.IsStub() {
@@ -52,11 +52,11 @@ func (rq *RoomQuerier) RoomInfo(ctx context.Context, roomID *spec.RoomID) (*goma
 	return result, err
 }
 
-func (rq *RoomQuerier) StateEvent(ctx context.Context, roomID *spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+func (rq *JoinRoomQuerier) StateEvent(ctx context.Context, roomID *spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
 	return rq.roomserver.GetStateEvent(ctx, roomID, eventType, stateKey)
 }
 
-func (rq *RoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName, roomID *spec.RoomID) (*gomatrixserverlib.JoinedToRoomResponse, error) {
+func (rq *JoinRoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName, roomID *spec.RoomID) (*gomatrixserverlib.JoinedToRoomResponse, error) {
 	req := api.QueryServerJoinedToRoomRequest{
 		ServerName: server,
 		RoomID:     roomID.String(),
@@ -74,15 +74,15 @@ func (rq *RoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName,
 	return &joinedResponse, nil
 }
 
-func (rq *RoomQuerier) Membership(ctx context.Context, roomNID int64, userID *spec.UserID) (bool, error) {
+func (rq *JoinRoomQuerier) Membership(ctx context.Context, roomNID int64, userID *spec.UserID) (bool, error) {
 	return rq.roomserver.IsInRoom(ctx, types.RoomNID(roomNID), userID)
 }
 
-func (rq *RoomQuerier) GetJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID int64) ([]gomatrixserverlib.PDU, error) {
+func (rq *JoinRoomQuerier) GetJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID int64) ([]gomatrixserverlib.PDU, error) {
 	return rq.roomserver.GetLocallyJoinedUsers(ctx, roomVersion, types.RoomNID(roomNID))
 }
 
-func (rq *RoomQuerier) InvitePending(ctx context.Context, roomID *spec.RoomID, userID *spec.UserID) (bool, error) {
+func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID *spec.RoomID, userID *spec.UserID) (bool, error) {
 	return rq.roomserver.IsInvitePending(ctx, roomID, userID)
 }
 
@@ -142,7 +142,7 @@ func MakeJoin(
 		return event, stateEvents, nil
 	}
 
-	roomQuerier := RoomQuerier{
+	roomQuerier := JoinRoomQuerier{
 		roomserver: rsAPI,
 	}
 
