@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -34,153 +35,144 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
+type RoomQuerier struct {
+	roomserver api.FederationRoomserverAPI
+}
+
+func (rq *RoomQuerier) RoomInfo(ctx context.Context, roomID *spec.RoomID) (*gomatrixserverlib.RoomInfo, error) {
+	roomInfo, err := rq.roomserver.QueryRoomInfo(ctx, roomID)
+	var result *gomatrixserverlib.RoomInfo
+	if roomInfo != nil && !roomInfo.IsStub() {
+		result = &gomatrixserverlib.RoomInfo{
+			Version: roomInfo.RoomVersion,
+			NID:     int64(roomInfo.RoomNID),
+		}
+	}
+
+	return result, err
+}
+
+func (rq *RoomQuerier) StateEvent(ctx context.Context, roomID *spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+	return rq.roomserver.GetStateEvent(ctx, roomID, eventType, stateKey)
+}
+
+func (rq *RoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName, roomID *spec.RoomID) (*gomatrixserverlib.JoinedToRoomResponse, error) {
+	req := api.QueryServerJoinedToRoomRequest{
+		ServerName: server,
+		RoomID:     roomID.String(),
+	}
+	res := api.QueryServerJoinedToRoomResponse{}
+	if err := rq.roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: Failed to query room")
+	}
+
+	joinedResponse := gomatrixserverlib.JoinedToRoomResponse{
+		RoomExists:   res.RoomExists,
+		ServerInRoom: res.IsInRoom,
+	}
+	return &joinedResponse, nil
+}
+
+func (rq *RoomQuerier) Membership(ctx context.Context, roomNID int64, userID *spec.UserID) (bool, error) {
+	return rq.roomserver.IsInRoom(ctx, types.RoomNID(roomNID), userID)
+}
+
+func (rq *RoomQuerier) GetJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID int64) ([]gomatrixserverlib.PDU, error) {
+	return rq.roomserver.GetLocallyJoinedUsers(ctx, roomVersion, types.RoomNID(roomNID))
+}
+
+func (rq *RoomQuerier) InvitePending(ctx context.Context, roomID *spec.RoomID, userID *spec.UserID) (bool, error) {
+	return rq.roomserver.IsInvitePending(ctx, roomID, userID)
+}
+
 // MakeJoin implements the /make_join API
 func MakeJoin(
 	httpReq *http.Request,
 	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
-	roomID, userID string,
+	roomID *spec.RoomID, userID *spec.UserID,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
-	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())
 	if err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("failed obtaining room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
 
-	// Check that the room that the remote side is trying to join is actually
-	// one of the room versions that they listed in their supported ?ver= in
-	// the make_join URL.
-	// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
-	remoteSupportsVersion := false
-	for _, v := range remoteVersions {
-		if v == roomVersion {
-			remoteSupportsVersion = true
-			break
+	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, *util.JSONResponse) {
+		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
+		if err != nil {
+			return nil, nil, &util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound(
+					fmt.Sprintf("Server name %q does not exist", request.Destination()),
+				),
+			}
 		}
-	}
-	// If it isn't, stop trying to join the room.
-	if !remoteSupportsVersion {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.IncompatibleRoomVersion(roomVersion),
+
+		queryRes := api.QueryLatestEventsAndStateResponse{
+			RoomVersion: roomVersion,
 		}
+		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+		if err == eventutil.ErrRoomNoExists {
+			return nil, nil, &util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("Room does not exist"),
+			}
+		} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+			return nil, nil, &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(e.Error()),
+			}
+		} else if err != nil {
+			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			e := jsonerror.InternalServerError()
+			return nil, nil, &e
+		}
+
+		stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
+		for i, stateEvent := range queryRes.StateEvents {
+			stateEvents[i] = stateEvent.PDU
+		}
+		return event, stateEvents, nil
 	}
 
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Invalid UserID"),
-		}
-	}
-	if domain != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be sent by the server of the user"),
-		}
+	roomQuerier := RoomQuerier{
+		roomserver: rsAPI,
 	}
 
-	// Check if we think we are still joined to the room
-	inRoomReq := &api.QueryServerJoinedToRoomRequest{
-		ServerName: cfg.Matrix.ServerName,
-		RoomID:     roomID,
+	input := gomatrixserverlib.HandleMakeJoinInput{
+		Context:            httpReq.Context(),
+		UserID:             userID,
+		RoomID:             roomID,
+		RoomVersion:        roomVersion,
+		RemoteVersions:     remoteVersions,
+		RequestOrigin:      request.Origin(),
+		RequestDestination: request.Destination(),
+		LocalServerName:    cfg.Matrix.ServerName,
+		RoomQuerier:        &roomQuerier,
+		BuildEventTemplate: createJoinTemplate,
 	}
-	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
-	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), inRoomReq, inRoomRes); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+	response, internalErr := gomatrixserverlib.HandleMakeJoin(input)
+	if internalErr != nil {
+		return *internalErr
+	}
+
+	if response == nil {
+		util.GetLogger(httpReq.Context()).Error("gmsl.HandleMakeJoin returned invalid response")
 		return jsonerror.InternalServerError()
-	}
-	if !inRoomRes.RoomExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(fmt.Sprintf("Room ID %q was not found on this server", roomID)),
-		}
-	}
-	if !inRoomRes.IsInRoom {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(fmt.Sprintf("Room ID %q has no remaining users on this server", roomID)),
-		}
-	}
-
-	// Check if the restricted join is allowed. If the room doesn't
-	// support restricted joins then this is effectively a no-op.
-	res, authorisedVia, err := checkRestrictedJoin(httpReq, rsAPI, roomVersion, roomID, userID)
-	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("checkRestrictedJoin failed")
-		return jsonerror.InternalServerError()
-	} else if res != nil {
-		return *res
-	}
-
-	// Try building an event for the server
-	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   userID,
-		RoomID:   roomID,
-		Type:     "m.room.member",
-		StateKey: &userID,
-	}
-	content := gomatrixserverlib.MemberContent{
-		Membership:    spec.Join,
-		AuthorisedVia: authorisedVia,
-	}
-	if err = proto.SetContent(content); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
-		return jsonerror.InternalServerError()
-	}
-
-	identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(
-				fmt.Sprintf("Server name %q does not exist", request.Destination()),
-			),
-		}
-	}
-
-	queryRes := api.QueryLatestEventsAndStateResponse{
-		RoomVersion: roomVersion,
-	}
-	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
-	if err == eventutil.ErrRoomNoExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room does not exist"),
-		}
-	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(e.Error()),
-		}
-	} else if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-		return jsonerror.InternalServerError()
-	}
-
-	// Check that the join is allowed or not
-	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
-	for i := range queryRes.StateEvents {
-		stateEvents[i] = queryRes.StateEvents[i].PDU
-	}
-
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(event.PDU, &provider); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(err.Error()),
-		}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"event":        proto,
-			"room_version": roomVersion,
+			"event":        response.JoinTemplateEvent,
+			"room_version": response.RoomVersion,
 		},
 	}
 }
@@ -449,74 +441,6 @@ func SendJoin(
 			Origin:      cfg.Matrix.ServerName,
 			Event:       signed.JSON(),
 		},
-	}
-}
-
-// checkRestrictedJoin finds out whether or not we can assist in processing
-// a restricted room join. If the room version does not support restricted
-// joins then this function returns with no side effects. This returns three
-// values:
-//   - an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
-//     should always be sent back to the client if one is specified
-//   - a user ID of an authorising user, typically a user that has power to
-//     issue invites in the room, if one has been found
-//   - an error if there was a problem finding out if this was allowable,
-//     like if the room version isn't known or a problem happened talking to
-//     the roomserver
-func checkRestrictedJoin(
-	httpReq *http.Request,
-	rsAPI api.FederationRoomserverAPI,
-	roomVersion gomatrixserverlib.RoomVersion,
-	roomID, userID string,
-) (*util.JSONResponse, string, error) {
-	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
-	if err != nil {
-		return nil, "", err
-	}
-	if !verImpl.MayAllowRestrictedJoinsInEventAuth() {
-		return nil, "", nil
-	}
-	req := &api.QueryRestrictedJoinAllowedRequest{
-		RoomID: roomID,
-		UserID: userID,
-	}
-	res := &api.QueryRestrictedJoinAllowedResponse{}
-	if err := rsAPI.QueryRestrictedJoinAllowed(httpReq.Context(), req, res); err != nil {
-		return nil, "", err
-	}
-
-	switch {
-	case !res.Restricted:
-		// The join rules for the room don't restrict membership.
-		return nil, "", nil
-
-	case !res.Resident:
-		// The join rules restrict membership but our server isn't currently
-		// joined to all of the allowed rooms, so we can't actually decide
-		// whether or not to allow the user to join. This error code should
-		// tell the joining server to try joining via another resident server
-		// instead.
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnableToAuthoriseJoin("This server cannot authorise the join."),
-		}, "", nil
-
-	case !res.Allowed:
-		// The join rules restrict membership, our server is in the relevant
-		// rooms and the user wasn't joined to join any of the allowed rooms
-		// and therefore can't join this room.
-		return &util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You are not joined to any matching rooms."),
-		}, "", nil
-
-	default:
-		// The join rules restrict membership, our server is in the relevant
-		// rooms and the user was allowed to join because they belong to one
-		// of the allowed rooms. We now need to pick one of our own local users
-		// from within the room to use as the authorising user ID, so that it
-		// can be referred to from within the membership content.
-		return nil, res.AuthorisedVia, nil
 	}
 }
 

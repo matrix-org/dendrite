@@ -858,6 +858,52 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	return nil
 }
 
+func (r *Queryer) IsInvitePending(ctx context.Context, roomID *spec.RoomID, userID *spec.UserID) (bool, error) {
+	pending, _, _, _, err := helpers.IsInvitePending(ctx, r.DB, roomID.String(), userID.String())
+	return pending, err
+}
+
+func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID *spec.RoomID) (*types.RoomInfo, error) {
+	return r.DB.RoomInfo(ctx, roomID.String())
+}
+
+func (r *Queryer) GetStateEvent(ctx context.Context, roomID *spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+	return r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
+}
+
+func (r *Queryer) IsInRoom(ctx context.Context, roomNID types.RoomNID, userID *spec.UserID) (bool, error) {
+	_, isIn, _, err := r.DB.GetMembership(ctx, roomNID, userID.String())
+	return isIn, err
+}
+
+func (r *Queryer) GetLocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error) {
+	joinNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true)
+	if err != nil || len(joinNIDs) == 0 {
+		// There should always be more than one join NID at this point
+		// because we are gated behind GetLocalServerInRoom, but y'know,
+		// sometimes strange things happen.
+		return nil, err
+	}
+
+	// For each of the joined users, let's see if we can get a valid
+	// membership event.
+	joinedUsers := []gomatrixserverlib.PDU{}
+	for _, joinNID := range joinNIDs {
+		events, err := r.DB.Events(ctx, roomVersion, []types.EventNID{joinNID})
+		if err != nil || len(events) != 1 {
+			continue
+		}
+		event := events[0]
+		if event.Type() != spec.MRoomMember || event.StateKey() == nil {
+			continue // shouldn't happen
+		}
+
+		joinedUsers = append(joinedUsers, event)
+	}
+
+	return joinedUsers, nil
+}
+
 // nolint:gocyclo
 func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse) error {
 	// Look up if we know anything about the room. If it doesn't exist

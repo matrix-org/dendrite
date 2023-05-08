@@ -313,8 +313,6 @@ func Setup(
 					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
 				}
 			}
-			roomID := vars["roomID"]
-			userID := vars["userID"]
 			queryVars := httpReq.URL.Query()
 			remoteVersions := []gomatrixserverlib.RoomVersion{}
 			if vers, ok := queryVars["ver"]; ok {
@@ -329,6 +327,24 @@ func Setup(
 				// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
 				remoteVersions = append(remoteVersions, gomatrixserverlib.RoomVersionV1)
 			}
+
+			userID, err := spec.NewUserID(vars["userID"], true)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.BadJSON("Invalid UserID"),
+				}
+			}
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.BadJSON("Invalid RoomID"),
+				}
+			}
+
+			logrus.Warnf("Processing make_join for user %s, room %s", userID.String(), roomID.String())
+
 			return MakeJoin(
 				httpReq, request, cfg, rsAPI, roomID, userID, remoteVersions,
 			)
