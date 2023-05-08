@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"unicode/utf8"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/util"
 )
 
