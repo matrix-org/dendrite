@@ -212,7 +212,7 @@ func (r *Queryer) QueryMembershipForUser(
 	response.IsInRoom = stillInRoom
 	response.HasBeenInRoom = true
 
-	evs, err := r.DB.Events(ctx, info, []types.EventNID{membershipEventNID})
+	evs, err := r.DB.Events(ctx, info.RoomVersion, []types.EventNID{membershipEventNID})
 	if err != nil {
 		return err
 	}
@@ -344,7 +344,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 			}
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}
-		events, err = r.DB.Events(ctx, info, eventNIDs)
+		events, err = r.DB.Events(ctx, info.RoomVersion, eventNIDs)
 		if err != nil {
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
@@ -383,7 +383,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return err
 		}
 
-		events, err = r.DB.Events(ctx, info, eventNIDs)
+		events, err = r.DB.Events(ctx, info.RoomVersion, eventNIDs)
 	} else {
 		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID)
 		if err != nil {
@@ -967,7 +967,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		// For each of the joined users, let's see if we can get a valid
 		// membership event.
 		for _, joinNID := range joinNIDs {
-			events, err := r.DB.Events(ctx, roomInfo, []types.EventNID{joinNID})
+			events, err := r.DB.Events(ctx, roomInfo.RoomVersion, []types.EventNID{joinNID})
 			if err != nil || len(events) != 1 {
 				continue
 			}

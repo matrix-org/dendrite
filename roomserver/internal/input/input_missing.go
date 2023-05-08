@@ -398,7 +398,10 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 	for _, entry := range stateEntries {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
-	stateEvents, err := t.db.Events(ctx, t.roomInfo, stateEventNIDs)
+	if t.roomInfo == nil {
+		return nil
+	}
+	stateEvents, err := t.db.Events(ctx, t.roomInfo.RoomVersion, stateEventNIDs)
 	if err != nil {
 		t.log.WithError(err).Warnf("failed to load state events locally")
 		return nil

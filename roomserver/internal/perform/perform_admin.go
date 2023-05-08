@@ -60,7 +60,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		return nil, err
 	}
 
-	memberEvents, err := r.DB.Events(ctx, roomInfo, memberNIDs)
+	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomVersion, memberNIDs)
 	if err != nil {
 		return nil, err
 	}
