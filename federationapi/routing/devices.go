@@ -50,9 +50,7 @@ func GetUserDevices(
 	for _, dev := range res.Devices {
 		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
 	}
-	if err := keyAPI.QuerySignatures(req.Context(), sigReq, sigRes); err != nil {
-		return spec.InternalAPIError(req.Context(), err)
-	}
+	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
 
 	response := fclient.RespUserDevices{
 		UserID:   userID,

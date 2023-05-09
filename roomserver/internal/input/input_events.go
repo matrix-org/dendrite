@@ -893,5 +893,6 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 		Asynchronous:    true, // Needs to be async, as we otherwise create a deadlock
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	return r.InputRoomEvents(ctx, inputReq, inputRes)
+	r.InputRoomEvents(ctx, inputReq, inputRes)
+	return nil
 }

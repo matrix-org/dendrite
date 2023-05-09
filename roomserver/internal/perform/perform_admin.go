@@ -141,8 +141,8 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		Asynchronous:    true,
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	err = r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
-	return affected, err
+	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+	return affected, nil
 }
 
 // PerformAdminEvacuateUser will remove the given user from all rooms.
@@ -334,9 +334,7 @@ func (r *Admin) PerformAdminDownloadState(
 		SendAsServer:  string(r.Cfg.Matrix.ServerName),
 	})
 
-	if err = r.Inputer.InputRoomEvents(ctx, inputReq, inputRes); err != nil {
-		return fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
-	}
+	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
 
 	if inputRes.ErrMsg != "" {
 		return inputRes.Err()

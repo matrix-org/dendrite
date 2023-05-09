@@ -113,7 +113,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	}, accAvailableResp); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalAPIError(req.Context(), err),
+			JSON: spec.InternalServerError(),
 		}
 	}
 	if accAvailableResp.Available {

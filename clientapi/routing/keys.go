@@ -112,14 +112,12 @@ func QueryKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *api.Device) u
 		return *resErr
 	}
 	queryRes := api.QueryKeysResponse{}
-	if err := keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
+	keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
 		UserID:        device.UserID,
 		UserToDevices: r.DeviceKeys,
 		Timeout:       r.GetTimeout(),
 		// TODO: Token?
-	}, &queryRes); err != nil {
-		return util.ErrorResponse(err)
-	}
+	}, &queryRes)
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
@@ -152,12 +150,10 @@ func ClaimKeys(req *http.Request, keyAPI api.ClientKeyAPI) util.JSONResponse {
 		return *resErr
 	}
 	claimRes := api.PerformClaimKeysResponse{}
-	if err := keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
+	keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: r.OneTimeKeys,
 		Timeout:     r.GetTimeout(),
-	}, &claimRes); err != nil {
-		return spec.InternalAPIError(req.Context(), err)
-	}
+	}, &claimRes)
 	if claimRes.Error != nil {
 		util.GetLogger(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
 		return spec.InternalServerError()

@@ -63,10 +63,10 @@ type FederationUserAPI interface {
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error)
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
-	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse) error
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse) error
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
 // api functions required by the sync api
@@ -646,17 +646,17 @@ type QueryAccountByLocalpartResponse struct {
 // API functions required by the clientapi
 type ClientKeyAPI interface {
 	UploadDeviceKeysAPI
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse) error
 
-	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse) error
+	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 	PerformMarkAsStaleIfNeeded(ctx context.Context, req *PerformMarkAsStaleRequest, res *struct{}) error
 }
 
 type UploadDeviceKeysAPI interface {
-	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse) error
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
 }
 
 // API functions required by the syncapi
@@ -668,10 +668,10 @@ type SyncKeyAPI interface {
 
 type FederationKeyAPI interface {
 	UploadDeviceKeysAPI
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
-	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse) error
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse) error
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server

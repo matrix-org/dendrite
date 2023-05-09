@@ -409,7 +409,7 @@ func SendJoin(
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
 		var response api.InputRoomEventsResponse
-		if err := rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
@@ -418,9 +418,7 @@ func SendJoin(
 					TransactionID: nil,
 				},
 			},
-		}, &response); err != nil {
-			return spec.InternalAPIError(httpReq.Context(), err)
-		}
+		}, &response)
 		if response.ErrMsg != "" {
 			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
 			if response.NotAllowed {

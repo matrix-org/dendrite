@@ -313,9 +313,7 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := rsAPI.InputRoomEventsResponse{}
-			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
-				return "", "", rsAPI.ErrNotAllowed{Err: err}
-			}
+			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
 			if err = inputRes.Err(); err != nil {
 				return "", "", rsAPI.ErrNotAllowed{Err: err}
 			}

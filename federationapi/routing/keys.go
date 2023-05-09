@@ -62,11 +62,9 @@ func QueryDeviceKeys(
 	}
 
 	var queryRes api.QueryKeysResponse
-	if err := keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
+	keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
 		UserToDevices: qkr.DeviceKeys,
-	}, &queryRes); err != nil {
-		return spec.InternalAPIError(httpReq.Context(), err)
-	}
+	}, &queryRes)
 	if queryRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
 		return spec.InternalServerError()
@@ -116,11 +114,9 @@ func ClaimOneTimeKeys(
 	}
 
 	var claimRes api.PerformClaimKeysResponse
-	if err := keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
+	keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: cor.OneTimeKeys,
-	}, &claimRes); err != nil {
-		return spec.InternalAPIError(httpReq.Context(), err)
-	}
+	}, &claimRes)
 	if claimRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
 		return spec.InternalServerError()
