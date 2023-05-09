@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -59,7 +58,7 @@ func Setup(
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Username was invalid"),
+					JSON: spec.InvalidUsername("Username was invalid"),
 				}
 			}
 			return SendTransactionToRelay(
@@ -84,7 +83,7 @@ func Setup(
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Username was invalid"),
+					JSON: spec.InvalidUsername("Username was invalid"),
 				}
 			}
 			return GetTransactionFromRelay(httpReq, request, relayAPI, *userID)

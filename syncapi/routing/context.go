@@ -33,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -57,7 +56,7 @@ func Context(
 ) util.JSONResponse {
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -75,7 +74,7 @@ func Context(
 		}
 		return util.JSONResponse{
 			Code:    http.StatusBadRequest,
-			JSON:    jsonerror.InvalidParam(errMsg),
+			JSON:    spec.InvalidParam(errMsg),
 			Headers: nil,
 		}
 	}
@@ -88,12 +87,12 @@ func Context(
 	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: device.UserID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to query membership")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if !membershipRes.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("room does not exist"),
+			JSON: spec.Forbidden("room does not exist"),
 		}
 	}
 
@@ -114,11 +113,11 @@ func Context(
 		if err == sql.ErrNoRows {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound(fmt.Sprintf("Event %s not found", eventID)),
+				JSON: spec.NotFound(fmt.Sprintf("Event %s not found", eventID)),
 			}
 		}
 		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// verify the user is allowed to see the context for this room/event
@@ -126,7 +125,7 @@ func Context(
 	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	logrus.WithFields(logrus.Fields{
 		"duration": time.Since(startTime),
@@ -135,27 +134,27 @@ func Context(
 	if len(filteredEvents) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("User is not allowed to query context"),
+			JSON: spec.Forbidden("User is not allowed to query context"),
 		}
 	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch before events")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch after events")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	startTime = time.Now()
 	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, device.UserID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -167,7 +166,7 @@ func Context(
 	state, err := snapshot.CurrentState(ctx, roomID, &stateFilter, nil)
 	if err != nil {
 		logrus.WithError(err).Error("unable to fetch current room state")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	eventsBeforeClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBeforeFiltered), synctypes.FormatAll)
@@ -181,7 +180,7 @@ func Context(
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
 			logrus.WithError(err).Error("unable to load membership events")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 	}
 

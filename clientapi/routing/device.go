@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -60,7 +60,7 @@ func GetDeviceByID(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	var targetDevice *api.Device
 	for _, device := range queryRes.Devices {
@@ -72,7 +72,7 @@ func GetDeviceByID(
 	if targetDevice == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Unknown device"),
+			JSON: spec.NotFound("Unknown device"),
 		}
 	}
 
@@ -97,7 +97,7 @@ func GetDevicesByLocalpart(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	res := devicesJSON{}
@@ -139,12 +139,12 @@ func UpdateDeviceByID(
 	}, &performRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceUpdate failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if !performRes.DeviceExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.Forbidden("device does not exist"),
+			JSON: spec.Forbidden("device does not exist"),
 		}
 	}
 
@@ -174,7 +174,7 @@ func DeleteDeviceById(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
 
@@ -184,7 +184,7 @@ func DeleteDeviceById(
 		if dev != deviceID {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("session and device mismatch"),
+				JSON: spec.Forbidden("session and device mismatch"),
 			}
 		}
 	}
@@ -206,7 +206,7 @@ func DeleteDeviceById(
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// make sure that the access token being used matches the login creds used for user interactive auth, else
@@ -214,7 +214,7 @@ func DeleteDeviceById(
 	if login.Username() != localpart && login.Username() != device.UserID {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("Cannot delete another user's device"),
+			JSON: spec.Forbidden("Cannot delete another user's device"),
 		}
 	}
 
@@ -224,7 +224,7 @@ func DeleteDeviceById(
 		DeviceIDs: []string{deviceID},
 	}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	deleteOK = true
@@ -245,7 +245,7 @@ func DeleteDevices(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
 	defer req.Body.Close() // nolint:errcheck
@@ -259,14 +259,14 @@ func DeleteDevices(
 	if login.Username() != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("unable to delete devices for other user"),
+			JSON: spec.Forbidden("unable to delete devices for other user"),
 		}
 	}
 
 	payload := devicesDeleteJSON{}
 	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	var res api.PerformDeviceDeletionResponse
@@ -275,7 +275,7 @@ func DeleteDevices(
 		DeviceIDs: payload.Devices,
 	}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -72,7 +72,7 @@ func UploadCrossSigningDeviceKeys(
 
 	uploadReq.UserID = device.UserID
 	if err := keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
+		return spec.InternalAPIError(req.Context(), err)
 	}
 
 	if err := uploadRes.Error; err != nil {
@@ -80,22 +80,22 @@ func UploadCrossSigningDeviceKeys(
 		case err.IsInvalidSignature:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidSignature(err.Error()),
+				JSON: spec.InvalidSignature(err.Error()),
 			}
 		case err.IsMissingParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.MissingParam(err.Error()),
+				JSON: spec.MissingParam(err.Error()),
 			}
 		case err.IsInvalidParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidParam(err.Error()),
+				JSON: spec.InvalidParam(err.Error()),
 			}
 		default:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown(err.Error()),
+				JSON: spec.Unknown(err.Error()),
 			}
 		}
 	}
@@ -116,7 +116,7 @@ func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.Clie
 
 	uploadReq.UserID = device.UserID
 	if err := keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
+		return spec.InternalAPIError(req.Context(), err)
 	}
 
 	if err := uploadRes.Error; err != nil {
@@ -124,22 +124,22 @@ func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.Clie
 		case err.IsInvalidSignature:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidSignature(err.Error()),
+				JSON: spec.InvalidSignature(err.Error()),
 			}
 		case err.IsMissingParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.MissingParam(err.Error()),
+				JSON: spec.MissingParam(err.Error()),
 			}
 		case err.IsInvalidParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidParam(err.Error()),
+				JSON: spec.InvalidParam(err.Error()),
 			}
 		default:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown(err.Error()),
+				JSON: spec.Unknown(err.Error()),
 			}
 		}
 	}

@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // Setup configures the given mux with sync-server listeners
@@ -158,12 +157,12 @@ func Setup(
 			if !cfg.Fulltext.Enabled {
 				return util.JSONResponse{
 					Code: http.StatusNotImplemented,
-					JSON: jsonerror.Unknown("Search has been disabled by the server administrator."),
+					JSON: spec.Unknown("Search has been disabled by the server administrator."),
 				}
 			}
 			var nextBatch *string
 			if err := req.ParseForm(); err != nil {
-				return jsonerror.InternalServerError()
+				return spec.InternalServerError()
 			}
 			if req.Form.Has("next_batch") {
 				nb := req.FormValue("next_batch")

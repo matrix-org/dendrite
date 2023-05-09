@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 var (
@@ -68,7 +67,7 @@ func GetPostPublicRooms(
 	if request.IncludeAllNetworks && request.NetworkID != "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
+			JSON: spec.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
 		}
 	}
 
@@ -82,7 +81,7 @@ func GetPostPublicRooms(
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -93,7 +92,7 @@ func GetPostPublicRooms(
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -173,7 +172,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 	if httpReq.Method != "GET" && httpReq.Method != "POST" {
 		return &util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
+			JSON: spec.NotFound("Bad method"),
 		}
 	}
 	if httpReq.Method == "GET" {
@@ -184,7 +183,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON("limit param is not a number"),
+				JSON: spec.BadJSON("limit param is not a number"),
 			}
 		}
 		request.Limit = int64(limit)

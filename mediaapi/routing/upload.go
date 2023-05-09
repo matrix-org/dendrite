@@ -33,7 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -165,7 +165,7 @@ func (r *uploadRequest) doUpload(
 		}).Warn("Error while transferring file")
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Failed to upload"),
+			JSON: spec.Unknown("Failed to upload"),
 		}
 	}
 
@@ -184,7 +184,7 @@ func (r *uploadRequest) doUpload(
 	if err != nil {
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		r.Logger.WithError(err).Error("Error querying the database by hash.")
-		resErr := jsonerror.InternalServerError()
+		resErr := spec.InternalServerError()
 		return &resErr
 	}
 	if existingMetadata != nil {
@@ -194,7 +194,7 @@ func (r *uploadRequest) doUpload(
 		mediaID, merr := r.generateMediaID(ctx, db)
 		if merr != nil {
 			r.Logger.WithError(merr).Error("Failed to generate media ID for existing file")
-			resErr := jsonerror.InternalServerError()
+			resErr := spec.InternalServerError()
 			return &resErr
 		}
 
@@ -217,7 +217,7 @@ func (r *uploadRequest) doUpload(
 		if err != nil {
 			fileutils.RemoveDir(tmpDir, r.Logger)
 			r.Logger.WithError(err).Error("Failed to generate media ID for new upload")
-			resErr := jsonerror.InternalServerError()
+			resErr := spec.InternalServerError()
 			return &resErr
 		}
 	}
@@ -239,7 +239,7 @@ func (r *uploadRequest) doUpload(
 func requestEntityTooLargeJSONResponse(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
 	return &util.JSONResponse{
 		Code: http.StatusRequestEntityTooLarge,
-		JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
+		JSON: spec.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
 	}
 }
 
@@ -251,7 +251,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 	if strings.HasPrefix(string(r.MediaMetadata.UploadName), "~") {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("File name must not begin with '~'."),
+			JSON: spec.Unknown("File name must not begin with '~'."),
 		}
 	}
 	// TODO: Validate filename - what are the valid characters?
@@ -264,7 +264,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 		if _, _, err := gomatrixserverlib.SplitID('@', string(r.MediaMetadata.UserID)); err != nil {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),
+				JSON: spec.BadJSON("user id must be in the form @localpart:domain"),
 			}
 		}
 	}
@@ -290,7 +290,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 		r.Logger.WithError(err).Error("Failed to move file.")
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Failed to upload"),
+			JSON: spec.Unknown("Failed to upload"),
 		}
 	}
 	if duplicate {
@@ -307,7 +307,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 		}
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Failed to upload"),
+			JSON: spec.Unknown("Failed to upload"),
 		}
 	}
 

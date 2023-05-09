@@ -29,7 +29,6 @@ import (
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -153,7 +152,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 				// See https://github.com/matrix-org/synapse/issues/7543
 				return nil, &util.JSONResponse{
 					Code: 400,
-					JSON: jsonerror.BadJSON("PDU contains bad JSON"),
+					JSON: spec.BadJSON("PDU contains bad JSON"),
 				}
 			}
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))

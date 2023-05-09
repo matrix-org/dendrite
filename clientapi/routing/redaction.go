@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 type redactionContent struct {
@@ -63,13 +62,13 @@ func SendRedaction(
 	if ev == nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.NotFound("unknown event ID"), // TODO: is it ok to leak existence?
+			JSON: spec.NotFound("unknown event ID"), // TODO: is it ok to leak existence?
 		}
 	}
 	if ev.RoomID() != roomID {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.NotFound("cannot redact event in another room"),
+			JSON: spec.NotFound("cannot redact event in another room"),
 		}
 	}
 
@@ -85,14 +84,14 @@ func SendRedaction(
 		if plEvent == nil {
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden("You don't have permission to redact this event, no power_levels event in this room."),
+				JSON: spec.Forbidden("You don't have permission to redact this event, no power_levels event in this room."),
 			}
 		}
 		pl, err := plEvent.PowerLevels()
 		if err != nil {
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden(
+				JSON: spec.Forbidden(
 					"You don't have permission to redact this event, the power_levels event for this room is malformed so auth checks cannot be performed.",
 				),
 			}
@@ -102,7 +101,7 @@ func SendRedaction(
 	if !allowedToRedact {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("You don't have permission to redact this event, power level too low."),
+			JSON: spec.Forbidden("You don't have permission to redact this event, power level too low."),
 		}
 	}
 
@@ -122,12 +121,12 @@ func SendRedaction(
 	err := proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
@@ -135,13 +134,13 @@ func SendRedaction(
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room does not exist"),
+			JSON: spec.NotFound("Room does not exist"),
 		}
 	}
 	domain := device.UserDomain()
 	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	res := util.JSONResponse{

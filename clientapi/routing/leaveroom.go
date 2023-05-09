@@ -19,7 +19,7 @@ import (
 
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -41,12 +41,12 @@ func LeaveRoomByID(
 		if leaveRes.Code != 0 {
 			return util.JSONResponse{
 				Code: leaveRes.Code,
-				JSON: jsonerror.LeaveServerNoticeError(),
+				JSON: spec.LeaveServerNoticeError(),
 			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(err.Error()),
+			JSON: spec.Unknown(err.Error()),
 		}
 	}
 

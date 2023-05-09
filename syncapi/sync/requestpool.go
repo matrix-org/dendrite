@@ -39,7 +39,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -232,12 +231,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		if err == types.ErrMalformedSyncToken {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidParam(err.Error()),
+				JSON: spec.InvalidParam(err.Error()),
 			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(err.Error()),
+			JSON: spec.Unknown(err.Error()),
 		}
 	}
 
@@ -517,32 +516,32 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	if from == "" || to == "" {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidParam("missing ?from= or ?to="),
+			JSON: spec.InvalidParam("missing ?from= or ?to="),
 		}
 	}
 	fromToken, err := types.NewStreamTokenFromString(from)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidParam("bad 'from' value"),
+			JSON: spec.InvalidParam("bad 'from' value"),
 		}
 	}
 	toToken, err := types.NewStreamTokenFromString(to)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidParam("bad 'to' value"),
+			JSON: spec.InvalidParam("bad 'to' value"),
 		}
 	}
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -553,7 +552,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	succeeded = true
 	return util.JSONResponse{

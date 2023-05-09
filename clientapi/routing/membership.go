@@ -34,7 +34,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 
 	"github.com/matrix-org/util"
 )
@@ -52,7 +51,7 @@ func SendBan(
 	if body.UserID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing user_id"),
+			JSON: spec.BadJSON("missing user_id"),
 		}
 	}
 
@@ -69,7 +68,7 @@ func SendBan(
 	if !allowedToBan {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You don't have permission to ban this user, power level too low."),
+			JSON: spec.Forbidden("You don't have permission to ban this user, power level too low."),
 		}
 	}
 
@@ -86,7 +85,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 	)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	serverName := device.UserDomain()
@@ -101,7 +100,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -122,7 +121,7 @@ func SendKick(
 	if body.UserID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing user_id"),
+			JSON: spec.BadJSON("missing user_id"),
 		}
 	}
 
@@ -139,7 +138,7 @@ func SendKick(
 	if !allowedToKick {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You don't have permission to kick this user, power level too low."),
+			JSON: spec.Forbidden("You don't have permission to kick this user, power level too low."),
 		}
 	}
 
@@ -155,7 +154,7 @@ func SendKick(
 	if queryRes.Membership != spec.Join && queryRes.Membership != spec.Invite {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Unknown("cannot /kick banned or left users"),
+			JSON: spec.Unknown("cannot /kick banned or left users"),
 		}
 	}
 	// TODO: should we be using SendLeave instead?
@@ -174,7 +173,7 @@ func SendUnban(
 	if body.UserID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing user_id"),
+			JSON: spec.BadJSON("missing user_id"),
 		}
 	}
 
@@ -196,7 +195,7 @@ func SendUnban(
 	if queryRes.Membership != spec.Ban {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("can only /unban users that are banned"),
+			JSON: spec.Unknown("can only /unban users that are banned"),
 		}
 	}
 	// TODO: should we be using SendLeave instead?
@@ -233,7 +232,7 @@ func SendInvite(
 	if body.UserID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing user_id"),
+			JSON: spec.BadJSON("missing user_id"),
 		}
 	}
 
@@ -263,7 +262,7 @@ func sendInvite(
 	)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
-		return jsonerror.InternalServerError(), err
+		return spec.InternalServerError(), err
 	}
 
 	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
@@ -277,12 +276,12 @@ func sendInvite(
 	case roomserverAPI.ErrInvalidID:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(e.Error()),
+			JSON: spec.Unknown(e.Error()),
 		}, e
 	case roomserverAPI.ErrNotAllowed:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(e.Error()),
+			JSON: spec.Forbidden(e.Error()),
 		}, e
 	case nil:
 	default:
@@ -290,7 +289,7 @@ func sendInvite(
 		sentry.CaptureException(err)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}, err
 	}
 
@@ -377,7 +376,7 @@ func extractRequestData(req *http.Request) (body *threepid.MembershipRequest, ev
 	if err != nil {
 		resErr = &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam(err.Error()),
+			JSON: spec.InvalidParam(err.Error()),
 		}
 		return
 	}
@@ -402,27 +401,27 @@ func checkAndProcessThreepid(
 	if err == threepid.ErrMissingParameter {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	} else if err == threepid.ErrNotTrusted {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotTrusted(body.IDServer),
+			JSON: spec.NotTrusted(body.IDServer),
 		}
 	} else if err == eventutil.ErrRoomNoExists {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(err.Error()),
+			JSON: spec.NotFound(err.Error()),
 		}
 	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(e.Error()),
+			JSON: spec.BadJSON(e.Error()),
 		}
 	}
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
-		er := jsonerror.InternalServerError()
+		er := spec.InternalServerError()
 		return inviteStored, &er
 	}
 	return
@@ -436,13 +435,13 @@ func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserver
 	}, &membershipRes)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
-		e := jsonerror.InternalServerError()
+		e := spec.InternalServerError()
 		return &e
 	}
 	if !membershipRes.IsInRoom {
 		return &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("user does not belong to room"),
+			JSON: spec.Forbidden("user does not belong to room"),
 		}
 	}
 	return nil
@@ -462,18 +461,18 @@ func SendForget(
 	err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes)
 	if err != nil {
 		logger.WithError(err).Error("QueryMembershipForUser: could not query membership for user")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if !membershipRes.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("room does not exist"),
+			JSON: spec.Forbidden("room does not exist"),
 		}
 	}
 	if membershipRes.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(fmt.Sprintf("User %s is in room %s", device.UserID, roomID)),
+			JSON: spec.Unknown(fmt.Sprintf("User %s is in room %s", device.UserID, roomID)),
 		}
 	}
 
@@ -484,7 +483,7 @@ func SendForget(
 	response := roomserverAPI.PerformForgetResponse{}
 	if err := rsAPI.PerformForget(ctx, &request, &response); err != nil {
 		logger.WithError(err).Error("PerformForget: unable to forget room")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -500,14 +499,14 @@ func getPowerlevels(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, 
 	if plEvent == nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You don't have permission to perform this action, no power_levels event in this room."),
+			JSON: spec.Forbidden("You don't have permission to perform this action, no power_levels event in this room."),
 		}
 	}
 	pl, err := plEvent.PowerLevels()
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You don't have permission to perform this action, the power_levels event for this room is malformed so auth checks cannot be performed."),
+			JSON: spec.Forbidden("You don't have permission to perform this action, the power_levels event for this room is malformed so auth checks cannot be performed."),
 		}
 	}
 	return pl, nil

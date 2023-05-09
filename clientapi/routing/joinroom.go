@@ -26,7 +26,6 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -75,7 +74,7 @@ func JoinRoomByIDOrAlias(
 		util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Unable to query user profile, no profile found."),
+			JSON: spec.Unknown("Unable to query user profile, no profile found."),
 		}
 	default:
 	}
@@ -99,12 +98,12 @@ func JoinRoomByIDOrAlias(
 		case roomserverAPI.ErrInvalidID:
 			response = util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown(e.Error()),
+				JSON: spec.Unknown(e.Error()),
 			}
 		case roomserverAPI.ErrNotAllowed:
-			jsonErr := jsonerror.Forbidden(e.Error())
+			jsonErr := spec.Forbidden(e.Error())
 			if device.AccountType == api.AccountTypeGuest {
-				jsonErr = jsonerror.GuestAccessForbidden(e.Error())
+				jsonErr = spec.GuestAccessForbidden(e.Error())
 			}
 			response = util.JSONResponse{
 				Code: http.StatusForbidden,
@@ -118,12 +117,12 @@ func JoinRoomByIDOrAlias(
 		default:
 			response = util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.InternalServerError(),
+				JSON: spec.InternalServerError(),
 			}
 			if errors.Is(err, eventutil.ErrRoomNoExists) {
 				response = util.JSONResponse{
 					Code: http.StatusNotFound,
-					JSON: jsonerror.NotFound(e.Error()),
+					JSON: spec.NotFound(e.Error()),
 				}
 			}
 		}
@@ -137,7 +136,7 @@ func JoinRoomByIDOrAlias(
 	case <-timer.C:
 		return util.JSONResponse{
 			Code: http.StatusAccepted,
-			JSON: jsonerror.Unknown("The room join will continue in the background."),
+			JSON: spec.Unknown("The room join will continue in the background."),
 		}
 	case result := <-done:
 		// Stop and drain the timer

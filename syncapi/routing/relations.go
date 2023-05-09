@@ -29,7 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type RelationsResponse struct {
@@ -73,14 +73,14 @@ func Relations(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: spec.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to get snapshot for relations")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)

@@ -21,7 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -37,7 +37,7 @@ func GetProfile(
 	if userID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("The request body did not contain required argument 'user_id'."),
+			JSON: spec.MissingParam("The request body did not contain required argument 'user_id'."),
 		}
 	}
 
@@ -46,14 +46,14 @@ func GetProfile(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam(fmt.Sprintf("Domain %q does not match this server", domain)),
+			JSON: spec.InvalidParam(fmt.Sprintf("Domain %q does not match this server", domain)),
 		}
 	}
 
 	profile, err := userAPI.QueryProfile(httpReq.Context(), userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryProfile failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	var res interface{}
@@ -71,7 +71,7 @@ func GetProfile(
 			}
 		default:
 			code = http.StatusBadRequest
-			res = jsonerror.InvalidParam("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
+			res = spec.InvalidParam("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
 		}
 	} else {
 		res = eventutil.UserProfile{

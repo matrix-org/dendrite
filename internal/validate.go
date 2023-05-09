@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -58,12 +57,12 @@ func PasswordResponse(err error) *util.JSONResponse {
 	case ErrPasswordWeak:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.WeakPassword(ErrPasswordWeak.Error()),
+			JSON: spec.WeakPassword(ErrPasswordWeak.Error()),
 		}
 	case ErrPasswordTooLong:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(ErrPasswordTooLong.Error()),
+			JSON: spec.BadJSON(ErrPasswordTooLong.Error()),
 		}
 	}
 	return nil
@@ -88,12 +87,12 @@ func UsernameResponse(err error) *util.JSONResponse {
 	case ErrUsernameTooLong:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case ErrUsernameInvalid, ErrUsernameUnderscore:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 	return nil

@@ -20,13 +20,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
-
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 // GetEvent returns the requested event
@@ -95,7 +93,7 @@ func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, roomID, 
 	if len(eventsResponse.Events) == 0 {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Event not found"),
+			JSON: spec.NotFound("Event not found"),
 		}
 	}
 

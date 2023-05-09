@@ -19,7 +19,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
@@ -39,7 +38,7 @@ func GetUserDevices(
 	}
 	if res.Error != nil {
 		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	sigReq := &api.QuerySignaturesRequest{
@@ -52,7 +51,7 @@ func GetUserDevices(
 		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
 	}
 	if err := keyAPI.QuerySignatures(req.Context(), sigReq, sigRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
+		return spec.InternalAPIError(req.Context(), err)
 	}
 
 	response := fclient.RespUserDevices{

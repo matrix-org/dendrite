@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -48,13 +48,13 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 	var res uapi.QueryLoginTokenResponse
 	if err := t.UserAPI.QueryLoginToken(ctx, &uapi.QueryLoginTokenRequest{Token: r.Token}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
-		jsonErr := jsonerror.InternalServerError()
+		jsonErr := spec.InternalServerError()
 		return nil, nil, &jsonErr
 	}
 	if res.Data == nil {
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("invalid login token"),
+			JSON: spec.Forbidden("invalid login token"),
 		}
 	}
 

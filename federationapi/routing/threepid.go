@@ -26,13 +26,10 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
-
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,7 +71,7 @@ func CreateInvitesFrom3PIDInvites(
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+				JSON: spec.UnsupportedRoomVersion(err.Error()),
 			}
 		}
 
@@ -83,7 +80,7 @@ func CreateInvitesFrom3PIDInvites(
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 		if event != nil {
 			evs = append(evs, &types.HeaderedEvent{PDU: event})
@@ -103,7 +100,7 @@ func CreateInvitesFrom3PIDInvites(
 		false,
 	); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -125,7 +122,7 @@ func ExchangeThirdPartyInvite(
 	if err := json.Unmarshal(request.Content(), &proto); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
@@ -133,7 +130,7 @@ func ExchangeThirdPartyInvite(
 	if proto.RoomID != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
+			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
 		}
 	}
 
@@ -141,7 +138,7 @@ func ExchangeThirdPartyInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Invalid sender ID: " + err.Error()),
+			JSON: spec.BadJSON("Invalid sender ID: " + err.Error()),
 		}
 	}
 
@@ -150,7 +147,7 @@ func ExchangeThirdPartyInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event's state key isn't a Matrix user ID"),
+			JSON: spec.BadJSON("The event's state key isn't a Matrix user ID"),
 		}
 	}
 
@@ -158,7 +155,7 @@ func ExchangeThirdPartyInvite(
 	if targetDomain != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event's state key doesn't have the same domain as the request's origin"),
+			JSON: spec.BadJSON("The event's state key doesn't have the same domain as the request's origin"),
 		}
 	}
 
@@ -166,7 +163,7 @@ func ExchangeThirdPartyInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+			JSON: spec.UnsupportedRoomVersion(err.Error()),
 		}
 	}
 
@@ -175,11 +172,11 @@ func ExchangeThirdPartyInvite(
 	if err == errNotInRoom {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Unknown room " + roomID),
+			JSON: spec.NotFound("Unknown room " + roomID),
 		}
 	} else if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("buildMembershipEvent failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// Ask the requesting server to sign the newly created event so we know it
@@ -187,22 +184,22 @@ func ExchangeThirdPartyInvite(
 	inviteReq, err := fclient.NewInviteV2Request(event, nil)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	signedEvent, err := federation.SendInviteV2(httpReq.Context(), senderDomain, request.Origin(), inviteReq)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Errorf("unknown room version: %s", roomVersion)
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(signedEvent.Event)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// Send the event to the roomserver
@@ -219,7 +216,7 @@ func ExchangeThirdPartyInvite(
 		false,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

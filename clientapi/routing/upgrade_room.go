@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -55,7 +55,7 @@ func UpgradeRoom(
 	if _, err := version.SupportedRoomVersion(gomatrixserverlib.RoomVersion(r.NewVersion)); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion("This server does not support that room version"),
+			JSON: spec.UnsupportedRoomVersion("This server does not support that room version"),
 		}
 	}
 
@@ -65,16 +65,16 @@ func UpgradeRoom(
 	case roomserverAPI.ErrNotAllowed:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(e.Error()),
+			JSON: spec.Forbidden(e.Error()),
 		}
 	default:
 		if errors.Is(err, eventutil.ErrRoomNoExists) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("Room does not exist"),
+				JSON: spec.NotFound("Room does not exist"),
 			}
 		}
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

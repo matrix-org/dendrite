@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -40,13 +39,13 @@ func GetTransactionFromRelay(
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("invalid json provided"),
+			JSON: spec.BadJSON("invalid json provided"),
 		}
 	}
 	if previousEntry.EntryID < 0 {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Invalid entry id provided. Must be >= 0."),
+			JSON: spec.BadJSON("Invalid entry id provided. Must be >= 0."),
 		}
 	}
 	logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)

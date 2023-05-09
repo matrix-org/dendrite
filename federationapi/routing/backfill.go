@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -50,7 +49,7 @@ func Backfill(
 	if _, _, err = gomatrixserverlib.SplitID('!', roomID); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("Bad room ID: " + err.Error()),
+			JSON: spec.MissingParam("Bad room ID: " + err.Error()),
 		}
 	}
 
@@ -65,14 +64,14 @@ func Backfill(
 	if !exists {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("v is missing"),
+			JSON: spec.MissingParam("v is missing"),
 		}
 	}
 	limit = httpReq.URL.Query().Get("limit")
 	if len(limit) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("limit is missing"),
+			JSON: spec.MissingParam("limit is missing"),
 		}
 	}
 
@@ -92,14 +91,14 @@ func Backfill(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam(fmt.Sprintf("limit %q is invalid format", limit)),
+			JSON: spec.InvalidParam(fmt.Sprintf("limit %q is invalid format", limit)),
 		}
 	}
 
 	// Query the roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// Filter any event that's not from the requested room out.

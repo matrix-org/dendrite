@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
@@ -54,7 +53,7 @@ func SetPresence(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Unable to set presence for other user."),
+			JSON: spec.Forbidden("Unable to set presence for other user."),
 		}
 	}
 	var presence presenceReq
@@ -67,7 +66,7 @@ func SetPresence(
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Unknown presence '%s'.", presence.Presence)),
+			JSON: spec.Unknown(fmt.Sprintf("Unknown presence '%s'.", presence.Presence)),
 		}
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
@@ -75,7 +74,7 @@ func SetPresence(
 		log.WithError(err).Errorf("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 
@@ -100,7 +99,7 @@ func GetPresence(
 		log.WithError(err).Errorf("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 
@@ -119,7 +118,7 @@ func GetPresence(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 

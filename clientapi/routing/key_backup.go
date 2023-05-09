@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -64,7 +64,7 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 	if len(kb.AuthData) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing auth_data"),
+			JSON: spec.BadJSON("missing auth_data"),
 		}
 	}
 	version, err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
@@ -98,7 +98,7 @@ func KeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *
 	if !queryResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("version not found"),
+			JSON: spec.NotFound("version not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -128,7 +128,7 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUse
 		Algorithm: kb.Algorithm,
 	})
 	switch e := err.(type) {
-	case *jsonerror.ErrRoomKeysVersion:
+	case *spec.ErrRoomKeysVersion:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: e,
@@ -141,7 +141,7 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUse
 	if !performKeyBackupResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("backup version not found"),
+			JSON: spec.NotFound("backup version not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -162,7 +162,7 @@ func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 	if !exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("backup version not found"),
+			JSON: spec.NotFound("backup version not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -182,7 +182,7 @@ func UploadBackupKeys(
 	})
 
 	switch e := err.(type) {
-	case *jsonerror.ErrRoomKeysVersion:
+	case *spec.ErrRoomKeysVersion:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: e,
@@ -194,7 +194,7 @@ func UploadBackupKeys(
 	if !performKeyBackupResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("backup version not found"),
+			JSON: spec.NotFound("backup version not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -223,7 +223,7 @@ func GetBackupKeys(
 	if !queryResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("version not found"),
+			JSON: spec.NotFound("version not found"),
 		}
 	}
 	if sessionID != "" {
@@ -274,6 +274,6 @@ func GetBackupKeys(
 	}
 	return util.JSONResponse{
 		Code: 404,
-		JSON: jsonerror.NotFound("keys not found"),
+		JSON: spec.NotFound("keys not found"),
 	}
 }

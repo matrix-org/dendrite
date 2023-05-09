@@ -19,7 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -42,7 +42,7 @@ func GetMissingEvents(
 	if err := json.Unmarshal(request.Content(), &gme); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
@@ -63,7 +63,7 @@ func GetMissingEvents(
 		&eventsResponse,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryMissingEvents failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	eventsResponse.Events = filterEvents(eventsResponse.Events, roomID)

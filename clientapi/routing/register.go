@@ -48,7 +48,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 var (
@@ -428,7 +427,7 @@ func validateApplicationService(
 	if matchedApplicationService == nil {
 		return "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.UnknownToken("Supplied access_token does not match any known application service"),
+			JSON: spec.UnknownToken("Supplied access_token does not match any known application service"),
 		}
 	}
 
@@ -439,7 +438,7 @@ func validateApplicationService(
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+			JSON: spec.ASExclusive(fmt.Sprintf(
 				"Supplied username %s did not match any namespaces for application service ID: %s", username, matchedApplicationService.ID)),
 		}
 	}
@@ -448,7 +447,7 @@ func validateApplicationService(
 	if UsernameMatchesMultipleExclusiveNamespaces(cfg, userID) {
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+			JSON: spec.ASExclusive(fmt.Sprintf(
 				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
 		}
 	}
@@ -474,7 +473,7 @@ func Register(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("Unable to read request body"),
+			JSON: spec.NotJSON("Unable to read request body"),
 		}
 	}
 
@@ -518,7 +517,7 @@ func Register(
 	if _, err = strconv.ParseInt(r.Username, 10, 64); err == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
+			JSON: spec.InvalidUsername("Numeric user IDs are reserved"),
 		}
 	}
 	// Auto generate a numeric username if r.Username is empty
@@ -529,7 +528,7 @@ func Register(
 		nres := &userapi.QueryNumericLocalpartResponse{}
 		if err = userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 		r.Username = strconv.FormatInt(nres.ID, 10)
 	}
@@ -552,7 +551,7 @@ func Register(
 		// type is not known or specified)
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
+			JSON: spec.MissingParam("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
 		}
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
@@ -590,7 +589,7 @@ func handleGuestRegistration(
 	if !registrationEnabled || !guestsEnabled {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(
+			JSON: spec.Forbidden(
 				fmt.Sprintf("Guest registration is disabled on %q", r.ServerName),
 			),
 		}
@@ -604,7 +603,7 @@ func handleGuestRegistration(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+			JSON: spec.Unknown("failed to create account: " + err.Error()),
 		}
 	}
 	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
@@ -616,7 +615,7 @@ func handleGuestRegistration(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Failed to generate access token"),
+			JSON: spec.Unknown("Failed to generate access token"),
 		}
 	}
 	//we don't allow guests to specify their own device_id
@@ -632,7 +631,7 @@ func handleGuestRegistration(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+			JSON: spec.Unknown("failed to create device: " + err.Error()),
 		}
 	}
 	return util.JSONResponse{
@@ -682,7 +681,7 @@ func handleRegistrationFlow(
 	if !registrationEnabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(
+			JSON: spec.Forbidden(
 				fmt.Sprintf("Registration is disabled on %q", r.ServerName),
 			),
 		}
@@ -696,7 +695,7 @@ func handleRegistrationFlow(
 		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
+			JSON: spec.ASExclusive("This username is reserved by an application service."),
 		}
 	}
 
@@ -706,15 +705,15 @@ func handleRegistrationFlow(
 		err := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
 		switch err {
 		case ErrCaptchaDisabled:
-			return util.JSONResponse{Code: http.StatusForbidden, JSON: jsonerror.Unknown(err.Error())}
+			return util.JSONResponse{Code: http.StatusForbidden, JSON: spec.Unknown(err.Error())}
 		case ErrMissingResponse:
-			return util.JSONResponse{Code: http.StatusBadRequest, JSON: jsonerror.BadJSON(err.Error())}
+			return util.JSONResponse{Code: http.StatusBadRequest, JSON: spec.BadJSON(err.Error())}
 		case ErrInvalidCaptcha:
-			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: jsonerror.BadJSON(err.Error())}
+			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: spec.BadJSON(err.Error())}
 		case nil:
 		default:
 			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
-			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: jsonerror.InternalServerError()}
+			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError()}
 		}
 
 		// Add Recaptcha to the list of completed registration stages
@@ -732,7 +731,7 @@ func handleRegistrationFlow(
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
-			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
+			JSON: spec.Unknown("unknown/unimplemented auth type"),
 		}
 	}
 
@@ -764,7 +763,7 @@ func handleApplicationServiceRegistration(
 	if tokenErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingToken(tokenErr.Error()),
+			JSON: spec.MissingToken(tokenErr.Error()),
 		}
 	}
 
@@ -834,14 +833,14 @@ func completeRegistration(
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("Missing username"),
+			JSON: spec.MissingParam("Missing username"),
 		}
 	}
 	// Blank passwords are only allowed by registered application services
 	if password == "" && appserviceID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("Missing password"),
+			JSON: spec.MissingParam("Missing password"),
 		}
 	}
 	var accRes userapi.PerformAccountCreationResponse
@@ -857,12 +856,12 @@ func completeRegistration(
 		if _, ok := err.(*userapi.ErrorConflict); ok { // user already exists
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+				JSON: spec.UserInUse("Desired user ID is already taken."),
 			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+			JSON: spec.Unknown("failed to create account: " + err.Error()),
 		}
 	}
 
@@ -884,7 +883,7 @@ func completeRegistration(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Failed to generate access token"),
+			JSON: spec.Unknown("Failed to generate access token"),
 		}
 	}
 
@@ -893,7 +892,7 @@ func completeRegistration(
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("failed to set display name: " + err.Error()),
+				JSON: spec.Unknown("failed to set display name: " + err.Error()),
 			}
 		}
 	}
@@ -911,7 +910,7 @@ func completeRegistration(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+			JSON: spec.Unknown("failed to create device: " + err.Error()),
 		}
 	}
 
@@ -1006,7 +1005,7 @@ func RegisterAvailable(
 		if v.ServerName == domain && !v.AllowRegistration {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(
+				JSON: spec.Forbidden(
 					fmt.Sprintf("Registration is not allowed on %q", string(v.ServerName)),
 				),
 			}
@@ -1023,7 +1022,7 @@ func RegisterAvailable(
 		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UserInUse("Desired user ID is reserved by an application service."),
+				JSON: spec.UserInUse("Desired user ID is reserved by an application service."),
 			}
 		}
 	}
@@ -1036,14 +1035,14 @@ func RegisterAvailable(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to check availability:" + err.Error()),
+			JSON: spec.Unknown("failed to check availability:" + err.Error()),
 		}
 	}
 
 	if !res.Available {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UserInUse("Desired User ID is already taken."),
+			JSON: spec.UserInUse("Desired User ID is already taken."),
 		}
 	}
 
@@ -1060,7 +1059,7 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("malformed json: %s", err)),
+			JSON: spec.BadJSON(fmt.Sprintf("malformed json: %s", err)),
 		}
 	}
 	valid, err := sr.IsValidMacLogin(ssrr.Nonce, ssrr.User, ssrr.Password, ssrr.Admin, ssrr.MacBytes)
@@ -1070,7 +1069,7 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if !valid {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("bad mac"),
+			JSON: spec.Forbidden("bad mac"),
 		}
 	}
 	// downcase capitals

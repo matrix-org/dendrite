@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -41,13 +40,13 @@ func MakeLeave(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Invalid UserID"),
+			JSON: spec.BadJSON("Invalid UserID"),
 		}
 	}
 	if domain != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The leave must be sent by the server of the user"),
+			JSON: spec.Forbidden("The leave must be sent by the server of the user"),
 		}
 	}
 
@@ -61,14 +60,14 @@ func MakeLeave(
 	err = proto.SetContent(map[string]interface{}{"membership": spec.Leave})
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("proto.SetContent failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(
+			JSON: spec.NotFound(
 				fmt.Sprintf("Server name %q does not exist", request.Destination()),
 			),
 		}
@@ -79,16 +78,16 @@ func MakeLeave(
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room does not exist"),
+			JSON: spec.NotFound("Room does not exist"),
 		}
 	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(e.Error()),
+			JSON: spec.BadJSON(e.Error()),
 		}
 	} else if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// If the user has already left then just return their last leave
@@ -118,7 +117,7 @@ func MakeLeave(
 	if err = gomatrixserverlib.Allowed(event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(err.Error()),
+			JSON: spec.Forbidden(err.Error()),
 		}
 	}
 
@@ -145,7 +144,7 @@ func SendLeave(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+			JSON: spec.UnsupportedRoomVersion(err.Error()),
 		}
 	}
 
@@ -153,7 +152,7 @@ func SendLeave(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.UnsupportedRoomVersion(
+			JSON: spec.UnsupportedRoomVersion(
 				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", roomVersion),
 			),
 		}
@@ -165,13 +164,13 @@ func SendLeave(
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case nil:
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
@@ -179,7 +178,7 @@ func SendLeave(
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the leave event JSON"),
+			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the leave event JSON"),
 		}
 	}
 
@@ -187,20 +186,20 @@ func SendLeave(
 	if event.EventID() != eventID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the leave event JSON"),
+			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the leave event JSON"),
 		}
 	}
 
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("No state key was provided in the leave event."),
+			JSON: spec.BadJSON("No state key was provided in the leave event."),
 		}
 	}
 	if !event.StateKeyEquals(event.Sender()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
+			JSON: spec.BadJSON("Event state key must match the event sender."),
 		}
 	}
 
@@ -211,12 +210,12 @@ func SendLeave(
 	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
+			JSON: spec.Forbidden("The sender of the join is invalid"),
 		}
 	} else if serverName != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The sender does not match the server that originated the request"),
+			JSON: spec.Forbidden("The sender does not match the server that originated the request"),
 		}
 	}
 
@@ -234,7 +233,7 @@ func SendLeave(
 	err = rsAPI.QueryLatestEventsAndState(httpReq.Context(), queryReq, queryRes)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryLatestEventsAndState failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	// The room doesn't exist or we weren't ever joined to it. Might as well
 	// no-op here.
@@ -268,7 +267,7 @@ func SendLeave(
 		logrus.WithError(err).Errorf("XXX: leave.go")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+			JSON: spec.BadJSON("The event JSON could not be redacted"),
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
@@ -280,12 +279,12 @@ func SendLeave(
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The leave must be signed by the server it originated on"),
+			JSON: spec.Forbidden("The leave must be signed by the server it originated on"),
 		}
 	}
 
@@ -295,13 +294,13 @@ func SendLeave(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("event.Membership failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing content.membership key"),
+			JSON: spec.BadJSON("missing content.membership key"),
 		}
 	}
 	if mem != spec.Leave {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The membership in the event content must be set to leave"),
+			JSON: spec.BadJSON("The membership in the event content must be set to leave"),
 		}
 	}
 
@@ -319,7 +318,7 @@ func SendLeave(
 			},
 		},
 	}, &response); err != nil {
-		return jsonerror.InternalAPIError(httpReq.Context(), err)
+		return spec.InternalAPIError(httpReq.Context(), err)
 	}
 
 	if response.ErrMsg != "" {
@@ -327,10 +326,10 @@ func SendLeave(
 		if response.NotAllowed {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Forbidden(response.ErrMsg),
+				JSON: spec.Forbidden(response.ErrMsg),
 			}
 		}
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

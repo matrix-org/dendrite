@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -22,13 +21,13 @@ func Test_validatePassword(t *testing.T) {
 			name:      "password too short",
 			password:  "shortpw",
 			wantError: ErrPasswordWeak,
-			wantJSON:  &util.JSONResponse{Code: http.StatusBadRequest, JSON: jsonerror.WeakPassword(ErrPasswordWeak.Error())},
+			wantJSON:  &util.JSONResponse{Code: http.StatusBadRequest, JSON: spec.WeakPassword(ErrPasswordWeak.Error())},
 		},
 		{
 			name:      "password too long",
 			password:  strings.Repeat("a", maxPasswordLength+1),
 			wantError: ErrPasswordTooLong,
-			wantJSON:  &util.JSONResponse{Code: http.StatusBadRequest, JSON: jsonerror.BadJSON(ErrPasswordTooLong.Error())},
+			wantJSON:  &util.JSONResponse{Code: http.StatusBadRequest, JSON: spec.BadJSON(ErrPasswordTooLong.Error())},
 		},
 		{
 			name:     "password OK",
@@ -65,7 +64,7 @@ func Test_validateUsername(t *testing.T) {
 			wantErr:   ErrUsernameInvalid,
 			wantJSON: &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(ErrUsernameInvalid.Error()),
+				JSON: spec.InvalidUsername(ErrUsernameInvalid.Error()),
 			},
 		},
 		{
@@ -75,7 +74,7 @@ func Test_validateUsername(t *testing.T) {
 			wantErr:   ErrUsernameInvalid,
 			wantJSON: &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(ErrUsernameInvalid.Error()),
+				JSON: spec.InvalidUsername(ErrUsernameInvalid.Error()),
 			},
 		},
 		{
@@ -85,7 +84,7 @@ func Test_validateUsername(t *testing.T) {
 			wantErr:   ErrUsernameTooLong,
 			wantJSON: &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(ErrUsernameTooLong.Error()),
+				JSON: spec.BadJSON(ErrUsernameTooLong.Error()),
 			},
 		},
 		{
@@ -95,7 +94,7 @@ func Test_validateUsername(t *testing.T) {
 			wantErr:   ErrUsernameUnderscore,
 			wantJSON: &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(ErrUsernameUnderscore.Error()),
+				JSON: spec.InvalidUsername(ErrUsernameUnderscore.Error()),
 			},
 		},
 		{
@@ -115,7 +114,7 @@ func Test_validateUsername(t *testing.T) {
 			wantErr:   ErrUsernameInvalid,
 			wantJSON: &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(ErrUsernameInvalid.Error()),
+				JSON: spec.InvalidUsername(ErrUsernameInvalid.Error()),
 			},
 		},
 		{
@@ -135,7 +134,7 @@ func Test_validateUsername(t *testing.T) {
 			wantErr:   ErrUsernameInvalid,
 			wantJSON: &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(ErrUsernameInvalid.Error()),
+				JSON: spec.InvalidUsername(ErrUsernameInvalid.Error()),
 			},
 		},
 		{

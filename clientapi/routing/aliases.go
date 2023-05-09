@@ -22,9 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-
 	"github.com/matrix-org/util"
 )
 
@@ -64,12 +62,12 @@ func GetAliases(
 		var queryRes api.QueryMembershipForUserResponse
 		if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 		if !queryRes.IsInRoom {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("You aren't a member of this room."),
+				JSON: spec.Forbidden("You aren't a member of this room."),
 			}
 		}
 	}

@@ -9,12 +9,12 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 func errorResponse(ctx context.Context, err error, msg string, args ...interface{}) util.JSONResponse {
-	if eerr, ok := err.(*jsonerror.MatrixError); ok {
+	if eerr, ok := err.(*spec.MatrixError); ok {
 		var status int
 		switch eerr.ErrCode {
 		case "M_INVALID_PARAM":
@@ -27,7 +27,7 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 		return util.MatrixErrorResponse(status, eerr.ErrCode, eerr.Err)
 	}
 	util.GetLogger(ctx).WithError(err).Errorf(msg, args...)
-	return jsonerror.InternalServerError()
+	return spec.InternalServerError()
 }
 
 func GetAllPushRules(ctx context.Context, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
@@ -48,7 +48,7 @@ func GetPushRulesByScope(ctx context.Context, scope string, device *userapi.Devi
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -63,12 +63,12 @@ func GetPushRulesByKind(ctx context.Context, scope, kind string, device *userapi
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	// Even if rulesPtr is not nil, there may not be any rules for this kind
 	if rulesPtr == nil || (rulesPtr != nil && len(*rulesPtr) == 0) {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -83,15 +83,15 @@ func GetPushRuleByRuleID(ctx context.Context, scope, kind, ruleID string, device
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	if rulesPtr == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	i := pushRuleIndexByID(*rulesPtr, ruleID)
 	if i < 0 {
-		return errorResponse(ctx, jsonerror.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
+		return errorResponse(ctx, spec.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -104,14 +104,14 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 	if err := json.NewDecoder(body).Decode(&newRule); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	}
 	newRule.RuleID = ruleID
 
 	errs := pushrules.ValidateRule(pushrules.Kind(kind), &newRule)
 	if len(errs) > 0 {
-		return errorResponse(ctx, jsonerror.InvalidParam(errs[0].Error()), "rule sanity check failed: %v", errs)
+		return errorResponse(ctx, spec.InvalidParam(errs[0].Error()), "rule sanity check failed: %v", errs)
 	}
 
 	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
@@ -120,12 +120,12 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	if rulesPtr == nil {
 		// while this should be impossible (ValidateRule would already return an error), better keep it around
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	i := pushRuleIndexByID(*rulesPtr, ruleID)
 	if i >= 0 && afterRuleID == "" && beforeRuleID == "" {
@@ -172,15 +172,15 @@ func DeletePushRuleByRuleID(ctx context.Context, scope, kind, ruleID string, dev
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	if rulesPtr == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	i := pushRuleIndexByID(*rulesPtr, ruleID)
 	if i < 0 {
-		return errorResponse(ctx, jsonerror.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
+		return errorResponse(ctx, spec.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
 	}
 
 	*rulesPtr = append((*rulesPtr)[:i], (*rulesPtr)[i+1:]...)
@@ -203,15 +203,15 @@ func GetPushRuleAttrByRuleID(ctx context.Context, scope, kind, ruleID, attr stri
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	if rulesPtr == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	i := pushRuleIndexByID(*rulesPtr, ruleID)
 	if i < 0 {
-		return errorResponse(ctx, jsonerror.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
+		return errorResponse(ctx, spec.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -226,7 +226,7 @@ func PutPushRuleAttrByRuleID(ctx context.Context, scope, kind, ruleID, attr stri
 	if err := json.NewDecoder(body).Decode(&newPartialRule); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	}
 	if newPartialRule.Actions == nil {
@@ -249,15 +249,15 @@ func PutPushRuleAttrByRuleID(ctx context.Context, scope, kind, ruleID, attr stri
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rule set"), "pushRuleSetByScope failed")
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	if rulesPtr == nil {
-		return errorResponse(ctx, jsonerror.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
+		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	i := pushRuleIndexByID(*rulesPtr, ruleID)
 	if i < 0 {
-		return errorResponse(ctx, jsonerror.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
+		return errorResponse(ctx, spec.NotFound("push rule ID not found"), "pushRuleIndexByID failed")
 	}
 
 	if !reflect.DeepEqual(attrGet((*rulesPtr)[i]), attrGet(&newPartialRule)) {
@@ -313,7 +313,7 @@ func pushRuleAttrGetter(attr string) (func(*pushrules.Rule) interface{}, error) 
 	case "enabled":
 		return func(rule *pushrules.Rule) interface{} { return rule.Enabled }, nil
 	default:
-		return nil, jsonerror.InvalidParam("invalid push rule attribute")
+		return nil, spec.InvalidParam("invalid push rule attribute")
 	}
 }
 
@@ -324,7 +324,7 @@ func pushRuleAttrSetter(attr string) (func(dest, src *pushrules.Rule), error) {
 	case "enabled":
 		return func(dest, src *pushrules.Rule) { dest.Enabled = src.Enabled }, nil
 	default:
-		return nil, jsonerror.InvalidParam("invalid push rule attribute")
+		return nil, spec.InvalidParam("invalid push rule attribute")
 	}
 }
 
@@ -338,10 +338,10 @@ func findPushRuleInsertionIndex(rules []*pushrules.Rule, afterID, beforeID strin
 			}
 		}
 		if i == len(rules) {
-			return 0, jsonerror.NotFound("after: rule ID not found")
+			return 0, spec.NotFound("after: rule ID not found")
 		}
 		if rules[i].Default {
-			return 0, jsonerror.NotFound("after: rule ID must not be a default rule")
+			return 0, spec.NotFound("after: rule ID must not be a default rule")
 		}
 		// We stopped on the "after" match to differentiate
 		// not-found from is-last-entry. Now we move to the earliest
@@ -356,10 +356,10 @@ func findPushRuleInsertionIndex(rules []*pushrules.Rule, afterID, beforeID strin
 			}
 		}
 		if i == len(rules) {
-			return 0, jsonerror.NotFound("before: rule ID not found")
+			return 0, spec.NotFound("before: rule ID not found")
 		}
 		if rules[i].Default {
-			return 0, jsonerror.NotFound("before: rule ID must not be a default rule")
+			return 0, spec.NotFound("before: rule ID must not be a default rule")
 		}
 	}
 

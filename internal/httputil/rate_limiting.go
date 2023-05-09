@@ -7,7 +7,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -118,7 +118,7 @@ func (l *RateLimits) Limit(req *http.Request, device *userapi.Device) *util.JSON
 		// We hit the rate limit. Tell the client to back off.
 		return &util.JSONResponse{
 			Code: http.StatusTooManyRequests,
-			JSON: jsonerror.LimitExceeded("You are sending too many requests too quickly!", l.cooloffDuration.Milliseconds()),
+			JSON: spec.LimitExceeded("You are sending too many requests too quickly!", l.cooloffDuration.Milliseconds()),
 		}
 	}
 

@@ -38,7 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 )
 
 type messagesReq struct {
@@ -82,7 +81,7 @@ func OnIncomingMessagesRequest(
 	// request that requires backfilling from the roomserver or federation.
 	snapshot, err := db.NewDatabaseTransaction(req.Context())
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -90,19 +89,19 @@ func OnIncomingMessagesRequest(
 	// check if the user has already forgotten about this room
 	membershipResp, err := getMembershipForUser(req.Context(), roomID, device.UserID, rsAPI)
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if !membershipResp.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("room does not exist"),
+			JSON: spec.Forbidden("room does not exist"),
 		}
 	}
 
 	if membershipResp.IsRoomForgotten {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("user already forgot about this room"),
+			JSON: spec.Forbidden("user already forgot about this room"),
 		}
 	}
 
@@ -110,7 +109,7 @@ func OnIncomingMessagesRequest(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam("unable to parse filter"),
+			JSON: spec.InvalidParam("unable to parse filter"),
 		}
 	}
 
@@ -132,7 +131,7 @@ func OnIncomingMessagesRequest(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: spec.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 	// A boolean is easier to handle in this case, especially since dir is sure
@@ -145,14 +144,14 @@ func OnIncomingMessagesRequest(
 		if streamToken, err = types.NewStreamTokenFromString(fromQuery); err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidParam("Invalid from parameter: " + err.Error()),
+				JSON: spec.InvalidParam("Invalid from parameter: " + err.Error()),
 			}
 		} else {
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-				return jsonerror.InternalServerError()
+				return spec.InternalServerError()
 			}
 		}
 	}
@@ -168,13 +167,13 @@ func OnIncomingMessagesRequest(
 			if streamToken, err = types.NewStreamTokenFromString(toQuery); err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidParam("Invalid to parameter: " + err.Error()),
+					JSON: spec.InvalidParam("Invalid to parameter: " + err.Error()),
 				}
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
 					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-					return jsonerror.InternalServerError()
+					return spec.InternalServerError()
 				}
 			}
 		}
@@ -197,7 +196,7 @@ func OnIncomingMessagesRequest(
 	if _, _, err = gomatrixserverlib.SplitID('!', roomID); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("Bad room ID: " + err.Error()),
+			JSON: spec.MissingParam("Bad room ID: " + err.Error()),
 		}
 	}
 
@@ -233,7 +232,7 @@ func OnIncomingMessagesRequest(
 	clientEvents, start, end, err := mReq.retrieveEvents()
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -254,7 +253,7 @@ func OnIncomingMessagesRequest(
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll)...)
 	}

@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -58,7 +58,7 @@ func VerifyUserFromRequest(
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingToken(err.Error()),
+			JSON: spec.MissingToken(err.Error()),
 		}
 	}
 	var res api.QueryAccessTokenResponse
@@ -68,21 +68,21 @@ func VerifyUserFromRequest(
 	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccessToken failed")
-		jsonErr := jsonerror.InternalServerError()
+		jsonErr := spec.InternalServerError()
 		return nil, &jsonErr
 	}
 	if res.Err != "" {
 		if strings.HasPrefix(strings.ToLower(res.Err), "forbidden:") { // TODO: use actual error and no string comparison
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(res.Err),
+				JSON: spec.Forbidden(res.Err),
 			}
 		}
 	}
 	if res.Device == nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.UnknownToken("Unknown token"),
+			JSON: spec.UnknownToken("Unknown token"),
 		}
 	}
 	return res.Device, nil

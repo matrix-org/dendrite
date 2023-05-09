@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
@@ -37,13 +37,13 @@ func GetFilter(
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot get filters for other users"),
+			JSON: spec.Forbidden("Cannot get filters for other users"),
 		}
 	}
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	filter := synctypes.DefaultFilter()
@@ -53,7 +53,7 @@ func GetFilter(
 		// even though it is not correct.
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotFound("No such filter"),
+			JSON: spec.NotFound("No such filter"),
 		}
 	}
 
@@ -76,14 +76,14 @@ func PutFilter(
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot create filters for other users"),
+			JSON: spec.Forbidden("Cannot create filters for other users"),
 		}
 	}
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	var filter synctypes.Filter
@@ -93,14 +93,14 @@ func PutFilter(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be read. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be read. " + err.Error()),
 		}
 	}
 
 	if err = json.Unmarshal(body, &filter); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// the filter `limit` is `int` which defaults to 0 if not set which is not what we want. We want to use the default
@@ -115,14 +115,14 @@ func PutFilter(
 	if err = filter.Validate(); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Invalid filter: " + err.Error()),
+			JSON: spec.BadJSON("Invalid filter: " + err.Error()),
 		}
 	}
 
 	filterID, err := syncDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("syncDB.PutFilter failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

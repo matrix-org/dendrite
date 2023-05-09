@@ -19,7 +19,7 @@ import (
 	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -36,7 +36,7 @@ func GetOpenIDUserInfo(
 	if len(token) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingParam("access_token is missing"),
+			JSON: spec.MissingParam("access_token is missing"),
 		}
 	}
 
@@ -55,7 +55,7 @@ func GetOpenIDUserInfo(
 	nowMS := time.Now().UnixNano() / int64(time.Millisecond)
 	if openIDTokenAttrResponse.Sub == "" || nowMS > openIDTokenAttrResponse.ExpiresAtMS {
 		code = http.StatusUnauthorized
-		res = jsonerror.UnknownToken("Access Token unknown or expired")
+		res = spec.UnknownToken("Access Token unknown or expired")
 	}
 
 	return util.JSONResponse{

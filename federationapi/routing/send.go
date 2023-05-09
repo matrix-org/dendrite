@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const (
@@ -104,7 +104,7 @@ func Send(
 	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// Transactions are limited in size; they can have at most 50 PDUs and 100 EDUs.
@@ -112,7 +112,7 @@ func Send(
 	if len(txnEvents.PDUs) > 50 || len(txnEvents.EDUs) > 100 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("max 50 pdus / 100 edus"),
+			JSON: spec.BadJSON("max 50 pdus / 100 edus"),
 		}
 	}
 

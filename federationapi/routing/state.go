@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -88,7 +88,7 @@ func parseEventIDParam(
 	if eventID == "" {
 		resErr = &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingParam("event_id missing"),
+			JSON: spec.MissingParam("event_id missing"),
 		}
 	}
 
@@ -114,7 +114,7 @@ func getState(
 	}
 
 	if event.RoomID() != roomID {
-		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: spec.NotFound("event does not belong to this room")}
 	}
 	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
 	if resErr != nil {
@@ -140,17 +140,17 @@ func getState(
 	case !response.RoomExists:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room not found"),
+			JSON: spec.NotFound("Room not found"),
 		}
 	case !response.StateKnown:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("State not known"),
+			JSON: spec.NotFound("State not known"),
 		}
 	case response.IsRejected:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Event not found"),
+			JSON: spec.NotFound("Event not found"),
 		}
 	}
 

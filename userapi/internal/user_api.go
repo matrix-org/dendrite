@@ -28,7 +28,6 @@ import (
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -715,7 +714,7 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 		return res, fmt.Errorf("backup was deleted")
 	}
 	if version != req.Version {
-		return res, jsonerror.WrongBackupVersionError(version)
+		return res, spec.WrongBackupVersionError(version)
 	}
 	res.Exists = true
 	res.Version = version

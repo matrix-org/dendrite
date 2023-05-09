@@ -18,7 +18,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"
 )
@@ -51,7 +51,7 @@ func GetAdminWhois(
 	if !allowed {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not match the current user"),
+			JSON: spec.Forbidden("userID does not match the current user"),
 		}
 	}
 
@@ -61,7 +61,7 @@ func GetAdminWhois(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("GetAdminWhois failed to query user devices")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	devices := make(map[string]deviceInfo)

@@ -37,7 +37,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
@@ -96,7 +95,7 @@ func federatedSpacesHandler(
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidParam("bad request uri"),
+			JSON: spec.InvalidParam("bad request uri"),
 		}
 	}
 
@@ -214,13 +213,13 @@ func (w *walker) walk() util.JSONResponse {
 			// CS API format
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden("room is unknown/forbidden"),
+				JSON: spec.Forbidden("room is unknown/forbidden"),
 			}
 		} else {
 			// SS API format
 			return util.JSONResponse{
 				Code: 404,
-				JSON: jsonerror.NotFound("room is unknown/forbidden"),
+				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		}
 	}
@@ -233,7 +232,7 @@ func (w *walker) walk() util.JSONResponse {
 		if cache == nil {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidParam("invalid from"),
+				JSON: spec.InvalidParam("invalid from"),
 			}
 		}
 	} else {
@@ -377,7 +376,7 @@ func (w *walker) walk() util.JSONResponse {
 	if len(discoveredRooms) == 0 {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("room is unknown/forbidden"),
+			JSON: spec.NotFound("room is unknown/forbidden"),
 		}
 	}
 	return util.JSONResponse{
