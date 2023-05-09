@@ -659,7 +659,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash"),
+				JSON: jsonerror.InvalidParam("missing trailing slash"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -674,7 +674,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("scope, kind and rule ID must be specified"),
+				JSON: jsonerror.InvalidParam("scope, kind and rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -693,7 +693,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after scope"),
+				JSON: jsonerror.InvalidParam("missing trailing slash after scope"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -702,7 +702,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("kind and rule ID must be specified"),
+				JSON: jsonerror.InvalidParam("kind and rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -721,7 +721,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after kind"),
+				JSON: jsonerror.InvalidParam("missing trailing slash after kind"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -730,7 +730,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("rule ID must be specified"),
+				JSON: jsonerror.InvalidParam("rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -1244,7 +1244,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: jsonerror.InvalidParam("version must be specified"),
 			}
 		}
 		var reqBody keyBackupSessionRequest
@@ -1265,7 +1265,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: jsonerror.InvalidParam("version must be specified"),
 			}
 		}
 		roomID := vars["roomID"]
@@ -1297,7 +1297,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: jsonerror.InvalidParam("version must be specified"),
 			}
 		}
 		var reqBody userapi.KeyBackupSession

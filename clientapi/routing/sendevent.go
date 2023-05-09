@@ -126,7 +126,7 @@ func SendEvent(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: jsonerror.InvalidParam(err.Error()),
 		}
 	}
 

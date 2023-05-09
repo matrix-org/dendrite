@@ -36,7 +36,7 @@ func GetOpenIDUserInfo(
 	if len(token) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingArgument("access_token is missing"),
+			JSON: jsonerror.MissingParam("access_token is missing"),
 		}
 	}
 

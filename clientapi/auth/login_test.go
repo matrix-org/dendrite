@@ -140,7 +140,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 				"type": "m.login.invalid",
 				"device_id": "adevice"
             }`,
-			WantErrCode: "M_INVALID_ARGUMENT_VALUE",
+			WantErrCode: "M_INVALID_PARAM",
 		},
 	}
 	for _, tst := range tsts {

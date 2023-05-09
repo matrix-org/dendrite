@@ -73,7 +73,7 @@ func Relations(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: jsonerror.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 

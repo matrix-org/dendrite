@@ -50,7 +50,7 @@ func Backfill(
 	if _, _, err = gomatrixserverlib.SplitID('!', roomID); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad room ID: " + err.Error()),
+			JSON: jsonerror.MissingParam("Bad room ID: " + err.Error()),
 		}
 	}
 
@@ -65,14 +65,14 @@ func Backfill(
 	if !exists {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("v is missing"),
+			JSON: jsonerror.MissingParam("v is missing"),
 		}
 	}
 	limit = httpReq.URL.Query().Get("limit")
 	if len(limit) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("limit is missing"),
+			JSON: jsonerror.MissingParam("limit is missing"),
 		}
 	}
 
@@ -92,7 +92,7 @@ func Backfill(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("limit %q is invalid format", limit)),
+			JSON: jsonerror.InvalidParam(fmt.Sprintf("limit %q is invalid format", limit)),
 		}
 	}
 

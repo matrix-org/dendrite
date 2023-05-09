@@ -110,7 +110,7 @@ func OnIncomingMessagesRequest(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("unable to parse filter"),
+			JSON: jsonerror.InvalidParam("unable to parse filter"),
 		}
 	}
 
@@ -132,7 +132,7 @@ func OnIncomingMessagesRequest(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: jsonerror.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 	// A boolean is easier to handle in this case, especially since dir is sure
@@ -145,7 +145,7 @@ func OnIncomingMessagesRequest(
 		if streamToken, err = types.NewStreamTokenFromString(fromQuery); err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
+				JSON: jsonerror.InvalidParam("Invalid from parameter: " + err.Error()),
 			}
 		} else {
 			fromStream = &streamToken
@@ -168,7 +168,7 @@ func OnIncomingMessagesRequest(
 			if streamToken, err = types.NewStreamTokenFromString(toQuery); err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidArgumentValue("Invalid to parameter: " + err.Error()),
+					JSON: jsonerror.InvalidParam("Invalid to parameter: " + err.Error()),
 				}
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
@@ -197,7 +197,7 @@ func OnIncomingMessagesRequest(
 	if _, _, err = gomatrixserverlib.SplitID('!', roomID); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad room ID: " + err.Error()),
+			JSON: jsonerror.MissingParam("Bad room ID: " + err.Error()),
 		}
 	}
 

@@ -552,7 +552,7 @@ func Register(
 		// type is not known or specified)
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
+			JSON: jsonerror.MissingParam("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
 		}
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
@@ -834,14 +834,14 @@ func completeRegistration(
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Missing username"),
+			JSON: jsonerror.MissingParam("Missing username"),
 		}
 	}
 	// Blank passwords are only allowed by registered application services
 	if password == "" && appserviceID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Missing password"),
+			JSON: jsonerror.MissingParam("Missing password"),
 		}
 	}
 	var accRes userapi.PerformAccountCreationResponse

@@ -104,7 +104,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: jsonerror.InvalidParam(err.Error()),
 		}
 	}
 	accAvailableResp := &api.QueryAccountAvailabilityResponse{}
@@ -135,7 +135,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	if request.Password == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting non-empty password."),
+			JSON: jsonerror.MissingParam("Expecting non-empty password."),
 		}
 	}
 
@@ -221,14 +221,14 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting room ID."),
+			JSON: jsonerror.MissingParam("Expecting room ID."),
 		}
 	}
 	serverName, ok := vars["serverName"]
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting remote server name."),
+			JSON: jsonerror.MissingParam("Expecting remote server name."),
 		}
 	}
 	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {

@@ -88,7 +88,7 @@ func parseEventIDParam(
 	if eventID == "" {
 		resErr = &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("event_id missing"),
+			JSON: jsonerror.MissingParam("event_id missing"),
 		}
 	}
 

@@ -377,7 +377,7 @@ func extractRequestData(req *http.Request) (body *threepid.MembershipRequest, ev
 	if err != nil {
 		resErr = &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: jsonerror.InvalidParam(err.Error()),
 		}
 		return
 	}

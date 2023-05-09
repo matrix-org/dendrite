@@ -232,7 +232,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		if err == types.ErrMalformedSyncToken {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue(err.Error()),
+				JSON: jsonerror.InvalidParam(err.Error()),
 			}
 		}
 		return util.JSONResponse{
@@ -517,21 +517,21 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	if from == "" || to == "" {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidArgumentValue("missing ?from= or ?to="),
+			JSON: jsonerror.InvalidParam("missing ?from= or ?to="),
 		}
 	}
 	fromToken, err := types.NewStreamTokenFromString(from)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidArgumentValue("bad 'from' value"),
+			JSON: jsonerror.InvalidParam("bad 'from' value"),
 		}
 	}
 	toToken, err := types.NewStreamTokenFromString(to)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidArgumentValue("bad 'to' value"),
+			JSON: jsonerror.InvalidParam("bad 'to' value"),
 		}
 	}
 	syncReq, err := newSyncRequest(req, *device, rp.db)

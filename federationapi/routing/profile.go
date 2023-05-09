@@ -37,7 +37,7 @@ func GetProfile(
 	if userID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("The request body did not contain required argument 'user_id'."),
+			JSON: jsonerror.MissingParam("The request body did not contain required argument 'user_id'."),
 		}
 	}
 
@@ -46,7 +46,7 @@ func GetProfile(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("Domain %q does not match this server", domain)),
+			JSON: jsonerror.InvalidParam(fmt.Sprintf("Domain %q does not match this server", domain)),
 		}
 	}
 
@@ -71,7 +71,7 @@ func GetProfile(
 			}
 		default:
 			code = http.StatusBadRequest
-			res = jsonerror.InvalidArgumentValue("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
+			res = jsonerror.InvalidParam("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
 		}
 	} else {
 		res = eventutil.UserProfile{

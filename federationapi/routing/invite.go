@@ -155,7 +155,7 @@ func processInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
+			JSON: jsonerror.InvalidParam(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
 		}
 	}
 

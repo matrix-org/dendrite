@@ -68,7 +68,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 	default:
 		err := util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("unhandled login type: " + header.Type),
+			JSON: jsonerror.InvalidParam("unhandled login type: " + header.Type),
 		}
 		return nil, nil, &err
 	}

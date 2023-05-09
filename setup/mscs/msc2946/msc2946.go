@@ -233,7 +233,7 @@ func (w *walker) walk() util.JSONResponse {
 		if cache == nil {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("invalid from"),
+				JSON: jsonerror.InvalidParam("invalid from"),
 			}
 		}
 	} else {
