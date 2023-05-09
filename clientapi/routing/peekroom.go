@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
@@ -61,12 +60,12 @@ func PeekRoomByIDOrAlias(
 	case roomserverAPI.ErrInvalidID:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(e.Error()),
+			JSON: spec.Unknown(e.Error()),
 		}
 	case roomserverAPI.ErrNotAllowed:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(e.Error()),
+			JSON: spec.Forbidden(e.Error()),
 		}
 	case *gomatrix.HTTPError:
 		return util.JSONResponse{
@@ -76,7 +75,7 @@ func PeekRoomByIDOrAlias(
 	case nil:
 	default:
 		logrus.WithError(err).WithField("roomID", roomIDOrAlias).Errorf("Failed to peek room")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// if this user is already joined to the room, we let them peek anyway
@@ -107,12 +106,12 @@ func UnpeekRoomByID(
 	case roomserverAPI.ErrInvalidID:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(e.Error()),
+			JSON: spec.Unknown(e.Error()),
 		}
 	case nil:
 	default:
 		logrus.WithError(err).WithField("roomID", roomID).Errorf("Failed to un-peek room")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

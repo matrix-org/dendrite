@@ -17,7 +17,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -37,7 +36,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	case eventutil.ErrRoomNoExists:
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(err.Error()),
+			JSON: spec.NotFound(err.Error()),
 		}
 	default:
 		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
@@ -91,7 +90,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	if req.Body == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Missing request body"),
+			JSON: spec.Unknown("Missing request body"),
 		}
 	}
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -104,7 +103,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: spec.InvalidParam(err.Error()),
 		}
 	}
 	accAvailableResp := &api.QueryAccountAvailabilityResponse{}
@@ -114,13 +113,13 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	}, accAvailableResp); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalAPIError(req.Context(), err),
+			JSON: spec.InternalServerError(),
 		}
 	}
 	if accAvailableResp.Available {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.Unknown("User does not exist"),
+			JSON: spec.Unknown("User does not exist"),
 		}
 	}
 	request := struct {
@@ -129,13 +128,13 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	if err = json.NewDecoder(req.Body).Decode(&request); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Failed to decode request body: " + err.Error()),
+			JSON: spec.Unknown("Failed to decode request body: " + err.Error()),
 		}
 	}
 	if request.Password == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting non-empty password."),
+			JSON: spec.MissingParam("Expecting non-empty password."),
 		}
 	}
 
@@ -153,7 +152,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	if err := userAPI.PerformPasswordUpdate(req.Context(), updateReq, updateRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Failed to perform password update: " + err.Error()),
+			JSON: spec.Unknown("Failed to perform password update: " + err.Error()),
 		}
 	}
 	return util.JSONResponse{
@@ -170,7 +169,7 @@ func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *api.Device, 
 	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
 	if err != nil {
 		logrus.WithError(err).Error("failed to publish nats message")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -192,7 +191,7 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI api.Clien
 	if cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam("Can not mark local device list as stale"),
+			JSON: spec.InvalidParam("Can not mark local device list as stale"),
 		}
 	}
 
@@ -203,7 +202,7 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI api.Clien
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to mark device list as stale: %s", err)),
+			JSON: spec.Unknown(fmt.Sprintf("Failed to mark device list as stale: %s", err)),
 		}
 	}
 	return util.JSONResponse{
@@ -221,21 +220,21 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting room ID."),
+			JSON: spec.MissingParam("Expecting room ID."),
 		}
 	}
 	serverName, ok := vars["serverName"]
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting remote server name."),
+			JSON: spec.MissingParam("Expecting remote server name."),
 		}
 	}
 	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {
 		if errors.Is(err, eventutil.ErrRoomNoExists) {
 			return util.JSONResponse{
 				Code: 200,
-				JSON: jsonerror.NotFound(eventutil.ErrRoomNoExists.Error()),
+				JSON: spec.NotFound(eventutil.ErrRoomNoExists.Error()),
 			}
 		}
 		logrus.WithError(err).WithFields(logrus.Fields{

@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -115,7 +114,7 @@ func (r *Leaver) performLeaveRoomByID(
 					// mimic the returned values from Synapse
 					res.Message = "You cannot reject this invite"
 					res.Code = 403
-					return nil, jsonerror.LeaveServerNoticeError()
+					return nil, spec.LeaveServerNoticeError()
 				}
 			}
 		}
@@ -203,9 +202,7 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	inputRes := api.InputRoomEventsResponse{}
-	if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
-		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
-	}
+	r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
 	if err = inputRes.Err(); err != nil {
 		return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 	}

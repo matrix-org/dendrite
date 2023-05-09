@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -49,7 +48,7 @@ func SetReceipt(req *http.Request, userAPI api.ClientUserAPI, syncProducer *prod
 	case "m.fully_read":
 		data, err := json.Marshal(fullyReadEvent{EventID: eventID})
 		if err != nil {
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 
 		dataReq := api.InputAccountDataRequest{

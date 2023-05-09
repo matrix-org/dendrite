@@ -21,7 +21,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	relayInternal "github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -59,7 +58,7 @@ func Setup(
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Username was invalid"),
+					JSON: spec.InvalidUsername("Username was invalid"),
 				}
 			}
 			return SendTransactionToRelay(
@@ -84,7 +83,7 @@ func Setup(
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Username was invalid"),
+					JSON: spec.InvalidUsername("Username was invalid"),
 				}
 			}
 			return GetTransactionFromRelay(httpReq, request, relayAPI, *userID)

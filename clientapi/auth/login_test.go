@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -140,7 +140,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 				"type": "m.login.invalid",
 				"device_id": "adevice"
             }`,
-			WantErrCode: "M_INVALID_ARGUMENT_VALUE",
+			WantErrCode: "M_INVALID_PARAM",
 		},
 	}
 	for _, tst := range tsts {
@@ -157,7 +157,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
-			} else if merr, ok := errRes.JSON.(*jsonerror.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
+			} else if merr, ok := errRes.JSON.(*spec.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
 			}
 		})

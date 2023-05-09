@@ -226,9 +226,7 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
-		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
-	}
+	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 	if err = inputRes.Err(); err != nil {
 		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
 		return nil, api.ErrNotAllowed{Err: err}

@@ -18,10 +18,10 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type typingContentJSON struct {
@@ -39,7 +39,7 @@ func SendTyping(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+			JSON: spec.Forbidden("Cannot set another user's typing state"),
 		}
 	}
 
@@ -58,7 +58,7 @@ func SendTyping(
 
 	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{

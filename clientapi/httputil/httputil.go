@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"unicode/utf8"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -32,7 +32,7 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
-		resp := jsonerror.InternalServerError()
+		resp := spec.InternalServerError()
 		return &resp
 	}
 
@@ -43,7 +43,7 @@ func UnmarshalJSON(body []byte, iface interface{}) *util.JSONResponse {
 	if !utf8.Valid(body) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("Body contains invalid UTF-8"),
+			JSON: spec.NotJSON("Body contains invalid UTF-8"),
 		}
 	}
 
@@ -53,7 +53,7 @@ func UnmarshalJSON(body []byte, iface interface{}) *util.JSONResponse {
 		// valid JSON with incorrect types for values.
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	return nil

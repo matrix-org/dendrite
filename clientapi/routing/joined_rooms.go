@@ -19,9 +19,9 @@ import (
 
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type getJoinedRoomsResponse struct {
@@ -40,7 +40,7 @@ func GetJoinedRooms(
 	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if res.RoomIDs == nil {
 		res.RoomIDs = []string{}

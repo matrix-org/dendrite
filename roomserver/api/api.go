@@ -60,7 +60,7 @@ type InputRoomEventsAPI interface {
 		ctx context.Context,
 		req *InputRoomEventsRequest,
 		res *InputRoomEventsResponse,
-	) error
+	)
 }
 
 // Query the latest events and state for a room from the room server.

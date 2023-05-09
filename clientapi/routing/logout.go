@@ -17,8 +17,8 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -33,7 +33,7 @@ func Logout(
 	}, &performRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -53,7 +53,7 @@ func LogoutAll(
 	}, &performRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{
