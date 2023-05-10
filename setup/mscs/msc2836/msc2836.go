@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -169,7 +168,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 			util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 			}
 		}
 		rc := reqCtx{
@@ -201,7 +200,7 @@ func federatedEventRelationship(
 		util.GetLogger(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+			JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 		}
 	}
 	rc := reqCtx{
@@ -268,7 +267,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 	if event == nil || !rc.authorisedToSeeEvent(event) {
 		return nil, &util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("Event does not exist or you are not authorised to see it"),
+			JSON: spec.Forbidden("Event does not exist or you are not authorised to see it"),
 		}
 	}
 	rc.roomVersion = event.Version()
@@ -428,7 +427,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	children, err := db.ChildrenForParent(rc.ctx, parentID, constRelType, recentFirst)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to get ChildrenForParent")
-		resErr := jsonerror.InternalServerError()
+		resErr := spec.InternalServerError()
 		return nil, &resErr
 	}
 	var childEvents []*types.HeaderedEvent

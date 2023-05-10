@@ -37,12 +37,11 @@ type fedRoomserverAPI struct {
 }
 
 // PerformJoin will call this function
-func (f *fedRoomserverAPI) InputRoomEvents(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) error {
+func (f *fedRoomserverAPI) InputRoomEvents(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
 	if f.inputRoomEvents == nil {
-		return nil
+		return
 	}
 	f.inputRoomEvents(ctx, req, res)
-	return nil
 }
 
 // keychange consumer calls this

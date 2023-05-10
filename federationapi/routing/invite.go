@@ -21,12 +21,12 @@ import (
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -46,14 +46,14 @@ func InviteV2(
 	case gomatrixserverlib.UnsupportedRoomVersionError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
+			JSON: spec.UnsupportedRoomVersion(
 				fmt.Sprintf("Room version %q is not supported by this server.", e.Version),
 			),
 		}
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case nil:
 		return processInvite(
@@ -62,7 +62,7 @@ func InviteV2(
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
 }
@@ -85,13 +85,13 @@ func InviteV1(
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case nil:
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
 		}
 	}
 	var strippedState []fclient.InviteV2StrippedState
@@ -122,7 +122,7 @@ func processInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
+			JSON: spec.UnsupportedRoomVersion(
 				fmt.Sprintf("Room version %q is not supported by this server.", roomVer),
 			),
 		}
@@ -132,7 +132,7 @@ func processInvite(
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
+			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
 		}
 	}
 
@@ -140,14 +140,14 @@ func processInvite(
 	if event.EventID() != eventID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
+			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
 		}
 	}
 
 	if event.StateKey() == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The invite event has no state key"),
+			JSON: spec.BadJSON("The invite event has no state key"),
 		}
 	}
 
@@ -155,7 +155,7 @@ func processInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
+			JSON: spec.InvalidParam(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
 		}
 	}
 
@@ -164,14 +164,14 @@ func processInvite(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+			JSON: spec.BadJSON("The event JSON could not be redacted"),
 		}
 	}
 	_, serverName, err := gomatrixserverlib.SplitID('@', event.Sender())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event JSON contains an invalid sender"),
+			JSON: spec.BadJSON("The event JSON contains an invalid sender"),
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
@@ -183,12 +183,12 @@ func processInvite(
 	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("keys.VerifyJSONs failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The invite must be signed by the server it originated on"),
+			JSON: spec.Forbidden("The invite must be signed by the server it originated on"),
 		}
 	}
 
@@ -211,7 +211,7 @@ func processInvite(
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 
@@ -219,12 +219,12 @@ func processInvite(
 	case api.ErrInvalidID:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(e.Error()),
+			JSON: spec.Unknown(e.Error()),
 		}
 	case api.ErrNotAllowed:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(e.Error()),
+			JSON: spec.Forbidden(e.Error()),
 		}
 	case nil:
 	default:
@@ -232,7 +232,7 @@ func processInvite(
 		sentry.CaptureException(err)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 

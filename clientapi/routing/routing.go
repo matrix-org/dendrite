@@ -33,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -148,7 +147,7 @@ func Setup(
 				}
 				return util.JSONResponse{
 					Code: http.StatusMethodNotAllowed,
-					JSON: jsonerror.NotFound("unknown method"),
+					JSON: spec.NotFound("unknown method"),
 				}
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
@@ -659,7 +658,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash"),
+				JSON: spec.InvalidParam("missing trailing slash"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -674,7 +673,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("scope, kind and rule ID must be specified"),
+				JSON: spec.InvalidParam("scope, kind and rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -693,7 +692,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after scope"),
+				JSON: spec.InvalidParam("missing trailing slash after scope"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -702,7 +701,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("kind and rule ID must be specified"),
+				JSON: spec.InvalidParam("kind and rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -721,7 +720,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after kind"),
+				JSON: spec.InvalidParam("missing trailing slash after kind"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -730,7 +729,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("rule ID must be specified"),
+				JSON: spec.InvalidParam("rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -939,7 +938,7 @@ func Setup(
 			// TODO: Allow people to peek into rooms.
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.GuestAccessForbidden("Guest access not implemented"),
+				JSON: spec.GuestAccessForbidden("Guest access not implemented"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -1244,7 +1243,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: spec.InvalidParam("version must be specified"),
 			}
 		}
 		var reqBody keyBackupSessionRequest
@@ -1265,7 +1264,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: spec.InvalidParam("version must be specified"),
 			}
 		}
 		roomID := vars["roomID"]
@@ -1297,7 +1296,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: spec.InvalidParam("version must be specified"),
 			}
 		}
 		var reqBody userapi.KeyBackupSession

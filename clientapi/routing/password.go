@@ -6,11 +6,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -90,7 +90,7 @@ func Password(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// Ask the user API to perform the password change.
@@ -102,11 +102,11 @@ func Password(
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if !passwordRes.PasswordUpdated {
 		util.GetLogger(req.Context()).Error("Expected password to have been updated but wasn't")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	// If the request asks us to log out all other devices then
@@ -120,7 +120,7 @@ func Password(
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 
 		pushersReq := &api.PerformPusherDeletionRequest{
@@ -130,7 +130,7 @@ func Password(
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 	}
 

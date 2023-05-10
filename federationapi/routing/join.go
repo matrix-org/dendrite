@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -100,7 +99,7 @@ func MakeJoin(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed obtaining room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 
@@ -109,7 +108,7 @@ func MakeJoin(
 		if err != nil {
 			return nil, nil, &util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound(
+				JSON: spec.NotFound(
 					fmt.Sprintf("Server name %q does not exist", request.Destination()),
 				),
 			}
@@ -122,16 +121,16 @@ func MakeJoin(
 		if err == eventutil.ErrRoomNoExists {
 			return nil, nil, &util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("Room does not exist"),
+				JSON: spec.NotFound("Room does not exist"),
 			}
 		} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
 			return nil, nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(e.Error()),
+				JSON: spec.BadJSON(e.Error()),
 			}
 		} else if err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-			e := jsonerror.InternalServerError()
+			e := spec.InternalServerError()
 			return nil, nil, &e
 		}
 
@@ -165,7 +164,7 @@ func MakeJoin(
 
 	if response == nil {
 		util.GetLogger(httpReq.Context()).Error("gmsl.HandleMakeJoin returned invalid response")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -194,14 +193,14 @@ func SendJoin(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError(),
 		}
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.UnsupportedRoomVersion(
+			JSON: spec.UnsupportedRoomVersion(
 				fmt.Sprintf("QueryRoomVersionForRoom returned unknown room version: %s", roomVersion),
 			),
 		}
@@ -211,7 +210,7 @@ func SendJoin(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON: " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON: " + err.Error()),
 		}
 	}
 
@@ -219,13 +218,13 @@ func SendJoin(
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("No state key was provided in the join event."),
+			JSON: spec.BadJSON("No state key was provided in the join event."),
 		}
 	}
 	if !event.StateKeyEquals(event.Sender()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
+			JSON: spec.BadJSON("Event state key must match the event sender."),
 		}
 	}
 
@@ -236,12 +235,12 @@ func SendJoin(
 	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
+			JSON: spec.Forbidden("The sender of the join is invalid"),
 		}
 	} else if serverName != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The sender does not match the server that originated the request"),
+			JSON: spec.Forbidden("The sender does not match the server that originated the request"),
 		}
 	}
 
@@ -249,7 +248,7 @@ func SendJoin(
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(
+			JSON: spec.BadJSON(
 				fmt.Sprintf(
 					"The room ID in the request path (%q) must match the room ID in the join event JSON (%q)",
 					roomID, event.RoomID(),
@@ -262,7 +261,7 @@ func SendJoin(
 	if event.EventID() != eventID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(
+			JSON: spec.BadJSON(
 				fmt.Sprintf(
 					"The event ID in the request path (%q) must match the event ID in the join event JSON (%q)",
 					eventID, event.EventID(),
@@ -276,13 +275,13 @@ func SendJoin(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing content.membership key"),
+			JSON: spec.BadJSON("missing content.membership key"),
 		}
 	}
 	if membership != spec.Join {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("membership must be 'join'"),
+			JSON: spec.BadJSON("membership must be 'join'"),
 		}
 	}
 
@@ -292,7 +291,7 @@ func SendJoin(
 		logrus.WithError(err).Errorf("XXX: join.go")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+			JSON: spec.BadJSON("The event JSON could not be redacted"),
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
@@ -304,12 +303,12 @@ func SendJoin(
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Signature check failed: " + verifyResults[0].Error.Error()),
+			JSON: spec.Forbidden("Signature check failed: " + verifyResults[0].Error.Error()),
 		}
 	}
 
@@ -324,19 +323,19 @@ func SendJoin(
 	}, &stateAndAuthChainResponse)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryStateAndAuthChain failed")
-		return jsonerror.InternalServerError()
+		return spec.InternalServerError()
 	}
 
 	if !stateAndAuthChainResponse.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room does not exist"),
+			JSON: spec.NotFound("Room does not exist"),
 		}
 	}
 	if !stateAndAuthChainResponse.StateKnown {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("State not known"),
+			JSON: spec.Forbidden("State not known"),
 		}
 	}
 
@@ -359,7 +358,7 @@ func SendJoin(
 	if isBanned {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("user is banned"),
+			JSON: spec.Forbidden("user is banned"),
 		}
 	}
 
@@ -369,7 +368,7 @@ func SendJoin(
 	if err := json.Unmarshal(event.Content(), &memberContent); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	}
 	if memberContent.AuthorisedVia != "" {
@@ -377,13 +376,13 @@ func SendJoin(
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(fmt.Sprintf("The authorising username %q is invalid.", memberContent.AuthorisedVia)),
+				JSON: spec.BadJSON(fmt.Sprintf("The authorising username %q is invalid.", memberContent.AuthorisedVia)),
 			}
 		}
 		if domain != cfg.Matrix.ServerName {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(fmt.Sprintf("The authorising username %q does not belong to this server.", memberContent.AuthorisedVia)),
+				JSON: spec.BadJSON(fmt.Sprintf("The authorising username %q does not belong to this server.", memberContent.AuthorisedVia)),
 			}
 		}
 	}
@@ -402,7 +401,7 @@ func SendJoin(
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
 		var response api.InputRoomEventsResponse
-		if err := rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
@@ -411,18 +410,16 @@ func SendJoin(
 					TransactionID: nil,
 				},
 			},
-		}, &response); err != nil {
-			return jsonerror.InternalAPIError(httpReq.Context(), err)
-		}
+		}, &response)
 		if response.ErrMsg != "" {
 			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
 			if response.NotAllowed {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.Forbidden(response.ErrMsg),
+					JSON: spec.Forbidden(response.ErrMsg),
 				}
 			}
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 	}
 

@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -153,7 +152,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 				// See https://github.com/matrix-org/synapse/issues/7543
 				return nil, &util.JSONResponse{
 					Code: 400,
-					JSON: jsonerror.BadJSON("PDU contains bad JSON"),
+					JSON: spec.BadJSON("PDU contains bad JSON"),
 				}
 			}
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))

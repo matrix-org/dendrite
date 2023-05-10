@@ -23,7 +23,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
@@ -150,7 +149,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return InviteV1(
@@ -166,7 +165,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return InviteV2(
@@ -206,7 +205,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return GetState(
@@ -221,7 +220,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return GetStateIDs(
@@ -236,7 +235,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return GetEventAuth(
@@ -279,7 +278,7 @@ func Setup(
 				if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 					return util.JSONResponse{
 						Code: http.StatusForbidden,
-						JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+						JSON: spec.Forbidden("Forbidden by server ACLs"),
 					}
 				}
 				roomID := vars["roomID"]
@@ -310,7 +309,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			queryVars := httpReq.URL.Query()
@@ -332,14 +331,14 @@ func Setup(
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.BadJSON("Invalid UserID"),
+					JSON: spec.BadJSON("Invalid UserID"),
 				}
 			}
 			roomID, err := spec.NewRoomID(vars["roomID"])
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.BadJSON("Invalid RoomID"),
+					JSON: spec.BadJSON("Invalid RoomID"),
 				}
 			}
 
@@ -357,7 +356,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			roomID := vars["roomID"]
@@ -370,7 +369,7 @@ func Setup(
 			body = []interface{}{
 				res.Code, res.JSON,
 			}
-			jerr, ok := res.JSON.(*jsonerror.MatrixError)
+			jerr, ok := res.JSON.(*spec.MatrixError)
 			if ok {
 				body = jerr
 			}
@@ -389,7 +388,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			roomID := vars["roomID"]
@@ -406,7 +405,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			roomID := vars["roomID"]
@@ -423,7 +422,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			roomID := vars["roomID"]
@@ -436,7 +435,7 @@ func Setup(
 			body = []interface{}{
 				res.Code, res.JSON,
 			}
-			jerr, ok := res.JSON.(*jsonerror.MatrixError)
+			jerr, ok := res.JSON.(*spec.MatrixError)
 			if ok {
 				body = jerr
 			}
@@ -455,7 +454,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			roomID := vars["roomID"]
@@ -479,7 +478,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return GetMissingEvents(httpReq, request, rsAPI, vars["roomID"])
@@ -492,7 +491,7 @@ func Setup(
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
 			return Backfill(httpReq, request, rsAPI, vars["roomID"], cfg)
@@ -544,7 +543,7 @@ func ErrorIfLocalServerNotInRoom(
 	if !joinedRes.IsInRoom {
 		return &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(fmt.Sprintf("This server is not joined to room %s", roomID)),
+			JSON: spec.NotFound(fmt.Sprintf("This server is not joined to room %s", roomID)),
 		}
 	}
 	return nil

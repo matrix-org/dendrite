@@ -104,9 +104,7 @@ func SendInputRoomEvents(
 		VirtualHost:     virtualHost,
 	}
 	var response InputRoomEventsResponse
-	if err := rsAPI.InputRoomEvents(ctx, &request, &response); err != nil {
-		return err
-	}
+	rsAPI.InputRoomEvents(ctx, &request, &response)
 	return response.Err()
 }
 

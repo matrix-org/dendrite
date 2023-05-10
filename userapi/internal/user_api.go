@@ -25,7 +25,6 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -715,7 +714,7 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 		return res, fmt.Errorf("backup was deleted")
 	}
 	if version != req.Version {
-		return res, jsonerror.WrongBackupVersionError(version)
+		return res, spec.WrongBackupVersionError(version)
 	}
 	res.Exists = true
 	res.Version = version

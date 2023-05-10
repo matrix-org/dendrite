@@ -18,13 +18,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -40,14 +40,14 @@ func RoomAliasToID(
 	if roomAlias == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Must supply room alias parameter."),
+			JSON: spec.BadJSON("Must supply room alias parameter."),
 		}
 	}
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
+			JSON: spec.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
 
@@ -61,7 +61,7 @@ func RoomAliasToID(
 		queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), queryReq, queryRes); err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 
 		if queryRes.RoomID != "" {
@@ -69,7 +69,7 @@ func RoomAliasToID(
 			var serverQueryRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
 				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
-				return jsonerror.InternalServerError()
+				return spec.InternalServerError()
 			}
 
 			resp = fclient.RespDirectory{
@@ -80,7 +80,7 @@ func RoomAliasToID(
 			// If no alias was found, return an error
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound(fmt.Sprintf("Room alias %s not found", roomAlias)),
+				JSON: spec.NotFound(fmt.Sprintf("Room alias %s not found", roomAlias)),
 			}
 		}
 	} else {
@@ -91,14 +91,14 @@ func RoomAliasToID(
 				if x.Code == http.StatusNotFound {
 					return util.JSONResponse{
 						Code: http.StatusNotFound,
-						JSON: jsonerror.NotFound("Room alias not found"),
+						JSON: spec.NotFound("Room alias not found"),
 					}
 				}
 			}
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
 			util.GetLogger(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
-			return jsonerror.InternalServerError()
+			return spec.InternalServerError()
 		}
 	}
 
