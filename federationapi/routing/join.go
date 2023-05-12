@@ -38,7 +38,7 @@ type JoinRoomQuerier struct {
 	roomserver api.FederationRoomserverAPI
 }
 
-func (rq *JoinRoomQuerier) RoomInfo(ctx context.Context, roomID *spec.RoomID) (*gomatrixserverlib.RoomInfo, error) {
+func (rq *JoinRoomQuerier) RoomInfo(ctx context.Context, roomID spec.RoomID) (*gomatrixserverlib.RoomInfo, error) {
 	roomInfo, err := rq.roomserver.QueryRoomInfo(ctx, roomID)
 	var result *gomatrixserverlib.RoomInfo
 	if roomInfo != nil && !roomInfo.IsStub() {
@@ -51,11 +51,11 @@ func (rq *JoinRoomQuerier) RoomInfo(ctx context.Context, roomID *spec.RoomID) (*
 	return result, err
 }
 
-func (rq *JoinRoomQuerier) StateEvent(ctx context.Context, roomID *spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+func (rq *JoinRoomQuerier) StateEvent(ctx context.Context, roomID spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
 	return rq.roomserver.GetStateEvent(ctx, roomID, eventType, stateKey)
 }
 
-func (rq *JoinRoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName, roomID *spec.RoomID) (*gomatrixserverlib.JoinedToRoomResponse, error) {
+func (rq *JoinRoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName, roomID spec.RoomID) (*gomatrixserverlib.JoinedToRoomResponse, error) {
 	req := api.QueryServerJoinedToRoomRequest{
 		ServerName: server,
 		RoomID:     roomID.String(),
@@ -73,7 +73,7 @@ func (rq *JoinRoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerN
 	return &joinedResponse, nil
 }
 
-func (rq *JoinRoomQuerier) Membership(ctx context.Context, roomNID int64, userID *spec.UserID) (bool, error) {
+func (rq *JoinRoomQuerier) Membership(ctx context.Context, roomNID int64, userID spec.UserID) (bool, error) {
 	return rq.roomserver.IsInRoom(ctx, types.RoomNID(roomNID), userID)
 }
 
@@ -81,7 +81,7 @@ func (rq *JoinRoomQuerier) GetJoinedUsers(ctx context.Context, roomVersion gomat
 	return rq.roomserver.GetLocallyJoinedUsers(ctx, roomVersion, types.RoomNID(roomNID))
 }
 
-func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID *spec.RoomID, userID *spec.UserID) (bool, error) {
+func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
 	return rq.roomserver.IsInvitePending(ctx, roomID, userID)
 }
 
@@ -91,7 +91,7 @@ func MakeJoin(
 	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
-	roomID *spec.RoomID, userID *spec.UserID,
+	roomID spec.RoomID, userID spec.UserID,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())

@@ -858,20 +858,20 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	return nil
 }
 
-func (r *Queryer) IsInvitePending(ctx context.Context, roomID *spec.RoomID, userID *spec.UserID) (bool, error) {
+func (r *Queryer) IsInvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
 	pending, _, _, _, err := helpers.IsInvitePending(ctx, r.DB, roomID.String(), userID.String())
 	return pending, err
 }
 
-func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID *spec.RoomID) (*types.RoomInfo, error) {
+func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error) {
 	return r.DB.RoomInfo(ctx, roomID.String())
 }
 
-func (r *Queryer) GetStateEvent(ctx context.Context, roomID *spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+func (r *Queryer) GetStateEvent(ctx context.Context, roomID spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
 	return r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
 }
 
-func (r *Queryer) IsInRoom(ctx context.Context, roomNID types.RoomNID, userID *spec.UserID) (bool, error) {
+func (r *Queryer) IsInRoom(ctx context.Context, roomNID types.RoomNID, userID spec.UserID) (bool, error) {
 	_, isIn, _, err := r.DB.GetMembership(ctx, roomNID, userID.String())
 	return isIn, err
 }
