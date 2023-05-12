@@ -106,6 +106,7 @@ func MakeJoin(
 	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, *util.JSONResponse) {
 		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
 		if err != nil {
+			util.GetLogger(httpReq.Context()).WithError(err).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, &util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound(
