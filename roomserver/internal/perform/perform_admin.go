@@ -52,7 +52,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		return nil, err
 	}
 	if roomInfo == nil || roomInfo.IsStub() {
-		return nil, eventutil.ErrRoomNoExists
+		return nil, eventutil.ErrRoomNoExists{}
 	}
 
 	memberNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
@@ -240,7 +240,7 @@ func (r *Admin) PerformAdminDownloadState(
 	}
 
 	if roomInfo == nil || roomInfo.IsStub() {
-		return eventutil.ErrRoomNoExists
+		return eventutil.ErrRoomNoExists{}
 	}
 
 	fwdExtremities, _, depth, err := r.DB.LatestEventIDs(ctx, roomInfo.RoomNID)

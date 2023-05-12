@@ -64,13 +64,33 @@ type idServerStoreInviteResponse struct {
 }
 
 var (
-	// ErrMissingParameter is the error raised if a request for 3PID invite has
-	// an incomplete body
-	ErrMissingParameter = errors.New("'address', 'id_server' and 'medium' must all be supplied")
-	// ErrNotTrusted is the error raised if an identity server isn't in the list
-	// of trusted servers in the configuration file.
-	ErrNotTrusted = errors.New("untrusted server")
+	errMissingParameter = fmt.Errorf("'address', 'id_server' and 'medium' must all be supplied")
+	errNotTrusted       = fmt.Errorf("untrusted server")
 )
+
+// ErrMissingParameter is the error raised if a request for 3PID invite has
+// an incomplete body
+type ErrMissingParameter struct{}
+
+func (e ErrMissingParameter) Error() string {
+	return errMissingParameter.Error()
+}
+
+func (e ErrMissingParameter) Unwrap() error {
+	return errMissingParameter
+}
+
+// ErrNotTrusted is the error raised if an identity server isn't in the list
+// of trusted servers in the configuration file.
+type ErrNotTrusted struct{}
+
+func (e ErrNotTrusted) Error() string {
+	return errNotTrusted.Error()
+}
+
+func (e ErrNotTrusted) Unwrap() error {
+	return errNotTrusted
+}
 
 // CheckAndProcessInvite analyses the body of an incoming membership request.
 // If the fields relative to a third-party-invite are all supplied, lookups the
@@ -99,7 +119,7 @@ func CheckAndProcessInvite(
 	} else if body.Address == "" || body.IDServer == "" || body.Medium == "" {
 		// If at least one of the 3PID-specific fields is supplied but not all
 		// of them, return an error
-		err = ErrMissingParameter
+		err = ErrMissingParameter{}
 		return
 	}
 

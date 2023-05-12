@@ -31,7 +31,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 	}
 
 	affected, err := rsAPI.PerformAdminEvacuateRoom(req.Context(), vars["roomID"])
-	switch err {
+	switch err.(type) {
 	case nil:
 	case eventutil.ErrRoomNoExists:
 		return util.JSONResponse{
@@ -231,10 +231,10 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 		}
 	}
 	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {
-		if errors.Is(err, eventutil.ErrRoomNoExists) {
+		if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 			return util.JSONResponse{
 				Code: 200,
-				JSON: spec.NotFound(eventutil.ErrRoomNoExists.Error()),
+				JSON: spec.NotFound(err.Error()),
 			}
 		}
 		logrus.WithError(err).WithFields(logrus.Fields{

@@ -284,28 +284,30 @@ func generateSendEvent(
 
 	var queryRes api.QueryLatestEventsAndStateResponse
 	e, err := eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
-	if err == eventutil.ErrRoomNoExists {
+	switch specificErr := err.(type) {
+	case nil:
+	case eventutil.ErrRoomNoExists:
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Room does not exist"),
 		}
-	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+	case gomatrixserverlib.BadJSONError:
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON(e.Error()),
+			JSON: spec.BadJSON(specificErr.Error()),
 		}
-	} else if e, ok := err.(gomatrixserverlib.EventValidationError); ok {
-		if e.Code == gomatrixserverlib.EventValidationTooLarge {
+	case gomatrixserverlib.EventValidationError:
+		if specificErr.Code == gomatrixserverlib.EventValidationTooLarge {
 			return nil, &util.JSONResponse{
 				Code: http.StatusRequestEntityTooLarge,
-				JSON: spec.BadJSON(e.Error()),
+				JSON: spec.BadJSON(specificErr.Error()),
 			}
 		}
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON(e.Error()),
+			JSON: spec.BadJSON(specificErr.Error()),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(ctx).WithError(err).Error("eventutil.BuildEvent failed")
 		resErr := spec.InternalServerError()
 		return nil, &resErr

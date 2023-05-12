@@ -75,17 +75,21 @@ func MakeLeave(
 
 	var queryRes api.QueryLatestEventsAndStateResponse
 	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
-	if err == eventutil.ErrRoomNoExists {
+	switch e := err.(type) {
+	case nil:
+	case eventutil.ErrRoomNoExists:
+		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Room does not exist"),
 		}
-	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+	case gomatrixserverlib.BadJSONError:
+		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(e.Error()),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return spec.InternalServerError()
 	}

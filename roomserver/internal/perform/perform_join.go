@@ -286,7 +286,7 @@ func (r *Joiner) performJoinRoomByID(
 	}
 	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
 
-	switch err {
+	switch err.(type) {
 	case nil:
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
@@ -328,7 +328,7 @@ func (r *Joiner) performJoinRoomByID(
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.
 			if len(req.ServerNames) == 0 {
-				return "", "", eventutil.ErrRoomNoExists
+				return "", "", eventutil.ErrRoomNoExists{}
 			}
 		}
 

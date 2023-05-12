@@ -186,5 +186,5 @@ func isTrusted(idServer string, cfg *config.ClientAPI) error {
 			return nil
 		}
 	}
-	return ErrNotTrusted
+	return ErrNotTrusted{}
 }

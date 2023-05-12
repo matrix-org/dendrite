@@ -74,12 +74,15 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 	}
 
 	resp.SID, err = threepid.CreateSession(req.Context(), body, cfg, client)
-	if err == threepid.ErrNotTrusted {
+	switch err.(type) {
+	case nil:
+	case threepid.ErrNotTrusted:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
 		return spec.InternalServerError()
 	}
@@ -102,12 +105,15 @@ func CheckAndSave3PIDAssociation(
 
 	// Check if the association has been validated
 	verified, address, medium, err := threepid.CheckAssociation(req.Context(), body.Creds, cfg, client)
-	if err == threepid.ErrNotTrusted {
+	switch err.(type) {
+	case nil:
+	case threepid.ErrNotTrusted:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.Creds.IDServer),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
 		return spec.InternalServerError()
 	}
