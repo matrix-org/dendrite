@@ -878,10 +878,7 @@ func (r *Queryer) UserJoinedToRoom(ctx context.Context, roomNID types.RoomNID, u
 
 func (r *Queryer) GetLocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error) {
 	joinNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true)
-	if err != nil || len(joinNIDs) == 0 {
-		// There should always be more than one join NID at this point
-		// because we are gated behind GetLocalServerInRoom, but y'know,
-		// sometimes strange things happen.
+	if err != nil {
 		return nil, err
 	}
 
