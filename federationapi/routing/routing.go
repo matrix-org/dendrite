@@ -342,8 +342,7 @@ func Setup(
 				}
 			}
 
-			logrus.Warnf("Processing make_join for user %s, room %s", userID.String(), roomID.String())
-
+			logrus.Debugf("Processing make_join for user %s, room %s", userID.String(), roomID.String())
 			return MakeJoin(
 				httpReq, request, cfg, rsAPI, roomID, userID, remoteVersions,
 			)
