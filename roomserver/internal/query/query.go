@@ -871,7 +871,7 @@ func (r *Queryer) GetStateEvent(ctx context.Context, roomID spec.RoomID, eventTy
 	return r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
 }
 
-func (r *Queryer) IsInRoom(ctx context.Context, roomNID types.RoomNID, userID spec.UserID) (bool, error) {
+func (r *Queryer) UserJoinedToRoom(ctx context.Context, roomNID types.RoomNID, userID spec.UserID) (bool, error) {
 	_, isIn, _, err := r.DB.GetMembership(ctx, roomNID, userID.String())
 	return isIn, err
 }

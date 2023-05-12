@@ -73,8 +73,8 @@ func (rq *JoinRoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerN
 	return &joinedResponse, nil
 }
 
-func (rq *JoinRoomQuerier) Membership(ctx context.Context, roomNID int64, userID spec.UserID) (bool, error) {
-	return rq.roomserver.IsInRoom(ctx, types.RoomNID(roomNID), userID)
+func (rq *JoinRoomQuerier) UserJoinedToRoom(ctx context.Context, roomNID int64, userID spec.UserID) (bool, error) {
+	return rq.roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomNID), userID)
 }
 
 func (rq *JoinRoomQuerier) GetJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID int64) ([]gomatrixserverlib.PDU, error) {
