@@ -51,7 +51,7 @@ func (rq *JoinRoomQuerier) RoomInfo(ctx context.Context, roomID spec.RoomID) (*g
 	return result, err
 }
 
-func (rq *JoinRoomQuerier) StateEvent(ctx context.Context, roomID spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+func (rq *JoinRoomQuerier) StateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
 	return rq.roomserver.GetStateEvent(ctx, roomID, eventType, stateKey)
 }
 

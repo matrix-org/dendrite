@@ -867,7 +867,7 @@ func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types
 	return r.DB.RoomInfo(ctx, roomID.String())
 }
 
-func (r *Queryer) GetStateEvent(ctx context.Context, roomID spec.RoomID, eventType spec.MatrixEventType, stateKey string) (gomatrixserverlib.PDU, error) {
+func (r *Queryer) GetStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
 	return r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
 }
 
