@@ -172,12 +172,16 @@ func MakeJoin(
 				code = http.StatusBadRequest
 			case spec.ErrorBadJSON:
 				code = http.StatusBadRequest
-			case spec.ErrorIncompatibleRoomVersion:
-				code = http.StatusBadRequest
 			}
 
 			return util.JSONResponse{
 				Code: code,
+				JSON: e,
+			}
+		case spec.IncompatibleRoomVersionError:
+			util.GetLogger(httpReq.Context()).WithError(internalErr)
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
 				JSON: e,
 			}
 		default:
