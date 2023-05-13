@@ -121,7 +121,7 @@ func JoinRoomByIDOrAlias(
 		default:
 			response = util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError(),
+				JSON: spec.InternalServerError{},
 			}
 		}
 		done <- response

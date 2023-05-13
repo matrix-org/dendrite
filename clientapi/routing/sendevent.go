@@ -149,7 +149,10 @@ func SendEvent(
 		}
 		aliasRes := &api.GetAliasesForRoomIDResponse{}
 		if err = rsAPI.GetAliasesForRoomID(req.Context(), &api.GetAliasesForRoomIDRequest{RoomID: roomID}, aliasRes); err != nil {
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		var found int
 		requestAliases := append(aliasReq.AltAliases, aliasReq.Alias)
@@ -193,7 +196,10 @@ func SendEvent(
 		false,
 	); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	timeToSubmitEvent := time.Since(startedSubmittingEvent)
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -272,14 +278,18 @@ func generateSendEvent(
 	err := proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("proto.SetContent failed")
-		resErr := spec.InternalServerError()
-		return nil, &resErr
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
 	if err != nil {
-		resErr := spec.InternalServerError()
-		return nil, &resErr
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
@@ -309,8 +319,10 @@ func generateSendEvent(
 		}
 	default:
 		util.GetLogger(ctx).WithError(err).Error("eventutil.BuildEvent failed")
-		resErr := spec.InternalServerError()
-		return nil, &resErr
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// check to see if this user can perform this operation

@@ -113,7 +113,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 	}, accAvailableResp); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 	if accAvailableResp.Available {
@@ -169,7 +169,10 @@ func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *api.Device, 
 	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
 	if err != nil {
 		logrus.WithError(err).Error("failed to publish nats message")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,

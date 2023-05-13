@@ -157,7 +157,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
-			} else if merr, ok := errRes.JSON.(*spec.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
+			} else if merr, ok := errRes.JSON.(spec.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
 			}
 		})

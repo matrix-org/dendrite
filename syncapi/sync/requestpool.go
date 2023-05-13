@@ -536,12 +536,18 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -552,7 +558,10 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	succeeded = true
 	return util.JSONResponse{

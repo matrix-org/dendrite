@@ -40,7 +40,10 @@ func GetJoinedRooms(
 	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if res.RoomIDs == nil {
 		res.RoomIDs = []string{}

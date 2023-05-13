@@ -99,20 +99,15 @@ func MakeJoin(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed obtaining room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 
-	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, *util.JSONResponse) {
+	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
 		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
 		if err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Errorf("obtaining signing identity for %s failed", request.Destination())
-			return nil, nil, &util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: spec.NotFound(
-					fmt.Sprintf("Server name %q does not exist", request.Destination()),
-				),
-			}
+			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 
 		queryRes := api.QueryLatestEventsAndStateResponse{
@@ -123,20 +118,13 @@ func MakeJoin(
 		case nil:
 		case eventutil.ErrRoomNoExists:
 			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-			return nil, nil, &util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: spec.NotFound("Room does not exist"),
-			}
+			return nil, nil, spec.NotFound("Room does not exist")
 		case gomatrixserverlib.BadJSONError:
 			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-			return nil, nil, &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: spec.BadJSON(e.Error()),
-			}
+			return nil, nil, spec.BadJSON(e.Error())
 		default:
 			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-			internalErr := spec.InternalServerError()
-			return nil, nil, &internalErr
+			return nil, nil, spec.InternalServerError{}
 		}
 
 		stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
@@ -164,12 +152,54 @@ func MakeJoin(
 	}
 	response, internalErr := gomatrixserverlib.HandleMakeJoin(input)
 	if internalErr != nil {
-		return *internalErr
+		switch e := internalErr.(type) {
+		case nil:
+		case spec.InternalServerError:
+			util.GetLogger(httpReq.Context()).WithError(internalErr)
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		case spec.MatrixError:
+			util.GetLogger(httpReq.Context()).WithError(internalErr)
+			code := http.StatusInternalServerError
+			switch e.Code {
+			case spec.ErrorForbidden:
+				code = http.StatusForbidden
+			case spec.ErrorNotFound:
+				code = http.StatusNotFound
+			case spec.ErrorUnableToAuthoriseJoin:
+				code = http.StatusBadRequest
+			case spec.ErrorBadJSON:
+				code = http.StatusBadRequest
+			}
+
+			return util.JSONResponse{
+				Code: code,
+				JSON: e,
+			}
+			// TODO: MatrixError & the other error types
+		case spec.IncompatibleRoomVersionError:
+			util.GetLogger(httpReq.Context()).WithError(internalErr)
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: e,
+			}
+		default:
+			util.GetLogger(httpReq.Context()).WithError(internalErr)
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("unknown error"),
+			}
+		}
 	}
 
 	if response == nil {
 		util.GetLogger(httpReq.Context()).Error("gmsl.HandleMakeJoin returned invalid response")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -198,7 +228,7 @@ func SendJoin(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
@@ -308,7 +338,10 @@ func SendJoin(
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -328,7 +361,10 @@ func SendJoin(
 	}, &stateAndAuthChainResponse)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryStateAndAuthChain failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !stateAndAuthChainResponse.RoomExists {
@@ -424,7 +460,10 @@ func SendJoin(
 					JSON: spec.Forbidden(response.ErrMsg),
 				}
 			}
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 

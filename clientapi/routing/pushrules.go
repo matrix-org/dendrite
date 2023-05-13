@@ -14,7 +14,7 @@ import (
 )
 
 func errorResponse(ctx context.Context, err error, msg string, args ...interface{}) util.JSONResponse {
-	if eerr, ok := err.(*spec.MatrixError); ok {
+	if eerr, ok := err.(spec.MatrixError); ok {
 		var status int
 		switch eerr.ErrCode {
 		case "M_INVALID_PARAM":
@@ -27,7 +27,10 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 		return util.MatrixErrorResponse(status, eerr.ErrCode, eerr.Err)
 	}
 	util.GetLogger(ctx).WithError(err).Errorf(msg, args...)
-	return spec.InternalServerError()
+	return util.JSONResponse{
+		Code: http.StatusInternalServerError,
+		JSON: spec.InternalServerError{},
+	}
 }
 
 func GetAllPushRules(ctx context.Context, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {

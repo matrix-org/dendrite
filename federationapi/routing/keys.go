@@ -67,7 +67,10 @@ func QueryDeviceKeys(
 	}, &queryRes)
 	if queryRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -119,7 +122,10 @@ func ClaimOneTimeKeys(
 	}, &claimRes)
 	if claimRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -243,7 +249,10 @@ func NotaryKeys(
 			j, err := json.Marshal(keys)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			js, err := gomatrixserverlib.SignJSON(
@@ -251,7 +260,10 @@ func NotaryKeys(
 			)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			response.ServerKeys = append(response.ServerKeys, js)

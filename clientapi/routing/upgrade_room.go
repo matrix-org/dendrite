@@ -74,7 +74,10 @@ func UpgradeRoom(
 				JSON: spec.NotFound("Room does not exist"),
 			}
 		}
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

@@ -402,7 +402,7 @@ func Test_register(t *testing.T) {
 			enableRecaptcha: true,
 			loginType:       authtypes.LoginTypeRecaptcha,
 			captchaBody:     `i should fail for other reasons`,
-			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError()},
+			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}},
 		},
 	}
 
@@ -484,7 +484,7 @@ func Test_register(t *testing.T) {
 					if !reflect.DeepEqual(r.Flows, cfg.Derived.Registration.Flows) {
 						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
 					}
-				case *spec.MatrixError:
+				case spec.MatrixError:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
 					}
@@ -541,7 +541,12 @@ func Test_register(t *testing.T) {
 				resp = Register(req, userAPI, &cfg.ClientAPI)
 
 				switch resp.JSON.(type) {
-				case *spec.MatrixError:
+				case spec.InternalServerError:
+					if !reflect.DeepEqual(tc.wantResponse, resp) {
+						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+					}
+					return
+				case spec.MatrixError:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
 					}

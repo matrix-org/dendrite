@@ -128,7 +128,7 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUse
 		Algorithm: kb.Algorithm,
 	})
 	switch e := err.(type) {
-	case *spec.ErrRoomKeysVersion:
+	case spec.ErrRoomKeysVersion:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: e,
@@ -182,7 +182,7 @@ func UploadBackupKeys(
 	})
 
 	switch e := err.(type) {
-	case *spec.ErrRoomKeysVersion:
+	case spec.ErrRoomKeysVersion:
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: e,

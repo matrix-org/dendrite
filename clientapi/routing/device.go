@@ -60,7 +60,10 @@ func GetDeviceByID(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var targetDevice *api.Device
 	for _, device := range queryRes.Devices {
@@ -97,7 +100,10 @@ func GetDevicesByLocalpart(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	res := devicesJSON{}
@@ -139,7 +145,10 @@ func UpdateDeviceByID(
 	}, &performRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceUpdate failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !performRes.DeviceExists {
 		return util.JSONResponse{
@@ -206,7 +215,10 @@ func DeleteDeviceById(
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// make sure that the access token being used matches the login creds used for user interactive auth, else
@@ -224,7 +236,10 @@ func DeleteDeviceById(
 		DeviceIDs: []string{deviceID},
 	}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	deleteOK = true
@@ -266,7 +281,10 @@ func DeleteDevices(
 	payload := devicesDeleteJSON{}
 	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var res api.PerformDeviceDeletionResponse
@@ -275,7 +293,10 @@ func DeleteDevices(
 		DeviceIDs: payload.Devices,
 	}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

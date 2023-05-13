@@ -184,8 +184,10 @@ func (r *uploadRequest) doUpload(
 	if err != nil {
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		r.Logger.WithError(err).Error("Error querying the database by hash.")
-		resErr := spec.InternalServerError()
-		return &resErr
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if existingMetadata != nil {
 		// The file already exists, delete the uploaded temporary file.
@@ -194,8 +196,10 @@ func (r *uploadRequest) doUpload(
 		mediaID, merr := r.generateMediaID(ctx, db)
 		if merr != nil {
 			r.Logger.WithError(merr).Error("Failed to generate media ID for existing file")
-			resErr := spec.InternalServerError()
-			return &resErr
+			return &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		// Then amend the upload metadata.
@@ -217,8 +221,10 @@ func (r *uploadRequest) doUpload(
 		if err != nil {
 			fileutils.RemoveDir(tmpDir, r.Logger)
 			r.Logger.WithError(err).Error("Failed to generate media ID for new upload")
-			resErr := spec.InternalServerError()
-			return &resErr
+			return &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 

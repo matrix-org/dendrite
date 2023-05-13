@@ -80,7 +80,10 @@ func Relations(
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to get snapshot for relations")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)

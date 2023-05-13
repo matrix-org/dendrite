@@ -38,7 +38,10 @@ func GetUserDevices(
 	}
 	if res.Error != nil {
 		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	sigReq := &api.QuerySignaturesRequest{

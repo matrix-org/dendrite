@@ -368,7 +368,7 @@ func Setup(
 			body = []interface{}{
 				res.Code, res.JSON,
 			}
-			jerr, ok := res.JSON.(*spec.MatrixError)
+			jerr, ok := res.JSON.(spec.MatrixError)
 			if ok {
 				body = jerr
 			}
@@ -434,7 +434,7 @@ func Setup(
 			body = []interface{}{
 				res.Code, res.JSON,
 			}
-			jerr, ok := res.JSON.(*spec.MatrixError)
+			jerr, ok := res.JSON.(spec.MatrixError)
 			if ok {
 				body = jerr
 			}

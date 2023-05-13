@@ -83,13 +83,19 @@ func completeAuth(
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var performRes userapi.PerformDeviceCreationResponse

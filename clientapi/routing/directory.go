@@ -69,7 +69,10 @@ func DirectoryRoom(
 	queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 	if err = rsAPI.GetRoomIDForAlias(req.Context(), queryReq, queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.GetRoomIDForAlias failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	res.RoomID = queryRes.RoomID
@@ -83,7 +86,10 @@ func DirectoryRoom(
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
 				util.GetLogger(req.Context()).WithError(fedErr).Error("federation.LookupRoomAlias failed")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			res.RoomID = fedRes.RoomID
 			res.fillServers(fedRes.Servers)
@@ -102,7 +108,10 @@ func DirectoryRoom(
 		var joinedHostsRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 		if err = fedSenderAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &joinedHostsReq, &joinedHostsRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("fedSenderAPI.QueryJoinedHostServerNamesInRoom failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		res.fillServers(joinedHostsRes.ServerNames)
 	}
@@ -180,7 +189,10 @@ func SetLocalAlias(
 	var queryRes roomserverAPI.SetRoomAliasResponse
 	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if queryRes.AliasExists {
@@ -210,7 +222,10 @@ func RemoveLocalAlias(
 	var queryRes roomserverAPI.RemoveRoomAliasResponse
 	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !queryRes.Found {
@@ -248,7 +263,10 @@ func GetVisibility(
 	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryPublishedRooms failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var v roomVisibility
@@ -286,7 +304,10 @@ func SetVisibility(
 	err := rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
 	if err != nil || len(queryEventsRes.StateEvents) == 0 {
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
@@ -308,7 +329,10 @@ func SetVisibility(
 		Visibility: v.Visibility,
 	}); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("failed to publish room")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -344,7 +368,10 @@ func SetVisibilityAS(
 		AppserviceID: dev.AppserviceID,
 	}); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("failed to publish room")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

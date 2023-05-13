@@ -81,7 +81,10 @@ func OnIncomingMessagesRequest(
 	// request that requires backfilling from the roomserver or federation.
 	snapshot, err := db.NewDatabaseTransaction(req.Context())
 	if err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -89,7 +92,10 @@ func OnIncomingMessagesRequest(
 	// check if the user has already forgotten about this room
 	membershipResp, err := getMembershipForUser(req.Context(), roomID, device.UserID, rsAPI)
 	if err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !membershipResp.RoomExists {
 		return util.JSONResponse{
@@ -151,7 +157,10 @@ func OnIncomingMessagesRequest(
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 		}
 	}
@@ -173,7 +182,10 @@ func OnIncomingMessagesRequest(
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
 					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-					return spec.InternalServerError()
+					return util.JSONResponse{
+						Code: http.StatusInternalServerError,
+						JSON: spec.InternalServerError{},
+					}
 				}
 			}
 		}
@@ -232,7 +244,10 @@ func OnIncomingMessagesRequest(
 	clientEvents, start, end, err := mReq.retrieveEvents()
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -253,7 +268,10 @@ func OnIncomingMessagesRequest(
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll)...)
 	}
