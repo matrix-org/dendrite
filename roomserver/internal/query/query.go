@@ -858,7 +858,7 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	return nil
 }
 
-func (r *Queryer) IsInvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
+func (r *Queryer) InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
 	pending, _, _, _, err := helpers.IsInvitePending(ctx, r.DB, roomID.String(), userID.String())
 	return pending, err
 }
@@ -867,7 +867,7 @@ func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types
 	return r.DB.RoomInfo(ctx, roomID.String())
 }
 
-func (r *Queryer) GetStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
+func (r *Queryer) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
 	return r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
 }
 
@@ -876,7 +876,7 @@ func (r *Queryer) UserJoinedToRoom(ctx context.Context, roomNID types.RoomNID, u
 	return isIn, err
 }
 
-func (r *Queryer) GetLocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error) {
+func (r *Queryer) LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error) {
 	joinNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true)
 	if err != nil {
 		return nil, err
