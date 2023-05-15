@@ -226,11 +226,11 @@ type FederationRoomserverAPI interface {
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
 
-	IsInvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error)
+	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
+	InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error)
 	QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error)
-	GetStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
 	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, userID spec.UserID) (bool, error)
-	GetLocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
+	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 }
 
 type KeyserverRoomserverAPI interface {

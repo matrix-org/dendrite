@@ -38,51 +38,47 @@ type JoinRoomQuerier struct {
 	roomserver api.FederationRoomserverAPI
 }
 
-func (rq *JoinRoomQuerier) RoomInfo(ctx context.Context, roomID spec.RoomID) (*gomatrixserverlib.RoomInfo, error) {
-	roomInfo, err := rq.roomserver.QueryRoomInfo(ctx, roomID)
-	var result *gomatrixserverlib.RoomInfo
-	if roomInfo != nil && !roomInfo.IsStub() {
-		result = &gomatrixserverlib.RoomInfo{
-			Version: roomInfo.RoomVersion,
-			NID:     int64(roomInfo.RoomNID),
-		}
-	}
-
-	return result, err
-}
-
 func (rq *JoinRoomQuerier) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
-	return rq.roomserver.GetStateEvent(ctx, roomID, eventType, stateKey)
-}
-
-func (rq *JoinRoomQuerier) ServerInRoom(ctx context.Context, server spec.ServerName, roomID spec.RoomID) (*gomatrixserverlib.JoinedToRoomResponse, error) {
-	req := api.QueryServerJoinedToRoomRequest{
-		ServerName: server,
-		RoomID:     roomID.String(),
-	}
-	res := api.QueryServerJoinedToRoomResponse{}
-	if err := rq.roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
-		return nil, fmt.Errorf("InternalServerError: Failed to query room")
-	}
-
-	joinedResponse := gomatrixserverlib.JoinedToRoomResponse{
-		RoomExists:   res.RoomExists,
-		ServerInRoom: res.IsInRoom,
-	}
-	return &joinedResponse, nil
-}
-
-func (rq *JoinRoomQuerier) UserJoinedToRoom(ctx context.Context, roomNID int64, userID spec.UserID) (bool, error) {
-	return rq.roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomNID), userID)
-}
-
-func (rq *JoinRoomQuerier) GetJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID int64) ([]gomatrixserverlib.PDU, error) {
-	return rq.roomserver.GetLocallyJoinedUsers(ctx, roomVersion, types.RoomNID(roomNID))
+	return rq.roomserver.CurrentStateEvent(ctx, roomID, eventType, stateKey)
 }
 
 func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
-	return rq.roomserver.IsInvitePending(ctx, roomID, userID)
+	return rq.roomserver.InvitePending(ctx, roomID, userID)
+}
+
+func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, userID spec.UserID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
+	roomInfo, err := rq.roomserver.QueryRoomInfo(ctx, roomID)
+	if err != nil || roomInfo == nil || roomInfo.IsStub() {
+		return nil, err
+	}
+
+	req := api.QueryServerJoinedToRoomRequest{
+		ServerName: localServerName,
+		RoomID:     roomID.String(),
+	}
+	res := api.QueryServerJoinedToRoomResponse{}
+	if err = rq.roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
+	}
+
+	userJoinedToRoom, err := rq.roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	locallyJoinedUsers, err := rq.roomserver.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	return &gomatrixserverlib.RestrictedRoomJoinInfo{
+		LocalServerInRoom: res.RoomExists && res.IsInRoom,
+		UserJoinedToRoom:  userJoinedToRoom,
+		JoinedUsers:       locallyJoinedUsers,
+	}, nil
 }
 
 // MakeJoin implements the /make_join API
@@ -97,6 +93,19 @@ func MakeJoin(
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed obtaining room version")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	req := api.QueryServerJoinedToRoomRequest{
+		ServerName: cfg.Matrix.ServerName,
+		RoomID:     roomID.String(),
+	}
+	res := api.QueryServerJoinedToRoomResponse{}
+	if err := rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -147,6 +156,7 @@ func MakeJoin(
 		RequestOrigin:      request.Origin(),
 		RequestDestination: request.Destination(),
 		LocalServerName:    cfg.Matrix.ServerName,
+		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		RoomQuerier:        &roomQuerier,
 		BuildEventTemplate: createJoinTemplate,
 	}

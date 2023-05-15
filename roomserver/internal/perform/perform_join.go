@@ -145,7 +145,7 @@ func (r *Joiner) performJoinRoomByAlias(
 	return r.performJoinRoomByID(ctx, req)
 }
 
-// TODO: Break this function up a bit
+// TODO: Break this function up a bit & move to GMSL
 // nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
