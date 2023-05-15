@@ -882,15 +882,15 @@ func (r *Queryer) GetLocallyJoinedUsers(ctx context.Context, roomVersion gomatri
 		return nil, err
 	}
 
+	events, err := r.DB.Events(ctx, roomVersion, joinNIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	// For each of the joined users, let's see if we can get a valid
 	// membership event.
 	joinedUsers := []gomatrixserverlib.PDU{}
-	for _, joinNID := range joinNIDs {
-		events, err := r.DB.Events(ctx, roomVersion, []types.EventNID{joinNID})
-		if err != nil || len(events) != 1 {
-			continue
-		}
-		event := events[0]
+	for _, event := range events {
 		if event.Type() != spec.MRoomMember || event.StateKey() == nil {
 			continue // shouldn't happen
 		}
