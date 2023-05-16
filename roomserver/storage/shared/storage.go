@@ -762,7 +762,7 @@ func (d *EventDatabase) StoreEvent(
 			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
 
-		if prevEvents := event.PrevEvents(); len(prevEvents) > 0 {
+		if prevEvents := event.PrevEventIDs(); len(prevEvents) > 0 {
 			// Create an updater - NB: on sqlite this WILL create a txn as we are directly calling the shared DB form of
 			// GetLatestEventsForUpdate - not via the SQLiteDatabase form which has `nil` txns. This
 			// function only does SELECTs though so the created txn (at this point) is just a read txn like
@@ -770,8 +770,8 @@ func (d *EventDatabase) StoreEvent(
 			// to do writes however then this will need to go inside `Writer.Do`.
 
 			// The following is a copy of RoomUpdater.StorePreviousEvents
-			for _, ref := range prevEvents {
-				if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			for _, eventID := range prevEvents {
+				if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, eventID, eventNID); err != nil {
 					return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
 				}
 			}

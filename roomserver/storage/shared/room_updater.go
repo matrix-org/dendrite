@@ -108,7 +108,7 @@ func (u *RoomUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
 		for _, ref := range previousEventReferences {
-			if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, txn, ref.EventID, eventNID); err != nil {
 				return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
 			}
 		}
@@ -204,7 +204,7 @@ func (u *RoomUpdater) EventsFromIDs(ctx context.Context, roomInfo *types.RoomInf
 
 // IsReferenced implements types.RoomRecentEventsUpdater
 func (u *RoomUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
-	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventReference.EventID, eventReference.EventSHA256)
+	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventReference.EventID)
 	if err == nil {
 		return true, nil
 	}

@@ -57,7 +57,7 @@ const insertPreviousEventSQL = "" +
 // This should only be done while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
 const selectPreviousEventExistsSQL = "" +
 	"SELECT 1 FROM roomserver_previous_events" +
-	" WHERE previous_event_id = $1 AND previous_reference_sha256 = $2"
+	" WHERE previous_event_id = $1"
 
 type previousEventStatements struct {
 	insertPreviousEventStmt       *sql.Stmt
@@ -82,12 +82,11 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	ctx context.Context,
 	txn *sql.Tx,
 	previousEventID string,
-	previousEventReferenceSHA256 []byte,
 	eventNID types.EventNID,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
 	_, err := stmt.ExecContext(
-		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
+		ctx, previousEventID, []byte(""), int64(eventNID),
 	)
 	return err
 }
@@ -95,9 +94,9 @@ func (s *previousEventStatements) InsertPreviousEvent(
 // Check if the event reference exists
 // Returns sql.ErrNoRows if the event reference doesn't exist.
 func (s *previousEventStatements) SelectPreviousEventExists(
-	ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte,
+	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
 	var ok int64
 	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
-	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
+	return stmt.QueryRowContext(ctx, eventID).Scan(&ok)
 }

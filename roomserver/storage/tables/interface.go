@@ -113,10 +113,10 @@ type RoomAliases interface {
 }
 
 type PreviousEvents interface {
-	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, previousEventReferenceSHA256 []byte, eventNID types.EventNID) error
+	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, eventNID types.EventNID) error
 	// Check if the event reference exists
 	// Returns sql.ErrNoRows if the event reference doesn't exist.
-	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
+	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string) error
 }
 
 type Invites interface {

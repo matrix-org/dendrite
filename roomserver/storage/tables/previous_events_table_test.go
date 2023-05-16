@@ -45,17 +45,17 @@ func TestPreviousEventsTable(t *testing.T) {
 		defer close()
 
 		for _, x := range room.Events() {
-			for _, prevEvent := range x.PrevEvents() {
-				err := tab.InsertPreviousEvent(ctx, nil, prevEvent.EventID, prevEvent.EventSHA256, 1)
+			for _, eventID := range x.PrevEventIDs() {
+				err := tab.InsertPreviousEvent(ctx, nil, eventID, 1)
 				assert.NoError(t, err)
 
-				err = tab.SelectPreviousEventExists(ctx, nil, prevEvent.EventID, prevEvent.EventSHA256)
+				err = tab.SelectPreviousEventExists(ctx, nil, eventID)
 				assert.NoError(t, err)
 			}
 		}
 
-		// RandomString with a correct EventSHA256 should fail and return sql.ErrNoRows
-		err := tab.SelectPreviousEventExists(ctx, nil, util.RandomString(16), room.Events()[0].EventReference().EventSHA256)
+		// RandomString should fail and return sql.ErrNoRows
+		err := tab.SelectPreviousEventExists(ctx, nil, util.RandomString(16))
 		assert.Error(t, err)
 	})
 }
