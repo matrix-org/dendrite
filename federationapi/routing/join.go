@@ -154,7 +154,6 @@ func MakeJoin(
 		RoomVersion:        roomVersion,
 		RemoteVersions:     remoteVersions,
 		RequestOrigin:      request.Origin(),
-		RequestDestination: request.Destination(),
 		LocalServerName:    cfg.Matrix.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		RoomQuerier:        &roomQuerier,
