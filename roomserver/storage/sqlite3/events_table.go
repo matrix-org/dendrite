@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -151,10 +152,24 @@ func CreateEventsTable(db *sql.DB) error {
 		return err
 	}
 
+	// check if the column exists
+	var cName string
+	migrationName := "roomserver: drop column reference_sha from roomserver_events"
+	err = db.QueryRowContext(context.Background(), `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'roomserver_eents' AND p.name = 'reference_sha256'`).Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(context.Background(), db, migrationName); err != nil {
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+			}
+			return nil
+		}
+		return err
+	}
+
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations([]sqlutil.Migration{
 		{
-			Version: "roomserver: drop column reference_sha from roomserver_events",
+			Version: migrationName,
 			Up:      deltas.UpDropEventReferenceSHA,
 		},
 	}...)
