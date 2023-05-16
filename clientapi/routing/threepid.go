@@ -70,7 +70,7 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.MatrixError{
-				ErrCode: "M_THREEPID_IN_USE",
+				ErrCode: spec.ErrorThreePIDInUse,
 				Err:     userdb.Err3PIDInUse.Error(),
 			},
 		}
@@ -131,7 +131,7 @@ func CheckAndSave3PIDAssociation(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.MatrixError{
-				ErrCode: "M_THREEPID_AUTH_FAILED",
+				ErrCode: spec.ErrorThreePIDAuthFailed,
 				Err:     "Failed to auth 3pid",
 			},
 		}

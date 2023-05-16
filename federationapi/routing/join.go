@@ -173,7 +173,7 @@ func MakeJoin(
 		case spec.MatrixError:
 			util.GetLogger(httpReq.Context()).WithError(internalErr)
 			code := http.StatusInternalServerError
-			switch e.Code {
+			switch e.ErrCode {
 			case spec.ErrorForbidden:
 				code = http.StatusForbidden
 			case spec.ErrorNotFound:

@@ -26,6 +26,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // EmailAssociationRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-register-email-requesttoken
@@ -133,7 +134,7 @@ func CheckAssociation(
 		return false, "", "", err
 	}
 
-	if respBody.ErrCode == "M_SESSION_NOT_VALIDATED" {
+	if respBody.ErrCode == string(spec.ErrorSessionNotValidated) {
 		return false, "", "", nil
 	} else if len(respBody.ErrCode) > 0 {
 		return false, "", "", errors.New(respBody.Error)

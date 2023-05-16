@@ -17,14 +17,14 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 	if eerr, ok := err.(spec.MatrixError); ok {
 		var status int
 		switch eerr.ErrCode {
-		case "M_INVALID_PARAM":
+		case spec.ErrorInvalidParam:
 			status = http.StatusBadRequest
-		case "M_NOT_FOUND":
+		case spec.ErrorNotFound:
 			status = http.StatusNotFound
 		default:
 			status = http.StatusInternalServerError
 		}
-		return util.MatrixErrorResponse(status, eerr.ErrCode, eerr.Err)
+		return util.MatrixErrorResponse(status, string(eerr.ErrCode), eerr.Err)
 	}
 	util.GetLogger(ctx).WithError(err).Errorf(msg, args...)
 	return util.JSONResponse{
