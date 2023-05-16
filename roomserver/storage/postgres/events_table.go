@@ -62,9 +62,6 @@ CREATE TABLE IF NOT EXISTS roomserver_events (
     -- Needed for state resolution.
     -- An event may only appear in this table once.
     event_id TEXT NOT NULL CONSTRAINT roomserver_event_id_unique UNIQUE,
-    -- The sha256 reference hash for the event.
-    -- Needed for setting reference hashes when sending new events.
-    reference_sha256 BYTEA NOT NULL,
     -- A list of numeric IDs for events that can authenticate this event.
 	auth_event_nids BIGINT[] NOT NULL,
 	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
@@ -75,10 +72,10 @@ CREATE INDEX IF NOT EXISTS roomserver_events_memberships_idx ON roomserver_event
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO roomserver_events AS e (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
+	"INSERT INTO roomserver_events AS e (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique DO UPDATE" +
-	" SET is_rejected = $8 WHERE e.event_id = $4 AND e.is_rejected = TRUE" +
+	" SET is_rejected = $7 WHERE e.event_id = $4 AND e.is_rejected = TRUE" +
 	" RETURNING event_nid, state_snapshot_nid"
 
 const selectEventSQL = "" +
@@ -130,11 +127,11 @@ const selectEventIDSQL = "" +
 	"SELECT event_id FROM roomserver_events WHERE event_nid = $1"
 
 const bulkSelectStateAtEventAndReferenceSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id" +
 	" FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const bulkSelectEventReferenceSQL = "" +
-	"SELECT event_id, reference_sha256 FROM roomserver_events WHERE event_nid = ANY($1)"
+	"SELECT event_id FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const bulkSelectEventIDSQL = "" +
 	"SELECT event_nid, event_id FROM roomserver_events WHERE event_nid = ANY($1)"
@@ -214,7 +211,6 @@ func (s *eventStatements) InsertEvent(
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
 	eventID string,
-	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 	depth int64,
 	isRejected bool,
@@ -224,7 +220,7 @@ func (s *eventStatements) InsertEvent(
 	stmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 	err := stmt.QueryRowContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
-		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
+		eventID, eventNIDsAsArray(authEventNIDs), depth,
 		isRejected,
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
@@ -441,11 +437,10 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		eventNID         int64
 		stateSnapshotNID int64
 		eventID          string
-		eventSHA256      []byte
 	)
 	for ; rows.Next(); i++ {
 		if err = rows.Scan(
-			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID, &eventSHA256,
+			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID,
 		); err != nil {
 			return nil, err
 		}
@@ -455,7 +450,6 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		result.EventNID = types.EventNID(eventNID)
 		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
 		result.EventID = eventID
-		result.EventSHA256 = eventSHA256
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -478,7 +472,7 @@ func (s *eventStatements) BulkSelectEventReference(
 	i := 0
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
+		if err = rows.Scan(&result.EventID); err != nil {
 			return nil, err
 		}
 	}

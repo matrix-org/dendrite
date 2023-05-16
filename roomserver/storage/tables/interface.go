@@ -42,7 +42,7 @@ type Events interface {
 	InsertEvent(
 		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventTypeNID types.EventTypeNID,
 		eventStateKeyNID types.EventStateKeyNID, eventID string,
-		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
+		authEventNIDs []types.EventNID, depth int64, isRejected bool,
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
 	BulkSelectSnapshotsFromEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[types.StateSnapshotNID][]string, error)

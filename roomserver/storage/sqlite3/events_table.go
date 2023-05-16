@@ -41,17 +41,16 @@ const eventsSchema = `
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
     depth INTEGER NOT NULL,
     event_id TEXT NOT NULL UNIQUE,
-    reference_sha256 BLOB NOT NULL,
 	auth_event_nids TEXT NOT NULL DEFAULT '[]',
 	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
   );
 `
 
 const insertEventSQL = `
-	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7)
 	  ON CONFLICT DO UPDATE
-	  SET is_rejected = $8 WHERE is_rejected = 1
+	  SET is_rejected = $7 WHERE is_rejected = 1
 	  RETURNING event_nid, state_snapshot_nid;
 `
 
@@ -100,11 +99,11 @@ const selectEventIDSQL = "" +
 	"SELECT event_id FROM roomserver_events WHERE event_nid = $1"
 
 const bulkSelectStateAtEventAndReferenceSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id" +
 	" FROM roomserver_events WHERE event_nid IN ($1)"
 
 const bulkSelectEventReferenceSQL = "" +
-	"SELECT event_id, reference_sha256 FROM roomserver_events WHERE event_nid IN ($1)"
+	"SELECT event_id FROM roomserver_events WHERE event_nid IN ($1)"
 
 const bulkSelectEventIDSQL = "" +
 	"SELECT event_nid, event_id FROM roomserver_events WHERE event_nid IN ($1)"
@@ -183,7 +182,6 @@ func (s *eventStatements) InsertEvent(
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
 	eventID string,
-	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 	depth int64,
 	isRejected bool,
@@ -194,7 +192,7 @@ func (s *eventStatements) InsertEvent(
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 	err := insertStmt.QueryRowContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
-		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth, isRejected,
+		eventID, eventNIDsAsArray(authEventNIDs), depth, isRejected,
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -475,11 +473,10 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		eventNID         int64
 		stateSnapshotNID int64
 		eventID          string
-		eventSHA256      []byte
 	)
 	for ; rows.Next(); i++ {
 		if err = rows.Scan(
-			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID, &eventSHA256,
+			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID,
 		); err != nil {
 			return nil, err
 		}
@@ -489,7 +486,6 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		result.EventNID = types.EventNID(eventNID)
 		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
 		result.EventID = eventID
-		result.EventSHA256 = eventSHA256
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
@@ -523,7 +519,7 @@ func (s *eventStatements) BulkSelectEventReference(
 	i := 0
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
+		if err = rows.Scan(&result.EventID); err != nil {
 			return nil, err
 		}
 	}

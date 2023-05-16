@@ -742,7 +742,6 @@ func (d *EventDatabase) StoreEvent(
 			eventTypeNID,
 			eventStateKeyNID,
 			event.EventID(),
-			event.EventReference().EventSHA256,
 			authEventNIDs,
 			event.Depth(),
 			isRejected,

@@ -51,7 +51,7 @@ func Test_EventsTable(t *testing.T) {
 		wantEventReferences := make([]gomatrixserverlib.EventReference, 0, len(room.Events()))
 		wantStateAtEventAndRefs := make([]types.StateAtEventAndReference, 0, len(room.Events()))
 		for _, ev := range room.Events() {
-			eventNID, snapNID, err := tab.InsertEvent(ctx, nil, 1, 1, 1, ev.EventID(), ev.EventReference().EventSHA256, nil, ev.Depth(), false)
+			eventNID, snapNID, err := tab.InsertEvent(ctx, nil, 1, 1, 1, ev.EventID(), nil, ev.Depth(), false)
 			assert.NoError(t, err)
 			gotEventNID, gotSnapNID, err := tab.SelectEvent(ctx, nil, ev.EventID())
 			assert.NoError(t, err)
@@ -75,7 +75,9 @@ func Test_EventsTable(t *testing.T) {
 			assert.True(t, sentToOutput)
 
 			eventIDs = append(eventIDs, ev.EventID())
-			wantEventReferences = append(wantEventReferences, ev.EventReference())
+			ref := ev.EventReference()
+			ref.EventSHA256 = nil
+			wantEventReferences = append(wantEventReferences, ref)
 
 			// Set the stateSnapshot to 2 for some events to verify they are returned later
 			stateSnapshot := 0
@@ -98,7 +100,7 @@ func Test_EventsTable(t *testing.T) {
 			wantStateAtEvent = append(wantStateAtEvent, stateAtEvent)
 			wantStateAtEventAndRefs = append(wantStateAtEventAndRefs, types.StateAtEventAndReference{
 				StateAtEvent:   stateAtEvent,
-				EventReference: ev.EventReference(),
+				EventReference: ref,
 			})
 		}
 
