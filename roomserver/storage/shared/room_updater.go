@@ -104,18 +104,6 @@ func (u *RoomUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 	return u.currentStateSnapshotNID
 }
 
-// StorePreviousEvents implements types.RoomRecentEventsUpdater - This must be called from a Writer
-func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
-	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		for _, ref := range previousEventReferences {
-			if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, txn, ref.EventID, eventNID); err != nil {
-				return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
-			}
-		}
-		return nil
-	})
-}
-
 func (u *RoomUpdater) Events(ctx context.Context, _ gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error) {
 	if u.roomInfo == nil {
 		return nil, types.ErrorInvalidRoomInfo
