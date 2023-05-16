@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -175,7 +176,18 @@ type eventStatements struct {
 
 func CreateEventsTable(db *sql.DB) error {
 	_, err := db.Exec(eventsSchema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: "roomserver: drop column reference_sha from roomserver_events",
+			Up:      deltas.UpDropEventReferenceSHA,
+		},
+	}...)
+	return m.Up(context.Background())
 }
 
 func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
