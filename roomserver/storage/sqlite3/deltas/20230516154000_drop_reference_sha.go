@@ -36,3 +36,37 @@ func UpDropEventReferenceSHA(ctx context.Context, tx *sql.Tx) error {
 	}
 	return nil
 }
+
+func UpDropEventReferenceSHAPrevEvents(ctx context.Context, tx *sql.Tx) error {
+	// rename the table
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_previous_events RENAME TO _roomserver_previous_events;`); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
+	}
+
+	// create new table
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS roomserver_previous_events (
+    previous_event_id TEXT NOT NULL,
+    event_nids TEXT NOT NULL,
+    UNIQUE (previous_event_id)
+  );`); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
+	}
+
+	// move data
+	if _, err := tx.ExecContext(ctx, `
+INSERT
+    INTO roomserver_previous_events (
+      previous_event_id, event_nids
+    ) SELECT
+        previous_event_id, event_nids
+    FROM _roomserver_previous_events
+;`); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
+	}
+	// drop old table
+	_, err := tx.ExecContext(ctx, `DROP TABLE _roomserver_previous_events;`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
+	return nil
+}

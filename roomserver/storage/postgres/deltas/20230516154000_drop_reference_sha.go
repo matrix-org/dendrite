@@ -20,7 +20,7 @@ import (
 	"fmt"
 )
 
-func UpDropEventReferenceSHA(ctx context.Context, tx *sql.Tx) error {
+func UpDropEventReferenceSHAEvents(ctx context.Context, tx *sql.Tx) error {
 	var count int
 	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM roomserver_events GROUP BY event_id HAVING count(event_id) > 1`).
 		Scan(&count)
@@ -31,6 +31,14 @@ func UpDropEventReferenceSHA(ctx context.Context, tx *sql.Tx) error {
 		return fmt.Errorf("unable to drop column, as there are duplicate event ids")
 	}
 	_, err = tx.ExecContext(ctx, `ALTER TABLE roomserver_events DROP COLUMN IF EXISTS reference_sha256;`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
+	return nil
+}
+
+func UpDropEventReferenceSHAPrevEvents(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_previous_events DROP COLUMN IF EXISTS previous_reference_sha256;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}

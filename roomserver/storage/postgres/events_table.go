@@ -184,7 +184,7 @@ func CreateEventsTable(db *sql.DB) error {
 	m.AddMigrations([]sqlutil.Migration{
 		{
 			Version: "roomserver: drop column reference_sha from roomserver_events",
-			Up:      deltas.UpDropEventReferenceSHA,
+			Up:      deltas.UpDropEventReferenceSHAEvents,
 		},
 	}...)
 	return m.Up(context.Background())

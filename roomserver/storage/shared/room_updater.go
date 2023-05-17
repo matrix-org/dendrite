@@ -191,8 +191,8 @@ func (u *RoomUpdater) EventsFromIDs(ctx context.Context, roomInfo *types.RoomInf
 }
 
 // IsReferenced implements types.RoomRecentEventsUpdater
-func (u *RoomUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
-	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventReference.EventID)
+func (u *RoomUpdater) IsReferenced(eventID string) (bool, error) {
+	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventID)
 	if err == nil {
 		return true, nil
 	}

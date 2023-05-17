@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -32,11 +33,9 @@ const previousEventSchema = `
 CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     -- The string event ID taken from the prev_events key of an event.
     previous_event_id TEXT NOT NULL,
-    -- The SHA256 reference hash taken from the prev_events key of an event.
-    previous_reference_sha256 BYTEA NOT NULL,
     -- A list of numeric event IDs of events that reference this prev_event.
     event_nids BIGINT[] NOT NULL,
-    CONSTRAINT roomserver_previous_event_id_unique UNIQUE (previous_event_id, previous_reference_sha256)
+    CONSTRAINT roomserver_previous_event_id_unique UNIQUE (previous_event_id)
 );
 `
 
@@ -47,11 +46,11 @@ CREATE TABLE IF NOT EXISTS roomserver_previous_events (
 // The lock is necessary to avoid data races when checking whether an event is already referenced by another event.
 const insertPreviousEventSQL = "" +
 	"INSERT INTO roomserver_previous_events" +
-	" (previous_event_id, previous_reference_sha256, event_nids)" +
-	" VALUES ($1, $2, array_append('{}'::bigint[], $3))" +
+	" (previous_event_id, event_nids)" +
+	" VALUES ($1, array_append('{}'::bigint[], $2))" +
 	" ON CONFLICT ON CONSTRAINT roomserver_previous_event_id_unique" +
-	" DO UPDATE SET event_nids = array_append(roomserver_previous_events.event_nids, $3)" +
-	" WHERE $3 != ALL(roomserver_previous_events.event_nids)"
+	" DO UPDATE SET event_nids = array_append(roomserver_previous_events.event_nids, $2)" +
+	" WHERE $2 != ALL(roomserver_previous_events.event_nids)"
 
 // Check if the event is referenced by another event in the table.
 // This should only be done while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
@@ -66,7 +65,18 @@ type previousEventStatements struct {
 
 func CreatePrevEventsTable(db *sql.DB) error {
 	_, err := db.Exec(previousEventSchema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: "roomserver: drop column reference_sha from roomserver_prev_events",
+			Up:      deltas.UpDropEventReferenceSHAPrevEvents,
+		},
+	}...)
+	return m.Up(context.Background())
 }
 
 func PreparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
@@ -86,7 +96,7 @@ func (s *previousEventStatements) InsertPreviousEvent(
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
 	_, err := stmt.ExecContext(
-		ctx, previousEventID, []byte(""), int64(eventNID),
+		ctx, previousEventID, int64(eventNID),
 	)
 	return err
 }

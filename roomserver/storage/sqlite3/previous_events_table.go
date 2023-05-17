@@ -18,12 +18,15 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/sirupsen/logrus"
 )
 
 // TODO: previous_reference_sha256 was NOT NULL before but it broke sytest because
@@ -34,9 +37,8 @@ import (
 const previousEventSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     previous_event_id TEXT NOT NULL,
-    previous_reference_sha256 BLOB,
     event_nids TEXT NOT NULL,
-    UNIQUE (previous_event_id, previous_reference_sha256)
+    UNIQUE (previous_event_id)
   );
 `
 
@@ -72,7 +74,34 @@ type previousEventStatements struct {
 
 func CreatePrevEventsTable(db *sql.DB) error {
 	_, err := db.Exec(previousEventSchema)
-	return err
+	if err != nil {
+		return err
+	}
+	// check if the column exists
+	var cName string
+	migrationName := "roomserver: drop column reference_sha from roomserver_prev_events"
+	err = db.QueryRowContext(context.Background(), `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'roomserver_previous_events' AND p.name = 'previous_reference_sha256'`).Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(context.Background(), db, migrationName); err != nil {
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+			}
+			return nil
+		}
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: migrationName,
+			Up:      deltas.UpDropEventReferenceSHAPrevEvents,
+		},
+	}...)
+	logrus.Infof("cName: %s", cName)
+	if err := m.Up(context.Background()); err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 func PreparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {

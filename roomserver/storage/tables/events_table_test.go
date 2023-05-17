@@ -75,8 +75,7 @@ func Test_EventsTable(t *testing.T) {
 			assert.True(t, sentToOutput)
 
 			eventIDs = append(eventIDs, ev.EventID())
-			ref := ev.EventReference()
-			ref.EventSHA256 = nil
+			ref := gomatrixserverlib.EventReference{EventID: eventID}
 			wantEventReferences = append(wantEventReferences, ref)
 
 			// Set the stateSnapshot to 2 for some events to verify they are returned later
@@ -99,8 +98,8 @@ func Test_EventsTable(t *testing.T) {
 			}
 			wantStateAtEvent = append(wantStateAtEvent, stateAtEvent)
 			wantStateAtEventAndRefs = append(wantStateAtEventAndRefs, types.StateAtEventAndReference{
-				StateAtEvent:   stateAtEvent,
-				EventReference: ref,
+				StateAtEvent: stateAtEvent,
+				EventID:      ev.EventID(),
 			})
 		}
 
