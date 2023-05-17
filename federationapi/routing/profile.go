@@ -53,7 +53,10 @@ func GetProfile(
 	profile, err := userAPI.QueryProfile(httpReq.Context(), userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryProfile failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var res interface{}

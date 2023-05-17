@@ -60,7 +60,10 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("mac.Write failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		resp.Password = base64.StdEncoding.EncodeToString(mac.Sum(nil))

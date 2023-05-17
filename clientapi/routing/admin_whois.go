@@ -61,7 +61,10 @@ func GetAdminWhois(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("GetAdminWhois failed to query user devices")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	devices := make(map[string]deviceInfo)

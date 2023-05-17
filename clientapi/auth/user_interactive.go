@@ -178,8 +178,10 @@ func (u *UserInteractive) NewSession() *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
 		logrus.WithError(err).Error("failed to generate session ID")
-		res := spec.InternalServerError()
-		return &res
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	u.Lock()
 	u.Sessions[sessionID] = []string{}
@@ -193,15 +195,19 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 	mixedObjects := make(map[string]interface{})
 	b, err := json.Marshal(response)
 	if err != nil {
-		ise := spec.InternalServerError()
-		return &ise
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	_ = json.Unmarshal(b, &mixedObjects)
 	challenge := u.challenge(sessionID)
 	b, err = json.Marshal(challenge.JSON)
 	if err != nil {
-		ise := spec.InternalServerError()
-		return &ise
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	_ = json.Unmarshal(b, &mixedObjects)
 

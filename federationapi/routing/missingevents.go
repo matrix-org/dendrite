@@ -63,7 +63,10 @@ func GetMissingEvents(
 		&eventsResponse,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryMissingEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	eventsResponse.Events = filterEvents(eventsResponse.Events, roomID)

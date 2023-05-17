@@ -274,7 +274,7 @@ func publishNewRoomAndUnpublishOldRoom(
 
 func (r *Upgrader) validateRoomExists(ctx context.Context, roomID string) error {
 	if _, err := r.URSAPI.QueryRoomVersionForRoom(ctx, roomID); err != nil {
-		return eventutil.ErrRoomNoExists
+		return eventutil.ErrRoomNoExists{}
 	}
 	return nil
 }
@@ -556,15 +556,18 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
 	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, evTime, r.URSAPI, &queryRes)
-	if err == eventutil.ErrRoomNoExists {
-		return nil, err
-	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+	switch e := err.(type) {
+	case nil:
+	case eventutil.ErrRoomNoExists:
 		return nil, e
-	} else if e, ok := err.(gomatrixserverlib.EventValidationError); ok {
+	case gomatrixserverlib.BadJSONError:
 		return nil, e
-	} else if err != nil {
+	case gomatrixserverlib.EventValidationError:
+		return nil, e
+	default:
 		return nil, fmt.Errorf("failed to build new %q event: %w", proto.Type, err)
 	}
+
 	// check to see if this user can perform this operation
 	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {

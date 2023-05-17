@@ -528,7 +528,10 @@ func Register(
 		nres := &userapi.QueryNumericLocalpartResponse{}
 		if err = userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		r.Username = strconv.FormatInt(nres.ID, 10)
 	}
@@ -713,7 +716,7 @@ func handleRegistrationFlow(
 		case nil:
 		default:
 			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
-			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError()}
+			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}}
 		}
 
 		// Add Recaptcha to the list of completed registration stages

@@ -32,8 +32,10 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
-		resp := spec.InternalServerError()
-		return &resp
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return UnmarshalJSON(body, iface)

@@ -40,7 +40,7 @@ func Peek(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 

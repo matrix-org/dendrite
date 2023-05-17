@@ -56,7 +56,10 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{},
 	}, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !stateRes.RoomExists {
 		return util.JSONResponse{
@@ -73,7 +76,10 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if visibility, ok := content["history_visibility"]; ok {
 				worldReadable = visibility == "world_readable"
@@ -99,7 +105,10 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
@@ -147,7 +156,10 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		}, &stateAfterRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		for _, ev := range stateAfterRes.StateEvents {
 			stateEvents = append(
@@ -202,7 +214,10 @@ func OnIncomingStateTypeRequest(
 		StateToFetch: stateToFetch,
 	}, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Look at the room state and see if we have a history visibility event
@@ -213,7 +228,10 @@ func OnIncomingStateTypeRequest(
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if visibility, ok := content["history_visibility"]; ok {
 				worldReadable = visibility == "world_readable"
@@ -239,7 +257,10 @@ func OnIncomingStateTypeRequest(
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
@@ -294,7 +315,10 @@ func OnIncomingStateTypeRequest(
 		}, &stateAfterRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if len(stateAfterRes.StateEvents) > 0 {
 			event = stateAfterRes.StateEvents[0]
