@@ -35,7 +35,10 @@ func GetNotifications(
 		limit, err = strconv.ParseInt(limitStr, 10, 64)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("ParseInt(limit) failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -43,7 +46,10 @@ func GetNotifications(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	err = userAPI.QueryNotifications(req.Context(), &userapi.QueryNotificationsRequest{
 		Localpart:  localpart,
@@ -54,7 +60,10 @@ func GetNotifications(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryNotifications failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	util.GetLogger(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Infof("QueryNotifications: len %d", len(queryRes.Notifications))
 	return util.JSONResponse{

@@ -48,7 +48,10 @@ func SetReceipt(req *http.Request, userAPI api.ClientUserAPI, syncProducer *prod
 	case "m.fully_read":
 		data, err := json.Marshal(fullyReadEvent{EventID: eventID})
 		if err != nil {
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		dataReq := api.InputAccountDataRequest{

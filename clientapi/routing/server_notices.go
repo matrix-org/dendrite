@@ -175,7 +175,10 @@ func SendServerNotice(
 			}}
 			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 		default:
@@ -189,7 +192,10 @@ func SendServerNotice(
 		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: r.UserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if !membershipRes.IsInRoom {
 			// re-invite the user
@@ -237,7 +243,10 @@ func SendServerNotice(
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),

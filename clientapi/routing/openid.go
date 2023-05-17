@@ -55,7 +55,10 @@ func CreateOpenIDToken(
 	err := userAPI.PerformOpenIDTokenCreation(req.Context(), &request, &response)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("userAPI.CreateOpenIDToken failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

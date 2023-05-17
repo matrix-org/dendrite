@@ -33,7 +33,10 @@ func Protocols(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, dev
 	resp := &appserviceAPI.ProtocolResponse{}
 
 	if err := asAPI.Protocols(req.Context(), &appserviceAPI.ProtocolRequest{Protocol: protocol}, resp); err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !resp.Exists {
 		if protocol != "" {
@@ -71,7 +74,10 @@ func User(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, device *
 		Protocol: protocol,
 		Params:   params.Encode(),
 	}, resp); err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !resp.Exists {
 		return util.JSONResponse{
@@ -97,7 +103,10 @@ func Location(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, devi
 		Protocol: protocol,
 		Params:   params.Encode(),
 	}, resp); err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !resp.Exists {
 		return util.JSONResponse{

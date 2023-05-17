@@ -60,28 +60,37 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.QueryLocalpartForThreePID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if len(res.Localpart) > 0 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.MatrixError{
-				ErrCode: "M_THREEPID_IN_USE",
+				ErrCode: spec.ErrorThreePIDInUse,
 				Err:     userdb.Err3PIDInUse.Error(),
 			},
 		}
 	}
 
 	resp.SID, err = threepid.CreateSession(req.Context(), body, cfg, client)
-	if err == threepid.ErrNotTrusted {
+	switch err.(type) {
+	case nil:
+	case threepid.ErrNotTrusted:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -102,21 +111,27 @@ func CheckAndSave3PIDAssociation(
 
 	// Check if the association has been validated
 	verified, address, medium, err := threepid.CheckAssociation(req.Context(), body.Creds, cfg, client)
-	if err == threepid.ErrNotTrusted {
+	switch err.(type) {
+	case nil:
+	case threepid.ErrNotTrusted:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.Creds.IDServer),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !verified {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.MatrixError{
-				ErrCode: "M_THREEPID_AUTH_FAILED",
+				ErrCode: spec.ErrorThreePIDAuthFailed,
 				Err:     "Failed to auth 3pid",
 			},
 		}
@@ -127,7 +142,10 @@ func CheckAndSave3PIDAssociation(
 		err = threepid.PublishAssociation(req.Context(), body.Creds, device.UserID, cfg, client)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("threepid.PublishAssociation failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -135,7 +153,10 @@ func CheckAndSave3PIDAssociation(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if err = threePIDAPI.PerformSaveThreePIDAssociation(req.Context(), &api.PerformSaveThreePIDAssociationRequest{
@@ -145,7 +166,10 @@ func CheckAndSave3PIDAssociation(
 		Medium:     medium,
 	}, &struct{}{}); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.PerformSaveThreePIDAssociation failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -161,7 +185,10 @@ func GetAssociated3PIDs(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	res := &api.QueryThreePIDsForLocalpartResponse{}
@@ -171,7 +198,10 @@ func GetAssociated3PIDs(
 	}, res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.QueryThreePIDsForLocalpart failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -192,7 +222,10 @@ func Forget3PID(req *http.Request, threepidAPI api.ClientUserAPI) util.JSONRespo
 		Medium:   body.Medium,
 	}, &struct{}{}); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.PerformForgetThreePID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

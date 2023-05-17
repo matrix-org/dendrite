@@ -107,13 +107,13 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 		Name string
 		Body string
 
-		WantErrCode string
+		WantErrCode spec.MatrixErrorCode
 	}{
-		{Name: "empty", WantErrCode: "M_BAD_JSON"},
+		{Name: "empty", WantErrCode: spec.ErrorBadJSON},
 		{
 			Name:        "badUnmarshal",
 			Body:        `badsyntaxJSON`,
-			WantErrCode: "M_BAD_JSON",
+			WantErrCode: spec.ErrorBadJSON,
 		},
 		{
 			Name: "badPassword",
@@ -123,7 +123,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 				"password": "invalidpassword",
 				"device_id": "adevice"
             }`,
-			WantErrCode: "M_FORBIDDEN",
+			WantErrCode: spec.ErrorForbidden,
 		},
 		{
 			Name: "badToken",
@@ -132,7 +132,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 				"token": "invalidtoken",
 				"device_id": "adevice"
             }`,
-			WantErrCode: "M_FORBIDDEN",
+			WantErrCode: spec.ErrorForbidden,
 		},
 		{
 			Name: "badType",
@@ -140,7 +140,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 				"type": "m.login.invalid",
 				"device_id": "adevice"
             }`,
-			WantErrCode: "M_INVALID_PARAM",
+			WantErrCode: spec.ErrorInvalidParam,
 		},
 	}
 	for _, tst := range tsts {
@@ -157,7 +157,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
-			} else if merr, ok := errRes.JSON.(*spec.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
+			} else if merr, ok := errRes.JSON.(spec.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
 			}
 		})

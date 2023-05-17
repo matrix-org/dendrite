@@ -51,13 +51,19 @@ func GetEvent(
 	})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	events, err := db.Events(ctx, []string{eventID})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.Events failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// The requested event does not exist in our database
@@ -81,7 +87,7 @@ func GetEvent(
 		logger.WithError(err).Error("GetEvent: internal.ApplyHistoryVisibilityFilter failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 

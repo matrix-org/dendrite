@@ -67,7 +67,10 @@ func GetMemberships(
 	var queryRes api.QueryMembershipForUserResponse
 	if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !queryRes.HasBeenInRoom {
@@ -86,7 +89,10 @@ func GetMemberships(
 
 	db, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	defer db.Rollback() // nolint: errcheck
 
@@ -98,7 +104,10 @@ func GetMemberships(
 			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("unable to get 'atToken'")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 		}
 	}
@@ -106,13 +115,19 @@ func GetMemberships(
 	eventIDs, err := db.SelectMemberships(req.Context(), roomID, atToken, membership, notMembership)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("db.SelectMemberships failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	qryRes := &api.QueryEventsByIDResponse{}
 	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	result := qryRes.Events
@@ -124,7 +139,10 @@ func GetMemberships(
 			var content databaseJoinedMember
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			res.Joined[ev.Sender()] = joinedMember(content)
 		}

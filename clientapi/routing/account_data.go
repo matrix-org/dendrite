@@ -104,7 +104,10 @@ func SaveAccountData(
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !json.Valid(body) {
@@ -157,7 +160,10 @@ func SaveReadMarker(
 	if r.FullyRead != "" {
 		data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
 		if err != nil {
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		dataReq := api.InputAccountDataRequest{

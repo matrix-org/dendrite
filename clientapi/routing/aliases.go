@@ -62,7 +62,10 @@ func GetAliases(
 		var queryRes api.QueryMembershipForUserResponse
 		if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if !queryRes.IsInRoom {
 			return util.JSONResponse{

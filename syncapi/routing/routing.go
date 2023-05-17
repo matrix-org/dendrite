@@ -162,7 +162,10 @@ func Setup(
 			}
 			var nextBatch *string
 			if err := req.ParseForm(); err != nil {
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if req.Form.Has("next_batch") {
 				nb := req.FormValue("next_batch")

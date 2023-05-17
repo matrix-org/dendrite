@@ -16,7 +16,6 @@ package routing
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -114,16 +113,15 @@ func JoinRoomByIDOrAlias(
 				Code: e.Code,
 				JSON: json.RawMessage(e.Message),
 			}
+		case eventutil.ErrRoomNoExists:
+			response = util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound(e.Error()),
+			}
 		default:
 			response = util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError(),
-			}
-			if errors.Is(err, eventutil.ErrRoomNoExists) {
-				response = util.JSONResponse{
-					Code: http.StatusNotFound,
-					JSON: spec.NotFound(e.Error()),
-				}
+				JSON: spec.InternalServerError{},
 			}
 		}
 		done <- response

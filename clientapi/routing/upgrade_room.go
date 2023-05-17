@@ -68,13 +68,16 @@ func UpgradeRoom(
 			JSON: spec.Forbidden(e.Error()),
 		}
 	default:
-		if errors.Is(err, eventutil.ErrRoomNoExists) {
+		if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("Room does not exist"),
 			}
 		}
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

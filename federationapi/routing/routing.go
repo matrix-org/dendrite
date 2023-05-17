@@ -312,8 +312,6 @@ func Setup(
 					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
-			roomID := vars["roomID"]
-			userID := vars["userID"]
 			queryVars := httpReq.URL.Query()
 			remoteVersions := []gomatrixserverlib.RoomVersion{}
 			if vers, ok := queryVars["ver"]; ok {
@@ -328,8 +326,25 @@ func Setup(
 				// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
 				remoteVersions = append(remoteVersions, gomatrixserverlib.RoomVersionV1)
 			}
+
+			userID, err := spec.NewUserID(vars["userID"], true)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.BadJSON("Invalid UserID"),
+				}
+			}
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.BadJSON("Invalid RoomID"),
+				}
+			}
+
+			logrus.Debugf("Processing make_join for user %s, room %s", userID.String(), roomID.String())
 			return MakeJoin(
-				httpReq, request, cfg, rsAPI, roomID, userID, remoteVersions,
+				httpReq, request, cfg, rsAPI, *roomID, *userID, remoteVersions,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -353,7 +368,7 @@ func Setup(
 			body = []interface{}{
 				res.Code, res.JSON,
 			}
-			jerr, ok := res.JSON.(*spec.MatrixError)
+			jerr, ok := res.JSON.(spec.MatrixError)
 			if ok {
 				body = jerr
 			}
@@ -419,7 +434,7 @@ func Setup(
 			body = []interface{}{
 				res.Code, res.JSON,
 			}
-			jerr, ok := res.JSON.(*spec.MatrixError)
+			jerr, ok := res.JSON.(spec.MatrixError)
 			if ok {
 				body = jerr
 			}
@@ -566,7 +581,7 @@ func MakeFedAPI(
 		go wakeup.Wakeup(req.Context(), fedReq.Origin())
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
-			return util.MatrixErrorResponse(400, "M_UNRECOGNISED", "badly encoded query params")
+			return util.MatrixErrorResponse(400, string(spec.ErrorUnrecognized), "badly encoded query params")
 		}
 
 		jsonRes := f(req, fedReq, vars)

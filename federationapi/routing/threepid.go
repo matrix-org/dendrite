@@ -80,7 +80,10 @@ func CreateInvitesFrom3PIDInvites(
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if event != nil {
 			evs = append(evs, &types.HeaderedEvent{PDU: event})
@@ -100,7 +103,10 @@ func CreateInvitesFrom3PIDInvites(
 		false,
 	); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -176,7 +182,10 @@ func ExchangeThirdPartyInvite(
 		}
 	} else if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("buildMembershipEvent failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Ask the requesting server to sign the newly created event so we know it
@@ -184,22 +193,34 @@ func ExchangeThirdPartyInvite(
 	inviteReq, err := fclient.NewInviteV2Request(event, nil)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	signedEvent, err := federation.SendInviteV2(httpReq.Context(), senderDomain, request.Origin(), inviteReq)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Errorf("unknown room version: %s", roomVersion)
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(signedEvent.Event)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Send the event to the roomserver
@@ -216,7 +237,10 @@ func ExchangeThirdPartyInvite(
 		false,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

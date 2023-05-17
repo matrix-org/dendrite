@@ -183,7 +183,10 @@ func processInvite(
 	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("keys.VerifyJSONs failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -211,7 +214,7 @@ func processInvite(
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 
@@ -232,7 +235,7 @@ func processInvite(
 		sentry.CaptureException(err)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 

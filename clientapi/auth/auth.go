@@ -68,8 +68,10 @@ func VerifyUserFromRequest(
 	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccessToken failed")
-		jsonErr := spec.InternalServerError()
-		return nil, &jsonErr
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if res.Err != "" {
 		if strings.HasPrefix(strings.ToLower(res.Err), "forbidden:") { // TODO: use actual error and no string comparison

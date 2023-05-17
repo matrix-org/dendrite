@@ -31,7 +31,17 @@ import (
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
 // doesn't exist
-var ErrRoomNoExists = errors.New("room does not exist")
+var errRoomNoExists = fmt.Errorf("room does not exist")
+
+type ErrRoomNoExists struct{}
+
+func (e ErrRoomNoExists) Error() string {
+	return errRoomNoExists.Error()
+}
+
+func (e ErrRoomNoExists) Unwrap() error {
+	return errRoomNoExists
+}
 
 // QueryAndBuildEvent builds a Matrix event using the event builder and roomserver query
 // API client provided. If also fills roomserver query API response (if provided)
@@ -116,7 +126,7 @@ func addPrevEventsToEvent(
 	queryRes *api.QueryLatestEventsAndStateResponse,
 ) error {
 	if !queryRes.RoomExists {
-		return ErrRoomNoExists
+		return ErrRoomNoExists{}
 	}
 
 	verImpl, err := gomatrixserverlib.GetRoomVersion(queryRes.RoomVersion)

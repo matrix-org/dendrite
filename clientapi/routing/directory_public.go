@@ -81,7 +81,10 @@ func GetPostPublicRooms(
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -92,7 +95,10 @@ func GetPostPublicRooms(
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,

@@ -75,7 +75,10 @@ func PeekRoomByIDOrAlias(
 	case nil:
 	default:
 		logrus.WithError(err).WithField("roomID", roomIDOrAlias).Errorf("Failed to peek room")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// if this user is already joined to the room, we let them peek anyway
@@ -111,7 +114,10 @@ func UnpeekRoomByID(
 	case nil:
 	default:
 		logrus.WithError(err).WithField("roomID", roomID).Errorf("Failed to un-peek room")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

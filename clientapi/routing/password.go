@@ -90,7 +90,10 @@ func Password(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Ask the user API to perform the password change.
@@ -102,11 +105,17 @@ func Password(
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !passwordRes.PasswordUpdated {
 		util.GetLogger(req.Context()).Error("Expected password to have been updated but wasn't")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// If the request asks us to log out all other devices then
@@ -120,7 +129,10 @@ func Password(
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		pushersReq := &api.PerformPusherDeletionRequest{
@@ -130,7 +142,10 @@ func Password(
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 

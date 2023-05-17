@@ -60,7 +60,10 @@ func MakeLeave(
 	err = proto.SetContent(map[string]interface{}{"membership": spec.Leave})
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("proto.SetContent failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
@@ -75,19 +78,26 @@ func MakeLeave(
 
 	var queryRes api.QueryLatestEventsAndStateResponse
 	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
-	if err == eventutil.ErrRoomNoExists {
+	switch e := err.(type) {
+	case nil:
+	case eventutil.ErrRoomNoExists:
+		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Room does not exist"),
 		}
-	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+	case gomatrixserverlib.BadJSONError:
+		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(e.Error()),
 		}
-	} else if err != nil {
+	default:
 		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// If the user has already left then just return their last leave
@@ -233,7 +243,10 @@ func SendLeave(
 	err = rsAPI.QueryLatestEventsAndState(httpReq.Context(), queryReq, queryRes)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryLatestEventsAndState failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	// The room doesn't exist or we weren't ever joined to it. Might as well
 	// no-op here.
@@ -279,7 +292,10 @@ func SendLeave(
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -327,7 +343,10 @@ func SendLeave(
 				JSON: spec.Forbidden(response.ErrMsg),
 			}
 		}
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

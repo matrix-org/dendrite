@@ -174,7 +174,10 @@ func createRoom(
 	_, userDomain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !cfg.Matrix.IsLocalServerName(userDomain) {
 		return util.JSONResponse{
@@ -218,7 +221,10 @@ func createRoom(
 	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	createContent := map[string]interface{}{}
@@ -342,7 +348,10 @@ func createRoom(
 		err = rsAPI.GetRoomIDForAlias(ctx, &hasAliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if aliasResp.RoomID != "" {
 			return util.JSONResponse{
@@ -455,7 +464,10 @@ func createRoom(
 		err = builder.SetContent(e.Content)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
@@ -463,17 +475,26 @@ func createRoom(
 		var ev gomatrixserverlib.PDU
 		if err = builder.AddAuthEvents(&authEvents); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("AddAuthEvents failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		ev, err = builder.Build(evTime, userDomain, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		// Add the event to the list of auth events
@@ -481,7 +502,10 @@ func createRoom(
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("authEvents.AddEvent failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -496,7 +520,10 @@ func createRoom(
 	}
 	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, device.UserDomain(), inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// TODO(#269): Reserve room alias while we create the room. This stops us
@@ -513,7 +540,10 @@ func createRoom(
 		err = rsAPI.SetRoomAlias(ctx, &aliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("aliasAPI.SetRoomAlias failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		if aliasResp.AliasExists {
@@ -596,7 +626,7 @@ func createRoom(
 				sentry.CaptureException(err)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError(),
+					JSON: spec.InternalServerError{},
 				}
 			}
 		}
@@ -609,7 +639,10 @@ func createRoom(
 			Visibility: spec.Public,
 		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("failed to publish room")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 

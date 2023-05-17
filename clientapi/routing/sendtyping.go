@@ -58,7 +58,10 @@ func SendTyping(
 
 	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

@@ -98,7 +98,10 @@ func Backfill(
 	// Query the roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Filter any event that's not from the requested room out.

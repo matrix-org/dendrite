@@ -427,8 +427,10 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	children, err := db.ChildrenForParent(rc.ctx, parentID, constRelType, recentFirst)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to get ChildrenForParent")
-		resErr := spec.InternalServerError()
-		return nil, &resErr
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var childEvents []*types.HeaderedEvent
 	for _, child := range children {

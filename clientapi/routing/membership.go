@@ -85,7 +85,10 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 	)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	serverName := device.UserDomain()
@@ -100,7 +103,10 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -262,7 +268,10 @@ func sendInvite(
 	)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
-		return spec.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 
 	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
@@ -289,7 +298,7 @@ func sendInvite(
 		sentry.CaptureException(err)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}, err
 	}
 
@@ -398,31 +407,38 @@ func checkAndProcessThreepid(
 		req.Context(), device, body, cfg, rsAPI, profileAPI,
 		roomID, evTime,
 	)
-	if err == threepid.ErrMissingParameter {
+	switch e := err.(type) {
+	case nil:
+	case threepid.ErrMissingParameter:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(err.Error()),
 		}
-	} else if err == threepid.ErrNotTrusted {
+	case threepid.ErrNotTrusted:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
-	} else if err == eventutil.ErrRoomNoExists {
+	case eventutil.ErrRoomNoExists:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound(err.Error()),
 		}
-	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+	case gomatrixserverlib.BadJSONError:
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(e.Error()),
 		}
-	}
-	if err != nil {
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
-		er := spec.InternalServerError()
-		return inviteStored, &er
+		return inviteStored, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return
 }
@@ -435,8 +451,10 @@ func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserver
 	}, &membershipRes)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
-		e := spec.InternalServerError()
-		return &e
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !membershipRes.IsInRoom {
 		return &util.JSONResponse{
@@ -461,7 +479,10 @@ func SendForget(
 	err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes)
 	if err != nil {
 		logger.WithError(err).Error("QueryMembershipForUser: could not query membership for user")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !membershipRes.RoomExists {
 		return util.JSONResponse{
@@ -483,7 +504,10 @@ func SendForget(
 	response := roomserverAPI.PerformForgetResponse{}
 	if err := rsAPI.PerformForget(ctx, &request, &response); err != nil {
 		logger.WithError(err).Error("PerformForget: unable to forget room")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,

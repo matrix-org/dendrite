@@ -52,7 +52,10 @@ func GetProfile(
 		}
 
 		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -111,7 +114,10 @@ func SetAvatarURL(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
@@ -132,7 +138,10 @@ func SetAvatarURL(
 	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	// No need to build new membership events, since nothing changed
 	if !changed {
@@ -200,7 +209,10 @@ func SetDisplayName(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
@@ -221,7 +233,10 @@ func SetDisplayName(
 	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	// No need to build new membership events, since nothing changed
 	if !changed {
@@ -254,13 +269,19 @@ func updateProfile(
 	}, &res)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
-		return spec.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return spec.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 
 	events, err := buildMembershipEvents(
@@ -275,12 +296,18 @@ func updateProfile(
 		}, e
 	default:
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvents failed")
-		return spec.InternalServerError(), e
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, e
 	}
 
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, true); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return spec.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 	return util.JSONResponse{}, nil
 }

@@ -74,7 +74,7 @@ func SetPresence(
 		log.WithError(err).Errorf("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 
@@ -99,7 +99,7 @@ func GetPresence(
 		log.WithError(err).Errorf("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 
@@ -118,7 +118,7 @@ func GetPresence(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 

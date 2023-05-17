@@ -55,7 +55,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	if from != nil && *from != "" {
 		nextBatch, err = strconv.Atoi(*from)
 		if err != nil {
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -65,7 +68,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -73,7 +79,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	// only search rooms the user is actually joined to
 	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")
 	if err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if len(joinedRooms) == 0 {
 		return util.JSONResponse{
@@ -115,7 +124,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	)
 	if err != nil {
 		logrus.WithError(err).Error("failed to search fulltext")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	logrus.Debugf("Search took %s", result.Took)
 
@@ -155,7 +167,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	evs, err := syncDB.Events(ctx, wantEvents)
 	if err != nil {
 		logrus.WithError(err).Error("failed to get events from database")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	groups := make(map[string]RoomResult)
@@ -173,12 +188,18 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get context events")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		startToken, endToken, err := getStartEnd(ctx, snapshot, eventsBefore, eventsAfter)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get start/end")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		profileInfos := make(map[string]ProfileInfoResponse)
@@ -221,7 +242,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			state, err := snapshot.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
 			if err != nil {
 				logrus.WithError(err).Error("unable to get current state")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync)
 		}

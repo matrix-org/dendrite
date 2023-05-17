@@ -8,6 +8,7 @@ import (
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -224,6 +225,12 @@ type FederationRoomserverAPI interface {
 	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
+
+	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
+	InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error)
+	QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error)
+	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, userID spec.UserID) (bool, error)
+	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 }
 
 type KeyserverRoomserverAPI interface {

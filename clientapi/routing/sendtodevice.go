@@ -53,7 +53,10 @@ func SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 		}
 	}

@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -121,17 +122,23 @@ func SendRedaction(
 	err := proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
 	if err != nil {
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
 	e, err := eventutil.QueryAndBuildEvent(req.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
-	if err == eventutil.ErrRoomNoExists {
+	if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Room does not exist"),
@@ -140,7 +147,10 @@ func SendRedaction(
 	domain := device.UserDomain()
 	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
-		return spec.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	res := util.JSONResponse{

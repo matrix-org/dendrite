@@ -61,7 +61,10 @@ func RoomAliasToID(
 		queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), queryReq, queryRes); err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		if queryRes.RoomID != "" {
@@ -69,7 +72,10 @@ func RoomAliasToID(
 			var serverQueryRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
 				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
-				return spec.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			resp = fclient.RespDirectory{
@@ -98,7 +104,10 @@ func RoomAliasToID(
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
 			util.GetLogger(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
-			return spec.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
