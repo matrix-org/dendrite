@@ -43,10 +43,9 @@ func UpDropEventReferenceSHAPrevEvents(ctx context.Context, tx *sql.Tx) error {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
 	// re-add constraint, as it seems to be dropped as well
-	_, err = tx.ExecContext(ctx, `ALTER TABLE roomserver_previous_events ADD CONSTRAINT roomserver_previous_event_id_unique UNIQUE (previous_event_id);`)
+	_, err = tx.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS roomserver_previous_event_id_unique ON roomserver_previous_events (previous_event_id);`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
-
 	}
 	return nil
 }
