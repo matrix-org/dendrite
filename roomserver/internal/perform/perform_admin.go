@@ -132,7 +132,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		})
 		affected = append(affected, stateKey)
 		prevEvents = []gomatrixserverlib.EventReference{
-			event.EventReference(),
+			{EventID: event.EventID(), EventSHA256: spec.Base64Bytes(event.EventID())},
 		}
 	}
 
