@@ -470,7 +470,7 @@ func createRoom(
 			}
 		}
 		if i > 0 {
-			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
+			builder.PrevEvents = []gomatrixserverlib.EventReference{{EventID: builtEvents[i-1].EventID(), EventSHA256: spec.Base64Bytes(builtEvents[i-1].EventID())}}
 		}
 		var ev gomatrixserverlib.PDU
 		if err = builder.AddAuthEvents(&authEvents); err != nil {
