@@ -884,7 +884,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			SendAsServer: string(senderDomain),
 		})
 		prevEvents = []gomatrixserverlib.EventReference{
-			{EventID: event.EventID(), EventSHA256: spec.Base64Bytes(event.EventID())},
+			{EventID: event.EventID(), EventSHA256: spec.Base64FromEventID(event.EventID())},
 		}
 	}
 
