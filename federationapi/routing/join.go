@@ -244,7 +244,7 @@ func SendJoin(
 		Context:         httpReq.Context(),
 		RoomID:          roomID,
 		EventID:         eventID,
-		EventContent:    request.Content(),
+		JoinEvent:       request.Content(),
 		RoomVersion:     roomVersion,
 		RequestOrigin:   request.Origin(),
 		LocalServerName: cfg.Matrix.ServerName,
