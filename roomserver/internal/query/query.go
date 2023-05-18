@@ -868,7 +868,11 @@ func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types
 }
 
 func (r *Queryer) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
-	return r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
+	res, err := r.DB.GetStateEvent(ctx, roomID.String(), string(eventType), "")
+	if res == nil {
+		return nil, err
+	}
+	return res, err
 }
 
 func (r *Queryer) UserJoinedToRoom(ctx context.Context, roomNID types.RoomNID, userID spec.UserID) (bool, error) {
