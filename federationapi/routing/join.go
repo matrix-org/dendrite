@@ -251,7 +251,7 @@ func SendJoin(
 		KeyID:           cfg.Matrix.KeyID,
 		PrivateKey:      cfg.Matrix.PrivateKey,
 		Verifier:        keys,
-		RoomQuerier:     &JoinRoomQuerier{roomserver: rsAPI},
+		StateQuerier:    &JoinRoomQuerier{roomserver: rsAPI},
 	}
 	response, err := gomatrixserverlib.HandleSendJoin(input)
 	if err != nil {
