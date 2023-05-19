@@ -217,9 +217,6 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	if len(outputEvents) == 0 {
-		return nil
-	}
 	return r.OutputProducer.ProduceRoomEvents(event.RoomID(), outputEvents)
 }
 
@@ -230,9 +227,6 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	outputEvents, err := r.Inviter.PerformInvite(ctx, req)
 	if err != nil {
 		return err
-	}
-	if len(outputEvents) == 0 {
-		return nil
 	}
 	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
 }
