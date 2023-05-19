@@ -216,6 +216,25 @@ func MakeJoin(
 	}
 }
 
+type MembershipQuerier struct {
+	roomserver api.FederationRoomserverAPI
+}
+
+func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error) {
+	req := api.QueryMembershipForUserRequest{
+		RoomID: roomID.String(),
+		UserID: userID.String(),
+	}
+	res := api.QueryMembershipForUserResponse{}
+	err := mq.roomserver.QueryMembershipForUser(ctx, &req, &res)
+
+	membership := ""
+	if err == nil {
+		membership = res.Membership
+	}
+	return membership, err
+}
+
 // SendJoin implements the /send_join API
 // The make-join send-join dance makes much more sense as a single
 // flow so the cyclomatic complexity is high:
@@ -239,17 +258,17 @@ func SendJoin(
 	}
 
 	input := gomatrixserverlib.HandleSendJoinInput{
-		Context:         httpReq.Context(),
-		RoomID:          roomID,
-		EventID:         eventID,
-		JoinEvent:       request.Content(),
-		RoomVersion:     roomVersion,
-		RequestOrigin:   request.Origin(),
-		LocalServerName: cfg.Matrix.ServerName,
-		KeyID:           cfg.Matrix.KeyID,
-		PrivateKey:      cfg.Matrix.PrivateKey,
-		Verifier:        keys,
-		StateQuerier:    &JoinRoomQuerier{roomserver: rsAPI},
+		Context:           httpReq.Context(),
+		RoomID:            roomID,
+		EventID:           eventID,
+		JoinEvent:         request.Content(),
+		RoomVersion:       roomVersion,
+		RequestOrigin:     request.Origin(),
+		LocalServerName:   cfg.Matrix.ServerName,
+		KeyID:             cfg.Matrix.KeyID,
+		PrivateKey:        cfg.Matrix.PrivateKey,
+		Verifier:          keys,
+		MembershipQuerier: &MembershipQuerier{roomserver: rsAPI},
 	}
 	response, joinErr := gomatrixserverlib.HandleSendJoin(input)
 	switch e := joinErr.(type) {
