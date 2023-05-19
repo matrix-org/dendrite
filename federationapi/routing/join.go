@@ -159,45 +159,43 @@ func MakeJoin(
 		BuildEventTemplate: createJoinTemplate,
 	}
 	response, internalErr := gomatrixserverlib.HandleMakeJoin(input)
-	if internalErr != nil {
-		switch e := internalErr.(type) {
-		case nil:
-		case spec.InternalServerError:
-			util.GetLogger(httpReq.Context()).WithError(internalErr)
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError{},
-			}
-		case spec.MatrixError:
-			util.GetLogger(httpReq.Context()).WithError(internalErr)
-			code := http.StatusInternalServerError
-			switch e.ErrCode {
-			case spec.ErrorForbidden:
-				code = http.StatusForbidden
-			case spec.ErrorNotFound:
-				code = http.StatusNotFound
-			case spec.ErrorUnableToAuthoriseJoin:
-				code = http.StatusBadRequest
-			case spec.ErrorBadJSON:
-				code = http.StatusBadRequest
-			}
+	switch e := internalErr.(type) {
+	case nil:
+	case spec.InternalServerError:
+		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	case spec.MatrixError:
+		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		code := http.StatusInternalServerError
+		switch e.ErrCode {
+		case spec.ErrorForbidden:
+			code = http.StatusForbidden
+		case spec.ErrorNotFound:
+			code = http.StatusNotFound
+		case spec.ErrorUnableToAuthoriseJoin:
+			code = http.StatusBadRequest
+		case spec.ErrorBadJSON:
+			code = http.StatusBadRequest
+		}
 
-			return util.JSONResponse{
-				Code: code,
-				JSON: e,
-			}
-		case spec.IncompatibleRoomVersionError:
-			util.GetLogger(httpReq.Context()).WithError(internalErr)
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: e,
-			}
-		default:
-			util.GetLogger(httpReq.Context()).WithError(internalErr)
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: spec.Unknown("unknown error"),
-			}
+		return util.JSONResponse{
+			Code: code,
+			JSON: e,
+		}
+	case spec.IncompatibleRoomVersionError:
+		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: e,
+		}
+	default:
+		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("unknown error"),
 		}
 	}
 
@@ -253,41 +251,38 @@ func SendJoin(
 		Verifier:        keys,
 		StateQuerier:    &JoinRoomQuerier{roomserver: rsAPI},
 	}
-	response, err := gomatrixserverlib.HandleSendJoin(input)
-	if err != nil {
-		// TODO: Double check this reflects old logic
-		switch e := err.(type) {
-		case nil:
-		case spec.InternalServerError:
-			util.GetLogger(httpReq.Context()).WithError(err)
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError{},
-			}
-		case spec.MatrixError:
-			util.GetLogger(httpReq.Context()).WithError(err)
-			code := http.StatusInternalServerError
-			switch e.ErrCode {
-			case spec.ErrorForbidden:
-				code = http.StatusForbidden
-			case spec.ErrorNotFound:
-				code = http.StatusNotFound
-			case spec.ErrorUnsupportedRoomVersion:
-				code = http.StatusInternalServerError
-			case spec.ErrorBadJSON:
-				code = http.StatusBadRequest
-			}
+	response, joinErr := gomatrixserverlib.HandleSendJoin(input)
+	switch e := joinErr.(type) {
+	case nil:
+	case spec.InternalServerError:
+		util.GetLogger(httpReq.Context()).WithError(joinErr)
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	case spec.MatrixError:
+		util.GetLogger(httpReq.Context()).WithError(joinErr)
+		code := http.StatusInternalServerError
+		switch e.ErrCode {
+		case spec.ErrorForbidden:
+			code = http.StatusForbidden
+		case spec.ErrorNotFound:
+			code = http.StatusNotFound
+		case spec.ErrorUnsupportedRoomVersion:
+			code = http.StatusInternalServerError
+		case spec.ErrorBadJSON:
+			code = http.StatusBadRequest
+		}
 
-			return util.JSONResponse{
-				Code: code,
-				JSON: e,
-			}
-		default:
-			util.GetLogger(httpReq.Context()).WithError(err)
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: spec.Unknown("unknown error"),
-			}
+		return util.JSONResponse{
+			Code: code,
+			JSON: e,
+		}
+	default:
+		util.GetLogger(httpReq.Context()).WithError(joinErr)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("unknown error"),
 		}
 	}
 
