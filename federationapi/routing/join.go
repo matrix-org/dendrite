@@ -176,7 +176,7 @@ func MakeJoin(
 		case spec.ErrorNotFound:
 			code = http.StatusNotFound
 		case spec.ErrorUnableToAuthoriseJoin:
-			code = http.StatusBadRequest
+			fallthrough // http.StatusBadRequest
 		case spec.ErrorBadJSON:
 			code = http.StatusBadRequest
 		}
