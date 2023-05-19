@@ -200,6 +200,8 @@ func processInvite(
 		string(domain), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
+	// TODO: Split out this logic!
+
 	// Add the invite event to the roomserver.
 	inviteEvent := &types.HeaderedEvent{PDU: signedEvent}
 	request := &api.PerformInviteRequest{
@@ -210,7 +212,7 @@ func processInvite(
 		TransactionID:   nil,
 	}
 
-	if err = rsAPI.PerformInvite(ctx, request); err != nil {
+	if err = rsAPI.HandleInvite(ctx, request); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

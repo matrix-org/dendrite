@@ -5,6 +5,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -19,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -204,6 +206,20 @@ func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 
 func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 	r.asAPI = asAPI
+}
+
+func (r *RoomserverInternalAPI) HandleInvite(
+	ctx context.Context,
+	req *api.PerformInviteRequest,
+) error {
+	outputEvents, err := r.Inviter.HandleInvite(ctx, req)
+	if err != nil {
+		return err
+	}
+	if len(outputEvents) == 0 {
+		return nil
+	}
+	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(

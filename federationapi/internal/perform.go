@@ -503,7 +503,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	)
 }
 
-// PerformLeaveRequest implements api.FederationInternalAPI
+// PerformInvite implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformInvite(
 	ctx context.Context,
 	request *api.PerformInviteRequest,
