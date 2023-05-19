@@ -210,16 +210,17 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 
 func (r *RoomserverInternalAPI) HandleInvite(
 	ctx context.Context,
-	req *api.PerformInviteRequest,
+	event *types.HeaderedEvent,
+	inviteRoomState []fclient.InviteV2StrippedState,
 ) error {
-	outputEvents, err := r.Inviter.HandleInvite(ctx, req)
+	outputEvents, err := r.Inviter.HandleInvite(ctx, event, inviteRoomState)
 	if err != nil {
 		return err
 	}
 	if len(outputEvents) == 0 {
 		return nil
 	}
-	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(event.RoomID(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(

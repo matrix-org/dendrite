@@ -61,10 +61,10 @@ func (r *Inviter) generateInviteStrippedState(
 
 func (r *Inviter) HandleInvite(
 	ctx context.Context,
-	req *api.PerformInviteRequest,
+	event *types.HeaderedEvent,
+	inviteRoomState []fclient.InviteV2StrippedState,
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
-	event := req.Event
 	if event.StateKey() == nil {
 		return nil, fmt.Errorf("invite must be a state event")
 	}
@@ -85,7 +85,7 @@ func (r *Inviter) HandleInvite(
 	if err != nil {
 		return nil, err
 	}
-	info, inviteState, err := r.generateInviteStrippedState(ctx, *validRoomID, req.Event, req.InviteRoomState)
+	info, inviteState, err := r.generateInviteStrippedState(ctx, *validRoomID, event, inviteRoomState)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (r *Inviter) HandleInvite(
 		"event_id": event.EventID(),
 	})
 	logger.WithFields(log.Fields{
-		"room_version":     req.RoomVersion,
+		"room_version":     event.Version(),
 		"room_info_exists": info != nil,
 		"target_local":     isTargetLocal,
 	}).Debug("processing incoming federation invite event")
@@ -114,13 +114,13 @@ func (r *Inviter) HandleInvite(
 
 	updateMembershipTableManually := func() ([]api.OutputEvent, error) {
 		var updater *shared.MembershipUpdater
-		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion); err != nil {
+		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, event.Version()); err != nil {
 			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 		}
 		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 			EventNID: 0,
 			PDU:      event.PDU,
-		}, outputUpdates, req.Event.Version())
+		}, outputUpdates, event.Version())
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
