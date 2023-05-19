@@ -61,16 +61,16 @@ func (r *Inviter) generateInviteStrippedState(
 
 func (r *Inviter) HandleInvite(
 	ctx context.Context,
-	event *types.HeaderedEvent,
+	inviteEvent *types.HeaderedEvent,
 	inviteRoomState []fclient.InviteV2StrippedState,
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
-	if event.StateKey() == nil {
+	if inviteEvent.StateKey() == nil {
 		return nil, fmt.Errorf("invite must be a state event")
 	}
 
-	roomID := event.RoomID()
-	targetUserID := *event.StateKey()
+	roomID := inviteEvent.RoomID()
+	targetUserID := *inviteEvent.StateKey()
 
 	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
 	if err != nil {
@@ -85,42 +85,42 @@ func (r *Inviter) HandleInvite(
 	if err != nil {
 		return nil, err
 	}
-	info, inviteState, err := r.generateInviteStrippedState(ctx, *validRoomID, event, inviteRoomState)
+	info, inviteState, err := r.generateInviteStrippedState(ctx, *validRoomID, inviteEvent, inviteRoomState)
 	if err != nil {
 		return nil, err
 	}
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
-		"inviter":  event.Sender(),
-		"invitee":  *event.StateKey(),
+		"inviter":  inviteEvent.Sender(),
+		"invitee":  *inviteEvent.StateKey(),
 		"room_id":  roomID,
-		"event_id": event.EventID(),
+		"event_id": inviteEvent.EventID(),
 	})
 	logger.WithFields(log.Fields{
-		"room_version":     event.Version(),
+		"room_version":     inviteEvent.Version(),
 		"room_info_exists": info != nil,
 		"target_local":     isTargetLocal,
 	}).Debug("processing incoming federation invite event")
 
 	if len(inviteState) == 0 {
-		if err = event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
+		if err = inviteEvent.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
 			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	} else {
-		if err = event.SetUnsignedField("invite_room_state", inviteState); err != nil {
+		if err = inviteEvent.SetUnsignedField("invite_room_state", inviteState); err != nil {
 			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	}
 
 	updateMembershipTableManually := func() ([]api.OutputEvent, error) {
 		var updater *shared.MembershipUpdater
-		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, event.Version()); err != nil {
+		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, inviteEvent.Version()); err != nil {
 			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 		}
 		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 			EventNID: 0,
-			PDU:      event.PDU,
-		}, outputUpdates, event.Version())
+			PDU:      inviteEvent.PDU,
+		}, outputUpdates, inviteEvent.Version())
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
@@ -142,7 +142,7 @@ func (r *Inviter) HandleInvite(
 
 	var isAlreadyJoined bool
 	if info != nil {
-		_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *event.StateKey())
+		_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *inviteEvent.StateKey())
 		if err != nil {
 			return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
 		}
@@ -343,7 +343,7 @@ func buildInviteStrippedState(
 	ctx context.Context,
 	db storage.Database,
 	info *types.RoomInfo,
-	event *types.HeaderedEvent,
+	inviteEvent *types.HeaderedEvent,
 ) ([]fclient.InviteV2StrippedState, error) {
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
 	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
@@ -377,9 +377,9 @@ func buildInviteStrippedState(
 		return nil, err
 	}
 	inviteState := []fclient.InviteV2StrippedState{
-		fclient.NewInviteV2StrippedState(event.PDU),
+		fclient.NewInviteV2StrippedState(inviteEvent.PDU),
 	}
-	stateEvents = append(stateEvents, types.Event{PDU: event.PDU})
+	stateEvents = append(stateEvents, types.Event{PDU: inviteEvent.PDU})
 	for _, event := range stateEvents {
 		inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.PDU))
 	}
