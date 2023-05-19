@@ -38,6 +38,7 @@ type Inviter struct {
 	DB      storage.Database
 	Cfg     *config.RoomServer
 	FSAPI   federationAPI.RoomserverFederationAPI
+	RSAPI   api.RoomserverInternalAPI
 	Inputer *input.Inputer
 }
 
@@ -59,12 +60,55 @@ func (r *Inviter) generateInviteStrippedState(
 	return info, strippedState, nil
 }
 
+func (r *Inviter) generateInviteStrippedStateNoNID(
+	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []fclient.InviteV2StrippedState,
+) (bool, []fclient.InviteV2StrippedState, error) {
+	info, err := r.DB.RoomInfo(ctx, roomID.String())
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to load RoomInfo: %w", err)
+	}
+	strippedState := inviteState
+	if len(strippedState) == 0 && info != nil {
+		var is []fclient.InviteV2StrippedState
+		if is, err = buildInviteStrippedState(ctx, r.DB, info, inviteEvent); err == nil {
+			strippedState = is
+		}
+	}
+
+	return (info != nil && !info.IsStub()), strippedState, nil
+}
+
+func (r *Inviter) processInviteMembership(
+	ctx context.Context, inviteEvent *types.HeaderedEvent,
+) ([]api.OutputEvent, error) {
+	var outputUpdates []api.OutputEvent
+	var updater *shared.MembershipUpdater
+	_, domain, err := gomatrixserverlib.SplitID('@', *inviteEvent.StateKey())
+	if err != nil {
+		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
+	}
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
+	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
+		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+	}
+	outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
+		EventNID: 0,
+		PDU:      inviteEvent.PDU,
+	}, outputUpdates, inviteEvent.Version())
+	if err != nil {
+		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
+	}
+	if err = updater.Commit(); err != nil {
+		return nil, fmt.Errorf("updater.Commit: %w", err)
+	}
+	return outputUpdates, nil
+}
+
 func (r *Inviter) HandleInvite(
 	ctx context.Context,
 	inviteEvent *types.HeaderedEvent,
 	inviteRoomState []fclient.InviteV2StrippedState,
 ) ([]api.OutputEvent, error) {
-	var outputUpdates []api.OutputEvent
 	if inviteEvent.StateKey() == nil {
 		return nil, fmt.Errorf("invite must be a state event")
 	}
@@ -85,7 +129,9 @@ func (r *Inviter) HandleInvite(
 	if err != nil {
 		return nil, err
 	}
-	info, inviteState, err := r.generateInviteStrippedState(ctx, *validRoomID, inviteEvent, inviteRoomState)
+	// HACK: What to do with this interface?
+	// NOTE: ???
+	isKnownRoom, inviteState, err := r.generateInviteStrippedStateNoNID(ctx, *validRoomID, inviteEvent, inviteRoomState)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +144,7 @@ func (r *Inviter) HandleInvite(
 	})
 	logger.WithFields(log.Fields{
 		"room_version":     inviteEvent.Version(),
-		"room_info_exists": info != nil,
+		"room_info_exists": isKnownRoom,
 		"target_local":     isTargetLocal,
 	}).Debug("processing incoming federation invite event")
 
@@ -112,41 +158,32 @@ func (r *Inviter) HandleInvite(
 		}
 	}
 
-	updateMembershipTableManually := func() ([]api.OutputEvent, error) {
-		var updater *shared.MembershipUpdater
-		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, inviteEvent.Version()); err != nil {
-			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
-		}
-		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
-			EventNID: 0,
-			PDU:      inviteEvent.PDU,
-		}, outputUpdates, inviteEvent.Version())
-		if err != nil {
-			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
-		}
-		if err = updater.Commit(); err != nil {
-			return nil, fmt.Errorf("updater.Commit: %w", err)
-		}
-		logger.Debugf("updated membership to invite and sending invite OutputEvent")
-		return outputUpdates, nil
-	}
-
-	if (info == nil || info.IsStub()) && isTargetLocal {
+	if !isKnownRoom && isTargetLocal {
 		// The invite came in over federation for a room that we don't know about
 		// yet. We need to handle this a bit differently to most invites because
 		// we don't know the room state, therefore the roomserver can't process
 		// an input event. Instead we will update the membership table with the
 		// new invite and generate an output event.
-		return updateMembershipTableManually()
+		// HACK: Easy to inject this interface
+		return r.processInviteMembership(ctx, inviteEvent)
 	}
 
-	var isAlreadyJoined bool
-	if info != nil {
-		_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *inviteEvent.StateKey())
-		if err != nil {
-			return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
-		}
+	// HACK: Easy to inject this interface
+	req := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: targetUserID,
 	}
+	res := api.QueryMembershipForUserResponse{}
+	err = r.RSAPI.QueryMembershipForUser(ctx, &req, &res)
+	if err != nil {
+		return nil, fmt.Errorf("r.QueryMembershipForUser: %w", err)
+	}
+	isAlreadyJoined := (res.Membership == spec.Join)
+
+	//_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *inviteEvent.StateKey())
+	//if err != nil {
+	//	return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
+	//}
 	if isAlreadyJoined {
 		// If the user is joined to the room then that takes precedence over this
 		// invite event. It makes little sense to move a user that is already
@@ -179,7 +216,8 @@ func (r *Inviter) HandleInvite(
 		return nil, api.ErrNotAllowed{Err: fmt.Errorf("user is already joined to room")}
 	}
 
-	return updateMembershipTableManually()
+	// HACK: Easy to inject this interface
+	return r.processInviteMembership(ctx, inviteEvent)
 }
 
 // nolint:gocyclo

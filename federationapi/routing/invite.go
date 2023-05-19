@@ -205,7 +205,7 @@ func processInvite(
 	// Add the invite event to the roomserver.
 	inviteEvent := &types.HeaderedEvent{PDU: signedEvent}
 	if err = rsAPI.HandleInvite(ctx, inviteEvent, strippedState); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -225,7 +225,7 @@ func processInvite(
 		}
 	case nil:
 	default:
-		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
 		sentry.CaptureException(err)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

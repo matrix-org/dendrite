@@ -132,6 +132,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB:      r.DB,
 		Cfg:     &r.Cfg.RoomServer,
 		FSAPI:   r.fsAPI,
+		RSAPI:   r,
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
