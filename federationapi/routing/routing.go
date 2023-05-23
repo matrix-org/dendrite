@@ -331,14 +331,14 @@ func Setup(
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: spec.BadJSON("Invalid UserID"),
+					JSON: spec.InvalidParam("Invalid UserID"),
 				}
 			}
 			roomID, err := spec.NewRoomID(vars["roomID"])
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: spec.BadJSON("Invalid RoomID"),
+					JSON: spec.InvalidParam("Invalid RoomID"),
 				}
 			}
 
@@ -358,10 +358,17 @@ func Setup(
 					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
-			roomID := vars["roomID"]
 			eventID := vars["eventID"]
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
+
 			res := SendJoin(
-				httpReq, request, cfg, rsAPI, keys, roomID, eventID,
+				httpReq, request, cfg, rsAPI, keys, *roomID, eventID,
 			)
 			// not all responses get wrapped in [code, body]
 			var body interface{}
@@ -390,10 +397,17 @@ func Setup(
 					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
-			roomID := vars["roomID"]
 			eventID := vars["eventID"]
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
+
 			return SendJoin(
-				httpReq, request, cfg, rsAPI, keys, roomID, eventID,
+				httpReq, request, cfg, rsAPI, keys, *roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodPut)
