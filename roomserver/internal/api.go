@@ -209,16 +209,24 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 	r.asAPI = asAPI
 }
 
+func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error) {
+	return r.Inviter.IsKnownRoom(ctx, roomID)
+}
+
+func (r *RoomserverInternalAPI) GenerateInviteStrippedStateV2(
+	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent *types.HeaderedEvent,
+) ([]fclient.InviteV2StrippedState, error) {
+	return r.Inviter.GenerateInviteStrippedStateV2(ctx, roomID, stateWanted, inviteEvent)
+}
+
 func (r *RoomserverInternalAPI) HandleInvite(
-	ctx context.Context,
-	event *types.HeaderedEvent,
-	inviteRoomState []fclient.InviteV2StrippedState,
+	ctx context.Context, inviteEvent *types.HeaderedEvent,
 ) error {
-	outputEvents, err := r.Inviter.HandleInvite(ctx, event, inviteRoomState)
+	outputEvents, err := r.Inviter.ProcessInviteMembership(ctx, inviteEvent)
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(event.RoomID(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(

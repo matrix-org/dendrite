@@ -42,6 +42,14 @@ type Inviter struct {
 	Inputer *input.Inputer
 }
 
+func (r *Inviter) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error) {
+	info, err := r.DB.RoomInfo(ctx, roomID.String())
+	if err != nil {
+		return false, fmt.Errorf("failed to load RoomInfo: %w", err)
+	}
+	return (info != nil && !info.IsStub()), nil
+}
+
 func (r *Inviter) generateInviteStrippedState(
 	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []fclient.InviteV2StrippedState,
 ) (*types.RoomInfo, []fclient.InviteV2StrippedState, error) {
@@ -58,6 +66,41 @@ func (r *Inviter) generateInviteStrippedState(
 	}
 
 	return info, strippedState, nil
+}
+
+func (r *Inviter) GenerateInviteStrippedStateV2(
+	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent *types.HeaderedEvent,
+) ([]fclient.InviteV2StrippedState, error) {
+	info, err := r.DB.RoomInfo(ctx, roomID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
+	}
+	if info != nil {
+		roomState := state.NewStateResolution(r.DB, info)
+		stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
+			ctx, info.StateSnapshotNID(), stateWanted,
+		)
+		if err != nil {
+			return nil, nil
+		}
+		stateNIDs := []types.EventNID{}
+		for _, stateNID := range stateEntries {
+			stateNIDs = append(stateNIDs, stateNID.EventNID)
+		}
+		stateEvents, err := r.DB.Events(ctx, info.RoomVersion, stateNIDs)
+		if err != nil {
+			return nil, nil
+		}
+		inviteState := []fclient.InviteV2StrippedState{
+			fclient.NewInviteV2StrippedState(inviteEvent.PDU),
+		}
+		stateEvents = append(stateEvents, types.Event{PDU: inviteEvent.PDU})
+		for _, event := range stateEvents {
+			inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.PDU))
+		}
+		return inviteState, nil
+	}
+	return nil, nil
 }
 
 func (r *Inviter) generateInviteStrippedStateNoNID(
@@ -78,7 +121,7 @@ func (r *Inviter) generateInviteStrippedStateNoNID(
 	return (info != nil && !info.IsStub()), strippedState, nil
 }
 
-func (r *Inviter) processInviteMembership(
+func (r *Inviter) ProcessInviteMembership(
 	ctx context.Context, inviteEvent *types.HeaderedEvent,
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
@@ -115,7 +158,6 @@ func (r *Inviter) HandleInvite(
 
 	roomID := inviteEvent.RoomID()
 	targetUserID := *inviteEvent.StateKey()
-
 	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", targetUserID)}
@@ -129,11 +171,34 @@ func (r *Inviter) HandleInvite(
 	if err != nil {
 		return nil, err
 	}
-	// HACK: What to do with this interface?
-	// NOTE: ???
-	isKnownRoom, inviteState, err := r.generateInviteStrippedStateNoNID(ctx, *validRoomID, inviteEvent, inviteRoomState)
+	// HACK: Easy to inject this interface
+	isKnownRoom, err := r.IsKnownRoom(ctx, *validRoomID)
 	if err != nil {
 		return nil, err
+	}
+
+	inviteState := inviteRoomState
+	if len(inviteState) == 0 {
+		// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
+		// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
+		stateWanted := []gomatrixserverlib.StateKeyTuple{}
+		for _, t := range []string{
+			spec.MRoomName, spec.MRoomCanonicalAlias,
+			spec.MRoomJoinRules, spec.MRoomAvatar,
+			spec.MRoomEncryption, spec.MRoomCreate,
+		} {
+			stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
+				EventType: t,
+				StateKey:  "",
+			})
+		}
+		// HACK: Mostly easy to inject this interface?
+		// NOTE: Only hard bit is the fclient.InviteV2StrippedState return type
+		if is, err := r.GenerateInviteStrippedStateV2(ctx, *validRoomID, stateWanted, inviteEvent); err == nil {
+			inviteState = is
+		} else {
+			return nil, err
+		}
 	}
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
@@ -165,7 +230,7 @@ func (r *Inviter) HandleInvite(
 		// an input event. Instead we will update the membership table with the
 		// new invite and generate an output event.
 		// HACK: Easy to inject this interface
-		return r.processInviteMembership(ctx, inviteEvent)
+		return r.ProcessInviteMembership(ctx, inviteEvent)
 	}
 
 	// HACK: Easy to inject this interface
@@ -217,7 +282,7 @@ func (r *Inviter) HandleInvite(
 	}
 
 	// HACK: Easy to inject this interface
-	return r.processInviteMembership(ctx, inviteEvent)
+	return r.ProcessInviteMembership(ctx, inviteEvent)
 }
 
 // nolint:gocyclo
@@ -326,7 +391,7 @@ func (r *Inviter) PerformInvite(
 	_, err = helpers.CheckAuthEvents(ctx, r.DB, info, event, event.AuthEventIDs())
 	if err != nil {
 		logger.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
-			"processInviteEvent.checkAuthEvents failed for event",
+			"ProcessInviteEvent.checkAuthEvents failed for event",
 		)
 		return nil, api.ErrNotAllowed{Err: err}
 	}

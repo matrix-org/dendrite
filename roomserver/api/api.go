@@ -224,7 +224,8 @@ type FederationRoomserverAPI interface {
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
 	QueryRestrictedJoinAllowed(ctx context.Context, req *QueryRestrictedJoinAllowedRequest, res *QueryRestrictedJoinAllowedResponse) error
 	PerformInboundPeek(ctx context.Context, req *PerformInboundPeekRequest, res *PerformInboundPeekResponse) error
-	HandleInvite(ctx context.Context, event *types.HeaderedEvent, inviteRoomState []fclient.InviteV2StrippedState) error
+	HandleInvite(ctx context.Context, event *types.HeaderedEvent) error
+
 	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
@@ -234,6 +235,9 @@ type FederationRoomserverAPI interface {
 	QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error)
 	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, userID spec.UserID) (bool, error)
 	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
+
+	IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error)
+	GenerateInviteStrippedStateV2(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent *types.HeaderedEvent) ([]fclient.InviteV2StrippedState, error)
 }
 
 type KeyserverRoomserverAPI interface {
