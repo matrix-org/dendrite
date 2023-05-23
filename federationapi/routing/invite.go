@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -34,7 +35,7 @@ import (
 func InviteV2(
 	httpReq *http.Request,
 	request *fclient.FederationRequest,
-	roomID string,
+	roomID spec.RoomID,
 	eventID string,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
@@ -56,9 +57,48 @@ func InviteV2(
 			JSON: spec.BadJSON(err.Error()),
 		}
 	case nil:
-		return processInvite(
-			httpReq.Context(), true, inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
-		)
+		if inviteReq.Event().StateKey() == nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("The invite event has no state key"),
+			}
+		}
+
+		invitedUser, err := spec.NewUserID(*inviteReq.Event().StateKey(), true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam(fmt.Sprintf("The user ID is invalid")),
+			}
+		}
+		if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam(fmt.Sprintf("The invited user domain does not belong to this server")),
+			}
+		}
+
+		input := HandleInviteInput{
+			Context:       httpReq.Context(),
+			RoomVersion:   inviteReq.RoomVersion(),
+			RoomID:        roomID,
+			EventID:       eventID,
+			InvitedUser:   *invitedUser,
+			KeyID:         cfg.Matrix.KeyID,
+			PrivateKey:    cfg.Matrix.PrivateKey,
+			Verifier:      keys,
+			InviteQuerier: rsAPI,
+			InviteEvent:   inviteReq.Event(),
+			StrippedState: inviteReq.InviteRoomState(),
+		}
+		event, jsonErr := handleInvite(input, rsAPI)
+		if err != nil {
+			return *jsonErr
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: fclient.RespInviteV2{Event: event.JSON()},
+		}
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -71,7 +111,7 @@ func InviteV2(
 func InviteV1(
 	httpReq *http.Request,
 	request *fclient.FederationRequest,
-	roomID string,
+	roomID spec.RoomID,
 	eventID string,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
@@ -99,50 +139,6 @@ func InviteV1(
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}
-	return processInvite(
-		httpReq.Context(), false, event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
-	)
-}
-
-func processInvite(
-	ctx context.Context,
-	isInviteV2 bool,
-	event gomatrixserverlib.PDU,
-	roomVer gomatrixserverlib.RoomVersion,
-	strippedState []fclient.InviteV2StrippedState,
-	roomID string,
-	eventID string,
-	cfg *config.FederationAPI,
-	rsAPI api.FederationRoomserverAPI,
-	keys gomatrixserverlib.JSONVerifier,
-) util.JSONResponse {
-
-	// Check that we can accept invites for this room version.
-	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVer)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.UnsupportedRoomVersion(
-				fmt.Sprintf("Room version %q is not supported by this server.", roomVer),
-			),
-		}
-	}
-
-	// Check that the room ID is correct.
-	if event.RoomID() != roomID {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
-		}
-	}
-
-	// Check that the event ID is correct.
-	if event.EventID() != eventID {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
-		}
-	}
 
 	if event.StateKey() == nil {
 		return util.JSONResponse{
@@ -151,125 +147,178 @@ func processInvite(
 		}
 	}
 
-	_, domain, err := cfg.Matrix.SplitLocalID('@', *event.StateKey())
+	invitedUser, err := spec.NewUserID(*event.StateKey(), true)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.InvalidParam(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
+			JSON: spec.InvalidParam(fmt.Sprintf("The user ID is invalid")),
 		}
 	}
-
-	// Check that the event is signed by the server sending the request.
-	redacted, err := verImpl.RedactEventJSON(event.JSON())
-	if err != nil {
+	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event JSON could not be redacted"),
+			JSON: spec.InvalidParam(fmt.Sprintf("The invited user domain does not belong to this server")),
 		}
 	}
-	_, serverName, err := gomatrixserverlib.SplitID('@', event.Sender())
+
+	input := HandleInviteInput{
+		Context:       httpReq.Context(),
+		RoomVersion:   roomVer,
+		RoomID:        roomID,
+		EventID:       eventID,
+		InvitedUser:   *invitedUser,
+		KeyID:         cfg.Matrix.KeyID,
+		PrivateKey:    cfg.Matrix.PrivateKey,
+		Verifier:      keys,
+		InviteQuerier: rsAPI,
+		InviteEvent:   event,
+		StrippedState: strippedState,
+	}
+	event, jsonErr := handleInvite(input, rsAPI)
 	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event JSON contains an invalid sender"),
-		}
+		return *jsonErr
 	}
-	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             serverName,
-		Message:                redacted,
-		AtTS:                   event.OriginServerTS(),
-		StrictValidityChecking: true,
-	}}
-	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("keys.VerifyJSONs failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-	if verifyResults[0].Error != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("The invite must be signed by the server it originated on"),
-		}
-	}
-
-	// Sign the event so that other servers will know that we have received the invite.
-	signedEvent := event.Sign(
-		string(domain), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
-	)
-
-	inviteEvent := &types.HeaderedEvent{PDU: signedEvent}
-	err = handleInvite(ctx, cfg, inviteEvent, strippedState, rsAPI)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-
-	// Add the invite event to the roomserver.
-	if err = rsAPI.HandleInvite(ctx, inviteEvent); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-
-	// Return the signed event to the originating server, it should then tell
-	// the other servers in the room that we have been invited.
-	if isInviteV2 {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: fclient.RespInviteV2{Event: signedEvent.JSON()},
-		}
-	} else {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: fclient.RespInvite{Event: signedEvent.JSON()},
-		}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: fclient.RespInvite{Event: event.JSON()},
 	}
 }
 
-// TODO: Define interface instead of passing in FedRoomserverAPI
+func handleInvite(input HandleInviteInput, rsAPI api.FederationRoomserverAPI) (gomatrixserverlib.PDU, *util.JSONResponse) {
+	inviteEvent, err := processInvite(input)
+	switch e := err.(type) {
+	case nil:
+	case spec.InternalServerError:
+		util.GetLogger(input.Context).WithError(err)
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	case spec.MatrixError:
+		util.GetLogger(input.Context).WithError(err)
+		code := http.StatusInternalServerError
+		switch e.ErrCode {
+		case spec.ErrorForbidden:
+			code = http.StatusForbidden
+		case spec.ErrorUnsupportedRoomVersion:
+			fallthrough // http.StatusBadRequest
+		case spec.ErrorBadJSON:
+			code = http.StatusBadRequest
+		}
+
+		return nil, &util.JSONResponse{
+			Code: code,
+			JSON: e,
+		}
+	default:
+		util.GetLogger(input.Context).WithError(err)
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("unknown error"),
+		}
+	}
+
+	headeredInvite := &types.HeaderedEvent{PDU: inviteEvent}
+	if err = rsAPI.HandleInvite(input.Context, headeredInvite); err != nil {
+		util.GetLogger(input.Context).WithError(err).Error("HandleInvite failed")
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	return inviteEvent, nil
+}
+
 // TODO: Migrate to GMSL
-// TODO: Clean up logic/naming of stuff
 
-func handleInvite(
-	ctx context.Context,
-	cfg *config.FederationAPI,
-	inviteEvent *types.HeaderedEvent,
-	inviteRoomState []fclient.InviteV2StrippedState,
-	rsAPI api.FederationRoomserverAPI,
-) error {
+type InviteQuerier interface {
+	IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error)
+	// TODO: get rid of fclient references if possible
+	GenerateInviteStrippedState(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU) ([]fclient.InviteV2StrippedState, error)
+	// TODO: Change this api shape dramatically for gmsl
+	QueryMembershipForUser(ctx context.Context, req *api.QueryMembershipForUserRequest, res *api.QueryMembershipForUserResponse) error
+}
+
+type HandleInviteInput struct {
+	Context       context.Context
+	RoomVersion   gomatrixserverlib.RoomVersion
+	RoomID        spec.RoomID
+	EventID       string
+	InvitedUser   spec.UserID
+	KeyID         gomatrixserverlib.KeyID
+	PrivateKey    ed25519.PrivateKey
+	Verifier      gomatrixserverlib.JSONVerifier
+	InviteQuerier InviteQuerier
+
+	InviteEvent   gomatrixserverlib.PDU
+	StrippedState []fclient.InviteV2StrippedState
+}
+
+func processInvite(
+	input HandleInviteInput,
+) (gomatrixserverlib.PDU, error) {
+	// Check that we can accept invites for this room version.
+	verImpl, err := gomatrixserverlib.GetRoomVersion(input.RoomVersion)
+	if err != nil {
+		return nil, spec.UnsupportedRoomVersion(
+			fmt.Sprintf("Room version %q is not supported by this server.", input.RoomVersion),
+		)
+	}
+
+	// Check that the room ID is correct.
+	if input.InviteEvent.RoomID() != input.RoomID.String() {
+		return nil, spec.BadJSON("The room ID in the request path must match the room ID in the invite event JSON")
+	}
+
+	// Check that the event ID is correct.
+	if input.InviteEvent.EventID() != input.EventID {
+		return nil, spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON")
+	}
+
+	// Check that the event is signed by the server sending the request.
+	redacted, err := verImpl.RedactEventJSON(input.InviteEvent.JSON())
+	if err != nil {
+		return nil, spec.BadJSON("The event JSON could not be redacted")
+	}
+
+	sender, err := spec.NewUserID(input.InviteEvent.Sender(), true)
+	if err != nil {
+		return nil, spec.BadJSON("The event JSON contains an invalid sender")
+	}
+	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
+		ServerName:             sender.Domain(),
+		Message:                redacted,
+		AtTS:                   input.InviteEvent.OriginServerTS(),
+		StrictValidityChecking: true,
+	}}
+	verifyResults, err := input.Verifier.VerifyJSONs(input.Context, verifyRequests)
+	if err != nil {
+		util.GetLogger(input.Context).WithError(err).Error("keys.VerifyJSONs failed")
+		return nil, spec.InternalServerError{}
+	}
+	if verifyResults[0].Error != nil {
+		return nil, spec.Forbidden("The invite must be signed by the server it originated on")
+	}
+
+	// Sign the event so that other servers will know that we have received the invite.
+	signedEvent := input.InviteEvent.Sign(
+		string(input.InvitedUser.Domain()), input.KeyID, input.PrivateKey,
+	)
+
+	inviteEvent := &types.HeaderedEvent{PDU: signedEvent}
+
 	if inviteEvent.StateKey() == nil {
-		return fmt.Errorf("invite must be a state event")
+		util.GetLogger(input.Context).Error("invite must be a state event")
+		return nil, spec.InternalServerError{}
 	}
 
-	roomID := inviteEvent.RoomID()
-	targetUserID := *inviteEvent.StateKey()
-	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
+	isKnownRoom, err := input.InviteQuerier.IsKnownRoom(input.Context, input.RoomID)
 	if err != nil {
-		return api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", targetUserID)}
-	}
-	isTargetLocal := cfg.Matrix.IsLocalServerName(domain)
-	if !isTargetLocal {
-		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be to a local user")}
+		util.GetLogger(input.Context).WithError(err).Error("failed querying known room")
+		return nil, spec.InternalServerError{}
 	}
 
-	validRoomID, err := spec.NewRoomID(roomID)
-	if err != nil {
-		return err
-	}
-	isKnownRoom, err := rsAPI.IsKnownRoom(ctx, *validRoomID)
-	if err != nil {
-		return err
-	}
-
-	inviteState := inviteRoomState
+	inviteState := input.StrippedState
 	if len(inviteState) == 0 {
 		// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 		// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
@@ -284,90 +333,83 @@ func handleInvite(
 				StateKey:  "",
 			})
 		}
-		if is, err := rsAPI.GenerateInviteStrippedStateV2(ctx, *validRoomID, stateWanted, inviteEvent); err == nil {
+		if is, err := input.InviteQuerier.GenerateInviteStrippedState(input.Context, input.RoomID, stateWanted, inviteEvent); err == nil {
 			inviteState = is
 		} else {
-			return err
+			util.GetLogger(input.Context).WithError(err).Error("failed querying known room")
+			return nil, spec.InternalServerError{}
 		}
 	}
 
-	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
+	logger := util.GetLogger(input.Context).WithFields(map[string]interface{}{
 		"inviter":  inviteEvent.Sender(),
 		"invitee":  *inviteEvent.StateKey(),
-		"room_id":  roomID,
+		"room_id":  input.RoomID.String(),
 		"event_id": inviteEvent.EventID(),
 	})
 	logger.WithFields(logrus.Fields{
 		"room_version":     inviteEvent.Version(),
 		"room_info_exists": isKnownRoom,
-		"target_local":     isTargetLocal,
 	}).Debug("processing incoming federation invite event")
 
 	if len(inviteState) == 0 {
 		if err = inviteEvent.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
-			return fmt.Errorf("event.SetUnsignedField: %w", err)
+			util.GetLogger(input.Context).WithError(err).Error("failed setting unsigned field")
+			return nil, spec.InternalServerError{}
 		}
 	} else {
 		if err = inviteEvent.SetUnsignedField("invite_room_state", inviteState); err != nil {
-			return fmt.Errorf("event.SetUnsignedField: %w", err)
+			util.GetLogger(input.Context).WithError(err).Error("failed setting unsigned field")
+			return nil, spec.InternalServerError{}
 		}
 	}
 
-	if !isKnownRoom && isTargetLocal {
-		// The invite came in over federation for a room that we don't know about
-		// yet. We need to handle this a bit differently to most invites because
-		// we don't know the room state, therefore the roomserver can't process
-		// an input event. Instead we will update the membership table with the
-		// new invite and generate an output event.
-		return nil
+	if isKnownRoom {
+		req := api.QueryMembershipForUserRequest{
+			RoomID: input.RoomID.String(),
+			UserID: input.InvitedUser.String(),
+		}
+		res := api.QueryMembershipForUserResponse{}
+		err = input.InviteQuerier.QueryMembershipForUser(input.Context, &req, &res)
+		if err != nil {
+			util.GetLogger(input.Context).WithError(err).Error("failed getting user membership")
+			return nil, spec.InternalServerError{}
+		}
+		isAlreadyJoined := (res.Membership == spec.Join)
+
+		if isAlreadyJoined {
+			// If the user is joined to the room then that takes precedence over this
+			// invite event. It makes little sense to move a user that is already
+			// joined to the room into the invite state.
+			// This could plausibly happen if an invite request raced with a join
+			// request for a user. For example if a user was invited to a public
+			// room and they joined the room at the same time as the invite was sent.
+			// The other way this could plausibly happen is if an invite raced with
+			// a kick. For example if a user was kicked from a room in error and in
+			// response someone else in the room re-invited them then it is possible
+			// for the invite request to race with the leave event so that the
+			// target receives invite before it learns that it has been kicked.
+			// There are a few ways this could be plausibly handled in the roomserver.
+			// 1) Store the invite, but mark it as retired. That will result in the
+			//    permanent rejection of that invite event. So even if the target
+			//    user leaves the room and the invite is retransmitted it will be
+			//    ignored. However a new invite with a new event ID would still be
+			//    accepted.
+			// 2) Silently discard the invite event. This means that if the event
+			//    was retransmitted at a later date after the target user had left
+			//    the room we would accept the invite. However since we hadn't told
+			//    the sending server that the invite had been discarded it would
+			//    have no reason to attempt to retry.
+			// 3) Signal the sending server that the user is already joined to the
+			//    room.
+			// For now we will implement option 2. Since in the abesence of a retry
+			// mechanism it will be equivalent to option 1, and we don't have a
+			// signalling mechanism to implement option 3.
+			logger.Debugf("user already joined")
+			util.GetLogger(input.Context).Error("user is already joined to room")
+			return nil, spec.InternalServerError{}
+		}
 	}
 
-	req := api.QueryMembershipForUserRequest{
-		RoomID: roomID,
-		UserID: targetUserID,
-	}
-	res := api.QueryMembershipForUserResponse{}
-	err = rsAPI.QueryMembershipForUser(ctx, &req, &res)
-	if err != nil {
-		return fmt.Errorf("r.QueryMembershipForUser: %w", err)
-	}
-	isAlreadyJoined := (res.Membership == spec.Join)
-
-	//_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *inviteEvent.StateKey())
-	//if err != nil {
-	//	return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
-	//}
-	if isAlreadyJoined {
-		// If the user is joined to the room then that takes precedence over this
-		// invite event. It makes little sense to move a user that is already
-		// joined to the room into the invite state.
-		// This could plausibly happen if an invite request raced with a join
-		// request for a user. For example if a user was invited to a public
-		// room and they joined the room at the same time as the invite was sent.
-		// The other way this could plausibly happen is if an invite raced with
-		// a kick. For example if a user was kicked from a room in error and in
-		// response someone else in the room re-invited them then it is possible
-		// for the invite request to race with the leave event so that the
-		// target receives invite before it learns that it has been kicked.
-		// There are a few ways this could be plausibly handled in the roomserver.
-		// 1) Store the invite, but mark it as retired. That will result in the
-		//    permanent rejection of that invite event. So even if the target
-		//    user leaves the room and the invite is retransmitted it will be
-		//    ignored. However a new invite with a new event ID would still be
-		//    accepted.
-		// 2) Silently discard the invite event. This means that if the event
-		//    was retransmitted at a later date after the target user had left
-		//    the room we would accept the invite. However since we hadn't told
-		//    the sending server that the invite had been discarded it would
-		//    have no reason to attempt to retry.
-		// 3) Signal the sending server that the user is already joined to the
-		//    room.
-		// For now we will implement option 2. Since in the abesence of a retry
-		// mechanism it will be equivalent to option 1, and we don't have a
-		// signalling mechanism to implement option 3.
-		logger.Debugf("user already joined")
-		return api.ErrNotAllowed{Err: fmt.Errorf("user is already joined to room")}
-	}
-
-	return nil
+	return inviteEvent.PDU, nil
 }

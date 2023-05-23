@@ -68,8 +68,8 @@ func (r *Inviter) generateInviteStrippedState(
 	return info, strippedState, nil
 }
 
-func (r *Inviter) GenerateInviteStrippedStateV2(
-	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent *types.HeaderedEvent,
+func (r *Inviter) GenerateInviteStrippedState(
+	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU,
 ) ([]fclient.InviteV2StrippedState, error) {
 	info, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
@@ -92,33 +92,15 @@ func (r *Inviter) GenerateInviteStrippedStateV2(
 			return nil, nil
 		}
 		inviteState := []fclient.InviteV2StrippedState{
-			fclient.NewInviteV2StrippedState(inviteEvent.PDU),
+			fclient.NewInviteV2StrippedState(inviteEvent),
 		}
-		stateEvents = append(stateEvents, types.Event{PDU: inviteEvent.PDU})
+		stateEvents = append(stateEvents, types.Event{PDU: inviteEvent})
 		for _, event := range stateEvents {
 			inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.PDU))
 		}
 		return inviteState, nil
 	}
 	return nil, nil
-}
-
-func (r *Inviter) generateInviteStrippedStateNoNID(
-	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []fclient.InviteV2StrippedState,
-) (bool, []fclient.InviteV2StrippedState, error) {
-	info, err := r.DB.RoomInfo(ctx, roomID.String())
-	if err != nil {
-		return false, nil, fmt.Errorf("failed to load RoomInfo: %w", err)
-	}
-	strippedState := inviteState
-	if len(strippedState) == 0 && info != nil {
-		var is []fclient.InviteV2StrippedState
-		if is, err = buildInviteStrippedState(ctx, r.DB, info, inviteEvent); err == nil {
-			strippedState = is
-		}
-	}
-
-	return (info != nil && !info.IsStub()), strippedState, nil
 }
 
 func (r *Inviter) ProcessInviteMembership(
@@ -145,144 +127,6 @@ func (r *Inviter) ProcessInviteMembership(
 		return nil, fmt.Errorf("updater.Commit: %w", err)
 	}
 	return outputUpdates, nil
-}
-
-func (r *Inviter) HandleInvite(
-	ctx context.Context,
-	inviteEvent *types.HeaderedEvent,
-	inviteRoomState []fclient.InviteV2StrippedState,
-) ([]api.OutputEvent, error) {
-	if inviteEvent.StateKey() == nil {
-		return nil, fmt.Errorf("invite must be a state event")
-	}
-
-	roomID := inviteEvent.RoomID()
-	targetUserID := *inviteEvent.StateKey()
-	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
-	if err != nil {
-		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", targetUserID)}
-	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
-	if !isTargetLocal {
-		return nil, api.ErrInvalidID{Err: fmt.Errorf("the invite must be to a local user")}
-	}
-
-	validRoomID, err := spec.NewRoomID(roomID)
-	if err != nil {
-		return nil, err
-	}
-	// HACK: Easy to inject this interface
-	isKnownRoom, err := r.IsKnownRoom(ctx, *validRoomID)
-	if err != nil {
-		return nil, err
-	}
-
-	inviteState := inviteRoomState
-	if len(inviteState) == 0 {
-		// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
-		// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
-		stateWanted := []gomatrixserverlib.StateKeyTuple{}
-		for _, t := range []string{
-			spec.MRoomName, spec.MRoomCanonicalAlias,
-			spec.MRoomJoinRules, spec.MRoomAvatar,
-			spec.MRoomEncryption, spec.MRoomCreate,
-		} {
-			stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
-				EventType: t,
-				StateKey:  "",
-			})
-		}
-		// HACK: Mostly easy to inject this interface?
-		// NOTE: Only hard bit is the fclient.InviteV2StrippedState return type
-		if is, err := r.GenerateInviteStrippedStateV2(ctx, *validRoomID, stateWanted, inviteEvent); err == nil {
-			inviteState = is
-		} else {
-			return nil, err
-		}
-	}
-
-	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
-		"inviter":  inviteEvent.Sender(),
-		"invitee":  *inviteEvent.StateKey(),
-		"room_id":  roomID,
-		"event_id": inviteEvent.EventID(),
-	})
-	logger.WithFields(log.Fields{
-		"room_version":     inviteEvent.Version(),
-		"room_info_exists": isKnownRoom,
-		"target_local":     isTargetLocal,
-	}).Debug("processing incoming federation invite event")
-
-	if len(inviteState) == 0 {
-		if err = inviteEvent.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
-			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
-		}
-	} else {
-		if err = inviteEvent.SetUnsignedField("invite_room_state", inviteState); err != nil {
-			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
-		}
-	}
-
-	if !isKnownRoom && isTargetLocal {
-		// The invite came in over federation for a room that we don't know about
-		// yet. We need to handle this a bit differently to most invites because
-		// we don't know the room state, therefore the roomserver can't process
-		// an input event. Instead we will update the membership table with the
-		// new invite and generate an output event.
-		// HACK: Easy to inject this interface
-		return r.ProcessInviteMembership(ctx, inviteEvent)
-	}
-
-	// HACK: Easy to inject this interface
-	req := api.QueryMembershipForUserRequest{
-		RoomID: roomID,
-		UserID: targetUserID,
-	}
-	res := api.QueryMembershipForUserResponse{}
-	err = r.RSAPI.QueryMembershipForUser(ctx, &req, &res)
-	if err != nil {
-		return nil, fmt.Errorf("r.QueryMembershipForUser: %w", err)
-	}
-	isAlreadyJoined := (res.Membership == spec.Join)
-
-	//_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *inviteEvent.StateKey())
-	//if err != nil {
-	//	return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
-	//}
-	if isAlreadyJoined {
-		// If the user is joined to the room then that takes precedence over this
-		// invite event. It makes little sense to move a user that is already
-		// joined to the room into the invite state.
-		// This could plausibly happen if an invite request raced with a join
-		// request for a user. For example if a user was invited to a public
-		// room and they joined the room at the same time as the invite was sent.
-		// The other way this could plausibly happen is if an invite raced with
-		// a kick. For example if a user was kicked from a room in error and in
-		// response someone else in the room re-invited them then it is possible
-		// for the invite request to race with the leave event so that the
-		// target receives invite before it learns that it has been kicked.
-		// There are a few ways this could be plausibly handled in the roomserver.
-		// 1) Store the invite, but mark it as retired. That will result in the
-		//    permanent rejection of that invite event. So even if the target
-		//    user leaves the room and the invite is retransmitted it will be
-		//    ignored. However a new invite with a new event ID would still be
-		//    accepted.
-		// 2) Silently discard the invite event. This means that if the event
-		//    was retransmitted at a later date after the target user had left
-		//    the room we would accept the invite. However since we hadn't told
-		//    the sending server that the invite had been discarded it would
-		//    have no reason to attempt to retry.
-		// 3) Signal the sending server that the user is already joined to the
-		//    room.
-		// For now we will implement option 2. Since in the abesence of a retry
-		// mechanism it will be equivalent to option 1, and we don't have a
-		// signalling mechanism to implement option 3.
-		logger.Debugf("user already joined")
-		return nil, api.ErrNotAllowed{Err: fmt.Errorf("user is already joined to room")}
-	}
-
-	// HACK: Easy to inject this interface
-	return r.ProcessInviteMembership(ctx, inviteEvent)
 }
 
 // nolint:gocyclo
