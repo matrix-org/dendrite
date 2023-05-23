@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -52,7 +51,7 @@ func (r *Inviter) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, er
 
 func (r *Inviter) GenerateInviteStrippedState(
 	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU,
-) ([]fclient.InviteV2StrippedState, error) {
+) ([]gomatrixserverlib.InviteStrippedState, error) {
 	info, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
@@ -73,12 +72,12 @@ func (r *Inviter) GenerateInviteStrippedState(
 		if err != nil {
 			return nil, nil
 		}
-		inviteState := []fclient.InviteV2StrippedState{
-			fclient.NewInviteV2StrippedState(inviteEvent),
+		inviteState := []gomatrixserverlib.InviteStrippedState{
+			gomatrixserverlib.NewInviteStrippedState(inviteEvent),
 		}
 		stateEvents = append(stateEvents, types.Event{PDU: inviteEvent})
 		for _, event := range stateEvents {
-			inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.PDU))
+			inviteState = append(inviteState, gomatrixserverlib.NewInviteStrippedState(event.PDU))
 		}
 		return inviteState, nil
 	}
@@ -269,15 +268,15 @@ func (r *Inviter) PerformInvite(
 }
 
 func (r *Inviter) generateInviteStrippedState(
-	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []fclient.InviteV2StrippedState,
-) (*types.RoomInfo, []fclient.InviteV2StrippedState, error) {
+	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []gomatrixserverlib.InviteStrippedState,
+) (*types.RoomInfo, []gomatrixserverlib.InviteStrippedState, error) {
 	info, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 	strippedState := inviteState
 	if len(strippedState) == 0 && info != nil {
-		var is []fclient.InviteV2StrippedState
+		var is []gomatrixserverlib.InviteStrippedState
 		if is, err = buildInviteStrippedState(ctx, r.DB, info, inviteEvent); err == nil {
 			strippedState = is
 		}
@@ -291,7 +290,7 @@ func buildInviteStrippedState(
 	db storage.Database,
 	info *types.RoomInfo,
 	inviteEvent *types.HeaderedEvent,
-) ([]fclient.InviteV2StrippedState, error) {
+) ([]gomatrixserverlib.InviteStrippedState, error) {
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
 	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
@@ -323,12 +322,12 @@ func buildInviteStrippedState(
 	if err != nil {
 		return nil, err
 	}
-	inviteState := []fclient.InviteV2StrippedState{
-		fclient.NewInviteV2StrippedState(inviteEvent.PDU),
+	inviteState := []gomatrixserverlib.InviteStrippedState{
+		gomatrixserverlib.NewInviteStrippedState(inviteEvent.PDU),
 	}
 	stateEvents = append(stateEvents, types.Event{PDU: inviteEvent.PDU})
 	for _, event := range stateEvents {
-		inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.PDU))
+		inviteState = append(inviteState, gomatrixserverlib.NewInviteStrippedState(event.PDU))
 	}
 	return inviteState, nil
 }

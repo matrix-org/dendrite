@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -237,7 +236,7 @@ type FederationRoomserverAPI interface {
 	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 
 	IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error)
-	GenerateInviteStrippedState(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU) ([]fclient.InviteV2StrippedState, error)
+	GenerateInviteStrippedState(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU) ([]gomatrixserverlib.InviteStrippedState, error)
 }
 
 type KeyserverRoomserverAPI interface {

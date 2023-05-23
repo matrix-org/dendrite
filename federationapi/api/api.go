@@ -190,9 +190,9 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion   `json:"room_version"`
-	Event           *rstypes.HeaderedEvent          `json:"event"`
-	InviteRoomState []fclient.InviteV2StrippedState `json:"invite_room_state"`
+	RoomVersion     gomatrixserverlib.RoomVersion           `json:"room_version"`
+	Event           *rstypes.HeaderedEvent                  `json:"event"`
+	InviteRoomState []gomatrixserverlib.InviteStrippedState `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {

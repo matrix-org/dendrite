@@ -3,7 +3,6 @@ package api
 import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -28,11 +27,11 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion   `json:"room_version"`
-	Event           *types.HeaderedEvent            `json:"event"`
-	InviteRoomState []fclient.InviteV2StrippedState `json:"invite_room_state"`
-	SendAsServer    string                          `json:"send_as_server"`
-	TransactionID   *TransactionID                  `json:"transaction_id"`
+	RoomVersion     gomatrixserverlib.RoomVersion           `json:"room_version"`
+	Event           *types.HeaderedEvent                    `json:"event"`
+	InviteRoomState []gomatrixserverlib.InviteStrippedState `json:"invite_room_state"`
+	SendAsServer    string                                  `json:"send_as_server"`
+	TransactionID   *TransactionID                          `json:"transaction_id"`
 }
 
 type PerformPeekRequest struct {

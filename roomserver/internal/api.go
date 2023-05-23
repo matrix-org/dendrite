@@ -5,7 +5,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -215,7 +214,7 @@ func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.Roo
 
 func (r *RoomserverInternalAPI) GenerateInviteStrippedState(
 	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU,
-) ([]fclient.InviteV2StrippedState, error) {
+) ([]gomatrixserverlib.InviteStrippedState, error) {
 	return r.Inviter.GenerateInviteStrippedState(ctx, roomID, stateWanted, inviteEvent)
 }
 
