@@ -22,11 +22,9 @@ import (
 	"sort"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -131,9 +129,6 @@ const bulkSelectStateAtEventAndReferenceSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id" +
 	" FROM roomserver_events WHERE event_nid = ANY($1)"
 
-const bulkSelectEventReferenceSQL = "" +
-	"SELECT event_id FROM roomserver_events WHERE event_nid = ANY($1)"
-
 const bulkSelectEventIDSQL = "" +
 	"SELECT event_nid, event_id FROM roomserver_events WHERE event_nid = ANY($1)"
 
@@ -165,7 +160,6 @@ type eventStatements struct {
 	updateEventSentToOutputStmt                   *sql.Stmt
 	selectEventIDStmt                             *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
-	bulkSelectEventReferenceStmt                  *sql.Stmt
 	bulkSelectEventIDStmt                         *sql.Stmt
 	bulkSelectEventNIDStmt                        *sql.Stmt
 	bulkSelectUnsentEventNIDStmt                  *sql.Stmt
@@ -206,7 +200,6 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
 		{&s.selectEventIDStmt, selectEventIDSQL},
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
-		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
@@ -462,31 +455,6 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		result.EventNID = types.EventNID(eventNID)
 		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
 		result.EventID = eventID
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	if i != len(eventNIDs) {
-		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
-	}
-	return results, nil
-}
-
-func (s *eventStatements) BulkSelectEventReference(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
-) ([]gomatrixserverlib.EventReference, error) {
-	rows, err := s.bulkSelectEventReferenceStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
-	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
-	i := 0
-	for ; rows.Next(); i++ {
-		result := &results[i]
-		if err = rows.Scan(&result.EventID); err != nil {
-			return nil, err
-		}
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err

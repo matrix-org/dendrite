@@ -134,8 +134,8 @@ func MakeLeave(
 	// TODO: Remove. This ensures we send event references instead of eventIDs
 	switch event.Version() {
 	case gomatrixserverlib.RoomVersionV1, gomatrixserverlib.RoomVersionV2:
-		proto.PrevEvents = gomatrixserverlib.ToEventReferenc(event.PrevEventIDs())
-		proto.AuthEvents = gomatrixserverlib.ToEventReferenc(event.AuthEventIDs())
+		proto.PrevEvents = gomatrixserverlib.ToEventReference(event.PrevEventIDs())
+		proto.AuthEvents = gomatrixserverlib.ToEventReference(event.AuthEventIDs())
 	}
 
 	return util.JSONResponse{

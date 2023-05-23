@@ -11,7 +11,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,7 +47,6 @@ func Test_EventsTable(t *testing.T) {
 		// create some dummy data
 		eventIDs := make([]string, 0, len(room.Events()))
 		wantStateAtEvent := make([]types.StateAtEvent, 0, len(room.Events()))
-		wantEventReferences := make([]gomatrixserverlib.EventReference, 0, len(room.Events()))
 		wantStateAtEventAndRefs := make([]types.StateAtEventAndReference, 0, len(room.Events()))
 		for _, ev := range room.Events() {
 			eventNID, snapNID, err := tab.InsertEvent(ctx, nil, 1, 1, 1, ev.EventID(), nil, ev.Depth(), false)
@@ -75,8 +73,6 @@ func Test_EventsTable(t *testing.T) {
 			assert.True(t, sentToOutput)
 
 			eventIDs = append(eventIDs, ev.EventID())
-			ref := gomatrixserverlib.EventReference{EventID: eventID}
-			wantEventReferences = append(wantEventReferences, ref)
 
 			// Set the stateSnapshot to 2 for some events to verify they are returned later
 			stateSnapshot := 0
@@ -140,10 +136,6 @@ func Test_EventsTable(t *testing.T) {
 			_, ok := nidMap[eventID]
 			assert.True(t, ok)
 		}
-
-		references, err := tab.BulkSelectEventReference(ctx, nil, nids)
-		assert.NoError(t, err)
-		assert.Equal(t, wantEventReferences, references)
 
 		stateAndRefs, err := tab.BulkSelectStateAtEventAndReference(ctx, nil, nids)
 		assert.NoError(t, err)
