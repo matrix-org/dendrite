@@ -50,24 +50,6 @@ func (r *Inviter) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, er
 	return (info != nil && !info.IsStub()), nil
 }
 
-func (r *Inviter) generateInviteStrippedState(
-	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []fclient.InviteV2StrippedState,
-) (*types.RoomInfo, []fclient.InviteV2StrippedState, error) {
-	info, err := r.DB.RoomInfo(ctx, roomID.String())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load RoomInfo: %w", err)
-	}
-	strippedState := inviteState
-	if len(strippedState) == 0 && info != nil {
-		var is []fclient.InviteV2StrippedState
-		if is, err = buildInviteStrippedState(ctx, r.DB, info, inviteEvent); err == nil {
-			strippedState = is
-		}
-	}
-
-	return info, strippedState, nil
-}
-
 func (r *Inviter) GenerateInviteStrippedState(
 	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU,
 ) ([]fclient.InviteV2StrippedState, error) {
@@ -284,6 +266,24 @@ func (r *Inviter) PerformInvite(
 	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
 	// gets the invite, as the roomserver will do this when it processes the m.room.member invite.
 	return outputUpdates, nil
+}
+
+func (r *Inviter) generateInviteStrippedState(
+	ctx context.Context, roomID spec.RoomID, inviteEvent *types.HeaderedEvent, inviteState []fclient.InviteV2StrippedState,
+) (*types.RoomInfo, []fclient.InviteV2StrippedState, error) {
+	info, err := r.DB.RoomInfo(ctx, roomID.String())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load RoomInfo: %w", err)
+	}
+	strippedState := inviteState
+	if len(strippedState) == 0 && info != nil {
+		var is []fclient.InviteV2StrippedState
+		if is, err = buildInviteStrippedState(ctx, r.DB, info, inviteEvent); err == nil {
+			strippedState = is
+		}
+	}
+
+	return info, strippedState, nil
 }
 
 func buildInviteStrippedState(
