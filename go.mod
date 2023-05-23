@@ -146,5 +146,3 @@ require (
 )
 
 go 1.18
-
-replace github.com/matrix-org/gomatrixserverlib => ../gomatrixserverlib
