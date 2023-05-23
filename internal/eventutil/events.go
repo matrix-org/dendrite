@@ -129,18 +129,12 @@ func addPrevEventsToEvent(
 		return ErrRoomNoExists{}
 	}
 
-	verImpl, err := gomatrixserverlib.GetRoomVersion(queryRes.RoomVersion)
-	if err != nil {
-		return fmt.Errorf("GetRoomVersion: %w", err)
-	}
-	eventFormat := verImpl.EventFormat()
-
 	builder.Depth = queryRes.Depth
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(queryRes.StateEvents[i].PDU)
+		err := authEvents.AddEvent(queryRes.StateEvents[i].PDU)
 		if err != nil {
 			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
@@ -151,22 +145,7 @@ func addPrevEventsToEvent(
 		return fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
 	}
 
-	truncAuth, truncPrev := truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
-	switch eventFormat {
-	case gomatrixserverlib.EventFormatV1:
-		builder.AuthEvents = truncAuth
-		builder.PrevEvents = truncPrev
-	case gomatrixserverlib.EventFormatV2:
-		v2AuthRefs, v2PrevRefs := []string{}, []string{}
-		for _, ref := range truncAuth {
-			v2AuthRefs = append(v2AuthRefs, ref.EventID)
-		}
-		for _, ref := range truncPrev {
-			v2PrevRefs = append(v2PrevRefs, ref.EventID)
-		}
-		builder.AuthEvents = v2AuthRefs
-		builder.PrevEvents = v2PrevRefs
-	}
+	builder.AuthEvents, builder.PrevEvents = truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
 
 	return nil
 }
@@ -176,8 +155,8 @@ func addPrevEventsToEvent(
 // NOTSPEC: The limits here feel a bit arbitrary but they are currently
 // here because of https://github.com/matrix-org/matrix-doc/issues/2307
 // and because Synapse will just drop events that don't comply.
-func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
-	truncAuth, truncPrev []gomatrixserverlib.EventReference,
+func truncateAuthAndPrevEvents(auth, prev []string) (
+	truncAuth, truncPrev []string,
 ) {
 	truncAuth, truncPrev = auth, prev
 	if len(truncAuth) > 10 {

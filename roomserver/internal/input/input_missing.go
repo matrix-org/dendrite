@@ -520,9 +520,9 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 		return nil, false, false, fmt.Errorf("t.DB.LatestEventIDs: %w", err)
 	}
 	latestEvents := make([]string, len(latest))
-	for i, ev := range latest {
-		latestEvents[i] = ev.EventID
-		t.hadEvent(ev.EventID)
+	for i := range latest {
+		latestEvents[i] = latest[i]
+		t.hadEvent(latest[i])
 	}
 
 	var missingResp *fclient.RespMissingEvents

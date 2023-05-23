@@ -398,21 +398,22 @@ func (d *EventDatabase) eventsFromIDs(ctx context.Context, txn *sql.Tx, roomInfo
 	return d.events(ctx, txn, roomInfo.RoomVersion, nids)
 }
 
-func (d *Database) LatestEventIDs(
-	ctx context.Context, roomNID types.RoomNID,
-) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
+func (d *Database) LatestEventIDs(ctx context.Context, roomNID types.RoomNID) (references []string, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
 	var eventNIDs []types.EventNID
 	eventNIDs, currentStateSnapshotNID, err = d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {
 		return
 	}
-	references, err = d.EventsTable.BulkSelectEventReference(ctx, nil, eventNIDs)
+	eventNIDMap, err := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
 	if err != nil {
 		return
 	}
 	depth, err = d.EventsTable.SelectMaxEventDepth(ctx, nil, eventNIDs)
 	if err != nil {
 		return
+	}
+	for _, eventID := range eventNIDMap {
+		references = append(references, eventID)
 	}
 	return
 }

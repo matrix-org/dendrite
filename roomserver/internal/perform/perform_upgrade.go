@@ -471,7 +471,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			return fmt.Errorf("failed to set content of new %q event: %w", proto.Type, err)
 		}
 		if i > 0 {
-			proto.PrevEvents = []gomatrixserverlib.EventReference{{EventID: builtEvents[i-1].EventID(), EventSHA256: spec.Base64FromEventID(builtEvents[i-1].EventID())}}
+			proto.PrevEvents = []string{builtEvents[i-1].EventID()}
 		}
 
 		var verImpl gomatrixserverlib.IRoomVersion

@@ -75,7 +75,7 @@ func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 	return r
 }
 
-func (r *Room) MustGetAuthEventRefsForEvent(t *testing.T, needed gomatrixserverlib.StateNeeded) []gomatrixserverlib.EventReference {
+func (r *Room) MustGetAuthEventRefsForEvent(t *testing.T, needed gomatrixserverlib.StateNeeded) []string {
 	t.Helper()
 	a, err := needed.AuthEventReferences(&r.authEvents)
 	if err != nil {
@@ -176,7 +176,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 		t.Fatalf("CreateEvent[%s]: failed to SetContent: %s", eventType, err)
 	}
 	if depth > 1 {
-		builder.PrevEvents = []gomatrixserverlib.EventReference{{EventSHA256: spec.Base64FromEventID(r.events[len(r.events)-1].EventID()), EventID: r.events[len(r.events)-1].EventID()}}
+		builder.PrevEvents = []string{r.events[len(r.events)-1].EventID()}
 	}
 
 	err = builder.AddAuthEvents(&r.authEvents)
