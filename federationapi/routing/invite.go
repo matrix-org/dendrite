@@ -61,17 +61,17 @@ func InviteV2(
 			}
 		}
 
-		invitedUser, err := spec.NewUserID(*inviteReq.Event().StateKey(), true)
-		if err != nil {
+		invitedUser, userErr := spec.NewUserID(*inviteReq.Event().StateKey(), true)
+		if userErr != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: spec.InvalidParam(fmt.Sprintf("The user ID is invalid")),
+				JSON: spec.InvalidParam("The user ID is invalid"),
 			}
 		}
 		if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: spec.InvalidParam(fmt.Sprintf("The invited user domain does not belong to this server")),
+				JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
 			}
 		}
 
@@ -134,7 +134,7 @@ func InviteV1(
 		}
 	}
 	var strippedState []gomatrixserverlib.InviteStrippedState
-	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
+	if jsonErr := json.Unmarshal(event.Unsigned(), &strippedState); jsonErr != nil {
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}
@@ -150,13 +150,13 @@ func InviteV1(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.InvalidParam(fmt.Sprintf("The user ID is invalid")),
+			JSON: spec.InvalidParam("The user ID is invalid"),
 		}
 	}
 	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.InvalidParam(fmt.Sprintf("The invited user domain does not belong to this server")),
+			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
 		}
 	}
 
