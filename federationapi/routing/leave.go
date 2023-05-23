@@ -101,13 +101,13 @@ func MakeLeave(
 	switch e := internalErr.(type) {
 	case nil:
 	case spec.InternalServerError:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -123,7 +123,7 @@ func MakeLeave(
 			JSON: e,
 		}
 	default:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
