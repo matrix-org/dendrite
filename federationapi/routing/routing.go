@@ -412,7 +412,7 @@ func Setup(
 		},
 	)).Methods(http.MethodPut)
 
-	v1fedmux.Handle("/make_leave/{roomID}/{eventID}", MakeFedAPI(
+	v1fedmux.Handle("/make_leave/{roomID}/{userID}", MakeFedAPI(
 		"federation_make_leave", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
@@ -421,10 +421,22 @@ func Setup(
 					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
-			roomID := vars["roomID"]
-			eventID := vars["eventID"]
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
+			userID, err := spec.NewUserID(vars["userID"], true)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid UserID"),
+				}
+			}
 			return MakeLeave(
-				httpReq, request, cfg, rsAPI, roomID, eventID,
+				httpReq, request, cfg, rsAPI, *roomID, *userID,
 			)
 		},
 	)).Methods(http.MethodGet)
