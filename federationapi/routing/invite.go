@@ -91,7 +91,7 @@ func InviteV2(
 			StrippedState:         inviteReq.InviteRoomState(),
 		}
 		event, jsonErr := handleInvite(input, rsAPI)
-		if err != nil {
+		if jsonErr != nil {
 			return *jsonErr
 		}
 		return util.JSONResponse{
@@ -176,7 +176,7 @@ func InviteV1(
 		StrippedState:         strippedState,
 	}
 	event, jsonErr := handleInvite(input, rsAPI)
-	if err != nil {
+	if jsonErr != nil {
 		return *jsonErr
 	}
 	return util.JSONResponse{
