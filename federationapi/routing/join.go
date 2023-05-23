@@ -99,7 +99,7 @@ func MakeJoin(
 	}
 
 	req := api.QueryServerJoinedToRoomRequest{
-		ServerName: cfg.Matrix.ServerName,
+		ServerName: request.Destination(),
 		RoomID:     roomID.String(),
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
