@@ -158,10 +158,10 @@ func (r *Inviter) PerformInvite(
 				StateKey:  "",
 			})
 		}
-		if is, err := r.GenerateInviteStrippedState(ctx, *validRoomID, stateWanted, req.Event); err == nil {
+		if is, generateErr := r.GenerateInviteStrippedState(ctx, *validRoomID, stateWanted, req.Event); generateErr == nil {
 			inviteState = is
 		} else {
-			util.GetLogger(ctx).WithError(err).Error("failed querying known room")
+			util.GetLogger(ctx).WithError(generateErr).Error("failed querying known room")
 			return nil, spec.InternalServerError{}
 		}
 	}
@@ -241,6 +241,7 @@ func (r *Inviter) PerformInvite(
 		)
 		return nil, api.ErrNotAllowed{Err: err}
 	}
+	// TODO: Move everything above here to gmsl (including fed call?)
 
 	// If the invite originated from us and the target isn't local then we
 	// should try and send the invite over federation first. It might be
