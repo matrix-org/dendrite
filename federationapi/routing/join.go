@@ -99,7 +99,7 @@ func MakeJoin(
 	}
 
 	req := api.QueryServerJoinedToRoomRequest{
-		ServerName: cfg.Matrix.ServerName,
+		ServerName: request.Destination(),
 		RoomID:     roomID.String(),
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
@@ -162,13 +162,13 @@ func MakeJoin(
 	switch e := internalErr.(type) {
 	case nil:
 	case spec.InternalServerError:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_join request")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_join request")
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -186,13 +186,13 @@ func MakeJoin(
 			JSON: e,
 		}
 	case spec.IncompatibleRoomVersionError:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_join request")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: e,
 		}
 	default:
-		util.GetLogger(httpReq.Context()).WithError(internalErr)
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_join request")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
