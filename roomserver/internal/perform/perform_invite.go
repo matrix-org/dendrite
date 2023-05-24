@@ -110,40 +110,114 @@ func (r *Inviter) ProcessInviteMembership(
 	return outputUpdates, nil
 }
 
+type QueryState struct {
+	storage.Database
+}
+
+func (q *QueryState) GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error) {
+	return helpers.GetAuthEvents(ctx, q.Database, event.Version(), event, event.AuthEventIDs())
+}
+
 // nolint:gocyclo
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-) ([]api.OutputEvent, error) {
-	var outputUpdates []api.OutputEvent
+) error {
 	event := req.Event
+
+	sender, err := spec.NewUserID(event.Sender(), true)
+	if err != nil {
+		return spec.InvalidParam("The user ID is invalid")
+	}
+	if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
+		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
+	}
+
 	if event.StateKey() == nil {
-		return nil, fmt.Errorf("invite must be a state event")
+		return fmt.Errorf("invite must be a state event")
 	}
-	_, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender())
+	invitedUser, err := spec.NewUserID(*event.StateKey(), true)
 	if err != nil {
-		return nil, fmt.Errorf("sender %q is invalid", event.Sender())
+		return spec.InvalidParam("The user ID is invalid")
 	}
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
 
-	roomID := event.RoomID()
-	targetUserID := *event.StateKey()
-
-	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
+	validRoomID, err := spec.NewRoomID(event.RoomID())
 	if err != nil {
-		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", targetUserID)}
-	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
-	isOriginLocal := r.Cfg.Matrix.IsLocalServerName(senderDomain)
-	if !isOriginLocal {
-		return nil, api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
+		return err
 	}
 
-	validRoomID, err := spec.NewRoomID(roomID)
+	input := PerformInviteInput{
+		Context:               ctx,
+		RoomID:                *validRoomID,
+		Event:                 event.PDU,
+		InvitedUser:           *invitedUser,
+		IsTargetLocal:         isTargetLocal,
+		StrippedState:         req.InviteRoomState,
+		MembershipQuerier:     &api.MembershipQuerier{Roomserver: r.RSAPI},
+		StateQuerier:          &QueryState{r.DB},
+		GenerateStrippedState: r.GenerateInviteStrippedState,
+	}
+	inviteEvent, err := PerformInvite(input, r.FSAPI)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	inviteState := req.InviteRoomState
+	// Use the returned event if there was one (due to federation), otherwise
+	// send the original invite event to the roomserver.
+	if inviteEvent == nil {
+		inviteEvent = event
+	}
+
+	// Send the invite event to the roomserver input stream. This will
+	// notify existing users in the room about the invite, update the
+	// membership table and ensure that the event is ready and available
+	// to use as an auth event when accepting the invite.
+	// It will NOT notify the invitee of this invite.
+	inputReq := &api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{
+			{
+				Kind:         api.KindNew,
+				Event:        &types.HeaderedEvent{PDU: inviteEvent},
+				Origin:       sender.Domain(),
+				SendAsServer: req.SendAsServer,
+			},
+		},
+	}
+	inputRes := &api.InputRoomEventsResponse{}
+	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+	if err := inputRes.Err(); err != nil {
+		util.GetLogger(ctx).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		return api.ErrNotAllowed{Err: err}
+	}
+
+	return nil
+}
+
+// TODO: Move to gmsl
+
+type StateQuerier interface {
+	GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error)
+}
+
+type PerformInviteInput struct {
+	Context               context.Context
+	RoomID                spec.RoomID
+	Event                 gomatrixserverlib.PDU
+	InvitedUser           spec.UserID
+	IsTargetLocal         bool
+	StrippedState         []gomatrixserverlib.InviteStrippedState
+	MembershipQuerier     gomatrixserverlib.MembershipQuerier
+	StateQuerier          StateQuerier
+	GenerateStrippedState func(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU) ([]gomatrixserverlib.InviteStrippedState, error)
+}
+
+type FederatedInviteClient interface {
+	SendInvite(ctx context.Context, event gomatrixserverlib.PDU, strippedState []gomatrixserverlib.InviteStrippedState) (gomatrixserverlib.PDU, error)
+}
+
+func PerformInvite(input PerformInviteInput, fedClient FederatedInviteClient) (gomatrixserverlib.PDU, error) {
+	inviteState := input.StrippedState
 	if len(inviteState) == 0 {
 		// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 		// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
@@ -158,47 +232,45 @@ func (r *Inviter) PerformInvite(
 				StateKey:  "",
 			})
 		}
-		if is, generateErr := r.GenerateInviteStrippedState(ctx, *validRoomID, stateWanted, req.Event); generateErr == nil {
+		if is, generateErr := input.GenerateStrippedState(input.Context, input.RoomID, stateWanted, input.Event); generateErr == nil {
 			inviteState = is
 		} else {
-			util.GetLogger(ctx).WithError(generateErr).Error("failed querying known room")
+			util.GetLogger(input.Context).WithError(generateErr).Error("failed querying known room")
 			return nil, spec.InternalServerError{}
 		}
 	}
 
-	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
-		"inviter":  event.Sender(),
-		"invitee":  *event.StateKey(),
-		"room_id":  roomID,
-		"event_id": event.EventID(),
+	logger := util.GetLogger(input.Context).WithFields(map[string]interface{}{
+		"inviter":  input.Event.Sender(),
+		"invitee":  *input.Event.StateKey(),
+		"room_id":  input.RoomID.String(),
+		"event_id": input.Event.EventID(),
 	})
 	logger.WithFields(log.Fields{
-		"room_version": req.RoomVersion,
-		"target_local": isTargetLocal,
+		"room_version": input.Event.Version(),
+		"target_local": input.IsTargetLocal,
 		"origin_local": true,
 	}).Debug("processing invite event")
 
 	if len(inviteState) == 0 {
-		if err = event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
+		if err := input.Event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
 			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	} else {
-		if err = event.SetUnsignedField("invite_room_state", inviteState); err != nil {
+		if err := input.Event.SetUnsignedField("invite_room_state", inviteState); err != nil {
 			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	}
 
-	membershipReq := api.QueryMembershipForUserRequest{
-		RoomID: validRoomID.String(),
-		UserID: *event.StateKey(),
-	}
-	res := api.QueryMembershipForUserResponse{}
-	err = r.RSAPI.QueryMembershipForUser(ctx, &membershipReq, &res)
-
+	membership, err := input.MembershipQuerier.CurrentMembership(input.Context, input.RoomID, input.InvitedUser)
 	if err != nil {
-		return nil, fmt.Errorf("r.RSAPI.QueryMembershipForUser: %w", err)
+		util.GetLogger(input.Context).WithError(err).Error("failed getting user membership")
+		return nil, spec.InternalServerError{}
+
 	}
-	if res.Membership == spec.Join {
+	isAlreadyJoined := (membership == spec.Join)
+
+	if isAlreadyJoined {
 		// If the user is joined to the room then that takes precedence over this
 		// invite event. It makes little sense to move a user that is already
 		// joined to the room into the invite state.
@@ -234,57 +306,34 @@ func (r *Inviter) PerformInvite(
 	// try and see if the user is allowed to make this invite. We can't do
 	// this for invites coming in over federation - we have to take those on
 	// trust.
-	_, err = helpers.CheckAuthEvents(ctx, r.DB, req.RoomVersion, event, event.AuthEventIDs())
+	authEventProvider, err := input.StateQuerier.GetAuthEvents(input.Context, input.Event)
 	if err != nil {
-		logger.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
-			"ProcessInviteEvent.checkAuthEvents failed for event",
+		logger.WithError(err).WithField("event_id", input.Event.EventID()).WithField("auth_event_ids", input.Event.AuthEventIDs()).Error(
+			"ProcessInvite.getAuthEvents failed for event",
 		)
 		return nil, api.ErrNotAllowed{Err: err}
 	}
-	// TODO: Move everything above here to gmsl (including fed call?)
 
-	// If the invite originated from us and the target isn't local then we
-	// should try and send the invite over federation first. It might be
-	// that the remote user doesn't exist, in which case we can give up
-	// processing here.
-	if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
-		fsReq := &federationAPI.PerformInviteRequest{
-			RoomVersion:     req.RoomVersion,
-			Event:           event,
-			InviteRoomState: inviteState,
-		}
-		fsRes := &federationAPI.PerformInviteResponse{}
-		if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
-			logger.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
-			return nil, api.ErrNotAllowed{Err: err}
-		}
-		event = fsRes.Event
-		logger.Debugf("Federated PerformInvite success with event ID %s", event.EventID())
-	}
-
-	// Send the invite event to the roomserver input stream. This will
-	// notify existing users in the room about the invite, update the
-	// membership table and ensure that the event is ready and available
-	// to use as an auth event when accepting the invite.
-	// It will NOT notify the invitee of this invite.
-	inputReq := &api.InputRoomEventsRequest{
-		InputRoomEvents: []api.InputRoomEvent{
-			{
-				Kind:         api.KindNew,
-				Event:        event,
-				Origin:       senderDomain,
-				SendAsServer: req.SendAsServer,
-			},
-		},
-	}
-	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
-	if err = inputRes.Err(); err != nil {
-		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+	// Check if the event is allowed.
+	if err = gomatrixserverlib.Allowed(input.Event, authEventProvider); err != nil {
+		logger.WithError(err).WithField("event_id", input.Event.EventID()).WithField("auth_event_ids", input.Event.AuthEventIDs()).Error(
+			"ProcessInvite: event not allowed",
+		)
 		return nil, api.ErrNotAllowed{Err: err}
 	}
 
-	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
-	// gets the invite, as the roomserver will do this when it processes the m.room.member invite.
-	return outputUpdates, nil
+	// If the target isn't local then we should try and send the invite
+	// over federation first. It might be that the remote user doesn't exist,
+	// in which case we can give up processing here.
+	var inviteEvent gomatrixserverlib.PDU
+	if !input.IsTargetLocal {
+		inviteEvent, err = fedClient.SendInvite(input.Context, input.Event, inviteState)
+		if err != nil {
+			logger.WithError(err).WithField("event_id", input.Event.EventID()).Error("fedClient.SendInvite failed")
+			return nil, api.ErrNotAllowed{Err: err}
+		}
+		logger.Debugf("Federated SendInvite success with event ID %s", input.Event.EventID())
+	}
+
+	return inviteEvent, nil
 }

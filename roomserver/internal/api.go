@@ -232,11 +232,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 ) error {
-	outputEvents, err := r.Inviter.PerformInvite(ctx, req)
-	if err != nil {
-		return err
-	}
-	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
+	return r.Inviter.PerformInvite(ctx, req)
 }
 
 func (r *RoomserverInternalAPI) PerformLeave(

@@ -17,6 +17,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -456,4 +457,23 @@ type QueryLeftUsersRequest struct {
 // QueryLeftUsersResponse is the response to QueryLeftUsersRequest.
 type QueryLeftUsersResponse struct {
 	LeftUsers []string `json:"user_ids"`
+}
+
+type MembershipQuerier struct {
+	Roomserver FederationRoomserverAPI
+}
+
+func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error) {
+	req := QueryMembershipForUserRequest{
+		RoomID: roomID.String(),
+		UserID: userID.String(),
+	}
+	res := QueryMembershipForUserResponse{}
+	err := mq.Roomserver.QueryMembershipForUser(ctx, &req, &res)
+
+	membership := ""
+	if err == nil {
+		membership = res.Membership
+	}
+	return membership, err
 }
