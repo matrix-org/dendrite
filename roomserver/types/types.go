@@ -200,7 +200,7 @@ func (s StateAtEvent) IsStateEvent() bool {
 // The StateAtEvent is used to construct the current state of the room from the latest events.
 type StateAtEventAndReference struct {
 	StateAtEvent
-	gomatrixserverlib.EventReference
+	EventID string
 }
 
 type StateAtEventAndReferences []StateAtEventAndReference

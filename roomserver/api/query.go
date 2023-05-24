@@ -49,7 +49,7 @@ type QueryLatestEventsAndStateResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room.
 	// These are used to set the prev_events when sending an event.
-	LatestEvents []gomatrixserverlib.EventReference `json:"latest_events"`
+	LatestEvents []string `json:"latest_events"`
 	// The state events requested.
 	// This list will be in an arbitrary order.
 	// These are used to set the auth_events when sending an event.

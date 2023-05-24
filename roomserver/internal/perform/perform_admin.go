@@ -131,9 +131,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			SendAsServer: string(senderDomain),
 		})
 		affected = append(affected, stateKey)
-		prevEvents = []gomatrixserverlib.EventReference{
-			event.EventReference(),
-		}
+		prevEvents = []string{event.EventID()}
 	}
 
 	inputReq := &api.InputRoomEventsRequest{
@@ -253,9 +251,9 @@ func (r *Admin) PerformAdminDownloadState(
 
 	for _, fwdExtremity := range fwdExtremities {
 		var state gomatrixserverlib.StateResponse
-		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, serverName, roomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, serverName, roomID, fwdExtremity, roomInfo.RoomVersion)
 		if err != nil {
-			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity.EventID, err)
+			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity, err)
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing); err != nil {
