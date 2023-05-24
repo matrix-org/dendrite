@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/sirupsen/logrus"
 )
 
 // TODO: previous_reference_sha256 was NOT NULL before but it broke sytest because
@@ -97,11 +96,7 @@ func CreatePrevEventsTable(db *sql.DB) error {
 			Up:      deltas.UpDropEventReferenceSHAPrevEvents,
 		},
 	}...)
-	logrus.Infof("cName: %s", cName)
-	if err := m.Up(context.Background()); err != nil {
-		panic(err)
-	}
-	return nil
+	return m.Up(context.Background())
 }
 
 func PreparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
