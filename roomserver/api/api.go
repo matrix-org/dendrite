@@ -236,7 +236,7 @@ type FederationRoomserverAPI interface {
 	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 
 	IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error)
-	GenerateInviteStrippedState(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU) ([]gomatrixserverlib.InviteStrippedState, error)
+	StateQuerier() gomatrixserverlib.StateQuerier
 }
 
 type KeyserverRoomserverAPI interface {

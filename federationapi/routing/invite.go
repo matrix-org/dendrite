@@ -76,19 +76,19 @@ func InviteV2(
 		}
 
 		input := gomatrixserverlib.HandleInviteInput{
-			Context:               httpReq.Context(),
-			RoomVersion:           inviteReq.RoomVersion(),
-			RoomID:                roomID,
-			EventID:               eventID,
-			InvitedUser:           *invitedUser,
-			KeyID:                 cfg.Matrix.KeyID,
-			PrivateKey:            cfg.Matrix.PrivateKey,
-			Verifier:              keys,
-			InviteQuerier:         rsAPI,
-			MembershipQuerier:     &api.MembershipQuerier{Roomserver: rsAPI},
-			GenerateStrippedState: rsAPI.GenerateInviteStrippedState,
-			InviteEvent:           inviteReq.Event(),
-			StrippedState:         inviteReq.InviteRoomState(),
+			Context:           httpReq.Context(),
+			RoomVersion:       inviteReq.RoomVersion(),
+			RoomID:            roomID,
+			EventID:           eventID,
+			InvitedUser:       *invitedUser,
+			KeyID:             cfg.Matrix.KeyID,
+			PrivateKey:        cfg.Matrix.PrivateKey,
+			Verifier:          keys,
+			InviteQuerier:     rsAPI,
+			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+			StateQuerier:      rsAPI.StateQuerier(),
+			InviteEvent:       inviteReq.Event(),
+			StrippedState:     inviteReq.InviteRoomState(),
 		}
 		event, jsonErr := handleInvite(input, rsAPI)
 		if jsonErr != nil {
@@ -161,19 +161,19 @@ func InviteV1(
 	}
 
 	input := gomatrixserverlib.HandleInviteInput{
-		Context:               httpReq.Context(),
-		RoomVersion:           roomVer,
-		RoomID:                roomID,
-		EventID:               eventID,
-		InvitedUser:           *invitedUser,
-		KeyID:                 cfg.Matrix.KeyID,
-		PrivateKey:            cfg.Matrix.PrivateKey,
-		Verifier:              keys,
-		InviteQuerier:         rsAPI,
-		MembershipQuerier:     &api.MembershipQuerier{Roomserver: rsAPI},
-		GenerateStrippedState: rsAPI.GenerateInviteStrippedState,
-		InviteEvent:           event,
-		StrippedState:         strippedState,
+		Context:           httpReq.Context(),
+		RoomVersion:       roomVer,
+		RoomID:            roomID,
+		EventID:           eventID,
+		InvitedUser:       *invitedUser,
+		KeyID:             cfg.Matrix.KeyID,
+		PrivateKey:        cfg.Matrix.PrivateKey,
+		Verifier:          keys,
+		InviteQuerier:     rsAPI,
+		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+		StateQuerier:      rsAPI.StateQuerier(),
+		InviteEvent:       event,
+		StrippedState:     strippedState,
 	}
 	event, jsonErr := handleInvite(input, rsAPI)
 	if jsonErr != nil {

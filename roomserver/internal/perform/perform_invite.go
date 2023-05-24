@@ -32,6 +32,47 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type QueryState struct {
+	storage.Database
+}
+
+func (q *QueryState) GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error) {
+	return helpers.GetAuthEvents(ctx, q.Database, event.Version(), event, event.AuthEventIDs())
+}
+
+func (q *QueryState) GetState(ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple) ([]gomatrixserverlib.PDU, error) {
+	info, err := q.Database.RoomInfo(ctx, roomID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
+	}
+	if info != nil {
+		roomState := state.NewStateResolution(q.Database, info)
+		stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
+			ctx, info.StateSnapshotNID(), stateWanted,
+		)
+		if err != nil {
+			return nil, nil
+		}
+		stateNIDs := []types.EventNID{}
+		for _, stateNID := range stateEntries {
+			stateNIDs = append(stateNIDs, stateNID.EventNID)
+		}
+		stateEvents, err := q.Database.Events(ctx, info.RoomVersion, stateNIDs)
+		if err != nil {
+			// TODO: really? no err?
+			return nil, nil
+		}
+
+		events := []gomatrixserverlib.PDU{}
+		for _, event := range stateEvents {
+			events = append(events, event.PDU)
+		}
+		return events, nil
+	}
+
+	return nil, nil
+}
+
 type Inviter struct {
 	DB      storage.Database
 	Cfg     *config.RoomServer
@@ -48,39 +89,8 @@ func (r *Inviter) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, er
 	return (info != nil && !info.IsStub()), nil
 }
 
-func (r *Inviter) GenerateInviteStrippedState(
-	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU,
-) ([]gomatrixserverlib.InviteStrippedState, error) {
-	info, err := r.DB.RoomInfo(ctx, roomID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
-	}
-	if info != nil {
-		roomState := state.NewStateResolution(r.DB, info)
-		stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
-			ctx, info.StateSnapshotNID(), stateWanted,
-		)
-		if err != nil {
-			return nil, nil
-		}
-		stateNIDs := []types.EventNID{}
-		for _, stateNID := range stateEntries {
-			stateNIDs = append(stateNIDs, stateNID.EventNID)
-		}
-		stateEvents, err := r.DB.Events(ctx, info.RoomVersion, stateNIDs)
-		if err != nil {
-			return nil, nil
-		}
-		inviteState := []gomatrixserverlib.InviteStrippedState{
-			gomatrixserverlib.NewInviteStrippedState(inviteEvent),
-		}
-		stateEvents = append(stateEvents, types.Event{PDU: inviteEvent})
-		for _, event := range stateEvents {
-			inviteState = append(inviteState, gomatrixserverlib.NewInviteStrippedState(event.PDU))
-		}
-		return inviteState, nil
-	}
-	return nil, nil
+func (r *Inviter) StateQuerier() gomatrixserverlib.StateQuerier {
+	return &QueryState{Database: r.DB}
 }
 
 func (r *Inviter) ProcessInviteMembership(
@@ -107,14 +117,6 @@ func (r *Inviter) ProcessInviteMembership(
 		return nil, fmt.Errorf("updater.Commit: %w", err)
 	}
 	return outputUpdates, nil
-}
-
-type QueryState struct {
-	storage.Database
-}
-
-func (q *QueryState) GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error) {
-	return helpers.GetAuthEvents(ctx, q.Database, event.Version(), event, event.AuthEventIDs())
 }
 
 // nolint:gocyclo
@@ -147,15 +149,14 @@ func (r *Inviter) PerformInvite(
 	}
 
 	input := gomatrixserverlib.PerformInviteInput{
-		Context:               ctx,
-		RoomID:                *validRoomID,
-		Event:                 event.PDU,
-		InvitedUser:           *invitedUser,
-		IsTargetLocal:         isTargetLocal,
-		StrippedState:         req.InviteRoomState,
-		MembershipQuerier:     &api.MembershipQuerier{Roomserver: r.RSAPI},
-		StateQuerier:          &QueryState{r.DB},
-		GenerateStrippedState: r.GenerateInviteStrippedState,
+		Context:           ctx,
+		RoomID:            *validRoomID,
+		Event:             event.PDU,
+		InvitedUser:       *invitedUser,
+		IsTargetLocal:     isTargetLocal,
+		StrippedState:     req.InviteRoomState,
+		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
+		StateQuerier:      &QueryState{r.DB},
 	}
 	inviteEvent, err := gomatrixserverlib.PerformInvite(input, r.FSAPI)
 	if err != nil {

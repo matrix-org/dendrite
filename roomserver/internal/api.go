@@ -212,10 +212,8 @@ func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.Roo
 	return r.Inviter.IsKnownRoom(ctx, roomID)
 }
 
-func (r *RoomserverInternalAPI) GenerateInviteStrippedState(
-	ctx context.Context, roomID spec.RoomID, stateWanted []gomatrixserverlib.StateKeyTuple, inviteEvent gomatrixserverlib.PDU,
-) ([]gomatrixserverlib.InviteStrippedState, error) {
-	return r.Inviter.GenerateInviteStrippedState(ctx, roomID, stateWanted, inviteEvent)
+func (r *RoomserverInternalAPI) StateQuerier() gomatrixserverlib.StateQuerier {
+	return r.Inviter.StateQuerier()
 }
 
 func (r *RoomserverInternalAPI) HandleInvite(
