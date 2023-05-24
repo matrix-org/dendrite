@@ -55,6 +55,30 @@ func (r *Queryer) QueryLatestEventsAndState(
 	return helpers.QueryLatestEventsAndState(ctx, r.DB, request, response)
 }
 
+func (r *Queryer) LatestState(
+	ctx context.Context, roomID spec.RoomID, userID spec.UserID,
+) ([]gomatrixserverlib.PDU, error) {
+	request := &api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID.String(),
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{
+			{
+				EventType: spec.MRoomMember,
+				StateKey:  userID.String(),
+			},
+		},
+	}
+	response := &api.QueryLatestEventsAndStateResponse{}
+	err := helpers.QueryLatestEventsAndState(ctx, r.DB, request, response)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]gomatrixserverlib.PDU, 0, len(response.StateEvents))
+	for _, ev := range response.StateEvents {
+		res = append(res, ev.PDU)
+	}
+	return res, nil
+}
+
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
 func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
