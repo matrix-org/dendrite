@@ -43,16 +43,9 @@ func createEventDB() *getEventDB {
 
 // Adds a fake event to the storage with given auth events.
 func (db *getEventDB) addFakeEvent(eventID string, authIDs []string) error {
-	authEvents := []gomatrixserverlib.EventReference{}
-	for _, authID := range authIDs {
-		authEvents = append(authEvents, gomatrixserverlib.EventReference{
-			EventID: authID,
-		})
-	}
-
 	builder := map[string]interface{}{
 		"event_id":    eventID,
-		"auth_events": authEvents,
+		"auth_events": authIDs,
 	}
 
 	eventJSON, err := json.Marshal(&builder)
