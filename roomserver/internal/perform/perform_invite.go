@@ -149,7 +149,7 @@ func (r *Inviter) PerformInvite(
 
 	input := gomatrixserverlib.PerformInviteInput{
 		RoomID:            *validRoomID,
-		Event:             event.PDU,
+		InviteEvent:       event.PDU,
 		InvitedUser:       *invitedUser,
 		IsTargetLocal:     isTargetLocal,
 		StrippedState:     req.InviteRoomState,
