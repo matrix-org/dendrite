@@ -149,7 +149,6 @@ func (r *Inviter) PerformInvite(
 	}
 
 	input := gomatrixserverlib.PerformInviteInput{
-		Context:           ctx,
 		RoomID:            *validRoomID,
 		Event:             event.PDU,
 		InvitedUser:       *invitedUser,
@@ -158,7 +157,7 @@ func (r *Inviter) PerformInvite(
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB},
 	}
-	inviteEvent, err := gomatrixserverlib.PerformInvite(input, r.FSAPI)
+	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
 	if err != nil {
 		switch e := err.(type) {
 		case spec.MatrixError:

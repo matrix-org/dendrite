@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -76,7 +77,6 @@ func InviteV2(
 		}
 
 		input := gomatrixserverlib.HandleInviteInput{
-			Context:           httpReq.Context(),
 			RoomVersion:       inviteReq.RoomVersion(),
 			RoomID:            roomID,
 			EventID:           eventID,
@@ -90,7 +90,7 @@ func InviteV2(
 			InviteEvent:       inviteReq.Event(),
 			StrippedState:     inviteReq.InviteRoomState(),
 		}
-		event, jsonErr := handleInvite(input, rsAPI)
+		event, jsonErr := handleInvite(httpReq.Context(), input, rsAPI)
 		if jsonErr != nil {
 			return *jsonErr
 		}
@@ -161,7 +161,6 @@ func InviteV1(
 	}
 
 	input := gomatrixserverlib.HandleInviteInput{
-		Context:           httpReq.Context(),
 		RoomVersion:       roomVer,
 		RoomID:            roomID,
 		EventID:           eventID,
@@ -175,7 +174,7 @@ func InviteV1(
 		InviteEvent:       event,
 		StrippedState:     strippedState,
 	}
-	event, jsonErr := handleInvite(input, rsAPI)
+	event, jsonErr := handleInvite(httpReq.Context(), input, rsAPI)
 	if jsonErr != nil {
 		return *jsonErr
 	}
@@ -185,18 +184,18 @@ func InviteV1(
 	}
 }
 
-func handleInvite(input gomatrixserverlib.HandleInviteInput, rsAPI api.FederationRoomserverAPI) (gomatrixserverlib.PDU, *util.JSONResponse) {
-	inviteEvent, err := gomatrixserverlib.HandleInvite(input)
+func handleInvite(ctx context.Context, input gomatrixserverlib.HandleInviteInput, rsAPI api.FederationRoomserverAPI) (gomatrixserverlib.PDU, *util.JSONResponse) {
+	inviteEvent, err := gomatrixserverlib.HandleInvite(ctx, input)
 	switch e := err.(type) {
 	case nil:
 	case spec.InternalServerError:
-		util.GetLogger(input.Context).WithError(err)
+		util.GetLogger(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		util.GetLogger(input.Context).WithError(err)
+		util.GetLogger(ctx).WithError(err)
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -212,7 +211,7 @@ func handleInvite(input gomatrixserverlib.HandleInviteInput, rsAPI api.Federatio
 			JSON: e,
 		}
 	default:
-		util.GetLogger(input.Context).WithError(err)
+		util.GetLogger(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
@@ -220,8 +219,8 @@ func handleInvite(input gomatrixserverlib.HandleInviteInput, rsAPI api.Federatio
 	}
 
 	headeredInvite := &types.HeaderedEvent{PDU: inviteEvent}
-	if err = rsAPI.HandleInvite(input.Context, headeredInvite); err != nil {
-		util.GetLogger(input.Context).WithError(err).Error("HandleInvite failed")
+	if err = rsAPI.HandleInvite(ctx, headeredInvite); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
