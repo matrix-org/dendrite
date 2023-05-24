@@ -59,8 +59,7 @@ func (q *QueryState) GetState(ctx context.Context, roomID spec.RoomID, stateWant
 		}
 		stateEvents, err := q.Database.Events(ctx, info.RoomVersion, stateNIDs)
 		if err != nil {
-			// TODO: really? no err?
-			return nil, nil
+			return nil, fmt.Errorf("failed to obtain required events: %w", err)
 		}
 
 		events := []gomatrixserverlib.PDU{}

@@ -76,10 +76,16 @@ func InviteV2(
 			}
 		}
 
+		if inviteReq.Event().EventID() != eventID {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
+			}
+		}
+
 		input := gomatrixserverlib.HandleInviteInput{
 			RoomVersion:       inviteReq.RoomVersion(),
 			RoomID:            roomID,
-			EventID:           eventID,
 			InvitedUser:       *invitedUser,
 			KeyID:             cfg.Matrix.KeyID,
 			PrivateKey:        cfg.Matrix.PrivateKey,
@@ -160,10 +166,16 @@ func InviteV1(
 		}
 	}
 
+	if event.EventID() != eventID {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
+		}
+	}
+
 	input := gomatrixserverlib.HandleInviteInput{
 		RoomVersion:       roomVer,
 		RoomID:            roomID,
-		EventID:           eventID,
 		InvitedUser:       *invitedUser,
 		KeyID:             cfg.Matrix.KeyID,
 		PrivateKey:        cfg.Matrix.PrivateKey,
