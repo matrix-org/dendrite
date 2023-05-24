@@ -43,9 +43,13 @@ func createEventDB() *getEventDB {
 
 // Adds a fake event to the storage with given auth events.
 func (db *getEventDB) addFakeEvent(eventID string, authIDs []string) error {
+	authEvents := make([]any, 0, len(authIDs))
+	for _, authID := range authIDs {
+		authEvents = append(authEvents, []any{authID, struct{}{}})
+	}
 	builder := map[string]interface{}{
 		"event_id":    eventID,
-		"auth_events": authIDs,
+		"auth_events": authEvents,
 	}
 
 	eventJSON, err := json.Marshal(&builder)
