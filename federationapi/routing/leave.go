@@ -34,115 +34,115 @@ func MakeLeave(
 	request *fclient.FederationRequest,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
-	roomID, userID string,
+	roomID spec.RoomID, userID spec.UserID,
 ) util.JSONResponse {
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())
 	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("Invalid UserID"),
-		}
-	}
-	if domain != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("The leave must be sent by the server of the user"),
-		}
-	}
-
-	// Try building an event for the server
-	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   userID,
-		RoomID:   roomID,
-		Type:     "m.room.member",
-		StateKey: &userID,
-	}
-	err = proto.SetContent(map[string]interface{}{"membership": spec.Leave})
-	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("proto.SetContent failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("failed obtaining room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
-	if err != nil {
+	req := api.QueryServerJoinedToRoomRequest{
+		ServerName: request.Destination(),
+		RoomID:     roomID.String(),
+	}
+	res := api.QueryServerJoinedToRoomResponse{}
+	if err := rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.NotFound(
-				fmt.Sprintf("Server name %q does not exist", request.Destination()),
-			),
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
 		}
 	}
 
-	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
-	switch e := err.(type) {
-	case nil:
-	case eventutil.ErrRoomNoExists:
-		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.NotFound("Room does not exist"),
+	createLeaveTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
+		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
+		if err != nil {
+			util.GetLogger(httpReq.Context()).WithError(err).Errorf("obtaining signing identity for %s failed", request.Destination())
+			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
-	case gomatrixserverlib.BadJSONError:
-		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+
+		queryRes := api.QueryLatestEventsAndStateResponse{}
+		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+		switch e := err.(type) {
+		case nil:
+		case eventutil.ErrRoomNoExists:
+			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			return nil, nil, spec.NotFound("Room does not exist")
+		case gomatrixserverlib.BadJSONError:
+			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			return nil, nil, spec.BadJSON(e.Error())
+		default:
+			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			return nil, nil, spec.InternalServerError{}
+		}
+
+		stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
+		for i, stateEvent := range queryRes.StateEvents {
+			stateEvents[i] = stateEvent.PDU
+		}
+		return event, stateEvents, nil
+	}
+
+	input := gomatrixserverlib.HandleMakeLeaveInput{
+		UserID:             userID,
+		RoomID:             roomID,
+		RoomVersion:        roomVersion,
+		RequestOrigin:      request.Origin(),
+		LocalServerName:    cfg.Matrix.ServerName,
+		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
+		BuildEventTemplate: createLeaveTemplate,
+	}
+
+	response, internalErr := gomatrixserverlib.HandleMakeLeave(input)
+	switch e := internalErr.(type) {
+	case nil:
+	case spec.InternalServerError:
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON(e.Error()),
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	case spec.MatrixError:
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
+		code := http.StatusInternalServerError
+		switch e.ErrCode {
+		case spec.ErrorForbidden:
+			code = http.StatusForbidden
+		case spec.ErrorNotFound:
+			code = http.StatusNotFound
+		case spec.ErrorBadJSON:
+			code = http.StatusBadRequest
+		}
+
+		return util.JSONResponse{
+			Code: code,
+			JSON: e,
 		}
 	default:
-		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+		util.GetLogger(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("unknown error"),
+		}
+	}
+
+	if response == nil {
+		util.GetLogger(httpReq.Context()).Error("gmsl.HandleMakeLeave returned invalid response")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
-	}
-
-	// If the user has already left then just return their last leave
-	// event. This means that /send_leave will be a no-op, which helps
-	// to reject invites multiple times - hopefully.
-	for _, state := range queryRes.StateEvents {
-		if !state.StateKeyEquals(userID) {
-			continue
-		}
-		if mem, merr := state.Membership(); merr == nil && mem == spec.Leave {
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: map[string]interface{}{
-					"room_version": event.Version(),
-					"event":        state,
-				},
-			}
-		}
-	}
-
-	// Check that the leave is allowed or not
-	stateEvents := make([]gomatrixserverlib.PDU, len(queryRes.StateEvents))
-	for i := range queryRes.StateEvents {
-		stateEvents[i] = queryRes.StateEvents[i].PDU
-	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(event, &provider); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden(err.Error()),
-		}
-	}
-
-	// TODO: Remove. This ensures we send event references instead of eventIDs
-	switch event.Version() {
-	case gomatrixserverlib.RoomVersionV1, gomatrixserverlib.RoomVersionV2:
-		proto.PrevEvents = gomatrixserverlib.ToEventReference(event.PrevEventIDs())
-		proto.AuthEvents = gomatrixserverlib.ToEventReference(event.AuthEventIDs())
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"room_version": event.Version(),
-			"event":        proto,
+			"event":        response.LeaveTemplateEvent,
+			"room_version": response.RoomVersion,
 		},
 	}
 }
