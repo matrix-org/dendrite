@@ -883,9 +883,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			Origin:       senderDomain,
 			SendAsServer: string(senderDomain),
 		})
-		prevEvents = []gomatrixserverlib.EventReference{
-			event.EventReference(),
-		}
+		prevEvents = []string{event.EventID()}
 	}
 
 	inputReq := &api.InputRoomEventsRequest{

@@ -398,21 +398,22 @@ func (d *EventDatabase) eventsFromIDs(ctx context.Context, txn *sql.Tx, roomInfo
 	return d.events(ctx, txn, roomInfo.RoomVersion, nids)
 }
 
-func (d *Database) LatestEventIDs(
-	ctx context.Context, roomNID types.RoomNID,
-) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
+func (d *Database) LatestEventIDs(ctx context.Context, roomNID types.RoomNID) (references []string, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
 	var eventNIDs []types.EventNID
 	eventNIDs, currentStateSnapshotNID, err = d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {
 		return
 	}
-	references, err = d.EventsTable.BulkSelectEventReference(ctx, nil, eventNIDs)
+	eventNIDMap, err := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
 	if err != nil {
 		return
 	}
 	depth, err = d.EventsTable.SelectMaxEventDepth(ctx, nil, eventNIDs)
 	if err != nil {
 		return
+	}
+	for _, eventID := range eventNIDMap {
+		references = append(references, eventID)
 	}
 	return
 }
@@ -742,7 +743,6 @@ func (d *EventDatabase) StoreEvent(
 			eventTypeNID,
 			eventStateKeyNID,
 			event.EventID(),
-			event.EventReference().EventSHA256,
 			authEventNIDs,
 			event.Depth(),
 			isRejected,
@@ -762,7 +762,7 @@ func (d *EventDatabase) StoreEvent(
 			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
 
-		if prevEvents := event.PrevEvents(); len(prevEvents) > 0 {
+		if prevEvents := event.PrevEventIDs(); len(prevEvents) > 0 {
 			// Create an updater - NB: on sqlite this WILL create a txn as we are directly calling the shared DB form of
 			// GetLatestEventsForUpdate - not via the SQLiteDatabase form which has `nil` txns. This
 			// function only does SELECTs though so the created txn (at this point) is just a read txn like
@@ -770,8 +770,8 @@ func (d *EventDatabase) StoreEvent(
 			// to do writes however then this will need to go inside `Writer.Do`.
 
 			// The following is a copy of RoomUpdater.StorePreviousEvents
-			for _, ref := range prevEvents {
-				if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			for _, eventID := range prevEvents {
+				if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, eventID, eventNID); err != nil {
 					return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
 				}
 			}

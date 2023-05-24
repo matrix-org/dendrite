@@ -64,7 +64,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	latestEvents, err := r.DB.EventsFromIDs(ctx, info, []string{latestEventRefs[0].EventID})
+	latestEvents, err := r.DB.EventsFromIDs(ctx, info, []string{latestEventRefs[0]})
 	if err != nil {
 		return err
 	}
