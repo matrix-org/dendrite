@@ -6,20 +6,20 @@ They can be found on Docker Hub:
 
 - [matrixdotorg/dendrite-monolith](https://hub.docker.com/r/matrixdotorg/dendrite-monolith) for monolith deployments
 
-## Dockerfiles
+## Dockerfile
 
 The `Dockerfile` is a multistage file which can build Dendrite. From the root of the Dendrite
 repository, run:
 
 ```
-docker build . --target monolith -t matrixdotorg/dendrite-monolith
+docker build . -t matrixdotorg/dendrite-monolith
 ```
 
-## Compose files
+## Compose file
 
 There is one sample `docker-compose` files:
 
-- `docker-compose.monolith.yml` which runs a monolith Dendrite deployment
+- `docker-compose.yml` which runs a Dendrite deployment with Postgres
 
 ## Configuration
 
@@ -52,7 +52,7 @@ Create your config based on the [`dendrite-sample.yaml`](https://github.com/matr
 Then start the deployment:
 
 ```
-docker-compose -f docker-compose.monolith.yml up
+docker-compose -f docker-compose.yml up
 ```
 
 ## Building the images
