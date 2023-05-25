@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const accountDataSchema = `
@@ -74,7 +74,7 @@ func NewPostgresAccountDataTable(db *sql.DB) (tables.AccountDataTable, error) {
 
 func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	roomID, dataType string, content json.RawMessage,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertAccountDataStmt)
@@ -90,7 +90,7 @@ func (s *accountDataStatements) InsertAccountData(
 
 func (s *accountDataStatements) SelectAccountData(
 	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) (
 	/* global */ map[string]json.RawMessage,
 	/* rooms */ map[string]map[string]json.RawMessage,
@@ -129,7 +129,7 @@ func (s *accountDataStatements) SelectAccountData(
 
 func (s *accountDataStatements) SelectAccountDataByType(
 	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	var bytes []byte

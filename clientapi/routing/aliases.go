@@ -15,14 +15,14 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -31,7 +31,7 @@ func GetAliases(
 	req *http.Request, rsAPI api.ClientRoomserverAPI, device *userapi.Device, roomID string,
 ) util.JSONResponse {
 	stateTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomHistoryVisibility,
+		EventType: spec.MRoomHistoryVisibility,
 		StateKey:  "",
 	}
 	stateReq := &api.QueryCurrentStateRequest{
@@ -47,13 +47,14 @@ func GetAliases(
 	visibility := gomatrixserverlib.HistoryVisibilityInvited
 	if historyVisEvent, ok := stateRes.StateEvents[stateTuple]; ok {
 		var err error
-		visibility, err = historyVisEvent.HistoryVisibility()
-		if err != nil {
+		var content gomatrixserverlib.HistoryVisibilityContent
+		if err = json.Unmarshal(historyVisEvent.Content(), &content); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("historyVisEvent.HistoryVisibility failed")
 			return util.ErrorResponse(fmt.Errorf("historyVisEvent.HistoryVisibility: %w", err))
 		}
+		visibility = content.HistoryVisibility
 	}
-	if visibility != gomatrixserverlib.WorldReadable {
+	if visibility != spec.WorldReadable {
 		queryReq := api.QueryMembershipForUserRequest{
 			RoomID: roomID,
 			UserID: device.UserID,
@@ -61,12 +62,15 @@ func GetAliases(
 		var queryRes api.QueryMembershipForUserResponse
 		if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if !queryRes.IsInRoom {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("You aren't a member of this room."),
+				JSON: spec.Forbidden("You aren't a member of this room."),
 			}
 		}
 	}

@@ -16,7 +16,7 @@ Dendrite contains an embedded profiler called `pprof`, which is a part of the st
 To enable the profiler, start Dendrite with the `PPROFLISTEN` environment variable. This variable specifies which address and port to listen on, e.g.
 
 ```
-PPROFLISTEN=localhost:65432 ./bin/dendrite-monolith-server ...
+PPROFLISTEN=localhost:65432 ./bin/dendrite ...
 ```
 
 If pprof has been enabled successfully, a log line at startup will show that pprof is listening:

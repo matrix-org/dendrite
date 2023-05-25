@@ -1,6 +1,6 @@
 #syntax=docker/dockerfile:1.2
 
-FROM golang:1.18-stretch as build
+FROM golang:1.20-bullseye as build
 RUN apt-get update && apt-get install -y sqlite3
 WORKDIR /build
 
@@ -17,7 +17,7 @@ RUN --mount=target=. \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
     CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/dendrite && \
-    CGO_ENABLED=${CGO} go test -c -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
+    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /dendrite

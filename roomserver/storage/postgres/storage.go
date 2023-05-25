@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -38,10 +37,10 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
-	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
@@ -53,7 +52,7 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 
 	// Special case, since this migration uses several tables, so it needs to
 	// be sure that all tables are created first.
-	if err = executeMigration(base.Context(), db); err != nil {
+	if err = executeMigration(ctx, db); err != nil {
 		return nil, err
 	}
 
@@ -194,23 +193,28 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 		return err
 	}
 	d.Database = shared.Database{
-		DB:                  db,
-		Cache:               cache,
-		Writer:              writer,
-		EventTypesTable:     eventTypes,
-		EventStateKeysTable: eventStateKeys,
-		EventJSONTable:      eventJSON,
-		EventsTable:         events,
-		RoomsTable:          rooms,
-		StateBlockTable:     stateBlock,
-		StateSnapshotTable:  stateSnapshot,
-		PrevEventsTable:     prevEvents,
-		RoomAliasesTable:    roomAliases,
-		InvitesTable:        invites,
-		MembershipTable:     membership,
-		PublishedTable:      published,
-		RedactionsTable:     redactions,
-		Purge:               purge,
+		DB: db,
+		EventDatabase: shared.EventDatabase{
+			DB:                  db,
+			Cache:               cache,
+			Writer:              writer,
+			EventsTable:         events,
+			EventJSONTable:      eventJSON,
+			EventTypesTable:     eventTypes,
+			EventStateKeysTable: eventStateKeys,
+			PrevEventsTable:     prevEvents,
+			RedactionsTable:     redactions,
+		},
+		Cache:              cache,
+		Writer:             writer,
+		RoomsTable:         rooms,
+		StateBlockTable:    stateBlock,
+		StateSnapshotTable: stateSnapshot,
+		RoomAliasesTable:   roomAliases,
+		InvitesTable:       invites,
+		MembershipTable:    membership,
+		PublishedTable:     published,
+		Purge:              purge,
 	}
 	return nil
 }

@@ -24,6 +24,8 @@ import (
 	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
@@ -39,7 +41,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -74,14 +75,13 @@ import (
 // or C.
 type Inputer struct {
 	Cfg                 *config.RoomServer
-	Base                *base.BaseDendrite
 	ProcessContext      *process.ProcessContext
-	DB                  storage.Database
+	DB                  storage.RoomDatabase
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
-	ServerName          gomatrixserverlib.ServerName
-	SigningIdentity     *gomatrixserverlib.SigningIdentity
+	ServerName          spec.ServerName
+	SigningIdentity     *fclient.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
@@ -89,8 +89,9 @@ type Inputer struct {
 	OutputProducer      *producers.RoomEventProducer
 	workers             sync.Map // room ID -> *worker
 
-	Queryer *query.Queryer
-	UserAPI userapi.RoomserverUserAPI
+	Queryer       *query.Queryer
+	UserAPI       userapi.RoomserverUserAPI
+	enableMetrics bool
 }
 
 // If a room consumer is inactive for a while then we will allow NATS
@@ -177,7 +178,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
 func (r *Inputer) Start() error {
-	if r.Base.EnableMetrics {
+	if r.enableMetrics {
 		prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
 	}
 	_, err := r.JetStream.Subscribe(
@@ -284,7 +285,7 @@ func (w *worker) _next() {
 	var errString string
 	if err = w.r.processRoomEvent(
 		w.r.ProcessContext.Context(),
-		gomatrixserverlib.ServerName(msg.Header.Get("virtual_host")),
+		spec.ServerName(msg.Header.Get("virtual_host")),
 		&inputRoomEvent,
 	); err != nil {
 		switch err.(type) {
@@ -388,18 +389,18 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) error {
+) {
 	// Queue up the event into the roomserver.
 	replySub, err := r.queueInputRoomEvents(ctx, request)
 	if err != nil {
 		response.ErrMsg = err.Error()
-		return nil
+		return
 	}
 
 	// If we aren't waiting for synchronous responses then we can
 	// give up here, there is nothing further to do.
 	if replySub == nil {
-		return nil
+		return
 	}
 
 	// Otherwise, we'll want to sit and wait for the responses
@@ -411,14 +412,12 @@ func (r *Inputer) InputRoomEvents(
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()
-			return nil
+			return
 		}
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
 	}
-
-	return nil
 }
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(

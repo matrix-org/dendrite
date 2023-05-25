@@ -22,8 +22,11 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -46,12 +49,12 @@ type QueryLatestEventsAndStateResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room.
 	// These are used to set the prev_events when sending an event.
-	LatestEvents []gomatrixserverlib.EventReference `json:"latest_events"`
+	LatestEvents []string `json:"latest_events"`
 	// The state events requested.
 	// This list will be in an arbitrary order.
 	// These are used to set the auth_events when sending an event.
 	// These are used to check whether the event is allowed.
-	StateEvents []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
+	StateEvents []*types.HeaderedEvent `json:"state_events"`
 	// The depth of the latest events.
 	// This is one greater than the maximum depth of the latest events.
 	// This is used to set the depth when sending an event.
@@ -81,11 +84,14 @@ type QueryStateAfterEventsResponse struct {
 	PrevEventsExist bool `json:"prev_events_exist"`
 	// The state events requested.
 	// This list will be in an arbitrary order.
-	StateEvents []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
+	StateEvents []*types.HeaderedEvent `json:"state_events"`
 }
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
 type QueryEventsByIDRequest struct {
+	// The roomID to query events for. If this is empty, we first try to fetch the roomID from the database
+	// as this is needed for further processing/parsing events.
+	RoomID string `json:"room_id"`
 	// The event IDs to look up.
 	EventIDs []string `json:"event_ids"`
 }
@@ -99,7 +105,7 @@ type QueryEventsByIDResponse struct {
 	// fails to read it from the database then it will fail
 	// the entire request.
 	// This list will be in an arbitrary order.
-	Events []*gomatrixserverlib.HeaderedEvent `json:"events"`
+	Events []*types.HeaderedEvent `json:"events"`
 }
 
 // QueryMembershipForUserRequest is a request to QueryMembership
@@ -143,7 +149,7 @@ type QueryMembershipsForRoomRequest struct {
 // QueryMembershipsForRoomResponse is a response to QueryMembershipsForRoom
 type QueryMembershipsForRoomResponse struct {
 	// The "m.room.member" events (of "join" membership) in the client format
-	JoinEvents []gomatrixserverlib.ClientEvent `json:"join_events"`
+	JoinEvents []synctypes.ClientEvent `json:"join_events"`
 	// True if the user has been in room before and has either stayed in it or
 	// left it.
 	HasBeenInRoom bool `json:"has_been_in_room"`
@@ -155,7 +161,7 @@ type QueryMembershipsForRoomResponse struct {
 type QueryServerJoinedToRoomRequest struct {
 	// Server name of the server to find. If not specified, we will
 	// default to checking if the local server is joined.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 	// ID of the room to see if we are still joined to
 	RoomID string `json:"room_id"`
 }
@@ -173,7 +179,7 @@ type QueryServerAllowedToSeeEventRequest struct {
 	// The event ID to look up invites in.
 	EventID string `json:"event_id"`
 	// The server interested in the event
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 // QueryServerAllowedToSeeEventResponse is a response to QueryServerAllowedToSeeEvent
@@ -191,13 +197,13 @@ type QueryMissingEventsRequest struct {
 	// Limit the number of events this query returns.
 	Limit int `json:"limit"`
 	// The server interested in the event
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	ServerName spec.ServerName `json:"server_name"`
 }
 
 // QueryMissingEventsResponse is a response to QueryMissingEvents
 type QueryMissingEventsResponse struct {
 	// Missing events, arbritrary order.
-	Events []*gomatrixserverlib.HeaderedEvent `json:"events"`
+	Events []*types.HeaderedEvent `json:"events"`
 }
 
 // QueryStateAndAuthChainRequest is a request to QueryStateAndAuthChain
@@ -231,19 +237,10 @@ type QueryStateAndAuthChainResponse struct {
 	StateKnown      bool `json:"state_known"`
 	// The state and auth chain events that were requested.
 	// The lists will be in an arbitrary order.
-	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
-	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	StateEvents     []*types.HeaderedEvent `json:"state_events"`
+	AuthChainEvents []*types.HeaderedEvent `json:"auth_chain_events"`
 	// True if the queried event was rejected earlier.
 	IsRejected bool `json:"is_rejected"`
-}
-
-// QueryRoomVersionCapabilitiesRequest asks for the default room version
-type QueryRoomVersionCapabilitiesRequest struct{}
-
-// QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
-type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
-	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
 // QueryRoomVersionForRoomRequest asks for the room version for a given room.
@@ -273,7 +270,7 @@ type QueryAuthChainRequest struct {
 }
 
 type QueryAuthChainResponse struct {
-	AuthChain []*gomatrixserverlib.HeaderedEvent
+	AuthChain []*types.HeaderedEvent
 }
 
 type QuerySharedUsersRequest struct {
@@ -331,7 +328,7 @@ type QueryCurrentStateRequest struct {
 }
 
 type QueryCurrentStateResponse struct {
-	StateEvents map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent
+	StateEvents map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent
 }
 
 type QueryKnownUsersRequest struct {
@@ -345,8 +342,8 @@ type QueryKnownUsersResponse struct {
 }
 
 type QueryServerBannedFromRoomRequest struct {
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-	RoomID     string                       `json:"room_id"`
+	ServerName spec.ServerName `json:"server_name"`
+	RoomID     string          `json:"room_id"`
 }
 
 type QueryServerBannedFromRoomResponse struct {
@@ -408,7 +405,7 @@ func (r *QueryBulkStateContentResponse) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON stringifies the StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
 func (r *QueryCurrentStateResponse) MarshalJSON() ([]byte, error) {
-	se := make(map[string]*gomatrixserverlib.HeaderedEvent, len(r.StateEvents))
+	se := make(map[string]*types.HeaderedEvent, len(r.StateEvents))
 	for k, v := range r.StateEvents {
 		// use 0x1F (unit separator) as the delimiter between type/state key,
 		se[fmt.Sprintf("%s\x1F%s", k.EventType, k.StateKey)] = v
@@ -417,12 +414,12 @@ func (r *QueryCurrentStateResponse) MarshalJSON() ([]byte, error) {
 }
 
 func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
-	res := make(map[string]*gomatrixserverlib.HeaderedEvent)
+	res := make(map[string]*types.HeaderedEvent)
 	err := json.Unmarshal(data, &res)
 	if err != nil {
 		return err
 	}
-	r.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent, len(res))
+	r.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent, len(res))
 	for k, v := range res {
 		fields := strings.Split(k, "\x1F")
 		r.StateEvents[gomatrixserverlib.StateKeyTuple{
@@ -446,7 +443,7 @@ type QueryMembershipAtEventResponse struct {
 	// Membership is a map from eventID to membership event. Events that
 	// do not have known state will return a nil event, resulting in a "leave" membership
 	// when calculating history visibility.
-	Membership map[string]*gomatrixserverlib.HeaderedEvent `json:"membership"`
+	Membership map[string]*types.HeaderedEvent `json:"membership"`
 }
 
 // QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a

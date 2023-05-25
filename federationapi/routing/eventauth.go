@@ -16,16 +16,17 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 // GetEventAuth returns event auth for the roomID and eventID
 func GetEventAuth(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
@@ -36,13 +37,13 @@ func GetEventAuth(
 		return *err
 	}
 
-	event, resErr := fetchEvent(ctx, rsAPI, eventID)
+	event, resErr := fetchEvent(ctx, rsAPI, roomID, eventID)
 	if resErr != nil {
 		return *resErr
 	}
 
 	if event.RoomID() != roomID {
-		return util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+		return util.JSONResponse{Code: http.StatusNotFound, JSON: spec.NotFound("event does not belong to this room")}
 	}
 	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
 	if resErr != nil {
@@ -70,8 +71,8 @@ func GetEventAuth(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespEventAuth{
-			AuthEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
+		JSON: fclient.RespEventAuth{
+			AuthEvents: types.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		},
 	}
 }

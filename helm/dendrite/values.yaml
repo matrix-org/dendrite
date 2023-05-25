@@ -43,6 +43,30 @@ persistence:
     # -- PVC Storage Request for the search volume
     capacity: "1Gi"
 
+# -- Add additional volumes to the Dendrite Pod
+extraVolumes: []
+# ex.
+# - name: extra-config
+#   secret:
+#     secretName: extra-config
+
+
+# -- Configure additional mount points volumes in the Dendrite Pod
+extraVolumeMounts: []
+# ex.
+# - mountPath: /etc/dendrite/extra-config
+#   name: extra-config
+
+strategy:
+  # -- Strategy to use for rolling updates (e.g. Recreate, RollingUpdate)
+  # If you are using ReadWriteOnce volumes, you should probably use Recreate
+  type: RollingUpdate
+  rollingUpdate:
+    # -- Maximum number of pods that can be unavailable during the update process
+    maxUnavailable: 25%
+    # -- Maximum number of pods that can be scheduled above the desired number of pods
+    maxSurge: 25%
+
 dendrite_config:
   version: 2
   global:
@@ -347,3 +371,26 @@ ingress:
 service:
   type: ClusterIP
   port: 8008
+
+prometheus:
+  servicemonitor:
+    # -- Enable ServiceMonitor for Prometheus-Operator for scrape metric-endpoint
+    enabled: false
+    # -- Extra Labels on ServiceMonitor for selector of Prometheus Instance
+    labels: {}
+  rules:
+    # -- Enable PrometheusRules for Prometheus-Operator for setup alerting
+    enabled: false
+    # -- Extra Labels on PrometheusRules for selector of Prometheus Instance
+    labels: {}
+    # -- additional alertrules (no default alertrules are provided)
+    additionalRules: []
+
+grafana:
+  dashboards:
+    enabled: false
+    # -- Extra Labels on ConfigMap for selector of grafana sidecar
+    labels:
+      grafana_dashboard: "1"
+    # -- Extra Annotations on ConfigMap additional config in grafana sidecar
+    annotations: {}

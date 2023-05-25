@@ -35,6 +35,8 @@ is fully resolved.
 
 ### Using the SyTest Docker image
 
+**We strongly recommend using the Docker image to run Sytest.**
+
 Use the following commands to pull the latest SyTest image and run the tests:
 
 ```sh
@@ -60,7 +62,6 @@ When debugging, the following Docker `run` options may also be useful:
 * `-e "DENDRITE_TRACE_HTTP=1"`: Adds HTTP tracing to server logs.
 * `-e "DENDRITE_TRACE_INTERNAL=1"`: Adds roomserver internal API tracing to
   server logs.
-* `-e "DENDRITE_TRACE_SQL=1"`: Adds tracing to all SQL statements to server logs.
 * `-e "COVER=1"`: Run Sytest with an instrumented binary, producing a Go coverage file per server.
 * `-e "RACE_DETECTION=1"`: Build the binaries with the `-race` flag (Note: This will significantly slow down test runs)
 

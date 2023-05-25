@@ -1,0 +1,26 @@
+{{- if and 
+  (and .Values.prometheus.servicemonitor.enabled .Values.dendrite_config.global.metrics.enabled )
+  ( .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" )
+}}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "dendrite.fullname" . }}
+  labels:
+    {{- include "dendrite.labels" . | nindent 4 }}
+    {{- toYaml .Values.prometheus.servicemonitor.labels | nindent 4 }}
+spec:
+  endpoints:
+    - port: http
+      basicAuth:
+        username:
+          name: {{ include "dendrite.fullname" . }}-metrics-basic-auth
+          key: "user"
+        password:
+          name: {{ include "dendrite.fullname" . }}-metrics-basic-auth
+          key: "password"
+  selector:
+    matchLabels:
+      {{- include "dendrite.selectorLabels" . | nindent 6 }}
+{{- end }}

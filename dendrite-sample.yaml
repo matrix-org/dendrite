@@ -94,7 +94,7 @@ global:
   # We use this information to understand how Dendrite is being used in the wild.
   report_stats:
     enabled: false
-    endpoint: https://matrix.org/report-usage-stats/push
+    endpoint: https://panopticon.matrix.org/push
 
   # Server notices allows server admins to send messages to all users on the server.
   server_notices:

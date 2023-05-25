@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -195,7 +195,7 @@ ON CONFLICT (localpart, device_id, timestamp) DO NOTHING
 const queryDBEngineVersion = "select sqlite_version();"
 
 type statsStatements struct {
-	serverName                    gomatrixserverlib.ServerName
+	serverName                    spec.ServerName
 	db                            *sql.DB
 	lastUpdate                    time.Time
 	countUsersLastSeenAfterStmt   *sql.Stmt
@@ -209,7 +209,7 @@ type statsStatements struct {
 	selectDailyMessagesStmt       *sql.Stmt
 }
 
-func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.StatsTable, error) {
+func NewSQLiteStatsTable(db *sql.DB, serverName spec.ServerName) (tables.StatsTable, error) {
 	s := &statsStatements{
 		serverName: serverName,
 		lastUpdate: time.Now(),
@@ -298,8 +298,8 @@ func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx)
 		params[i] = v                  // i: 0 1 2 => ($1, $2, $3)
 		params[i+1+len(nonGuests)] = v // i: 4 5 6 => ($5, $6, $7)
 	}
-	params[3] = api.AccountTypeGuest                           // $4
-	params[7] = gomatrixserverlib.AsTimestamp(registeredAfter) // $8
+	params[3] = api.AccountTypeGuest              // $4
+	params[7] = spec.AsTimestamp(registeredAfter) // $8
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -324,7 +324,7 @@ func (s *statsStatements) dailyUsers(ctx context.Context, txn *sql.Tx) (result i
 	stmt := sqlutil.TxStmt(txn, s.countUsersLastSeenAfterStmt)
 	lastSeenAfter := time.Now().AddDate(0, 0, -1)
 	err = stmt.QueryRowContext(ctx,
-		gomatrixserverlib.AsTimestamp(lastSeenAfter),
+		spec.AsTimestamp(lastSeenAfter),
 	).Scan(&result)
 	return
 }
@@ -333,7 +333,7 @@ func (s *statsStatements) monthlyUsers(ctx context.Context, txn *sql.Tx) (result
 	stmt := sqlutil.TxStmt(txn, s.countUsersLastSeenAfterStmt)
 	lastSeenAfter := time.Now().AddDate(0, 0, -30)
 	err = stmt.QueryRowContext(ctx,
-		gomatrixserverlib.AsTimestamp(lastSeenAfter),
+		spec.AsTimestamp(lastSeenAfter),
 	).Scan(&result)
 	return
 }
@@ -348,8 +348,8 @@ func (s *statsStatements) r30Users(ctx context.Context, txn *sql.Tx) (map[string
 	diff := time.Hour * 24 * 30
 
 	rows, err := stmt.QueryContext(ctx,
-		gomatrixserverlib.AsTimestamp(lastSeenAfter),
-		gomatrixserverlib.AsTimestamp(lastSeenAfter),
+		spec.AsTimestamp(lastSeenAfter),
+		spec.AsTimestamp(lastSeenAfter),
 		diff.Milliseconds(),
 	)
 	if err != nil {
@@ -386,8 +386,8 @@ func (s *statsStatements) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[stri
 	tomorrow := time.Now().Add(time.Hour * 24)
 
 	rows, err := stmt.QueryContext(ctx,
-		gomatrixserverlib.AsTimestamp(sixtyDaysAgo),
-		gomatrixserverlib.AsTimestamp(tomorrow),
+		spec.AsTimestamp(sixtyDaysAgo),
+		spec.AsTimestamp(tomorrow),
 		diff.Milliseconds(),
 	)
 	if err != nil {
@@ -482,9 +482,9 @@ func (s *statsStatements) UpdateUserDailyVisits(
 		startTime = startTime.AddDate(0, 0, -1)
 	}
 	_, err := stmt.ExecContext(ctx,
-		gomatrixserverlib.AsTimestamp(startTime),
-		gomatrixserverlib.AsTimestamp(lastUpdate),
-		gomatrixserverlib.AsTimestamp(time.Now()),
+		spec.AsTimestamp(startTime),
+		spec.AsTimestamp(lastUpdate),
+		spec.AsTimestamp(time.Now()),
 	)
 	if err == nil {
 		s.lastUpdate = time.Now()
@@ -494,13 +494,13 @@ func (s *statsStatements) UpdateUserDailyVisits(
 
 func (s *statsStatements) UpsertDailyStats(
 	ctx context.Context, txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName, stats types.MessageStats,
+	serverName spec.ServerName, stats types.MessageStats,
 	activeRooms, activeE2EERooms int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.upsertMessagesStmt)
 	timestamp := time.Now().Truncate(time.Hour * 24)
 	_, err := stmt.ExecContext(ctx,
-		gomatrixserverlib.AsTimestamp(timestamp),
+		spec.AsTimestamp(timestamp),
 		serverName,
 		stats.Messages, stats.SentMessages, stats.MessagesE2EE, stats.SentMessagesE2EE,
 		activeRooms, activeE2EERooms,
@@ -510,12 +510,12 @@ func (s *statsStatements) UpsertDailyStats(
 
 func (s *statsStatements) DailyRoomsMessages(
 	ctx context.Context, txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectDailyMessagesStmt)
 	timestamp := time.Now().Truncate(time.Hour * 24)
 
-	err = stmt.QueryRowContext(ctx, serverName, gomatrixserverlib.AsTimestamp(timestamp)).
+	err = stmt.QueryRowContext(ctx, serverName, spec.AsTimestamp(timestamp)).
 		Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
 	if err != nil && err != sql.ErrNoRows {
 		return msgStats, 0, 0, err

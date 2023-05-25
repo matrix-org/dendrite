@@ -20,9 +20,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Database stores information needed by the relayapi
@@ -34,14 +33,14 @@ type Database struct {
 
 // NewDatabase opens a new database
 func NewDatabase(
-	base *base.BaseDendrite,
+	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	isLocalServerName func(spec.ServerName) bool,
 ) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
+	if d.db, d.writer, err = conMan.Connection(dbProperties); err != nil {
 		return nil, err
 	}
 	queue, err := NewPostgresRelayQueueTable(d.db)

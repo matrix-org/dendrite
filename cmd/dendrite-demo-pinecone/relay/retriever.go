@@ -21,7 +21,7 @@ import (
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
@@ -32,35 +32,35 @@ const (
 
 type RelayServerRetriever struct {
 	ctx                 context.Context
-	serverName          gomatrixserverlib.ServerName
+	serverName          spec.ServerName
 	federationAPI       federationAPI.FederationInternalAPI
 	relayAPI            relayServerAPI.RelayInternalAPI
-	relayServersQueried map[gomatrixserverlib.ServerName]bool
+	relayServersQueried map[spec.ServerName]bool
 	queriedServersMutex sync.Mutex
 	running             atomic.Bool
-	quit                <-chan bool
+	quit                chan bool
 }
 
 func NewRelayServerRetriever(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	federationAPI federationAPI.FederationInternalAPI,
 	relayAPI relayServerAPI.RelayInternalAPI,
-	quit <-chan bool,
+	quit chan bool,
 ) RelayServerRetriever {
 	return RelayServerRetriever{
 		ctx:                 ctx,
 		serverName:          serverName,
 		federationAPI:       federationAPI,
 		relayAPI:            relayAPI,
-		relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
+		relayServersQueried: make(map[spec.ServerName]bool),
 		running:             *atomic.NewBool(false),
 		quit:                quit,
 	}
 }
 
 func (r *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
-	request := federationAPI.P2PQueryRelayServersRequest{Server: gomatrixserverlib.ServerName(r.serverName)}
+	request := federationAPI.P2PQueryRelayServersRequest{Server: spec.ServerName(r.serverName)}
 	response := federationAPI.P2PQueryRelayServersResponse{}
 	err := r.federationAPI.P2PQueryRelayServers(r.ctx, &request, &response)
 	if err != nil {
@@ -76,13 +76,13 @@ func (r *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
 	eLog.Infof("Registered relay servers: %v", response.RelayServers)
 }
 
-func (r *RelayServerRetriever) SetRelayServers(servers []gomatrixserverlib.ServerName) {
+func (r *RelayServerRetriever) SetRelayServers(servers []spec.ServerName) {
 	UpdateNodeRelayServers(r.serverName, servers, r.ctx, r.federationAPI)
 
 	// Replace list of servers to sync with and mark them all as unsynced.
 	r.queriedServersMutex.Lock()
 	defer r.queriedServersMutex.Unlock()
-	r.relayServersQueried = make(map[gomatrixserverlib.ServerName]bool)
+	r.relayServersQueried = make(map[spec.ServerName]bool)
 	for _, server := range servers {
 		r.relayServersQueried[server] = false
 	}
@@ -90,10 +90,10 @@ func (r *RelayServerRetriever) SetRelayServers(servers []gomatrixserverlib.Serve
 	r.StartSync()
 }
 
-func (r *RelayServerRetriever) GetRelayServers() []gomatrixserverlib.ServerName {
+func (r *RelayServerRetriever) GetRelayServers() []spec.ServerName {
 	r.queriedServersMutex.Lock()
 	defer r.queriedServersMutex.Unlock()
-	relayServers := []gomatrixserverlib.ServerName{}
+	relayServers := []spec.ServerName{}
 	for server := range r.relayServersQueried {
 		relayServers = append(relayServers, server)
 	}
@@ -101,11 +101,11 @@ func (r *RelayServerRetriever) GetRelayServers() []gomatrixserverlib.ServerName 
 	return relayServers
 }
 
-func (r *RelayServerRetriever) GetQueriedServerStatus() map[gomatrixserverlib.ServerName]bool {
+func (r *RelayServerRetriever) GetQueriedServerStatus() map[spec.ServerName]bool {
 	r.queriedServersMutex.Lock()
 	defer r.queriedServersMutex.Unlock()
 
-	result := map[gomatrixserverlib.ServerName]bool{}
+	result := map[spec.ServerName]bool{}
 	for server, queried := range r.relayServersQueried {
 		result[server] = queried
 	}
@@ -128,7 +128,7 @@ func (r *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
 
 	t := time.NewTimer(relayServerRetryInterval)
 	for {
-		relayServersToQuery := []gomatrixserverlib.ServerName{}
+		relayServersToQuery := []spec.ServerName{}
 		func() {
 			r.queriedServersMutex.Lock()
 			defer r.queriedServersMutex.Unlock()
@@ -151,16 +151,17 @@ func (r *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
 			if !t.Stop() {
 				<-t.C
 			}
+			logrus.Info("Stopped relay server retriever")
 			return
 		case <-t.C:
 		}
 	}
 }
 
-func (r *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
+func (r *RelayServerRetriever) queryRelayServers(relayServers []spec.ServerName) {
 	logrus.Info("Querying relay servers for any available transactions")
 	for _, server := range relayServers {
-		userID, err := gomatrixserverlib.NewUserID("@user:"+string(r.serverName), false)
+		userID, err := spec.NewUserID("@user:"+string(r.serverName), false)
 		if err != nil {
 			return
 		}
@@ -186,8 +187,8 @@ func (r *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverli
 }
 
 func UpdateNodeRelayServers(
-	node gomatrixserverlib.ServerName,
-	relays []gomatrixserverlib.ServerName,
+	node spec.ServerName,
+	relays []spec.ServerName,
 	ctx context.Context,
 	fedAPI federationAPI.FederationInternalAPI,
 ) {
@@ -200,7 +201,7 @@ func UpdateNodeRelayServers(
 	}
 
 	// Remove old, non-matching relays
-	var serversToRemove []gomatrixserverlib.ServerName
+	var serversToRemove []spec.ServerName
 	for _, existingServer := range response.RelayServers {
 		shouldRemove := true
 		for _, newServer := range relays {

@@ -20,43 +20,47 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
 )
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == eventutil.ErrProfileNoExists {
+		if err == appserviceAPI.ErrProfileNotExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
+				JSON: spec.NotFound("The user does not exist or does not have a profile"),
 			}
 		}
 
 		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: eventutil.ProfileResponse{
+		JSON: eventutil.UserProfile{
 			AvatarURL:   profile.AvatarURL,
 			DisplayName: profile.DisplayName,
 		},
@@ -65,64 +69,61 @@ func GetProfile(
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
-	if err != nil {
-		if err == eventutil.ErrProfileNoExists {
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-			}
-		}
-
-		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
-		return jsonerror.InternalServerError()
+	profile := GetProfile(req, profileAPI, cfg, userID, asAPI, federation)
+	p, ok := profile.JSON.(eventutil.UserProfile)
+	// not a profile response, so most likely an error, return that
+	if !ok {
+		return profile
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: eventutil.AvatarURL{
-			AvatarURL: profile.AvatarURL,
+		JSON: eventutil.UserProfile{
+			AvatarURL: p.AvatarURL,
 		},
 	}
 }
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, profileAPI userapi.ClientUserAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI,
 	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not match the current user"),
+			JSON: spec.Forbidden("userID does not match the current user"),
 		}
 	}
 
-	var r eventutil.AvatarURL
+	var r eventutil.UserProfile
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
 	if r.AvatarURL == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
+			JSON: spec.BadJSON("'avatar_url' must be supplied."),
 		}
 	}
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not belong to a locally configured domain"),
+			JSON: spec.Forbidden("userID does not belong to a locally configured domain"),
 		}
 	}
 
@@ -130,28 +131,27 @@ func SetAvatarURL(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: spec.InvalidParam(err.Error()),
 		}
 	}
 
-	setRes := &userapi.PerformSetAvatarURLResponse{}
-	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
-		Localpart:  localpart,
-		ServerName: domain,
-		AvatarURL:  r.AvatarURL,
-	}, setRes); err != nil {
+	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	// No need to build new membership events, since nothing changed
-	if !setRes.Changed {
+	if !changed {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, setRes.Profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
 	if err != nil {
 		return response
 	}
@@ -164,64 +164,61 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
-	if err != nil {
-		if err == eventutil.ErrProfileNoExists {
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-			}
-		}
-
-		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
-		return jsonerror.InternalServerError()
+	profile := GetProfile(req, profileAPI, cfg, userID, asAPI, federation)
+	p, ok := profile.JSON.(eventutil.UserProfile)
+	// not a profile response, so most likely an error, return that
+	if !ok {
+		return profile
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: eventutil.DisplayName{
-			DisplayName: profile.DisplayName,
+		JSON: eventutil.UserProfile{
+			DisplayName: p.DisplayName,
 		},
 	}
 }
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, profileAPI userapi.ClientUserAPI,
+	req *http.Request, profileAPI userapi.ProfileAPI,
 	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not match the current user"),
+			JSON: spec.Forbidden("userID does not match the current user"),
 		}
 	}
 
-	var r eventutil.DisplayName
+	var r eventutil.UserProfile
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
 	if r.DisplayName == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("'displayname' must be supplied."),
+			JSON: spec.BadJSON("'displayname' must be supplied."),
 		}
 	}
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not belong to a locally configured domain"),
+			JSON: spec.Forbidden("userID does not belong to a locally configured domain"),
 		}
 	}
 
@@ -229,29 +226,27 @@ func SetDisplayName(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: spec.InvalidParam(err.Error()),
 		}
 	}
 
-	profileRes := &userapi.PerformUpdateDisplayNameResponse{}
-	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
-		Localpart:   localpart,
-		ServerName:  domain,
-		DisplayName: r.DisplayName,
-	}, profileRes)
+	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	// No need to build new membership events, since nothing changed
-	if !profileRes.Changed {
+	if !changed {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, profileRes.Profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
 	if err != nil {
 		return response
 	}
@@ -274,13 +269,19 @@ func updateProfile(
 	}, &res)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
-		return jsonerror.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 
 	events, err := buildMembershipEvents(
@@ -291,16 +292,22 @@ func updateProfile(
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(e.Error()),
+			JSON: spec.BadJSON(e.Error()),
 		}, e
 	default:
 		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvents failed")
-		return jsonerror.InternalServerError(), e
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, e
 	}
 
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, true); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError(), err
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
 	}
 	return util.JSONResponse{}, nil
 }
@@ -308,12 +315,12 @@ func updateProfile(
 // getProfile gets the full profile of a user by querying the database or a
 // remote homeserver.
 // Returns an error when something goes wrong or specifically
-// eventutil.ErrProfileNoExists when the profile doesn't exist.
+// eventutil.ErrProfileNotExists when the profile doesn't exist.
 func getProfile(
-	ctx context.Context, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
+	ctx context.Context, profileAPI userapi.ProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 ) (*authtypes.Profile, error) {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -325,7 +332,7 @@ func getProfile(
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
-					return nil, eventutil.ErrProfileNoExists
+					return nil, appserviceAPI.ErrProfileNotExists
 				}
 			}
 
@@ -353,17 +360,11 @@ func buildMembershipEvents(
 	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
 	evTime time.Time, rsAPI api.ClientRoomserverAPI,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	evs := []*gomatrixserverlib.HeaderedEvent{}
+) ([]*types.HeaderedEvent, error) {
+	evs := []*types.HeaderedEvent{}
 
 	for _, roomID := range roomIDs {
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
-			return nil, err
-		}
-
-		builder := gomatrixserverlib.EventBuilder{
+		proto := gomatrixserverlib.ProtoEvent{
 			Sender:   userID,
 			RoomID:   roomID,
 			Type:     "m.room.member",
@@ -371,13 +372,13 @@ func buildMembershipEvents(
 		}
 
 		content := gomatrixserverlib.MemberContent{
-			Membership: gomatrixserverlib.Join,
+			Membership: spec.Join,
 		}
 
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err := builder.SetContent(content); err != nil {
+		if err := proto.SetContent(content); err != nil {
 			return nil, err
 		}
 
@@ -386,12 +387,12 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, nil)
+		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		evs = append(evs, event.Headered(verRes.RoomVersion))
+		evs = append(evs, event)
 	}
 
 	return evs, nil

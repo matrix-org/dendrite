@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"nhooyr.io/websocket"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -90,18 +90,18 @@ func createTransport(s *pineconeSessions.Sessions) *http.Transport {
 }
 
 func CreateClient(
-	base *base.BaseDendrite, s *pineconeSessions.Sessions,
-) *gomatrixserverlib.Client {
-	return gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(createTransport(s)),
+	s *pineconeSessions.Sessions,
+) *fclient.Client {
+	return fclient.NewClient(
+		fclient.WithTransport(createTransport(s)),
 	)
 }
 
 func CreateFederationClient(
-	base *base.BaseDendrite, s *pineconeSessions.Sessions,
-) *gomatrixserverlib.FederationClient {
-	return gomatrixserverlib.NewFederationClient(
-		base.Cfg.Global.SigningIdentities(),
-		gomatrixserverlib.WithTransport(createTransport(s)),
+	cfg *config.Dendrite, s *pineconeSessions.Sessions,
+) fclient.FederationClient {
+	return fclient.NewFederationClient(
+		cfg.Global.SigningIdentities(),
+		fclient.WithTransport(createTransport(s)),
 	)
 }

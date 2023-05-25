@@ -55,7 +55,7 @@ var latest, _ = semver.NewVersion("v6.6.6") // Dummy version, used as "HEAD"
 // due to the error:
 // When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const DockerfilePostgreSQL = `FROM golang:1.18-stretch as build
+const DockerfilePostgreSQL = `FROM golang:1.18-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
@@ -72,18 +72,18 @@ RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
 # Replace the connection string with a single postgres DB, using user/db = 'postgres' and no password
-RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml 
+RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml
 # No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/9.6/main/pg_hba.conf
+RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/11/main/pg_hba.conf
 # Bump up max conns for moar concurrency
-RUN sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/9.6/main/postgresql.conf
+RUN sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/11/main/postgresql.conf
 RUN sed -i 's/max_open_conns:.*$/max_open_conns: 100/g' dendrite.yaml
 
 # This entry script starts postgres, waits for it to be up then starts dendrite
 RUN echo '\
 #!/bin/bash -eu \n\
 pg_lsclusters \n\
-pg_ctlcluster 9.6 main start \n\
+pg_ctlcluster 11 main start \n\
  \n\
 until pg_isready \n\
 do \n\
@@ -101,7 +101,7 @@ ENV BINARY=dendrite
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh`
 
-const DockerfileSQLite = `FROM golang:1.18-stretch as build
+const DockerfileSQLite = `FROM golang:1.18-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
@@ -119,7 +119,7 @@ RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key
 
 # Make sure the SQLite databases are in a persistent location, we're already mapping
 # the postgresql folder so let's just use that for simplicity
-RUN sed -i "s%connection_string:.file:%connection_string: file:\/var\/lib\/postgresql\/9.6\/main\/%g" dendrite.yaml 
+RUN sed -i "s%connection_string:.file:%connection_string: file:\/var\/lib\/postgresql\/11\/main\/%g" dendrite.yaml
 
 # This entry script starts postgres, waits for it to be up then starts dendrite
 RUN echo '\
@@ -259,10 +259,20 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir 
 
 func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Version, err error) {
 	u := "https://api.github.com/repos/matrix-org/dendrite/tags"
-	res, err := httpClient.Get(u)
-	if err != nil {
-		return nil, err
+
+	var res *http.Response
+	for i := 0; i < 3; i++ {
+		res, err = httpClient.Get(u)
+		if err != nil {
+			return nil, err
+		}
+		if res.StatusCode == 200 {
+			break
+		}
+		log.Printf("Github API returned HTTP %d, retrying\n", res.StatusCode)
+		time.Sleep(time.Second * 5)
 	}
+
 	if res.StatusCode != 200 {
 		return nil, fmt.Errorf("%s returned HTTP %d", u, res.StatusCode)
 	}
@@ -392,7 +402,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 			{
 				Type:   mount.TypeVolume,
 				Source: volumeName,
-				Target: "/var/lib/postgresql/9.6/main",
+				Target: "/var/lib/postgresql/11/main",
 			},
 		},
 	}, nil, nil, "dendrite_upgrade_test_"+branchName)

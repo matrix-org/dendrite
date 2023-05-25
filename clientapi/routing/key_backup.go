@@ -20,8 +20,8 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -61,28 +61,26 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 	if resErr != nil {
 		return *resErr
 	}
-	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	if len(kb.AuthData) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("missing auth_data"),
+		}
+	}
+	version, err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:    device.UserID,
 		Version:   "",
 		AuthData:  kb.AuthData,
 		Algorithm: kb.Algorithm,
-	}, &performKeyBackupResp); err != nil {
-		return jsonerror.InternalServerError()
+	})
+	if err != nil {
+		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %w", err))
 	}
-	if performKeyBackupResp.Error != "" {
-		if performKeyBackupResp.BadInput {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
-			}
-		}
-		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
-	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: keyBackupVersionCreateResponse{
-			Version: performKeyBackupResp.Version,
+			Version: version,
 		},
 	}
 }
@@ -90,20 +88,17 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 // KeyBackupVersion returns the key backup version specified. If `version` is empty, the latest `keyBackupVersionResponse` is returned.
 // Implements GET  /_matrix/client/r0/room_keys/version and GET /_matrix/client/r0/room_keys/version/{version}
 func KeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
-	var queryResp userapi.QueryKeyBackupResponse
-	if err := userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
+	queryResp, err := userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
 		UserID:  device.UserID,
 		Version: version,
-	}, &queryResp); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if queryResp.Error != "" {
-		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", queryResp.Error))
+	})
+	if err != nil {
+		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", err))
 	}
 	if !queryResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("version not found"),
+			JSON: spec.NotFound("version not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -126,31 +121,29 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUse
 	if resErr != nil {
 		return *resErr
 	}
-	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	performKeyBackupResp, err := userAPI.UpdateBackupKeyAuthData(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:    device.UserID,
 		Version:   version,
 		AuthData:  kb.AuthData,
 		Algorithm: kb.Algorithm,
-	}, &performKeyBackupResp); err != nil {
-		return jsonerror.InternalServerError()
-	}
-	if performKeyBackupResp.Error != "" {
-		if performKeyBackupResp.BadInput {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
-			}
+	})
+	switch e := err.(type) {
+	case spec.ErrRoomKeysVersion:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: e,
 		}
-		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
+	case nil:
+	default:
+		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %w", e))
 	}
+
 	if !performKeyBackupResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("backup version not found"),
+			JSON: spec.NotFound("backup version not found"),
 		}
 	}
-	// Unclear what the 200 body should be
 	return util.JSONResponse{
 		Code: 200,
 		JSON: keyBackupVersionCreateResponse{
@@ -162,35 +155,19 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUse
 // Delete a version of key backup. Version must not be empty. If the key backup was previously deleted, will return 200 OK.
 // Implements DELETE  /_matrix/client/r0/room_keys/version/{version}
 func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
-	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
-		UserID:       device.UserID,
-		Version:      version,
-		DeleteBackup: true,
-	}, &performKeyBackupResp); err != nil {
-		return jsonerror.InternalServerError()
+	exists, err := userAPI.DeleteKeyBackup(req.Context(), device.UserID, version)
+	if err != nil {
+		return util.ErrorResponse(fmt.Errorf("DeleteKeyBackup: %s", err))
 	}
-	if performKeyBackupResp.Error != "" {
-		if performKeyBackupResp.BadInput {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
-			}
-		}
-		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
-	}
-	if !performKeyBackupResp.Exists {
+	if !exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("backup version not found"),
+			JSON: spec.NotFound("backup version not found"),
 		}
 	}
-	// Unclear what the 200 body should be
 	return util.JSONResponse{
 		Code: 200,
-		JSON: keyBackupVersionCreateResponse{
-			Version: performKeyBackupResp.Version,
-		},
+		JSON: struct{}{},
 	}
 }
 
@@ -198,27 +175,26 @@ func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 func UploadBackupKeys(
 	req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string, keys *keyBackupSessionRequest,
 ) util.JSONResponse {
-	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	performKeyBackupResp, err := userAPI.UpdateBackupKeyAuthData(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:  device.UserID,
 		Version: version,
 		Keys:    *keys,
-	}, &performKeyBackupResp); err != nil && performKeyBackupResp.Error == "" {
-		return jsonerror.InternalServerError()
-	}
-	if performKeyBackupResp.Error != "" {
-		if performKeyBackupResp.BadInput {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
-			}
+	})
+
+	switch e := err.(type) {
+	case spec.ErrRoomKeysVersion:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: e,
 		}
-		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
+	case nil:
+	default:
+		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %w", e))
 	}
 	if !performKeyBackupResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("backup version not found"),
+			JSON: spec.NotFound("backup version not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -234,23 +210,20 @@ func UploadBackupKeys(
 func GetBackupKeys(
 	req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version, roomID, sessionID string,
 ) util.JSONResponse {
-	var queryResp userapi.QueryKeyBackupResponse
-	if err := userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
+	queryResp, err := userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
 		UserID:           device.UserID,
 		Version:          version,
 		ReturnKeys:       true,
 		KeysForRoomID:    roomID,
 		KeysForSessionID: sessionID,
-	}, &queryResp); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if queryResp.Error != "" {
-		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", queryResp.Error))
+	})
+	if err != nil {
+		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %w", err))
 	}
 	if !queryResp.Exists {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("version not found"),
+			JSON: spec.NotFound("version not found"),
 		}
 	}
 	if sessionID != "" {
@@ -267,17 +240,20 @@ func GetBackupKeys(
 		}
 	} else if roomID != "" {
 		roomData, ok := queryResp.Keys[roomID]
-		if ok {
-			// wrap response in "sessions"
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct {
-					Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
-				}{
-					Sessions: roomData,
-				},
-			}
+		if !ok {
+			// If no keys are found, then an object with an empty sessions property will be returned
+			roomData = make(map[string]userapi.KeyBackupSession)
 		}
+		// wrap response in "sessions"
+		return util.JSONResponse{
+			Code: 200,
+			JSON: struct {
+				Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+			}{
+				Sessions: roomData,
+			},
+		}
+
 	} else {
 		// response is the same as the upload request
 		var resp keyBackupSessionRequest
@@ -298,6 +274,6 @@ func GetBackupKeys(
 	}
 	return util.JSONResponse{
 		Code: 404,
-		JSON: jsonerror.NotFound("keys not found"),
+		JSON: spec.NotFound("keys not found"),
 	}
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -79,7 +79,7 @@ func mustMakeAccountAndDevice(
 	accDB tables.AccountsTable,
 	devDB tables.DevicesTable,
 	localpart string,
-	serverName gomatrixserverlib.ServerName, // nolint:unparam
+	serverName spec.ServerName, // nolint:unparam
 	accType api.AccountType,
 	userAgent string,
 ) {
@@ -108,7 +108,7 @@ func mustUpdateDeviceLastSeen(
 	timestamp time.Time,
 ) {
 	t.Helper()
-	_, err := db.ExecContext(ctx, "UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
+	_, err := db.ExecContext(ctx, "UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart)
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
@@ -121,7 +121,7 @@ func mustUserUpdateRegistered(
 	localpart string,
 	timestamp time.Time,
 ) {
-	_, err := db.ExecContext(ctx, "UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
+	_, err := db.ExecContext(ctx, "UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart)
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
@@ -187,8 +187,8 @@ func Test_UserStatistics(t *testing.T) {
 		})
 
 		t.Run("Users not active for one/two month", func(t *testing.T) {
-			mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now().AddDate(0, -2, 0))
-			mustUpdateDeviceLastSeen(t, ctx, db, "user2", time.Now().AddDate(0, -1, 0))
+			mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now().AddDate(0, 0, -60))
+			mustUpdateDeviceLastSeen(t, ctx, db, "user2", time.Now().AddDate(0, 0, -30))
 			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -224,9 +224,9 @@ func Test_UserStatistics(t *testing.T) {
 		- Where account creation and last_seen are > 30 days apart
 		*/
 		t.Run("R30Users tests", func(t *testing.T) {
-			mustUserUpdateRegistered(t, ctx, db, "user1", time.Now().AddDate(0, -2, 0))
+			mustUserUpdateRegistered(t, ctx, db, "user1", time.Now().AddDate(0, 0, -60))
 			mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now())
-			mustUserUpdateRegistered(t, ctx, db, "user4", time.Now().AddDate(0, -2, 0))
+			mustUserUpdateRegistered(t, ctx, db, "user4", time.Now().AddDate(0, 0, -60))
 			mustUpdateDeviceLastSeen(t, ctx, db, "user4", time.Now())
 			startTime := time.Now().AddDate(0, 0, -2)
 			err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24))

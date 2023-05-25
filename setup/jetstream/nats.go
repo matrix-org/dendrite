@@ -20,6 +20,8 @@ import (
 
 type NATSInstance struct {
 	*natsserver.Server
+	nc *natsclient.Conn
+	js natsclient.JetStreamContext
 }
 
 var natsLock sync.Mutex
@@ -40,7 +42,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	}
 	if s.Server == nil {
 		var err error
-		s.Server, err = natsserver.NewServer(&natsserver.Options{
+		opts := &natsserver.Options{
 			ServerName:      "monolith",
 			DontListen:      true,
 			JetStream:       true,
@@ -49,11 +51,14 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			MaxPayload:      16 * 1024 * 1024,
 			NoSigs:          true,
 			NoLog:           cfg.NoLog,
-		})
+		}
+		s.Server, err = natsserver.NewServer(opts)
 		if err != nil {
 			panic(err)
 		}
-		s.ConfigureLogger()
+		if !cfg.NoLog {
+			s.SetLogger(NewLogAdapter(), opts.Debug, opts.Trace)
+		}
 		go func() {
 			process.ComponentStarted()
 			s.Start()
@@ -68,11 +73,18 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	if !s.ReadyForConnections(time.Second * 10) {
 		logrus.Fatalln("NATS did not start in time")
 	}
+	// reuse existing connections
+	if s.nc != nil {
+		return s.js, s.nc
+	}
 	nc, err := natsclient.Connect("", natsclient.InProcessServer(s))
 	if err != nil {
 		logrus.Fatalln("Failed to create NATS client")
 	}
-	return setupNATS(process, cfg, nc)
+	js, _ := setupNATS(process, cfg, nc)
+	s.js = js
+	s.nc = nc
+	return js, nc
 }
 
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {

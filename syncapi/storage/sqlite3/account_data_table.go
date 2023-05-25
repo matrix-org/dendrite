@@ -22,8 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const accountDataSchema = `
@@ -66,16 +66,11 @@ func NewSqliteAccountDataTable(db *sql.DB, streamID *StreamIDStatements) (tables
 	if err != nil {
 		return nil, err
 	}
-	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxAccountDataIDStmt, err = db.Prepare(selectMaxAccountDataIDSQL); err != nil {
-		return nil, err
-	}
-	if s.selectAccountDataInRangeStmt, err = db.Prepare(selectAccountDataInRangeSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertAccountDataStmt, insertAccountDataSQL},
+		{&s.selectMaxAccountDataIDStmt, selectMaxAccountDataIDSQL},
+		{&s.selectAccountDataInRangeStmt, selectAccountDataInRangeSQL},
+	}.Prepare(db)
 }
 
 func (s *accountDataStatements) InsertAccountData(
@@ -94,7 +89,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
 	r types.Range,
-	filter *gomatrixserverlib.EventFilter,
+	filter *synctypes.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
 	stmt, params, err := prepareWithFilters(

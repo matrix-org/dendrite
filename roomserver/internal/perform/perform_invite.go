@@ -28,6 +28,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -43,7 +45,6 @@ type Inviter struct {
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-	res *api.PerformInviteResponse,
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
 	event := req.Event
@@ -64,20 +65,12 @@ func (r *Inviter) PerformInvite(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("The user ID %q is invalid!", targetUserID),
-		}
-		return nil, nil
+		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", targetUserID)}
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
 	isOriginLocal := r.Cfg.Matrix.IsLocalServerName(senderDomain)
 	if !isOriginLocal && !isTargetLocal {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  "The invite must be either from or to a local user",
-		}
-		return nil, nil
+		return nil, api.ErrInvalidID{Err: fmt.Errorf("the invite must be either from or to a local user")}
 	}
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
@@ -95,7 +88,7 @@ func (r *Inviter) PerformInvite(
 
 	inviteState := req.InviteRoomState
 	if len(inviteState) == 0 && info != nil {
-		var is []gomatrixserverlib.InviteV2StrippedState
+		var is []fclient.InviteV2StrippedState
 		if is, err = buildInviteStrippedState(ctx, r.DB, info, req); err == nil {
 			inviteState = is
 		}
@@ -117,8 +110,8 @@ func (r *Inviter) PerformInvite(
 		}
 		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 			EventNID: 0,
-			Event:    event.Unwrap(),
-		}, outputUpdates, req.Event.RoomVersion)
+			PDU:      event.PDU,
+		}, outputUpdates, req.Event.Version())
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
@@ -173,12 +166,8 @@ func (r *Inviter) PerformInvite(
 		// For now we will implement option 2. Since in the abesence of a retry
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorNotAllowed,
-			Msg:  "User is already joined to room",
-		}
 		logger.Debugf("user already joined")
-		return nil, nil
+		return nil, api.ErrNotAllowed{Err: fmt.Errorf("user is already joined to room")}
 	}
 
 	// If the invite originated remotely then we can't send an
@@ -194,16 +183,12 @@ func (r *Inviter) PerformInvite(
 	// try and see if the user is allowed to make this invite. We can't do
 	// this for invites coming in over federation - we have to take those on
 	// trust.
-	_, err = helpers.CheckAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
+	_, err = helpers.CheckAuthEvents(ctx, r.DB, info, event, event.AuthEventIDs())
 	if err != nil {
 		logger.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 			"processInviteEvent.checkAuthEvents failed for event",
 		)
-		res.Error = &api.PerformError{
-			Msg:  err.Error(),
-			Code: api.PerformErrorNotAllowed,
-		}
-		return nil, nil
+		return nil, api.ErrNotAllowed{Err: err}
 	}
 
 	// If the invite originated from us and the target isn't local then we
@@ -218,12 +203,8 @@ func (r *Inviter) PerformInvite(
 		}
 		fsRes := &federationAPI.PerformInviteResponse{}
 		if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
-			res.Error = &api.PerformError{
-				Msg:  err.Error(),
-				Code: api.PerformErrorNotAllowed,
-			}
 			logger.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
-			return nil, nil
+			return nil, api.ErrNotAllowed{Err: err}
 		}
 		event = fsRes.Event
 		logger.Debugf("Federated PerformInvite success with event ID %s", event.EventID())
@@ -245,15 +226,10 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
-		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
-	}
+	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 	if err = inputRes.Err(); err != nil {
-		res.Error = &api.PerformError{
-			Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
-			Code: api.PerformErrorNotAllowed,
-		}
 		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		return nil, api.ErrNotAllowed{Err: err}
 	}
 
 	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
@@ -266,14 +242,14 @@ func buildInviteStrippedState(
 	db storage.Database,
 	info *types.RoomInfo,
 	input *api.PerformInviteRequest,
-) ([]gomatrixserverlib.InviteV2StrippedState, error) {
+) ([]fclient.InviteV2StrippedState, error) {
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
 	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
 	for _, t := range []string{
-		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
-		gomatrixserverlib.MRoomJoinRules, gomatrixserverlib.MRoomAvatar,
-		gomatrixserverlib.MRoomEncryption, gomatrixserverlib.MRoomCreate,
+		spec.MRoomName, spec.MRoomCanonicalAlias,
+		spec.MRoomJoinRules, spec.MRoomAvatar,
+		spec.MRoomEncryption, spec.MRoomCreate,
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,
@@ -291,16 +267,19 @@ func buildInviteStrippedState(
 	for _, stateNID := range stateEntries {
 		stateNIDs = append(stateNIDs, stateNID.EventNID)
 	}
-	stateEvents, err := db.Events(ctx, stateNIDs)
+	if info == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	stateEvents, err := db.Events(ctx, info.RoomVersion, stateNIDs)
 	if err != nil {
 		return nil, err
 	}
-	inviteState := []gomatrixserverlib.InviteV2StrippedState{
-		gomatrixserverlib.NewInviteV2StrippedState(input.Event.Event),
+	inviteState := []fclient.InviteV2StrippedState{
+		fclient.NewInviteV2StrippedState(input.Event.PDU),
 	}
-	stateEvents = append(stateEvents, types.Event{Event: input.Event.Unwrap()})
+	stateEvents = append(stateEvents, types.Event{PDU: input.Event.PDU})
 	for _, event := range stateEvents {
-		inviteState = append(inviteState, gomatrixserverlib.NewInviteV2StrippedState(event.Event))
+		inviteState = append(inviteState, fclient.NewInviteV2StrippedState(event.PDU))
 	}
 	return inviteState, nil
 }

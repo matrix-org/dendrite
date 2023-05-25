@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -44,7 +45,7 @@ func UpdateToInviteMembership(
 		updates = append(updates, api.OutputEvent{
 			Type: api.OutputTypeNewInviteEvent,
 			NewInviteEvent: &api.OutputNewInviteEvent{
-				Event:       add.Headered(roomVersion),
+				Event:       &types.HeaderedEvent{PDU: add.PDU},
 				RoomVersion: roomVersion,
 			},
 		})
@@ -54,7 +55,7 @@ func UpdateToInviteMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
+				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetUserID:     *add.StateKey(),
 			},
@@ -67,7 +68,7 @@ func UpdateToInviteMembership(
 // memberships. If the servername is not supplied then the local server will be
 // checked instead using a faster code path.
 // TODO: This should probably be replaced by an API call.
-func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
+func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverName spec.ServerName, roomID string) (bool, error) {
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
 		return false, err
@@ -85,21 +86,21 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 		return false, err
 	}
 
-	events, err := db.Events(ctx, eventNIDs)
+	events, err := db.Events(ctx, info.RoomVersion, eventNIDs)
 	if err != nil {
 		return false, err
 	}
-	gmslEvents := make([]*gomatrixserverlib.Event, len(events))
+	gmslEvents := make([]gomatrixserverlib.PDU, len(events))
 	for i := range events {
-		gmslEvents[i] = events[i].Event
+		gmslEvents[i] = events[i].PDU
 	}
-	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, gomatrixserverlib.Join), nil
+	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, spec.Join), nil
 }
 
 func IsInvitePending(
 	ctx context.Context, db storage.Database,
 	roomID, userID string,
-) (bool, string, string, *gomatrixserverlib.Event, error) {
+) (bool, string, string, gomatrixserverlib.PDU, error) {
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -148,7 +149,12 @@ func IsInvitePending(
 		return false, "", "", nil, fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, info.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(info.RoomVersion)
+	if err != nil {
+		return false, "", "", nil, err
+	}
+
+	event, err := verImpl.NewEventFromTrustedJSON(eventJSON, false)
 
 	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
 }
@@ -157,7 +163,7 @@ func IsInvitePending(
 // only keep the "m.room.member" events with a "join" membership. These events are returned.
 // Returns an error if there was an issue fetching the events.
 func GetMembershipsAtState(
-	ctx context.Context, db storage.Database, stateEntries []types.StateEntry, joinedOnly bool,
+	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, stateEntries []types.StateEntry, joinedOnly bool,
 ) ([]types.Event, error) {
 
 	var eventNIDs types.EventNIDs
@@ -177,7 +183,10 @@ func GetMembershipsAtState(
 	util.Unique(eventNIDs)
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, eventNIDs)
+	if roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +203,7 @@ func GetMembershipsAtState(
 			return nil, err
 		}
 
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			events = append(events, event)
 		}
 	}
@@ -220,39 +229,42 @@ func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.Room
 	return roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 }
 
-func MembershipAtEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID) (map[string][]types.StateEntry, error) {
+func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID) (map[string][]types.StateEntry, error) {
 	roomState := state.NewStateResolution(db, info)
 	// Fetch the state as it was when this event was fired
 	return roomState.LoadMembershipAtEvent(ctx, eventIDs, stateKeyNID)
 }
 
 func LoadEvents(
-	ctx context.Context, db storage.Database, eventNIDs []types.EventNID,
-) ([]*gomatrixserverlib.Event, error) {
-	stateEvents, err := db.Events(ctx, eventNIDs)
+	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, eventNIDs []types.EventNID,
+) ([]gomatrixserverlib.PDU, error) {
+	if roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]*gomatrixserverlib.Event, len(stateEvents))
+	result := make([]gomatrixserverlib.PDU, len(stateEvents))
 	for i := range stateEvents {
-		result[i] = stateEvents[i].Event
+		result[i] = stateEvents[i].PDU
 	}
 	return result, nil
 }
 
 func LoadStateEvents(
-	ctx context.Context, db storage.Database, stateEntries []types.StateEntry,
-) ([]*gomatrixserverlib.Event, error) {
+	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
+) ([]gomatrixserverlib.PDU, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
 		eventNIDs[i] = stateEntries[i].EventNID
 	}
-	return LoadEvents(ctx, db, eventNIDs)
+	return LoadEvents(ctx, db, roomInfo, eventNIDs)
 }
 
 func CheckServerAllowedToSeeEvent(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName, isServerInRoom bool,
 ) (bool, error) {
 	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
 	switch err {
@@ -280,8 +292,8 @@ func CheckServerAllowedToSeeEvent(
 }
 
 func slowGetHistoryVisibilityState(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName,
-) ([]*gomatrixserverlib.Event, error) {
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName,
+) ([]gomatrixserverlib.PDU, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
@@ -326,13 +338,13 @@ func slowGetHistoryVisibilityState(
 		return nil, nil
 	}
 
-	return LoadStateEvents(ctx, db, filteredEntries)
+	return LoadStateEvents(ctx, db, info, filteredEntries)
 }
 
 // TODO: Remove this when we have tests to assert correctness of this function
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, front []string, visited map[string]bool, limit int,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) ([]types.EventNID, map[string]struct{}, error) {
 	var resultNIDs []types.EventNID
 	var err error
@@ -366,7 +378,7 @@ BFSLoop:
 			next = make([]string, 0)
 		}
 		// Retrieve the events to process from the database.
-		events, err = db.EventsFromIDs(ctx, front)
+		events, err = db.EventsFromIDs(ctx, info, front)
 		if err != nil {
 			return resultNIDs, redactEventIDs, err
 		}
@@ -467,13 +479,13 @@ func QueryLatestEventsAndState(
 		return err
 	}
 
-	stateEvents, err := LoadStateEvents(ctx, db, stateEntries)
+	stateEvents, err := LoadStateEvents(ctx, db, roomInfo, stateEntries)
 	if err != nil {
 		return err
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, event.Headered(roomInfo.RoomVersion))
+		response.StateEvents = append(response.StateEvents, &types.HeaderedEvent{PDU: event})
 	}
 
 	return nil

@@ -74,3 +74,7 @@ complement/
 docs/_site
 
 media_store/
+build
+
+# golang workspaces
+go.work*

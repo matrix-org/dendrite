@@ -19,7 +19,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
@@ -130,20 +130,6 @@ func (d DataSource) IsPostgres() bool {
 
 // A Topic in kafka.
 type Topic string
-
-// An Address to listen on.
-type Address string
-
-// An HTTPAddress to listen on, starting with either http:// or https://.
-type HTTPAddress string
-
-func (h HTTPAddress) Address() (Address, error) {
-	url, err := url.Parse(string(h))
-	if err != nil {
-		return "", err
-	}
-	return Address(url.Host), nil
-}
 
 // FileSizeBytes is a file size in bytes
 type FileSizeBytes int64
@@ -254,7 +240,7 @@ func loadConfig(
 
 			key.KeyID = keyID
 			key.PrivateKey = privateKey
-			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
+			key.PublicKey = spec.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
 
 		case key.KeyID == "":
 			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")

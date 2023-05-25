@@ -11,7 +11,7 @@ permalink: /installation/manual/configuration
 A YAML configuration file is used to configure Dendrite. A sample configuration file is
 present in the top level of the Dendrite repository:
 
-* [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml)
+* [`dendrite-sample.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.yaml)
 
 You will need to duplicate the sample, calling it `dendrite.yaml` for example, and then
 tailor it to your installation. At a minimum, you will need to populate the following
@@ -101,15 +101,15 @@ global:
 
 **You must then remove or comment out** the `database` sections from other areas of the
 configuration file, e.g. under the `app_service_api`, `federation_api`, `key_server`,
-`media_api`, `mscs`, `room_server`, `sync_api` and `user_api` blocks, otherwise these will
-override the `global` database configuration.
+`media_api`, `mscs`, `relay_api`, `room_server`, `sync_api` and `user_api` blocks, otherwise
+these will override the `global` database configuration.
 
 ### Per-component connections (all other configurations)
 
 If you are using SQLite databases or separate PostgreSQL databases per component, 
 then you must instead configure the `database` sections under each
 of the component blocks ,e.g. under the `app_service_api`, `federation_api`, `key_server`,
-`media_api`, `mscs`, `room_server`, `sync_api` and `user_api` blocks. Make sure the **sum** of all
+`media_api`, `mscs`, `relay_api`, `room_server`, `sync_api` and `user_api` blocks. Make sure the **sum** of all
 `max_open_conns` does **not** exceed the `max_connections` configured for Postgres.
 
 For example, with PostgreSQL:

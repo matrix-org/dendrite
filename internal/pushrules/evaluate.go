@@ -53,7 +53,7 @@ func NewRuleSetEvaluator(ec EvaluationContext, ruleSet *RuleSet) *RuleSetEvaluat
 
 // MatchEvent returns the first matching rule. Returns nil if there
 // was no match rule.
-func (rse *RuleSetEvaluator) MatchEvent(event *gomatrixserverlib.Event) (*Rule, error) {
+func (rse *RuleSetEvaluator) MatchEvent(event gomatrixserverlib.PDU) (*Rule, error) {
 	// TODO: server-default rules have lower priority than user rules,
 	// but they are stored together with the user rules. It's a bit
 	// unclear what the specification (11.14.1.4 Predefined rules)
@@ -83,7 +83,7 @@ func (rse *RuleSetEvaluator) MatchEvent(event *gomatrixserverlib.Event) (*Rule, 
 	return nil, nil
 }
 
-func ruleMatches(rule *Rule, kind Kind, event *gomatrixserverlib.Event, ec EvaluationContext) (bool, error) {
+func ruleMatches(rule *Rule, kind Kind, event gomatrixserverlib.PDU, ec EvaluationContext) (bool, error) {
 	if !rule.Enabled {
 		return false, nil
 	}
@@ -120,7 +120,7 @@ func ruleMatches(rule *Rule, kind Kind, event *gomatrixserverlib.Event, ec Evalu
 	}
 }
 
-func conditionMatches(cond *Condition, event *gomatrixserverlib.Event, ec EvaluationContext) (bool, error) {
+func conditionMatches(cond *Condition, event gomatrixserverlib.PDU, ec EvaluationContext) (bool, error) {
 	switch cond.Kind {
 	case EventMatchCondition:
 		if cond.Pattern == nil {
@@ -150,7 +150,7 @@ func conditionMatches(cond *Condition, event *gomatrixserverlib.Event, ec Evalua
 	}
 }
 
-func patternMatches(key, pattern string, event *gomatrixserverlib.Event) (bool, error) {
+func patternMatches(key, pattern string, event gomatrixserverlib.PDU) (bool, error) {
 	// It doesn't make sense for an empty pattern to match anything.
 	if pattern == "" {
 		return false, nil

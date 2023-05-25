@@ -15,12 +15,16 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -168,7 +172,7 @@ func TestMSC2836(t *testing.T) {
 			bob:     {roomID},
 			charlie: {roomID},
 		},
-		events: map[string]*gomatrixserverlib.HeaderedEvent{
+		events: map[string]*types.HeaderedEvent{
 			eventA.EventID(): eventA,
 			eventB.EventID(): eventB,
 			eventC.EventID(): eventC,
@@ -179,7 +183,7 @@ func TestMSC2836(t *testing.T) {
 			eventH.EventID(): eventH,
 		},
 	}
-	router := injectEvents(t, nopUserAPI, nopRsAPI, []*gomatrixserverlib.HeaderedEvent{
+	router := injectEvents(t, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
 		eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
 	})
 	cancel := runServer(t, router)
@@ -393,7 +397,7 @@ func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2836.EventRelatio
 func runServer(t *testing.T, router *mux.Router) func() {
 	t.Helper()
 	externalServ := &http.Server{
-		Addr:         string(":8009"),
+		Addr:         string("127.0.0.1:8009"),
 		WriteTimeout: 60 * time.Second,
 		Handler:      router,
 	}
@@ -461,7 +465,7 @@ func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wan
 	}
 }
 
-func assertUnsignedChildren(t *testing.T, ev gomatrixserverlib.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
+func assertUnsignedChildren(t *testing.T, ev synctypes.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
 	t.Helper()
 	unsigned := struct {
 		Children map[string]int `json:"children"`
@@ -518,7 +522,7 @@ type testRoomserverAPI struct {
 	// We'll override the functions we care about.
 	roomserver.RoomserverInternalAPI
 	userToJoinedRooms map[string][]string
-	events            map[string]*gomatrixserverlib.HeaderedEvent
+	events            map[string]*types.HeaderedEvent
 }
 
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
@@ -544,7 +548,7 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 	return nil
 }
 
-func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*gomatrixserverlib.HeaderedEvent) *mux.Router {
+func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
@@ -554,20 +558,18 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}
-	base := &base.BaseDendrite{
-		Cfg:                    cfg,
-		PublicClientAPIMux:     mux.NewRouter().PathPrefix(httputil.PublicClientPathPrefix).Subrouter(),
-		PublicFederationAPIMux: mux.NewRouter().PathPrefix(httputil.PublicFederationPathPrefix).Subrouter(),
-	}
 
-	err := msc2836.Enable(base, rsAPI, nil, userAPI, nil)
+	processCtx := process.NewProcessContext()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+	err := msc2836.Enable(cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {
 		t.Fatalf("failed to enable MSC2836: %s", err)
 	}
 	for _, ev := range events {
 		hooks.Run(hooks.KindNewEventPersisted, ev)
 	}
-	return base.PublicClientAPIMux
+	return routers.Client
 }
 
 type fledglingEvent struct {
@@ -578,28 +580,28 @@ type fledglingEvent struct {
 	RoomID   string
 }
 
-func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEvent) {
 	t.Helper()
 	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
-	eb := gomatrixserverlib.EventBuilder{
+	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
 		Sender:   ev.Sender,
 		Depth:    999,
 		Type:     ev.Type,
 		StateKey: ev.StateKey,
 		RoomID:   ev.RoomID,
-	}
+	})
 	err := eb.SetContent(ev.Content)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to marshal event content %+v", ev.Content)
 	}
 	// make sure the origin_server_ts changes so we can test recency
 	time.Sleep(1 * time.Millisecond)
-	signedEvent, err := eb.Build(time.Now(), gomatrixserverlib.ServerName("localhost"), "ed25519:test", key, roomVer)
+	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := signedEvent.Headered(roomVer)
+	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h
 }

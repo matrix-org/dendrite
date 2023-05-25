@@ -15,19 +15,21 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func NewUserAPIDatabase(
-	base *base.BaseDendrite,
+func NewUserDatabase(
+	ctx context.Context,
+	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	bcryptCost int,
 	openIDTokenLifetimeMS int64,
 	loginTokenLifetime time.Duration,
@@ -35,7 +37,20 @@ func NewUserAPIDatabase(
 ) (UserDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewUserDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+		return sqlite3.NewUserDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+	case dbProperties.ConnectionString.IsPostgres():
+		return nil, fmt.Errorf("can't use Postgres implementation")
+	default:
+		return nil, fmt.Errorf("unexpected database type")
+	}
+}
+
+// NewKeyDatabase opens a new Postgres or Sqlite database (base on dataSourceName) scheme)
+// and sets postgres connection parameters.
+func NewKeyDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.NewKeyDatabase(conMan, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

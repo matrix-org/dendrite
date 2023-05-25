@@ -17,22 +17,26 @@ package caching
 import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Caches contains a set of references to caches. They may be
 // different implementations as long as they satisfy the Cache
 // interface.
 type Caches struct {
-	RoomVersions        Cache[string, gomatrixserverlib.RoomVersion]           // room ID -> room version
-	ServerKeys          Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
-	RoomServerRoomNIDs  Cache[string, types.RoomNID]                           // room ID -> room NID
-	RoomServerRoomIDs   Cache[types.RoomNID, string]                           // room NID -> room ID
-	RoomServerEvents    Cache[int64, *gomatrixserverlib.Event]                 // event NID -> event
-	RoomServerStateKeys Cache[types.EventStateKeyNID, string]                  // event NID -> event state key
-	FederationPDUs      Cache[int64, *gomatrixserverlib.HeaderedEvent]         // queue NID -> PDU
-	FederationEDUs      Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
-	SpaceSummaryRooms   Cache[string, gomatrixserverlib.MSC2946SpacesResponse] // room ID -> space response
-	LazyLoading         Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
+	RoomVersions            Cache[string, gomatrixserverlib.RoomVersion]           // room ID -> room version
+	ServerKeys              Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
+	RoomServerRoomNIDs      Cache[string, types.RoomNID]                           // room ID -> room NID
+	RoomServerRoomIDs       Cache[types.RoomNID, string]                           // room NID -> room ID
+	RoomServerEvents        Cache[int64, *types.HeaderedEvent]                     // event NID -> event
+	RoomServerStateKeys     Cache[types.EventStateKeyNID, string]                  // eventStateKey NID -> event state key
+	RoomServerStateKeyNIDs  Cache[string, types.EventStateKeyNID]                  // event state key -> eventStateKey NID
+	RoomServerEventTypeNIDs Cache[string, types.EventTypeNID]                      // eventType -> eventType NID
+	RoomServerEventTypes    Cache[types.EventTypeNID, string]                      // eventType NID -> eventType
+	FederationPDUs          Cache[int64, *types.HeaderedEvent]                     // queue NID -> PDU
+	FederationEDUs          Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
+	SpaceSummaryRooms       Cache[string, fclient.MSC2946SpacesResponse]           // room ID -> space response
+	LazyLoading             Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
 }
 
 // Cache is the interface that an implementation must satisfy.

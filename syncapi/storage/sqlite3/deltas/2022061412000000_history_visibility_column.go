@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -91,7 +92,7 @@ func currentHistoryVisibilities(ctx context.Context, tx *sql.Tx) (map[string]gom
 	defer rows.Close() // nolint: errcheck
 	var eventBytes []byte
 	var roomID string
-	var event gomatrixserverlib.HeaderedEvent
+	var event types.HeaderedEvent
 	var hisVis gomatrixserverlib.HistoryVisibility
 	historyVisibilities := make(map[string]gomatrixserverlib.HistoryVisibility)
 	for rows.Next() {
