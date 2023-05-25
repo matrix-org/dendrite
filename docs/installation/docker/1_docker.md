@@ -9,7 +9,7 @@ permalink: /installation/docker/install
 
 # Installing Dendrite using Docker Compose
 
-Dendrite provides an [example](https://github.com/matrix-org/dendrite/blob/main/build/docker/docker-compose.monolith.yml) 
+Dendrite provides an [example](https://github.com/matrix-org/dendrite/blob/main/build/docker/docker-compose.yml) 
 Docker compose file, which needs some preparation to start successfully.
 Please note that this compose file only has Postgres as a dependency, and you need to configure
 a [reverse proxy](../planning#reverse-proxy).
@@ -53,5 +53,5 @@ You can then change `config/dendrite.yaml` to your liking.
 Once you're done changing the config, you can now start up Dendrite with
 
 ```bash
-docker-compose -f docker-compose.monolith.yml up 
+docker-compose -f docker-compose.yml up 
 ```

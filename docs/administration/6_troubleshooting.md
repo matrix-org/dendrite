@@ -19,7 +19,7 @@ be clues in the logs.
 You can increase this log level to the more verbose `debug` level if necessary by adding
 this to the config and restarting Dendrite:
 
-```
+```yaml
 logging:
 - type: std
   level: debug
@@ -57,12 +57,7 @@ number of database connections does not exceed the maximum allowed by PostgreSQL
 
 Open your `postgresql.conf` configuration file and check the value of `max_connections`
 (which is typically `100` by default). Then open your `dendrite.yaml` configuration file
-and ensure that:
-
-1. If you are using the `global.database` section, that `max_open_conns` does not exceed
-   that number;
-2. If you are **not** using the `global.database` section, that the sum total of all
-   `max_open_conns` across all `database` blocks does not exceed that number.
+and ensure that in the `global.database` section, `max_open_conns` does not exceed that number.
 
 ## 5. File descriptors
 
@@ -78,7 +73,7 @@ If there aren't, you will see a log lines like this:
 level=warning msg="IMPORTANT: Process file descriptor limit is currently 65535, it is recommended to raise the limit for Dendrite to at least 65535 to avoid issues"
 ```
 
-Follow the [Optimisation](11_optimisation.md) instructions to correct the
+Follow the [Optimisation](5_optimisation.md) instructions to correct the
 available number of file descriptors.
 
 ## 6. STUN/TURN Server tester

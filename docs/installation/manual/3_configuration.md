@@ -79,12 +79,7 @@ You do not need to configure the `storage_path` when using a standalone NATS Ser
 In the case that you are connecting to a multi-node NATS cluster, you can configure more than
 one address in the `addresses` field.
 
-## Database connections
-
-Configuring database connections varies based on the [database configuration](database)
-that you chose.
-
-### Global connection pool (with a single PostgreSQL database only)
+## Database connection using a global connection pool
 
 If you want to use a single connection pool to a single PostgreSQL database, 
 then you must uncomment and configure the `database` section within the `global` section:
@@ -103,38 +98,6 @@ global:
 configuration file, e.g. under the `app_service_api`, `federation_api`, `key_server`,
 `media_api`, `mscs`, `relay_api`, `room_server`, `sync_api` and `user_api` blocks, otherwise
 these will override the `global` database configuration.
-
-### Per-component connections (all other configurations)
-
-If you are using SQLite databases or separate PostgreSQL databases per component, 
-then you must instead configure the `database` sections under each
-of the component blocks ,e.g. under the `app_service_api`, `federation_api`, `key_server`,
-`media_api`, `mscs`, `relay_api`, `room_server`, `sync_api` and `user_api` blocks. Make sure the **sum** of all
-`max_open_conns` does **not** exceed the `max_connections` configured for Postgres.
-
-For example, with PostgreSQL:
-
-```yaml
-room_server:
-  # ...
-  database:
-    connection_string: postgres://user:pass@hostname/dendrite_component?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-```
-
-... or with SQLite:
-
-```yaml
-room_server:
-  # ...
-  database:
-    connection_string: file:roomserver.db
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-```
 
 ## Full-text search
 

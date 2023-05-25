@@ -50,13 +50,17 @@ the room IDs of all affected rooms.
 
 ## POST `/_dendrite/admin/resetPassword/{userID}`
 
-Reset the password of a local user.
+Reset the password of a local user. 
+
+**If `logout_devices` is set to `true`, all `access_tokens` will be invalidated, resulting
+in the potential loss of encrypted messages**
 
 Request body format:
 
-```
+```json
 {
-    "password": "new_password_here"
+    "password": "new_password_here",
+    "logout_devices": false
 }
 ```
 
@@ -76,7 +80,7 @@ This endpoint instructs Dendrite to remove the given room from its database. Bef
 ## POST `/_synapse/admin/v1/send_server_notice`
 
 Request body format:
-```
+```json
 {
     "user_id": "@target_user:server_name",
     "content": {
@@ -89,7 +93,7 @@ Request body format:
 Send a server notice to a specific user. See the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#server-notices) for additional details on server notice behaviour.
 If successfully sent, the API will return the following response:
 
-```
+```json
 {
      "event_id": "<event_id>"
 }

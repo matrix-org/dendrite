@@ -36,11 +36,6 @@ connections it will open to the database.
 **If you are using the `global` database pool** then you only need to configure the
 `max_open_conns` setting once in the `global` section.
 
-**If you are defining a `database` config per component** then you will need to ensure that
-the **sum total** of all configured `max_open_conns` to a given database server do not exceed
-the connection limit. If you configure a total that adds up to more connections than are available
-then this will cause database queries to fail.
-
 You may wish to raise the `max_connections` limit on your PostgreSQL server to accommodate
 additional connections, in which case you should also update the `max_open_conns` in your
 Dendrite configuration accordingly. However be aware that this is only advisable on particularly
