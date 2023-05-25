@@ -40,7 +40,7 @@ spec:
     - host: {{ .Values.ingress.hostName | quote }}
       http:
         paths:
-          - path: /_matrix
+          - path: /
             pathType: ImplementationSpecific
             backend:
               {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
