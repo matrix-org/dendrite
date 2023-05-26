@@ -78,12 +78,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 	for _, userID := range r.Invite {
-		// TODO: We should put user ID parsing code into gomatrixserverlib and use that instead
-		//       (see https://github.com/matrix-org/gomatrixserverlib/blob/3394e7c7003312043208aa73727d2256eea3d1f6/eventcontent.go#L347 )
-		//       It should be a struct (with pointers into a single string to avoid copying) and
-		//       we should update all refs to use UserID types rather than strings.
-		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
-		if _, _, err := gomatrixserverlib.SplitID('@', userID); err != nil {
+		if _, err := spec.NewUserID(userID, true); err != nil {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("user id must be in the form @localpart:domain"),
@@ -143,12 +138,12 @@ func CreateRoom(
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 ) util.JSONResponse {
-	var r createRoomRequest
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	var createRequest createRoomRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &createRequest)
 	if resErr != nil {
 		return *resErr
 	}
-	if resErr = r.Validate(); resErr != nil {
+	if resErr = createRequest.Validate(); resErr != nil {
 		return *resErr
 	}
 	evTime, err := httputil.ParseTSParam(req)
@@ -158,7 +153,7 @@ func CreateRoom(
 			JSON: spec.InvalidParam(err.Error()),
 		}
 	}
-	return createRoom(req.Context(), r, device, cfg, profileAPI, rsAPI, asAPI, evTime)
+	return createRoom(req.Context(), createRequest, device, cfg, profileAPI, rsAPI, asAPI, evTime)
 }
 
 // createRoom implements /createRoom
@@ -166,39 +161,45 @@ func CreateRoom(
 func createRoom(
 	ctx context.Context,
 	// TODO: remove dependency on createRoomRequest
-	r createRoomRequest, device *api.Device,
+	createRequest createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	evTime time.Time,
 ) util.JSONResponse {
-	_, userDomain, err := gomatrixserverlib.SplitID('@', device.UserID)
+	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(ctx).WithError(err).Error("invalid userID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(userDomain) {
+	if !cfg.Matrix.IsLocalServerName(userID.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userDomain)),
+			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userID.Domain())),
 		}
 	}
 
 	logger := util.GetLogger(ctx)
-	userID := device.UserID
 
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), userDomain)
+	roomID, err := spec.NewRoomID(fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain()))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("invalid roomID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
 
 	// Clobber keys: creator, room_version
 
 	roomVersion := roomserverVersion.DefaultRoomVersion()
-	if r.RoomVersion != "" {
-		candidateVersion := gomatrixserverlib.RoomVersion(r.RoomVersion)
+	if createRequest.RoomVersion != "" {
+		candidateVersion := gomatrixserverlib.RoomVersion(createRequest.RoomVersion)
 		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
 		if roomVersionError != nil {
 			return util.JSONResponse{
@@ -210,12 +211,12 @@ func createRoom(
 	}
 
 	logger.WithFields(log.Fields{
-		"userID":      userID,
-		"roomID":      roomID,
+		"userID":      userID.String(),
+		"roomID":      roomID.String(),
 		"roomVersion": roomVersion,
 	}).Info("Creating new room")
 
-	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return util.JSONResponse{
@@ -238,8 +239,8 @@ func createRoom(
 	// Make sure this doesn't fall into an application service's namespace though!
 
 	createContent := map[string]interface{}{}
-	if len(r.CreationContent) > 0 {
-		if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
+	if len(createRequest.CreationContent) > 0 {
+		if err = json.Unmarshal(createRequest.CreationContent, &createContent); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for creation_content failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
@@ -247,9 +248,9 @@ func createRoom(
 			}
 		}
 	}
-	createContent["creator"] = userID
+	createContent["creator"] = userID.String()
 	createContent["room_version"] = roomVersion
-	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
+	powerLevelContent := eventutil.InitialPowerLevelsContent(userID.String())
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
 		JoinRule: spec.Invite,
 	}
@@ -257,9 +258,9 @@ func createRoom(
 		HistoryVisibility: historyVisibilityShared,
 	}
 
-	if r.PowerLevelContentOverride != nil {
+	if createRequest.PowerLevelContentOverride != nil {
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
-		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
+		err = json.Unmarshal(createRequest.PowerLevelContentOverride, &powerLevelContent)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
 			return util.JSONResponse{
@@ -270,7 +271,7 @@ func createRoom(
 	}
 
 	var guestsCanJoin bool
-	switch r.Preset {
+	switch createRequest.Preset {
 	case presetPrivateChat:
 		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
@@ -278,7 +279,7 @@ func createRoom(
 	case presetTrustedPrivateChat:
 		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
-		for _, invitee := range r.Invite {
+		for _, invitee := range createRequest.Invite {
 			powerLevelContent.Users[invitee] = 100
 		}
 		guestsCanJoin = true
@@ -305,7 +306,7 @@ func createRoom(
 	}
 	membershipEvent := fledglingEvent{
 		Type:     spec.MRoomMember,
-		StateKey: userID,
+		StateKey: userID.String(),
 		Content: gomatrixserverlib.MemberContent{
 			Membership:  spec.Join,
 			DisplayName: userDisplayName,
@@ -318,20 +319,20 @@ func createRoom(
 	var guestAccessEvent *fledglingEvent
 	var aliasEvent *fledglingEvent
 
-	if r.Name != "" {
+	if createRequest.Name != "" {
 		nameEvent = &fledglingEvent{
 			Type: spec.MRoomName,
 			Content: eventutil.NameContent{
-				Name: r.Name,
+				Name: createRequest.Name,
 			},
 		}
 	}
 
-	if r.Topic != "" {
+	if createRequest.Topic != "" {
 		topicEvent = &fledglingEvent{
 			Type: spec.MRoomTopic,
 			Content: eventutil.TopicContent{
-				Topic: r.Topic,
+				Topic: createRequest.Topic,
 			},
 		}
 	}
@@ -346,8 +347,8 @@ func createRoom(
 	}
 
 	var roomAlias string
-	if r.RoomAliasName != "" {
-		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, userDomain)
+	if createRequest.RoomAliasName != "" {
+		roomAlias = fmt.Sprintf("#%s:%s", createRequest.RoomAliasName, userID.Domain())
 		// check it's free TODO: This races but is better than nothing
 		hasAliasReq := roomserverAPI.GetRoomIDForAliasRequest{
 			Alias:              roomAlias,
@@ -379,36 +380,36 @@ func createRoom(
 	}
 
 	var initialStateEvents []fledglingEvent
-	for i := range r.InitialState {
-		if r.InitialState[i].StateKey != "" {
-			initialStateEvents = append(initialStateEvents, r.InitialState[i])
+	for i := range createRequest.InitialState {
+		if createRequest.InitialState[i].StateKey != "" {
+			initialStateEvents = append(initialStateEvents, createRequest.InitialState[i])
 			continue
 		}
 
-		switch r.InitialState[i].Type {
+		switch createRequest.InitialState[i].Type {
 		case spec.MRoomCreate:
 			continue
 
 		case spec.MRoomPowerLevels:
-			powerLevelEvent = r.InitialState[i]
+			powerLevelEvent = createRequest.InitialState[i]
 
 		case spec.MRoomJoinRules:
-			joinRuleEvent = r.InitialState[i]
+			joinRuleEvent = createRequest.InitialState[i]
 
 		case spec.MRoomHistoryVisibility:
-			historyVisibilityEvent = r.InitialState[i]
+			historyVisibilityEvent = createRequest.InitialState[i]
 
 		case spec.MRoomGuestAccess:
-			guestAccessEvent = &r.InitialState[i]
+			guestAccessEvent = &createRequest.InitialState[i]
 
 		case spec.MRoomName:
-			nameEvent = &r.InitialState[i]
+			nameEvent = &createRequest.InitialState[i]
 
 		case spec.MRoomTopic:
-			topicEvent = &r.InitialState[i]
+			topicEvent = &createRequest.InitialState[i]
 
 		default:
-			initialStateEvents = append(initialStateEvents, r.InitialState[i])
+			initialStateEvents = append(initialStateEvents, createRequest.InitialState[i])
 		}
 	}
 
@@ -465,8 +466,8 @@ func createRoom(
 		depth := i + 1 // depth starts at 1
 
 		builder := verImpl.NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-			Sender:   userID,
-			RoomID:   roomID,
+			Sender:   userID.String(),
+			RoomID:   roomID.String(),
 			Type:     e.Type,
 			StateKey: &e.StateKey,
 			Depth:    int64(depth),
@@ -490,7 +491,7 @@ func createRoom(
 				JSON: spec.InternalServerError{},
 			}
 		}
-		ev, err = builder.Build(evTime, userDomain, keyID, privateKey)
+		ev, err = builder.Build(evTime, userID.Domain(), keyID, privateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return util.JSONResponse{
@@ -524,11 +525,11 @@ func createRoom(
 		inputs = append(inputs, roomserverAPI.InputRoomEvent{
 			Kind:         roomserverAPI.KindNew,
 			Event:        event,
-			Origin:       userDomain,
+			Origin:       userID.Domain(),
 			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
-	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, userDomain, inputs, false); err != nil {
+	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, userID.Domain(), inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -542,8 +543,8 @@ func createRoom(
 	if roomAlias != "" {
 		aliasReq := roomserverAPI.SetRoomAliasRequest{
 			Alias:  roomAlias,
-			RoomID: roomID,
-			UserID: userID,
+			RoomID: roomID.String(),
+			UserID: userID.String(),
 		}
 
 		var aliasResp roomserverAPI.SetRoomAliasResponse
@@ -565,7 +566,7 @@ func createRoom(
 	}
 
 	// If this is a direct message then we should invite the participants.
-	if len(r.Invite) > 0 {
+	if len(createRequest.Invite) > 0 {
 		// Build some stripped state for the invite.
 		var globalStrippedState []fclient.InviteV2StrippedState
 		for _, event := range builtEvents {
@@ -597,11 +598,11 @@ func createRoom(
 
 		// Process the invites.
 		var inviteEvent *types.HeaderedEvent
-		for _, invitee := range r.Invite {
+		for _, invitee := range createRequest.Invite {
 			// Build the invite event.
 			inviteEvent, err = buildMembershipEventDirect(
-				ctx, invitee, "", userDisplayName, userAvatarURL, userID, userDomain, spec.Invite,
-				roomID, r.IsDirect, keyID, privateKey, evTime, rsAPI,
+				ctx, invitee, "", userDisplayName, userAvatarURL, userID.String(), userID.Domain(), spec.Invite,
+				roomID.String(), createRequest.IsDirect, keyID, privateKey, evTime, rsAPI,
 			)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
@@ -617,7 +618,7 @@ func createRoom(
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
 				RoomVersion:     event.Version(),
-				SendAsServer:    string(userDomain),
+				SendAsServer:    string(userID.Domain()),
 			})
 			switch e := err.(type) {
 			case roomserverAPI.ErrInvalidID:
@@ -642,10 +643,10 @@ func createRoom(
 		}
 	}
 
-	if r.Visibility == spec.Public {
+	if createRequest.Visibility == spec.Public {
 		// expose this room in the published room list
 		if err = rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
-			RoomID:     roomID,
+			RoomID:     roomID.String(),
 			Visibility: spec.Public,
 		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("failed to publish room")
@@ -657,7 +658,7 @@ func createRoom(
 	}
 
 	response := createRoomResponse{
-		RoomID:    roomID,
+		RoomID:    roomID.String(),
 		RoomAlias: roomAlias,
 	}
 
