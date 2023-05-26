@@ -555,7 +555,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 		return nil, fmt.Errorf("failed to get signing identity for %q: %w", senderDomain, err)
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, evTime, r.URSAPI, &queryRes)
+	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, r.URSAPI, &queryRes)
 	switch e := err.(type) {
 	case nil:
 	case eventutil.ErrRoomNoExists:

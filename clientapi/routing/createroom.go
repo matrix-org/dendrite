@@ -165,6 +165,7 @@ func CreateRoom(
 // nolint: gocyclo
 func createRoom(
 	ctx context.Context,
+	// TODO: remove dependency on createRoomRequest
 	r createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
@@ -186,12 +187,12 @@ func createRoom(
 		}
 	}
 
+	logger := util.GetLogger(ctx)
+	userID := device.UserID
+
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), userDomain)
-
-	logger := util.GetLogger(ctx)
-	userID := device.UserID
 
 	// Clobber keys: creator, room_version
 
@@ -208,10 +209,6 @@ func createRoom(
 		roomVersion = candidateVersion
 	}
 
-	// TODO: visibility/presets/raw initial state
-	// TODO: Create room alias association
-	// Make sure this doesn't fall into an application service's namespace though!
-
 	logger.WithFields(log.Fields{
 		"userID":      userID,
 		"roomID":      roomID,
@@ -226,6 +223,19 @@ func createRoom(
 			JSON: spec.InternalServerError{},
 		}
 	}
+
+	userDisplayName := profile.DisplayName
+	userAvatarURL := profile.AvatarURL
+
+	keyID := cfg.Matrix.KeyID
+	privateKey := cfg.Matrix.PrivateKey
+
+	// TODO: Move this whole function to roomserver to start
+	// HACK: asdklfjsdklfj
+
+	// TODO: visibility/presets/raw initial state
+	// TODO: Create room alias association
+	// Make sure this doesn't fall into an application service's namespace though!
 
 	createContent := map[string]interface{}{}
 	if len(r.CreationContent) > 0 {
@@ -298,8 +308,8 @@ func createRoom(
 		StateKey: userID,
 		Content: gomatrixserverlib.MemberContent{
 			Membership:  spec.Join,
-			DisplayName: profile.DisplayName,
-			AvatarURL:   profile.AvatarURL,
+			DisplayName: userDisplayName,
+			AvatarURL:   userAvatarURL,
 		},
 	}
 
@@ -480,7 +490,7 @@ func createRoom(
 				JSON: spec.InternalServerError{},
 			}
 		}
-		ev, err = builder.Build(evTime, userDomain, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+		ev, err = builder.Build(evTime, userDomain, keyID, privateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return util.JSONResponse{
@@ -518,7 +528,7 @@ func createRoom(
 			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
-	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, device.UserDomain(), inputs, false); err != nil {
+	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, userDomain, inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -589,9 +599,9 @@ func createRoom(
 		var inviteEvent *types.HeaderedEvent
 		for _, invitee := range r.Invite {
 			// Build the invite event.
-			inviteEvent, err = buildMembershipEvent(
-				ctx, invitee, "", profileAPI, device, spec.Invite,
-				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
+			inviteEvent, err = buildMembershipEventDirect(
+				ctx, invitee, "", userDisplayName, userAvatarURL, userID, userDomain, spec.Invite,
+				roomID, r.IsDirect, keyID, privateKey, evTime, rsAPI,
 			)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")

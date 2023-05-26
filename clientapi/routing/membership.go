@@ -16,12 +16,14 @@ package routing
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -308,6 +310,37 @@ func sendInvite(
 	}, nil
 }
 
+func buildMembershipEventDirect(
+	ctx context.Context,
+	targetUserID, reason string, userDisplayName, userAvatarURL string,
+	sender string, senderDomain spec.ServerName,
+	membership, roomID string, isDirect bool,
+	keyID gomatrixserverlib.KeyID, privateKey ed25519.PrivateKey, evTime time.Time,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+) (*types.HeaderedEvent, error) {
+	proto := gomatrixserverlib.ProtoEvent{
+		Sender:   sender,
+		RoomID:   roomID,
+		Type:     "m.room.member",
+		StateKey: &targetUserID,
+	}
+
+	content := gomatrixserverlib.MemberContent{
+		Membership:  membership,
+		DisplayName: userDisplayName,
+		AvatarURL:   userAvatarURL,
+		Reason:      reason,
+		IsDirect:    isDirect,
+	}
+
+	if err := proto.SetContent(content); err != nil {
+		return nil, err
+	}
+
+	identity := &fclient.SigningIdentity{senderDomain, keyID, privateKey}
+	return eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, nil)
+}
+
 func buildMembershipEvent(
 	ctx context.Context,
 	targetUserID, reason string, profileAPI userapi.ClientUserAPI,
@@ -321,31 +354,13 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   device.UserID,
-		RoomID:   roomID,
-		Type:     "m.room.member",
-		StateKey: &targetUserID,
-	}
-
-	content := gomatrixserverlib.MemberContent{
-		Membership:  membership,
-		DisplayName: profile.DisplayName,
-		AvatarURL:   profile.AvatarURL,
-		Reason:      reason,
-		IsDirect:    isDirect,
-	}
-
-	if err = proto.SetContent(content); err != nil {
-		return nil, err
-	}
-
 	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
 	if err != nil {
 		return nil, err
 	}
 
-	return eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, nil)
+	return buildMembershipEventDirect(ctx, targetUserID, reason, profile.DisplayName, profile.AvatarURL,
+		device.UserID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

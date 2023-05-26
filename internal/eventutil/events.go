@@ -22,7 +22,6 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -51,7 +50,7 @@ func (e ErrRoomNoExists) Unwrap() error {
 // Returns an error if something else went wrong
 func QueryAndBuildEvent(
 	ctx context.Context,
-	proto *gomatrixserverlib.ProtoEvent, cfg *config.Global,
+	proto *gomatrixserverlib.ProtoEvent,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*types.HeaderedEvent, error) {
@@ -64,14 +63,14 @@ func QueryAndBuildEvent(
 		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
 	}
-	return BuildEvent(ctx, proto, cfg, identity, evTime, eventsNeeded, queryRes)
+	return BuildEvent(ctx, proto, identity, evTime, eventsNeeded, queryRes)
 }
 
 // BuildEvent builds a Matrix event from the builder and QueryLatestEventsAndStateResponse
 // provided.
 func BuildEvent(
 	ctx context.Context,
-	proto *gomatrixserverlib.ProtoEvent, cfg *config.Global,
+	proto *gomatrixserverlib.ProtoEvent,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	eventsNeeded *gomatrixserverlib.StateNeeded, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*types.HeaderedEvent, error) {

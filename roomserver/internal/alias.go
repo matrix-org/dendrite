@@ -208,7 +208,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			newEvent, err := eventutil.BuildEvent(ctx, proto, &r.Cfg.Global, identity, time.Now(), &eventsNeeded, stateRes)
+			newEvent, err := eventutil.BuildEvent(ctx, proto, identity, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}
