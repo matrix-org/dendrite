@@ -2,6 +2,98 @@ apiVersion: v1
 entries:
   dendrite:
   - apiVersion: v2
+    appVersion: 0.12.0
+    created: "2023-05-02T16:29:48.253934984Z"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 12.1.7
+    description: Dendrite Matrix Homeserver
+    digest: 918dd710a55cd177a309d5215b336b1376ee9f048a574a5f0f4fcb529878f1c6
+    home: https://github.com/matrix-org/dendrite
+    keywords:
+    - matrix
+    - chat
+    - homeserver
+    - dendrite
+    name: dendrite
+    sources:
+    - https://github.com/matrix-org/dendrite
+    type: application
+    urls:
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.12.3/dendrite-0.12.3.tgz
+    version: 0.12.3
+  - apiVersion: v2
+    appVersion: 0.12.0
+    created: "2023-04-03T07:13:52.184193517Z"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 12.1.7
+    description: Dendrite Matrix Homeserver
+    digest: 07b62f5113cbba71c35155cb2dadf194f0894bba31a1f33b3fe148a8e096eec4
+    home: https://github.com/matrix-org/dendrite
+    keywords:
+    - matrix
+    - chat
+    - homeserver
+    - dendrite
+    name: dendrite
+    sources:
+    - https://github.com/matrix-org/dendrite
+    type: application
+    urls:
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.12.2/dendrite-0.12.2.tgz
+    version: 0.12.2
+  - apiVersion: v2
+    appVersion: 0.12.0
+    created: "2023-03-28T06:30:46.828528955Z"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 12.1.7
+    description: Dendrite Matrix Homeserver
+    digest: 996566be7a1a6381bd16bffb05b3ac6bc7ed93382e511c6ffe5488d7ec556afe
+    home: https://github.com/matrix-org/dendrite
+    keywords:
+    - matrix
+    - chat
+    - homeserver
+    - dendrite
+    name: dendrite
+    sources:
+    - https://github.com/matrix-org/dendrite
+    type: application
+    urls:
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.12.1/dendrite-0.12.1.tgz
+    version: 0.12.1
+  - apiVersion: v2
+    appVersion: 0.12.0
+    created: "2023-03-13T19:03:25.532326612Z"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 12.1.7
+    description: Dendrite Matrix Homeserver
+    digest: 3a5f7558e0d51552ac9cf3fa5f869f25cb39a3da63a68f343d102f60429accf0
+    home: https://github.com/matrix-org/dendrite
+    keywords:
+    - matrix
+    - chat
+    - homeserver
+    - dendrite
+    name: dendrite
+    sources:
+    - https://github.com/matrix-org/dendrite
+    type: application
+    urls:
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.12.0/dendrite-0.12.0.tgz
+    version: 0.12.0
+  - apiVersion: v2
     appVersion: 0.11.1
     created: "2023-02-28T13:18:47.099940149Z"
     dependencies:
@@ -116,4 +208,4 @@ entries:
     urls:
     - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.10.8/dendrite-0.10.8.tgz
     version: 0.10.8
-generated: "2023-02-28T13:18:47.099967749Z"
+generated: "2023-05-02T16:29:48.253970683Z"
