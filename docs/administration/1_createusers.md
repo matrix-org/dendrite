@@ -11,10 +11,9 @@ User accounts can be created on a Dendrite instance in a number of ways.
 
 ## From the command line
 
-The `create-account` tool is built in the `bin` folder when building Dendrite with
-the `build.sh` script.
+The `create-account` tool is built in the `bin` folder when [building](../installation/build) Dendrite.
 
-It uses the `dendrite.yaml` configuration file to connect to a running Dendrite instance and requires
+It uses the `dendrite.yaml` configuration file to connect to a **running** Dendrite instance and requires
 shared secret registration to be enabled as explained below.
 
 An example of using `create-account` to create a **normal account**:
