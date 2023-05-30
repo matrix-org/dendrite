@@ -18,11 +18,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
-	"golang.org/x/exp/slices"
+	"github.com/matrix-org/util"
 )
 
 func UpDropEventReferenceSHAEvents(ctx context.Context, tx *sql.Tx) error {
@@ -83,8 +82,7 @@ func UpDropEventReferenceSHAPrevEvents(ctx context.Context, tx *sql.Tx) error {
 			return dupeNIDsRows.Err()
 		}
 		// dedupe NIDs
-		sort.Sort(nids(dupeNIDs))
-		dupeNIDs = slices.Compact(dupeNIDs)
+		dupeNIDs = dupeNIDs[:util.SortAndUnique(nids(dupeNIDs))]
 		// now that we have all NIDs, check which room they belong to
 		var roomCount int
 		err = tx.QueryRowContext(ctx, `SELECT count(distinct room_nid) FROM roomserver_events WHERE event_nid = ANY($1)`, pq.Array(dupeNIDs)).Scan(&roomCount)
