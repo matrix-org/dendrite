@@ -23,6 +23,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/dgraph-io/ristretto/z"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -102,8 +103,8 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Prefix: roomIDsCache,
 			MaxAge: maxAge,
 		},
-		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{ // event NID -> event
-			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
+		RoomServerEvents: &RistrettoCostedCachePartition[int64, *types.HeaderedEvent]{ // event NID -> event
+			&RistrettoCachePartition[int64, *types.HeaderedEvent]{
 				cache:   cache,
 				Prefix:  roomEventsCache,
 				MaxAge:  maxAge,
@@ -130,8 +131,8 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Prefix: eventTypeNIDCache,
 			MaxAge: maxAge,
 		},
-		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{ // queue NID -> PDU
-			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
+		FederationPDUs: &RistrettoCostedCachePartition[int64, *types.HeaderedEvent]{ // queue NID -> PDU
+			&RistrettoCachePartition[int64, *types.HeaderedEvent]{
 				cache:   cache,
 				Prefix:  federationPDUsCache,
 				Mutable: true,
@@ -146,7 +147,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				MaxAge:  lesserOf(time.Hour/2, maxAge),
 			},
 		},
-		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{ // room ID -> space response
+		SpaceSummaryRooms: &RistrettoCachePartition[string, fclient.MSC2946SpacesResponse]{ // room ID -> space response
 			cache:   cache,
 			Prefix:  spaceSummaryRoomsCache,
 			Mutable: true,

@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -35,7 +35,10 @@ func GetNotifications(
 		limit, err = strconv.ParseInt(limitStr, 10, 64)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("ParseInt(limit) failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -43,7 +46,10 @@ func GetNotifications(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	err = userAPI.QueryNotifications(req.Context(), &userapi.QueryNotificationsRequest{
 		Localpart:  localpart,
@@ -54,7 +60,10 @@ func GetNotifications(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryNotifications failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	util.GetLogger(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Infof("QueryNotifications: len %d", len(queryRes.Notifications))
 	return util.JSONResponse{

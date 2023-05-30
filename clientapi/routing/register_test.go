@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -39,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
@@ -306,7 +306,7 @@ func Test_register(t *testing.T) {
 			guestsDisabled: true,
 			wantResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(`Guest registration is disabled on "test"`),
+				JSON: spec.Forbidden(`Guest registration is disabled on "test"`),
 			},
 		},
 		{
@@ -318,7 +318,7 @@ func Test_register(t *testing.T) {
 			loginType: "im.not.known",
 			wantResponse: util.JSONResponse{
 				Code: http.StatusNotImplemented,
-				JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
+				JSON: spec.Unknown("unknown/unimplemented auth type"),
 			},
 		},
 		{
@@ -326,7 +326,7 @@ func Test_register(t *testing.T) {
 			registrationDisabled: true,
 			wantResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(`Registration is disabled on "test"`),
+				JSON: spec.Forbidden(`Registration is disabled on "test"`),
 			},
 		},
 		{
@@ -344,7 +344,7 @@ func Test_register(t *testing.T) {
 			username: "success",
 			wantResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+				JSON: spec.UserInUse("Desired user ID is already taken."),
 			},
 		},
 		{
@@ -361,7 +361,7 @@ func Test_register(t *testing.T) {
 			username: "1337",
 			wantResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
+				JSON: spec.InvalidUsername("Numeric user IDs are reserved"),
 			},
 		},
 		{
@@ -369,7 +369,7 @@ func Test_register(t *testing.T) {
 			loginType: authtypes.LoginTypeRecaptcha,
 			wantResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Unknown(ErrCaptchaDisabled.Error()),
+				JSON: spec.Unknown(ErrCaptchaDisabled.Error()),
 			},
 		},
 		{
@@ -378,7 +378,7 @@ func Test_register(t *testing.T) {
 			loginType:       authtypes.LoginTypeRecaptcha,
 			wantResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(ErrMissingResponse.Error()),
+				JSON: spec.BadJSON(ErrMissingResponse.Error()),
 			},
 		},
 		{
@@ -388,7 +388,7 @@ func Test_register(t *testing.T) {
 			captchaBody:     `notvalid`,
 			wantResponse: util.JSONResponse{
 				Code: http.StatusUnauthorized,
-				JSON: jsonerror.BadJSON(ErrInvalidCaptcha.Error()),
+				JSON: spec.BadJSON(ErrInvalidCaptcha.Error()),
 			},
 		},
 		{
@@ -402,7 +402,7 @@ func Test_register(t *testing.T) {
 			enableRecaptcha: true,
 			loginType:       authtypes.LoginTypeRecaptcha,
 			captchaBody:     `i should fail for other reasons`,
-			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: jsonerror.InternalServerError()},
+			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}},
 		},
 	}
 
@@ -484,7 +484,7 @@ func Test_register(t *testing.T) {
 					if !reflect.DeepEqual(r.Flows, cfg.Derived.Registration.Flows) {
 						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
 					}
-				case *jsonerror.MatrixError:
+				case spec.MatrixError:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
 					}
@@ -541,7 +541,12 @@ func Test_register(t *testing.T) {
 				resp = Register(req, userAPI, &cfg.ClientAPI)
 
 				switch resp.JSON.(type) {
-				case *jsonerror.MatrixError:
+				case spec.InternalServerError:
+					if !reflect.DeepEqual(tc.wantResponse, resp) {
+						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+					}
+					return
+				case spec.MatrixError:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
 					}
@@ -611,11 +616,9 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		req := api.QueryProfileRequest{UserID: "@user:server"}
-		var res api.QueryProfileResponse
-		err := userAPI.QueryProfile(processCtx.Context(), &req, &res)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@user:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, res.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }
 
@@ -662,10 +665,8 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		)
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		profilReq := api.QueryProfileRequest{UserID: "@alice:server"}
-		var profileRes api.QueryProfileResponse
-		err = userAPI.QueryProfile(processCtx.Context(), &profilReq, &profileRes)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@alice:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, profileRes.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }

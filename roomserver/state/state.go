@@ -41,21 +41,21 @@ type StateResolutionStorage interface {
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error)
+	Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error)
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 }
 
 type StateResolution struct {
 	db       StateResolutionStorage
 	roomInfo *types.RoomInfo
-	events   map[types.EventNID]*gomatrixserverlib.Event
+	events   map[types.EventNID]gomatrixserverlib.PDU
 }
 
 func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) StateResolution {
 	return StateResolution{
 		db:       db,
 		roomInfo: roomInfo,
-		events:   make(map[types.EventNID]*gomatrixserverlib.Event),
+		events:   make(map[types.EventNID]gomatrixserverlib.PDU),
 	}
 }
 
@@ -85,7 +85,10 @@ func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatri
 		return nil, fmt.Errorf("unable to find power level event")
 	}
 
-	events, err := p.db.Events(ctx, p.roomInfo, []types.EventNID{plNID})
+	if p.roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	events, err := p.db.Events(ctx, p.roomInfo.RoomVersion, []types.EventNID{plNID})
 	if err != nil {
 		return nil, err
 	}
@@ -702,7 +705,7 @@ func init() {
 // Returns a numeric ID for the snapshot of the state before the event.
 func (v *StateResolution) CalculateAndStoreStateBeforeEvent(
 	ctx context.Context,
-	event *gomatrixserverlib.Event,
+	event gomatrixserverlib.PDU,
 	isRejected bool,
 ) (types.StateSnapshotNID, error) {
 	trace, ctx := internal.StartRegion(ctx, "StateResolution.CalculateAndStoreStateBeforeEvent")
@@ -878,10 +881,12 @@ func (v *StateResolution) resolveConflicts(
 	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflicts")
 	defer trace.EndRegion()
 
-	stateResAlgo, err := version.StateResAlgorithm()
+	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
 	if err != nil {
 		return nil, err
 	}
+
+	stateResAlgo := verImpl.StateResAlgorithm()
 	switch stateResAlgo {
 	case gomatrixserverlib.StateResV1:
 		return v.resolveConflictsV1(ctx, notConflicted, conflicted)
@@ -993,8 +998,8 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// For each conflicted event, we will add a new set of auth events. Auth
 	// events may be duplicated across these sets but that's OK.
-	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
-	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
+	authSets := make(map[string][]gomatrixserverlib.PDU, len(conflicted))
+	authEvents := make([]gomatrixserverlib.PDU, 0, estimate*3)
 	gotAuthEvents := make(map[string]struct{}, estimate*3)
 	knownAuthEvents := make(map[string]types.Event, estimate*3)
 
@@ -1044,7 +1049,7 @@ func (v *StateResolution) resolveConflictsV2(
 	gotAuthEvents = nil // nolint:ineffassign
 
 	// Resolve the conflicts.
-	resolvedEvents := func() []*gomatrixserverlib.Event {
+	resolvedEvents := func() []gomatrixserverlib.PDU {
 		resolvedTrace, _ := internal.StartRegion(ctx, "StateResolution.ResolveStateConflictsV2")
 		defer resolvedTrace.EndRegion()
 
@@ -1117,11 +1122,11 @@ func (v *StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.E
 // Returns an error if there was a problem talking to the database.
 func (v *StateResolution) loadStateEvents(
 	ctx context.Context, entries []types.StateEntry,
-) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
+) ([]gomatrixserverlib.PDU, map[string]types.StateEntry, error) {
 	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateEvents")
 	defer trace.EndRegion()
 
-	result := make([]*gomatrixserverlib.Event, 0, len(entries))
+	result := make([]gomatrixserverlib.PDU, 0, len(entries))
 	eventEntries := make([]types.StateEntry, 0, len(entries))
 	eventNIDs := make(types.EventNIDs, 0, len(entries))
 	for _, entry := range entries {
@@ -1132,7 +1137,11 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	events, err := v.db.Events(ctx, v.roomInfo, eventNIDs)
+
+	if v.roomInfo == nil {
+		return nil, nil, types.ErrorInvalidRoomInfo
+	}
+	events, err := v.db.Events(ctx, v.roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1142,9 +1151,9 @@ func (v *StateResolution) loadStateEvents(
 		if !ok {
 			panic(fmt.Errorf("corrupt DB: Missing event numeric ID %d", entry.EventNID))
 		}
-		result = append(result, event.Event)
-		eventIDMap[event.Event.EventID()] = entry
-		v.events[entry.EventNID] = event.Event
+		result = append(result, event.PDU)
+		eventIDMap[event.PDU.EventID()] = entry
+		v.events[entry.EventNID] = event.PDU
 	}
 	return result, eventIDMap, nil
 }
@@ -1161,8 +1170,8 @@ type authEventLoader struct {
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
 func (l *authEventLoader) loadAuthEvents(
-	ctx context.Context, roomInfo *types.RoomInfo, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
-) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
+	ctx context.Context, roomInfo *types.RoomInfo, event gomatrixserverlib.PDU, eventMap map[string]types.Event,
+) ([]gomatrixserverlib.PDU, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()
 	authEvents := []types.Event{}     // our returned list
@@ -1263,9 +1272,9 @@ func (l *authEventLoader) loadAuthEvents(
 			},
 		}
 	}
-	nakedEvents := make([]*gomatrixserverlib.Event, 0, len(authEvents))
+	nakedEvents := make([]gomatrixserverlib.PDU, 0, len(authEvents))
 	for _, authEvent := range authEvents {
-		nakedEvents = append(nakedEvents, authEvent.Event)
+		nakedEvents = append(nakedEvents, authEvent.PDU)
 	}
 	return nakedEvents, stateEntryMap, nil
 }

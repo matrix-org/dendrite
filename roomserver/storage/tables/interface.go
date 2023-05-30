@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -41,7 +42,7 @@ type Events interface {
 	InsertEvent(
 		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventTypeNID types.EventTypeNID,
 		eventStateKeyNID types.EventStateKeyNID, eventID string,
-		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
+		authEventNIDs []types.EventNID, depth int64, isRejected bool,
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
 	BulkSelectSnapshotsFromEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
@@ -58,7 +59,6 @@ type Events interface {
 	UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error
 	SelectEventID(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) (eventID string, err error)
 	BulkSelectStateAtEventAndReference(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error)
-	BulkSelectEventReference(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) ([]gomatrixserverlib.EventReference, error)
 	// BulkSelectEventID returns a map from numeric event ID to string event ID.
 	BulkSelectEventID(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
 	// BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
@@ -94,7 +94,7 @@ type StateSnapshot interface {
 
 	BulkSelectMembershipForHistoryVisibility(
 		ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
-	) (map[string]*gomatrixserverlib.HeaderedEvent, error)
+	) (map[string]*types.HeaderedEvent, error)
 }
 
 type StateBlock interface {
@@ -112,10 +112,10 @@ type RoomAliases interface {
 }
 
 type PreviousEvents interface {
-	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, previousEventReferenceSHA256 []byte, eventNID types.EventNID) error
+	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, eventNID types.EventNID) error
 	// Check if the event reference exists
 	// Returns sql.ErrNoRows if the event reference doesn't exist.
-	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
+	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string) error
 }
 
 type Invites interface {
@@ -147,7 +147,7 @@ type Membership interface {
 	SelectKnownUsers(ctx context.Context, txn *sql.Tx, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
 	UpdateForgetMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool) error
 	SelectLocalServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) (bool, error)
-	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
+	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName spec.ServerName) (bool, error)
 	DeleteMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) error
 	SelectJoinedUsers(ctx context.Context, txn *sql.Tx, targetUserNIDs []types.EventStateKeyNID) ([]types.EventStateKeyNID, error)
 }
@@ -195,21 +195,21 @@ type StrippedEvent struct {
 // ExtractContentValue from the given state event. For example, given an m.room.name event with:
 // content: { name: "Foo" }
 // this returns "Foo".
-func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
+func ExtractContentValue(ev *types.HeaderedEvent) string {
 	content := ev.Content()
 	key := ""
 	switch ev.Type() {
-	case gomatrixserverlib.MRoomCreate:
+	case spec.MRoomCreate:
 		key = "creator"
-	case gomatrixserverlib.MRoomCanonicalAlias:
+	case spec.MRoomCanonicalAlias:
 		key = "alias"
-	case gomatrixserverlib.MRoomHistoryVisibility:
+	case spec.MRoomHistoryVisibility:
 		key = "history_visibility"
-	case gomatrixserverlib.MRoomJoinRules:
+	case spec.MRoomJoinRules:
 		key = "join_rule"
-	case gomatrixserverlib.MRoomMember:
+	case spec.MRoomMember:
 		key = "membership"
-	case gomatrixserverlib.MRoomName:
+	case spec.MRoomName:
 		key = "name"
 	case "m.room.avatar":
 		key = "url"

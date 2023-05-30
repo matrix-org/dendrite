@@ -21,14 +21,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database is used to store room events and stream offsets.

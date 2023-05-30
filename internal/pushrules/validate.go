@@ -10,6 +10,10 @@ import (
 func ValidateRule(kind Kind, rule *Rule) []error {
 	var errs []error
 
+	if len(rule.RuleID) > 0 && rule.RuleID[:1] == "." {
+		errs = append(errs, fmt.Errorf("invalid rule ID: rule can not start with a dot"))
+	}
+
 	if !validRuleIDRE.MatchString(rule.RuleID) {
 		errs = append(errs, fmt.Errorf("invalid rule ID: %s", rule.RuleID))
 	}

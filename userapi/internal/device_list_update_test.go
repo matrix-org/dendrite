@@ -29,6 +29,8 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -64,7 +66,7 @@ func (d *mockDeviceListUpdaterDatabase) DeleteStaleDeviceLists(ctx context.Conte
 
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 // If no domains are given, all user IDs with stale device lists are returned.
-func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var result []string
@@ -123,8 +125,7 @@ func (d *mockDeviceListUpdaterDatabase) DeviceKeysJSON(ctx context.Context, keys
 type mockDeviceListUpdaterAPI struct {
 }
 
-func (d *mockDeviceListUpdaterAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) error {
-	return nil
+func (d *mockDeviceListUpdaterAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) {
 }
 
 type roundTripper struct {
@@ -135,19 +136,17 @@ func (t *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.fn(req)
 }
 
-func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrixserverlib.FederationClient {
+func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.FederationClient {
 	_, pkey, _ := ed25519.GenerateKey(nil)
-	fedClient := gomatrixserverlib.NewFederationClient(
-		[]*gomatrixserverlib.SigningIdentity{
+	fedClient := fclient.NewFederationClient(
+		[]*fclient.SigningIdentity{
 			{
-				ServerName: gomatrixserverlib.ServerName("example.test"),
+				ServerName: spec.ServerName("example.test"),
 				KeyID:      gomatrixserverlib.KeyID("ed25519:test"),
 				PrivateKey: pkey,
 			},
 		},
-	)
-	fedClient.Client = *gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(&roundTripper{tripper}),
+		fclient.WithTransport(&roundTripper{tripper}),
 	)
 	return fedClient
 }
@@ -293,7 +292,7 @@ func TestDebounce(t *testing.T) {
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
 	fedCh := make(chan *http.Response, 1)
-	srv := gomatrixserverlib.ServerName("example.com")
+	srv := spec.ServerName("example.com")
 	userID := "@alice:example.com"
 	keyJSON := `{"user_id":"` + userID + `","device_id":"JLAFKJWSCS","algorithms":["m.olm.v1.curve25519-aes-sha2","m.megolm.v1.aes-sha2"],"keys":{"curve25519:JLAFKJWSCS":"3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI","ed25519:JLAFKJWSCS":"lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI"},"signatures":{"` + userID + `":{"ed25519:JLAFKJWSCS":"dSO80A01XiigH3uBiDVx/EjzaoycHcjq9lfQX0uWsqxl2giMIiSPR8a4d291W1ihKJL/a+myXS367WT6NAIcBA"}}}`
 	incomingFedReq := make(chan struct{})
@@ -413,7 +412,7 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 		}
 
 		// check that we still have Alice in our stale list
-		staleUsers, err := db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		staleUsers, err := db.StaleDeviceLists(ctx, []spec.ServerName{"test"})
 		if err != nil {
 			t.Error(err)
 		}

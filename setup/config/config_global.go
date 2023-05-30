@@ -8,13 +8,15 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"golang.org/x/crypto/ed25519"
 )
 
 type Global struct {
 	// Signing identity contains the server name, private key and key ID of
 	// the deployment.
-	gomatrixserverlib.SigningIdentity `yaml:",inline"`
+	fclient.SigningIdentity `yaml:",inline"`
 
 	// The secondary server names, used for virtual hosting.
 	VirtualHosts []*VirtualHost `yaml:"-"`
@@ -121,7 +123,7 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 	c.Cache.Verify(configErrs)
 }
 
-func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool {
+func (c *Global) IsLocalServerName(serverName spec.ServerName) bool {
 	if c.ServerName == serverName {
 		return true
 	}
@@ -133,7 +135,7 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 	return false
 }
 
-func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.ServerName, error) {
+func (c *Global) SplitLocalID(sigil byte, id string) (string, spec.ServerName, error) {
 	u, s, err := gomatrixserverlib.SplitID(sigil, id)
 	if err != nil {
 		return u, s, err
@@ -144,7 +146,7 @@ func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.
 	return u, s, nil
 }
 
-func (c *Global) VirtualHost(serverName gomatrixserverlib.ServerName) *VirtualHost {
+func (c *Global) VirtualHost(serverName spec.ServerName) *VirtualHost {
 	for _, v := range c.VirtualHosts {
 		if v.ServerName == serverName {
 			return v
@@ -153,7 +155,7 @@ func (c *Global) VirtualHost(serverName gomatrixserverlib.ServerName) *VirtualHo
 	return nil
 }
 
-func (c *Global) VirtualHostForHTTPHost(serverName gomatrixserverlib.ServerName) *VirtualHost {
+func (c *Global) VirtualHostForHTTPHost(serverName spec.ServerName) *VirtualHost {
 	for _, v := range c.VirtualHosts {
 		if v.ServerName == serverName {
 			return v
@@ -167,7 +169,7 @@ func (c *Global) VirtualHostForHTTPHost(serverName gomatrixserverlib.ServerName)
 	return nil
 }
 
-func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.SigningIdentity, error) {
+func (c *Global) SigningIdentityFor(serverName spec.ServerName) (*fclient.SigningIdentity, error) {
 	for _, id := range c.SigningIdentities() {
 		if id.ServerName == serverName {
 			return id, nil
@@ -176,8 +178,8 @@ func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*g
 	return nil, fmt.Errorf("no signing identity for %q", serverName)
 }
 
-func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
-	identities := make([]*gomatrixserverlib.SigningIdentity, 0, len(c.VirtualHosts)+1)
+func (c *Global) SigningIdentities() []*fclient.SigningIdentity {
+	identities := make([]*fclient.SigningIdentity, 0, len(c.VirtualHosts)+1)
 	identities = append(identities, &c.SigningIdentity)
 	for _, v := range c.VirtualHosts {
 		identities = append(identities, &v.SigningIdentity)
@@ -188,7 +190,7 @@ func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
 type VirtualHost struct {
 	// Signing identity contains the server name, private key and key ID of
 	// the virtual host.
-	gomatrixserverlib.SigningIdentity `yaml:",inline"`
+	fclient.SigningIdentity `yaml:",inline"`
 
 	// Path to the private key. If not specified, the default global private key
 	// will be used instead.
@@ -204,7 +206,7 @@ type VirtualHost struct {
 	// Match these HTTP Host headers on the `/key/v2/server` endpoint, this needs
 	// to match all delegated names, likely including the port number too if
 	// the well-known delegation includes that also.
-	MatchHTTPHosts []gomatrixserverlib.ServerName `yaml:"match_http_hosts"`
+	MatchHTTPHosts []spec.ServerName `yaml:"match_http_hosts"`
 
 	// Is registration enabled on this virtual host?
 	AllowRegistration bool `yaml:"allow_registration"`
@@ -235,14 +237,14 @@ type OldVerifyKeys struct {
 	PrivateKey ed25519.PrivateKey `yaml:"-"`
 
 	// The public key, in case only that part is known.
-	PublicKey gomatrixserverlib.Base64Bytes `yaml:"public_key"`
+	PublicKey spec.Base64Bytes `yaml:"public_key"`
 
 	// The key ID of the private key.
 	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 
 	// When the private key was designed as "expired", as a UNIX timestamp
 	// in millisecond precision.
-	ExpiredAt gomatrixserverlib.Timestamp `yaml:"expired_at"`
+	ExpiredAt spec.Timestamp `yaml:"expired_at"`
 }
 
 // The configuration to use for Prometheus metrics

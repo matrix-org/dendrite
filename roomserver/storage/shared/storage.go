@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
@@ -62,7 +63,7 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 
 func (d *Database) GetMembershipForHistoryVisibility(
 	ctx context.Context, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
-) (map[string]*gomatrixserverlib.HeaderedEvent, error) {
+) (map[string]*types.HeaderedEvent, error) {
 	return d.StateSnapshotTable.BulkSelectMembershipForHistoryVisibility(ctx, nil, userNID, roomInfo, eventIDs...)
 }
 
@@ -391,24 +392,28 @@ func (d *EventDatabase) eventsFromIDs(ctx context.Context, txn *sql.Tx, roomInfo
 		nids = append(nids, nid.EventNID)
 	}
 
-	return d.events(ctx, txn, roomInfo, nids)
+	if roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	return d.events(ctx, txn, roomInfo.RoomVersion, nids)
 }
 
-func (d *Database) LatestEventIDs(
-	ctx context.Context, roomNID types.RoomNID,
-) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
+func (d *Database) LatestEventIDs(ctx context.Context, roomNID types.RoomNID) (references []string, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
 	var eventNIDs []types.EventNID
 	eventNIDs, currentStateSnapshotNID, err = d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {
 		return
 	}
-	references, err = d.EventsTable.BulkSelectEventReference(ctx, nil, eventNIDs)
+	eventNIDMap, err := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
 	if err != nil {
 		return
 	}
 	depth, err = d.EventsTable.SelectMaxEventDepth(ctx, nil, eventNIDs)
 	if err != nil {
 		return
+	}
+	for _, eventID := range eventNIDMap {
+		references = append(references, eventID)
 	}
 	return
 }
@@ -530,19 +535,15 @@ func (d *Database) GetInvitesForUser(
 	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 }
 
-func (d *EventDatabase) Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error) {
-	return d.events(ctx, nil, roomInfo, eventNIDs)
+func (d *EventDatabase) Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error) {
+	return d.events(ctx, nil, roomVersion, eventNIDs)
 }
 
 func (d *EventDatabase) events(
-	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, inputEventNIDs types.EventNIDs,
+	ctx context.Context, txn *sql.Tx, roomVersion gomatrixserverlib.RoomVersion, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
-	if roomInfo == nil { // this should never happen
-		return nil, fmt.Errorf("unable to parse events without roomInfo")
-	}
-
 	sort.Sort(inputEventNIDs)
-	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
+	events := make(map[types.EventNID]gomatrixserverlib.PDU, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
 	for _, nid := range inputEventNIDs {
 		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
@@ -561,7 +562,7 @@ func (d *EventDatabase) events(
 			}
 			results = append(results, types.Event{
 				EventNID: nid,
-				Event:    event,
+				PDU:      event,
 			})
 		}
 		if !redactionsArePermanent {
@@ -578,16 +579,21 @@ func (d *EventDatabase) events(
 		eventIDs = map[types.EventNID]string{}
 	}
 
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, eventJSON := range eventJSONs {
 		redacted := gjson.GetBytes(eventJSON.EventJSON, "unsigned.redacted_because").Exists()
-		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, redacted, roomInfo.RoomVersion,
+		events[eventJSON.EventNID], err = verImpl.NewEventFromTrustedJSONWithEventID(
+			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, redacted,
 		)
 		if err != nil {
 			return nil, err
 		}
 		if event := events[eventJSON.EventNID]; event != nil {
-			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, &types.HeaderedEvent{PDU: event})
 		}
 	}
 	results := make([]types.Event, 0, len(inputEventNIDs))
@@ -598,7 +604,7 @@ func (d *EventDatabase) events(
 		}
 		results = append(results, types.Event{
 			EventNID: nid,
-			Event:    event,
+			PDU:      event,
 		})
 	}
 	if !redactionsArePermanent {
@@ -652,7 +658,7 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 }
 
 // GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
-func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserverlib.Event) (roomInfo *types.RoomInfo, err error) {
+func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserverlib.PDU) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
 	// then we will use our configured default to create the room.
 	// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
@@ -663,13 +669,17 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event *gomatrixserve
 	if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
 		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
-	if roomVersion == "" {
-		rv, ok := d.Cache.GetRoomVersion(event.RoomID())
-		if ok {
-			roomVersion = rv
-		}
+
+	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID())
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID())
+	// if we found both, the roomNID and version in our cache, no need to query the database
+	if nidOK && versionOK {
+		return &types.RoomInfo{
+			RoomNID:     roomNID,
+			RoomVersion: cachedRoomVersion,
+		}, nil
 	}
-	var roomNID types.RoomNID
+
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion)
 		if err != nil {
@@ -715,7 +725,7 @@ func (d *Database) GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKe
 }
 
 func (d *EventDatabase) StoreEvent(
-	ctx context.Context, event *gomatrixserverlib.Event,
+	ctx context.Context, event gomatrixserverlib.PDU,
 	roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.StateAtEvent, error) {
@@ -733,7 +743,6 @@ func (d *EventDatabase) StoreEvent(
 			eventTypeNID,
 			eventStateKeyNID,
 			event.EventID(),
-			event.EventReference().EventSHA256,
 			authEventNIDs,
 			event.Depth(),
 			isRejected,
@@ -753,7 +762,7 @@ func (d *EventDatabase) StoreEvent(
 			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
 
-		if prevEvents := event.PrevEvents(); len(prevEvents) > 0 {
+		if prevEvents := event.PrevEventIDs(); len(prevEvents) > 0 {
 			// Create an updater - NB: on sqlite this WILL create a txn as we are directly calling the shared DB form of
 			// GetLatestEventsForUpdate - not via the SQLiteDatabase form which has `nil` txns. This
 			// function only does SELECTs though so the created txn (at this point) is just a read txn like
@@ -761,8 +770,8 @@ func (d *EventDatabase) StoreEvent(
 			// to do writes however then this will need to go inside `Writer.Do`.
 
 			// The following is a copy of RoomUpdater.StorePreviousEvents
-			for _, ref := range prevEvents {
-				if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			for _, eventID := range prevEvents {
+				if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, eventID, eventNID); err != nil {
 					return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
 				}
 			}
@@ -807,7 +816,7 @@ func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, incl
 }
 
 func (d *Database) MissingAuthPrevEvents(
-	ctx context.Context, e *gomatrixserverlib.Event,
+	ctx context.Context, e gomatrixserverlib.PDU,
 ) (missingAuth, missingPrev []string, err error) {
 	authEventNIDs, err := d.EventNIDs(ctx, e.AuthEventIDs())
 	if err != nil {
@@ -899,13 +908,13 @@ func (d *EventDatabase) assignStateKeyNID(
 	return eventStateKeyNID, err
 }
 
-func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
+func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 	gomatrixserverlib.RoomVersion, error,
 ) {
 	var err error
 	var roomVersion gomatrixserverlib.RoomVersion
 	// Look for m.room.create events.
-	if event.Type() != gomatrixserverlib.MRoomCreate {
+	if event.Type() != spec.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
 	roomVersion = gomatrixserverlib.RoomVersionV1
@@ -939,8 +948,8 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 //
 // Returns the redaction event and the redacted event if this call resulted in a redaction.
 func (d *EventDatabase) MaybeRedactEvent(
-	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event, plResolver state.PowerLevelResolver,
-) (*gomatrixserverlib.Event, *gomatrixserverlib.Event, error) {
+	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error) {
 	var (
 		redactionEvent, redactedEvent *types.Event
 		err                           error
@@ -949,7 +958,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 	)
 
 	wErr := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+		isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 		if isRedactionEvent {
 			// an event which redacts itself should be ignored
 			if event.EventID() == event.Redacts() {
@@ -1034,30 +1043,30 @@ func (d *EventDatabase) MaybeRedactEvent(
 	if ignoreRedaction || redactionEvent == nil || redactedEvent == nil {
 		return nil, nil, nil
 	}
-	return redactionEvent.Event, redactedEvent.Event, nil
+	return redactionEvent.PDU, redactedEvent.PDU, nil
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
 func (d *EventDatabase) loadRedactionPair(
-	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, eventNID types.EventNID, event *gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU,
 ) (*types.Event, *types.Event, bool, error) {
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
 	var err error
-	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+	isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 
 	var eventBeingRedacted string
 	if isRedactionEvent {
 		eventBeingRedacted = event.Redacts()
 		redactionEvent = &types.Event{
 			EventNID: eventNID,
-			Event:    event,
+			PDU:      event,
 		}
 	} else {
 		eventBeingRedacted = event.EventID() // maybe, we'll see if we have info
 		redactedEvent = &types.Event{
 			EventNID: eventNID,
-			Event:    event,
+			PDU:      event,
 		}
 	}
 
@@ -1097,7 +1106,10 @@ func (d *EventDatabase) loadEvent(ctx context.Context, roomInfo *types.RoomInfo,
 	if len(nids) == 0 {
 		return nil
 	}
-	evs, err := d.Events(ctx, roomInfo, []types.EventNID{nids[eventID].EventNID})
+	if roomInfo == nil {
+		return nil
+	}
+	evs, err := d.Events(ctx, roomInfo.RoomVersion, []types.EventNID{nids[eventID].EventNID})
 	if err != nil {
 		return nil
 	}
@@ -1107,7 +1119,7 @@ func (d *EventDatabase) loadEvent(ctx context.Context, roomInfo *types.RoomInfo,
 	return &evs[0]
 }
 
-func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error) {
+func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]gomatrixserverlib.PDU, error) {
 	eventStates, err := d.EventsTable.BulkSelectStateAtEventByID(ctx, nil, []string{eventID})
 	if err != nil {
 		return nil, err
@@ -1124,13 +1136,17 @@ func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *type
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
-	events := make([]*gomatrixserverlib.Event, 0, len(eventNIDs))
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
+	if err != nil {
+		return nil, err
+	}
+	events := make([]gomatrixserverlib.PDU, 0, len(eventNIDs))
 	for _, eventNID := range eventNIDs {
 		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{eventNID})
 		if err != nil {
 			return nil, err
 		}
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[eventNID], data[0].EventJSON, false, roomInfo.RoomVersion)
+		ev, err := verImpl.NewEventFromTrustedJSONWithEventID(eventIDs[eventNID], data[0].EventJSON, false)
 		if err != nil {
 			return nil, err
 		}
@@ -1142,7 +1158,7 @@ func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *type
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
-func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error) {
 	roomInfo, err := d.roomInfo(ctx, nil, roomID)
 	if err != nil {
 		return nil, err
@@ -1154,7 +1170,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if roomInfo.IsStub() {
 		return nil, nil
 	}
-	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, evType)
 	if err == sql.ErrNoRows {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
@@ -1162,7 +1178,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
+	stateKeyNID, err := d.GetOrCreateEventStateKeyNID(ctx, &stateKey)
 	if err == sql.ErrNoRows {
 		// No rooms have a state event with this state key, otherwise we'd have an state key NID
 		return nil, nil
@@ -1180,6 +1196,10 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			eventNIDs = append(eventNIDs, e.EventNID)
 		}
 	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
+	if err != nil {
+		return nil, err
+	}
 	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
@@ -1187,6 +1207,10 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	// return the event requested
 	for _, e := range entries {
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
+			cachedEvent, ok := d.Cache.GetRoomServerEvent(e.EventNID)
+			if ok {
+				return &types.HeaderedEvent{PDU: cachedEvent}, nil
+			}
 			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{e.EventNID})
 			if err != nil {
 				return nil, err
@@ -1194,11 +1218,11 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if len(data) == 0 {
 				return nil, fmt.Errorf("GetStateEvent: no json for event nid %d", e.EventNID)
 			}
-			ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[e.EventNID], data[0].EventJSON, false, roomInfo.RoomVersion)
+			ev, err := verImpl.NewEventFromTrustedJSONWithEventID(eventIDs[e.EventNID], data[0].EventJSON, false)
 			if err != nil {
 				return nil, err
 			}
-			return ev.Headered(roomInfo.RoomVersion), nil
+			return &types.HeaderedEvent{PDU: ev}, nil
 		}
 	}
 
@@ -1207,7 +1231,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 
 // Same as GetStateEvent but returns all matching state events with this event type. Returns no error
 // if there are no events with this event type.
-func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*types.HeaderedEvent, error) {
 	roomInfo, err := d.roomInfo(ctx, nil, roomID)
 	if err != nil {
 		return nil, err
@@ -1249,13 +1273,17 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if len(eventPairs) == 0 {
 		return nil, nil
 	}
-	var result []*gomatrixserverlib.HeaderedEvent
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
+	if err != nil {
+		return nil, err
+	}
+	var result []*types.HeaderedEvent
 	for _, pair := range eventPairs {
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[pair.EventNID], pair.EventJSON, false, roomInfo.RoomVersion)
+		ev, err := verImpl.NewEventFromTrustedJSONWithEventID(eventIDs[pair.EventNID], pair.EventJSON, false)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, ev.Headered(roomInfo.RoomVersion))
+		result = append(result, &types.HeaderedEvent{PDU: ev})
 	}
 
 	return result, nil
@@ -1306,7 +1334,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	}
 	// we don't bother failing the request if we get asked for event types we don't know about, as all that would result in is no matches which
 	// isn't a failure.
-	eventTypeNIDMap, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, nil, eventTypes)
+	eventTypeNIDMap, err := d.eventTypeNIDs(ctx, nil, eventTypes)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to map event type nids: %w", err)
 	}
@@ -1371,7 +1399,11 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	result := make([]tables.StrippedEvent, len(events))
 	for i := range events {
 		roomVer := eventNIDToVer[events[i].EventNID]
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[events[i].EventNID], events[i].EventJSON, false, roomVer)
+		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVer)
+		if err != nil {
+			return nil, err
+		}
+		ev, err := verImpl.NewEventFromTrustedJSONWithEventID(eventIDs[events[i].EventNID], events[i].EventJSON, false)
 		if err != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event NID %v : %w", events[i].EventNID, err)
 		}
@@ -1379,7 +1411,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			EventType:    ev.Type(),
 			RoomID:       ev.RoomID(),
 			StateKey:     *ev.StateKey(),
-			ContentValue: tables.ExtractContentValue(ev.Headered(roomVer)),
+			ContentValue: tables.ExtractContentValue(&types.HeaderedEvent{PDU: ev}),
 		}
 	}
 
@@ -1469,7 +1501,7 @@ func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomN
 }
 
 // GetServerInRoom returns true if we think a server is in a given room or false otherwise.
-func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName spec.ServerName) (bool, error) {
 	return d.MembershipTable.SelectServerInRoom(ctx, nil, roomNID, serverName)
 }
 

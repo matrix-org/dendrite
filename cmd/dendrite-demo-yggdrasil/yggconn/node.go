@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/neilalexander/utp"
 	"github.com/sirupsen/logrus"
 
@@ -134,14 +134,14 @@ func (n *Node) PeerCount() int {
 	return len(n.core.GetPeers())
 }
 
-func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
+func (n *Node) KnownNodes() []spec.ServerName {
 	nodemap := map[string]struct{}{}
 	for _, peer := range n.core.GetPeers() {
 		nodemap[hex.EncodeToString(peer.Key)] = struct{}{}
 	}
-	var nodes []gomatrixserverlib.ServerName
+	var nodes []spec.ServerName
 	for node := range nodemap {
-		nodes = append(nodes, gomatrixserverlib.ServerName(node))
+		nodes = append(nodes, spec.ServerName(node))
 	}
 	return nodes
 }

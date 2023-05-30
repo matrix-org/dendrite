@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/bcrypt"
@@ -99,7 +100,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 
 		// Insert a dummy event
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
-			Event: gomatrixserverlib.HeaderedToClientEvent(dummyEvent, gomatrixserverlib.FormatAll),
+			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll),
 		}); err != nil {
 			t.Error(err)
 		}

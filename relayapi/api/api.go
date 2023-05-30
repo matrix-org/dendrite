@@ -18,6 +18,8 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // RelayInternalAPI is used to query information from the relay server.
@@ -27,8 +29,8 @@ type RelayInternalAPI interface {
 	// Retrieve from external relay server all transactions stored for us and process them.
 	PerformRelayServerSync(
 		ctx context.Context,
-		userID gomatrixserverlib.UserID,
-		relayServer gomatrixserverlib.ServerName,
+		userID spec.UserID,
+		relayServer spec.ServerName,
 	) error
 
 	// Tells the relayapi whether or not it should act as a relay server for external servers.
@@ -44,14 +46,14 @@ type RelayServerAPI interface {
 	PerformStoreTransaction(
 		ctx context.Context,
 		transaction gomatrixserverlib.Transaction,
-		userID gomatrixserverlib.UserID,
+		userID spec.UserID,
 	) error
 
 	// Obtain the oldest stored transaction for the specified userID.
 	QueryTransactions(
 		ctx context.Context,
-		userID gomatrixserverlib.UserID,
-		previousEntry gomatrixserverlib.RelayEntry,
+		userID spec.UserID,
+		previousEntry fclient.RelayEntry,
 	) (QueryRelayTransactionsResponse, error)
 }
 

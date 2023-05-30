@@ -17,16 +17,16 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // GetEvent implements
@@ -51,13 +51,19 @@ func GetEvent(
 	})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	events, err := db.Events(ctx, []string{eventID})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.Events failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// The requested event does not exist in our database
@@ -65,7 +71,7 @@ func GetEvent(
 		logger.Debugf("GetEvent: requested event doesn't exist locally")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
+			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
 
@@ -81,7 +87,7 @@ func GetEvent(
 		logger.WithError(err).Error("GetEvent: internal.ApplyHistoryVisibilityFilter failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 
@@ -91,12 +97,12 @@ func GetEvent(
 		logger.WithField("event_count", len(events)).Debug("GetEvent: can't return the requested event")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
+			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.HeaderedToClientEvent(events[0], gomatrixserverlib.FormatAll),
+		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll),
 	}
 }

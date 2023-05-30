@@ -5,6 +5,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -43,7 +44,7 @@ type RoomserverInternalAPI struct {
 	DB                     storage.Database
 	Cfg                    *config.Dendrite
 	Cache                  caching.RoomServerCaches
-	ServerName             gomatrixserverlib.ServerName
+	ServerName             spec.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.RoomserverFederationAPI
@@ -53,7 +54,7 @@ type RoomserverInternalAPI struct {
 	Durable                string
 	InputRoomEventTopic    string // JetStream topic for new input room events
 	OutputProducer         *producers.RoomEventProducer
-	PerspectiveServerNames []gomatrixserverlib.ServerName
+	PerspectiveServerNames []spec.ServerName
 	enableMetrics          bool
 }
 
@@ -61,7 +62,7 @@ func NewRoomserverAPI(
 	processContext *process.ProcessContext, dendriteCfg *config.Dendrite, roomserverDB storage.Database,
 	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
-	var perspectiveServerNames []gomatrixserverlib.ServerName
+	var perspectiveServerNames []spec.ServerName
 	for _, kp := range dendriteCfg.FederationAPI.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
@@ -160,6 +161,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Cfg:     &r.Cfg.RoomServer,
 		DB:      r.DB,
 		FSAPI:   r.fsAPI,
+		RSAPI:   r,
 		Inputer: r.Inputer,
 	}
 	r.Publisher = &perform.Publisher{
@@ -207,11 +209,9 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-	res *api.PerformInviteResponse,
 ) error {
-	outputEvents, err := r.Inviter.PerformInvite(ctx, req, res)
+	outputEvents, err := r.Inviter.PerformInvite(ctx, req)
 	if err != nil {
-		sentry.CaptureException(err)
 		return err
 	}
 	if len(outputEvents) == 0 {

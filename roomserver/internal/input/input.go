@@ -24,6 +24,8 @@ import (
 	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
@@ -78,8 +80,8 @@ type Inputer struct {
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
-	ServerName          gomatrixserverlib.ServerName
-	SigningIdentity     *gomatrixserverlib.SigningIdentity
+	ServerName          spec.ServerName
+	SigningIdentity     *fclient.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
@@ -283,7 +285,7 @@ func (w *worker) _next() {
 	var errString string
 	if err = w.r.processRoomEvent(
 		w.r.ProcessContext.Context(),
-		gomatrixserverlib.ServerName(msg.Header.Get("virtual_host")),
+		spec.ServerName(msg.Header.Get("virtual_host")),
 		&inputRoomEvent,
 	); err != nil {
 		switch err.(type) {
@@ -387,18 +389,18 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) error {
+) {
 	// Queue up the event into the roomserver.
 	replySub, err := r.queueInputRoomEvents(ctx, request)
 	if err != nil {
 		response.ErrMsg = err.Error()
-		return nil
+		return
 	}
 
 	// If we aren't waiting for synchronous responses then we can
 	// give up here, there is nothing further to do.
 	if replySub == nil {
-		return nil
+		return
 	}
 
 	// Otherwise, we'll want to sit and wait for the responses
@@ -410,14 +412,12 @@ func (r *Inputer) InputRoomEvents(
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()
-			return nil
+			return
 		}
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
 	}
-
-	return nil
 }
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(

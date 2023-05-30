@@ -26,8 +26,11 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,61 +42,44 @@ type Admin struct {
 	Leaver  *Leaver
 }
 
-// PerformEvacuateRoom will remove all local users from the given room.
+// PerformAdminEvacuateRoom will remove all local users from the given room.
 func (r *Admin) PerformAdminEvacuateRoom(
 	ctx context.Context,
-	req *api.PerformAdminEvacuateRoomRequest,
-	res *api.PerformAdminEvacuateRoomResponse,
-) error {
-	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	roomID string,
+) (affected []string, err error) {
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.RoomInfo: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 	if roomInfo == nil || roomInfo.IsStub() {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorNoRoom,
-			Msg:  fmt.Sprintf("Room %s not found", req.RoomID),
-		}
-		return nil
+		return nil, eventutil.ErrRoomNoExists{}
 	}
 
 	memberNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.GetMembershipEventNIDsForRoom: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
-	memberEvents, err := r.DB.Events(ctx, roomInfo, memberNIDs)
+	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomVersion, memberNIDs)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.Events: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
 	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
-	res.Affected = make([]string, 0, len(memberEvents))
+	affected = make([]string, 0, len(memberEvents))
 	latestReq := &api.QueryLatestEventsAndStateRequest{
-		RoomID: req.RoomID,
+		RoomID: roomID,
 	}
 	latestRes := &api.QueryLatestEventsAndStateResponse{}
 	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.Queryer.QueryLatestEventsAndState: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
 	prevEvents := latestRes.LatestEvents
+	var senderDomain spec.ServerName
+	var eventsNeeded gomatrixserverlib.StateNeeded
+	var identity *fclient.SigningIdentity
+	var event *types.HeaderedEvent
 	for _, memberEvent := range memberEvents {
 		if memberEvent.StateKey() == nil {
 			continue
@@ -101,57 +87,41 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 		var memberContent gomatrixserverlib.MemberContent
 		if err = json.Unmarshal(memberEvent.Content(), &memberContent); err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("json.Unmarshal: %s", err),
-			}
-			return nil
+			return nil, err
 		}
-		memberContent.Membership = gomatrixserverlib.Leave
+		memberContent.Membership = spec.Leave
 
 		stateKey := *memberEvent.StateKey()
-		fledglingEvent := &gomatrixserverlib.EventBuilder{
-			RoomID:     req.RoomID,
-			Type:       gomatrixserverlib.MRoomMember,
+		fledglingEvent := &gomatrixserverlib.ProtoEvent{
+			RoomID:     roomID,
+			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			Sender:     stateKey,
 			PrevEvents: prevEvents,
 		}
 
-		_, senderDomain, err := gomatrixserverlib.SplitID('@', fledglingEvent.Sender)
+		_, senderDomain, err = gomatrixserverlib.SplitID('@', fledglingEvent.Sender)
 		if err != nil {
 			continue
 		}
 
 		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("json.Marshal: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 
-		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		eventsNeeded, err = gomatrixserverlib.StateNeededForProtoEvent(fledglingEvent)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 
-		identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+		identity, err = r.Cfg.Matrix.SigningIdentityFor(senderDomain)
 		if err != nil {
 			continue
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
+		event, err = eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("eventutil.BuildEvent: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 
 		inputEvents = append(inputEvents, api.InputRoomEvent{
@@ -160,119 +130,100 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			Origin:       senderDomain,
 			SendAsServer: string(senderDomain),
 		})
-		res.Affected = append(res.Affected, stateKey)
-		prevEvents = []gomatrixserverlib.EventReference{
-			event.EventReference(),
-		}
+		affected = append(affected, stateKey)
+		prevEvents = []string{event.EventID()}
 	}
 
 	inputReq := &api.InputRoomEventsRequest{
 		InputRoomEvents: inputEvents,
-		Asynchronous:    true,
+		Asynchronous:    false,
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	return r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+	return affected, nil
 }
 
+// PerformAdminEvacuateUser will remove the given user from all rooms.
 func (r *Admin) PerformAdminEvacuateUser(
 	ctx context.Context,
-	req *api.PerformAdminEvacuateUserRequest,
-	res *api.PerformAdminEvacuateUserResponse,
-) error {
-	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	userID string,
+) (affected []string, err error) {
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Malformed user ID: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  "Can only evacuate local users using this endpoint",
-		}
-		return nil
+		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Join)
+	if err != nil {
+		return nil, err
+	}
+
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
-		}
-		return nil
+		return nil, err
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
-	if err != nil && err != sql.ErrNoRows {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
-		}
-		return nil
-	}
-
-	for _, roomID := range append(roomIDs, inviteRoomIDs...) {
+	allRooms := append(roomIDs, inviteRoomIDs...)
+	affected = make([]string, 0, len(allRooms))
+	for _, roomID := range allRooms {
 		leaveReq := &api.PerformLeaveRequest{
 			RoomID: roomID,
-			UserID: req.UserID,
+			UserID: userID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
 		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("r.Leaver.PerformLeave: %s", err),
-			}
-			return nil
+			return nil, err
 		}
-		res.Affected = append(res.Affected, roomID)
+		affected = append(affected, roomID)
 		if len(outputEvents) == 0 {
 			continue
 		}
 		if err := r.Inputer.OutputProducer.ProduceRoomEvents(roomID, outputEvents); err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("r.Inputer.WriteOutputEvents: %s", err),
-			}
-			return nil
+			return nil, err
 		}
 	}
-	return nil
+	return affected, nil
 }
 
+// PerformAdminPurgeRoom removes all traces for the given room from the database.
 func (r *Admin) PerformAdminPurgeRoom(
 	ctx context.Context,
-	req *api.PerformAdminPurgeRoomRequest,
-	res *api.PerformAdminPurgeRoomResponse,
+	roomID string,
 ) error {
 	// Validate we actually got a room ID and nothing else
-	if _, _, err := gomatrixserverlib.SplitID('!', req.RoomID); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Malformed room ID: %s", err),
-		}
-		return nil
+	if _, _, err := gomatrixserverlib.SplitID('!', roomID); err != nil {
+		return err
 	}
 
-	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
-	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
-		logrus.WithField("room_id", req.RoomID).WithError(err).Warn("Failed to purge room from roomserver")
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  err.Error(),
-		}
-		return nil
+	// Evacuate the room before purging it from the database
+	evacAffected, err := r.PerformAdminEvacuateRoom(ctx, roomID)
+	if err != nil {
+		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to evacuate room before purging")
+		return err
 	}
 
-	logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
+	logrus.WithFields(logrus.Fields{
+		"room_id":         roomID,
+		"evacuated_users": len(evacAffected),
+	}).Warn("Evacuated room, purging room from roomserver now")
 
-	return r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
+	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
+	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
+		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+		return err
+	}
+
+	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
+
+	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypePurgeRoom,
 			PurgeRoom: &api.OutputPurgeRoom{
-				RoomID: req.RoomID,
+				RoomID: roomID,
 			},
 		},
 	})
@@ -280,97 +231,72 @@ func (r *Admin) PerformAdminPurgeRoom(
 
 func (r *Admin) PerformAdminDownloadState(
 	ctx context.Context,
-	req *api.PerformAdminDownloadStateRequest,
-	res *api.PerformAdminDownloadStateResponse,
+	roomID, userID string, serverName spec.ServerName,
 ) error {
-	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', req.UserID)
+	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.Cfg.Matrix.SplitLocalID: %s", err),
-		}
-		return nil
+		return err
 	}
 
-	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.RoomInfo: %s", err),
-		}
-		return nil
+		return err
 	}
 
 	if roomInfo == nil || roomInfo.IsStub() {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("room %q not found", req.RoomID),
-		}
-		return nil
+		return eventutil.ErrRoomNoExists{}
 	}
 
 	fwdExtremities, _, depth, err := r.DB.LatestEventIDs(ctx, roomInfo.RoomNID)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.DB.LatestEventIDs: %s", err),
-		}
-		return nil
+		return err
 	}
 
-	authEventMap := map[string]*gomatrixserverlib.Event{}
-	stateEventMap := map[string]*gomatrixserverlib.Event{}
+	authEventMap := map[string]gomatrixserverlib.PDU{}
+	stateEventMap := map[string]gomatrixserverlib.PDU{}
 
 	for _, fwdExtremity := range fwdExtremities {
-		var state gomatrixserverlib.RespState
-		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		var state gomatrixserverlib.StateResponse
+		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, serverName, roomID, fwdExtremity, roomInfo.RoomVersion)
 		if err != nil {
-			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
-				Msg:  fmt.Sprintf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity.EventID, err),
-			}
-			return nil
+			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity, err)
 		}
-		for _, authEvent := range state.AuthEvents.UntrustedEvents(roomInfo.RoomVersion) {
-			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			authEventMap[authEvent.EventID()] = authEvent
 		}
-		for _, stateEvent := range state.StateEvents.UntrustedEvents(roomInfo.RoomVersion) {
-			if err = stateEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing); err != nil {
 				continue
 			}
 			stateEventMap[stateEvent.EventID()] = stateEvent
 		}
 	}
 
-	authEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(authEventMap))
-	stateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(stateEventMap))
+	authEvents := make([]*types.HeaderedEvent, 0, len(authEventMap))
+	stateEvents := make([]*types.HeaderedEvent, 0, len(stateEventMap))
 	stateIDs := make([]string, 0, len(stateEventMap))
 
 	for _, authEvent := range authEventMap {
-		authEvents = append(authEvents, authEvent.Headered(roomInfo.RoomVersion))
+		authEvents = append(authEvents, &types.HeaderedEvent{PDU: authEvent})
 	}
 	for _, stateEvent := range stateEventMap {
-		stateEvents = append(stateEvents, stateEvent.Headered(roomInfo.RoomVersion))
+		stateEvents = append(stateEvents, &types.HeaderedEvent{PDU: stateEvent})
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 
-	builder := &gomatrixserverlib.EventBuilder{
+	proto := &gomatrixserverlib.ProtoEvent{
 		Type:    "org.matrix.dendrite.state_download",
-		Sender:  req.UserID,
-		RoomID:  req.RoomID,
-		Content: gomatrixserverlib.RawJSON("{}"),
+		Sender:  userID,
+		RoomID:  roomID,
+		Content: spec.RawJSON("{}"),
 	}
 
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
-		}
-		return nil
+		return fmt.Errorf("gomatrixserverlib.StateNeededForProtoEvent: %w", err)
 	}
 
 	queryRes := &api.QueryLatestEventsAndStateResponse{
@@ -386,13 +312,9 @@ func (r *Admin) PerformAdminDownloadState(
 		return err
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
+	ev, err := eventutil.BuildEvent(ctx, proto, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
 	if err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("eventutil.BuildEvent: %s", err),
-		}
-		return nil
+		return fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}
 
 	inputReq := &api.InputRoomEventsRequest{
@@ -416,19 +338,10 @@ func (r *Admin) PerformAdminDownloadState(
 		SendAsServer:  string(r.Cfg.Matrix.ServerName),
 	})
 
-	if err := r.Inputer.InputRoomEvents(ctx, inputReq, inputRes); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("r.Inputer.InputRoomEvents: %s", err),
-		}
-		return nil
-	}
+	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
 
 	if inputRes.ErrMsg != "" {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  inputRes.ErrMsg,
-		}
+		return inputRes.Err()
 	}
 
 	return nil

@@ -26,21 +26,29 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// ApplicationServiceTransaction is the transaction that is sent off to an
+// application service.
+type ApplicationServiceTransaction struct {
+	Events []synctypes.ClientEvent `json:"events"`
+}
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	ctx       context.Context
 	cfg       *config.AppServiceAPI
-	client    *http.Client
 	jetstream nats.JetStreamContext
 	topic     string
 	rsAPI     api.AppserviceRoomserverAPI
@@ -56,14 +64,12 @@ type appserviceState struct {
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.AppServiceAPI,
-	client *http.Client,
 	js nats.JetStreamContext,
 	rsAPI api.AppserviceRoomserverAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:       process.Context(),
 		cfg:       cfg,
-		client:    client,
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		rsAPI:     rsAPI,
@@ -99,7 +105,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 	ctx context.Context, state *appserviceState, msgs []*nats.Msg,
 ) bool {
 	log.WithField("appservice", state.ID).Tracef("Appservice worker received %d message(s) from roomserver", len(msgs))
-	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(msgs))
+	events := make([]*types.HeaderedEvent, 0, len(msgs))
 	for _, msg := range msgs {
 		// Only handle events we care about
 		receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
@@ -169,13 +175,13 @@ func (s *OutputRoomEventConsumer) onMessage(
 // endpoint. It will block for the backoff period if necessary.
 func (s *OutputRoomEventConsumer) sendEvents(
 	ctx context.Context, state *appserviceState,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*types.HeaderedEvent,
 	txnID string,
 ) error {
 	// Create the transaction body.
 	transaction, err := json.Marshal(
-		gomatrixserverlib.ApplicationServiceTransaction{
-			Events: gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll),
+		ApplicationServiceTransaction{
+			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll),
 		},
 	)
 	if err != nil {
@@ -184,18 +190,18 @@ func (s *OutputRoomEventConsumer) sendEvents(
 
 	// If txnID is not defined, generate one from the events.
 	if txnID == "" {
-		txnID = fmt.Sprintf("%d_%d", events[0].Event.OriginServerTS(), len(transaction))
+		txnID = fmt.Sprintf("%d_%d", events[0].PDU.OriginServerTS(), len(transaction))
 	}
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
-	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
+	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.RequestUrl(), txnID, url.QueryEscape(state.HSToken))
 	req, err := http.NewRequestWithContext(ctx, "PUT", address, bytes.NewBuffer(transaction))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.client.Do(req)
+	resp, err := state.HTTPClient.Do(req)
 	if err != nil {
 		return state.backoffAndPause(err)
 	}
@@ -206,7 +212,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	case http.StatusOK:
 		state.backoff = 0
 	default:
-		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice", resp.StatusCode))
+		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice url %s", resp.StatusCode, address))
 	}
 	return nil
 }
@@ -226,7 +232,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 // event falls within one of a given application service's namespaces.
 //
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice *config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
 	switch {
 	case appservice.URL == "":
 		return false
@@ -236,7 +242,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return true
 	}
 
-	if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+	if event.Type() == spec.MRoomMember && event.StateKey() != nil {
 		if appservice.IsInterestedInUserID(*event.StateKey()) {
 			return true
 		}
@@ -264,7 +270,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 
 // appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
-func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice *config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
 	// TODO: This is only checking the current room state, not the state at
 	// the event in question. Pretty sure this is what Synapse does too, but
 	// until we have a lighter way of checking the state before the event that
@@ -282,7 +288,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			switch {
 			case ev.StateKey == nil:
 				continue
-			case ev.Type != gomatrixserverlib.MRoomMember:
+			case ev.Type != spec.MRoomMember:
 				continue
 			}
 			var membership gomatrixserverlib.MemberContent
@@ -290,7 +296,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			switch {
 			case err != nil:
 				continue
-			case membership.Membership == gomatrixserverlib.Join:
+			case membership.Membership == spec.Join:
 				if appservice.IsInterestedInUserID(*ev.StateKey) {
 					return true
 				}

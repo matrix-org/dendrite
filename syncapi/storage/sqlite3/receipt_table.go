@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const receiptsSchema = `
@@ -97,7 +97,7 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Re
 }
 
 // UpsertReceipt creates new user receipts
-func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
+func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
 	pos, err = r.streamIDStatements.nextReceiptID(ctx, txn)
 	if err != nil {
 		return

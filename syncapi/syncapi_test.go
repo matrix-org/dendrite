@@ -15,11 +15,14 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/tidwall/gjson"
 
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -473,7 +476,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				}
 				// We only care about the returned events at this point
 				var res struct {
-					Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+					Chunk []synctypes.ClientEvent `json:"chunk"`
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
 					t.Errorf("failed to decode response body: %s", err)
@@ -488,7 +491,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
 				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
 
-				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
@@ -521,7 +524,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 	}
 }
 
-func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []gomatrixserverlib.ClientEvent) {
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *rstypes.HeaderedEvent, chunk []synctypes.ClientEvent) {
 	t.Helper()
 	if wantVisible {
 		for _, ev := range chunk {
@@ -611,10 +614,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -630,10 +633,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
 			},
@@ -649,7 +652,7 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
 			},
@@ -665,7 +668,7 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -705,10 +708,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -1140,7 +1143,7 @@ func TestUpdateRelations(t *testing.T) {
 		},
 		{
 			name:      "redactions are ignored",
-			eventType: gomatrixserverlib.MRoomRedaction,
+			eventType: spec.MRoomRedaction,
 			eventContent: map[string]interface{}{
 				"m.relates_to": map[string]interface{}{
 					"event_id": "$randomEventID",
@@ -1226,7 +1229,7 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
+func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string

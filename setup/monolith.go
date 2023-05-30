@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Monolith represents an instantiation of all dependencies required to build
@@ -41,8 +42,8 @@ import (
 type Monolith struct {
 	Config    *config.Dendrite
 	KeyRing   *gomatrixserverlib.KeyRing
-	Client    *gomatrixserverlib.Client
-	FedClient *gomatrixserverlib.FederationClient
+	Client    *fclient.Client
+	FedClient fclient.FederationClient
 
 	AppserviceAPI appserviceAPI.AppServiceInternalAPI
 	FederationAPI federationAPI.FederationInternalAPI
@@ -75,7 +76,7 @@ func (m *Monolith) AddAllPublicRoutes(
 		m.ExtPublicRoomsProvider, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
-		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, nil, enableMetrics,
+		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
 	mediaapi.AddPublicRoutes(routers.Media, cm, cfg, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)

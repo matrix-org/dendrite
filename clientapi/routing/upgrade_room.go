@@ -15,16 +15,18 @@
 package routing
 
 import (
+	"errors"
 	"net/http"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -53,42 +55,35 @@ func UpgradeRoom(
 	if _, err := version.SupportedRoomVersion(gomatrixserverlib.RoomVersion(r.NewVersion)); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion("This server does not support that room version"),
+			JSON: spec.UnsupportedRoomVersion("This server does not support that room version"),
 		}
 	}
 
-	upgradeReq := roomserverAPI.PerformRoomUpgradeRequest{
-		UserID:      device.UserID,
-		RoomID:      roomID,
-		RoomVersion: gomatrixserverlib.RoomVersion(r.NewVersion),
-	}
-	upgradeResp := roomserverAPI.PerformRoomUpgradeResponse{}
-
-	if err := rsAPI.PerformRoomUpgrade(req.Context(), &upgradeReq, &upgradeResp); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-
-	if upgradeResp.Error != nil {
-		if upgradeResp.Error.Code == roomserverAPI.PerformErrorNoRoom {
+	newRoomID, err := rsAPI.PerformRoomUpgrade(req.Context(), roomID, device.UserID, gomatrixserverlib.RoomVersion(r.NewVersion))
+	switch e := err.(type) {
+	case nil:
+	case roomserverAPI.ErrNotAllowed:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden(e.Error()),
+		}
+	default:
+		if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("Room does not exist"),
+				JSON: spec.NotFound("Room does not exist"),
 			}
-		} else if upgradeResp.Error.Code == roomserverAPI.PerformErrorNotAllowed {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(upgradeResp.Error.Msg),
-			}
-		} else {
-			return jsonerror.InternalServerError()
 		}
-
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: upgradeRoomResponse{
-			ReplacementRoom: upgradeResp.NewRoomID,
+			ReplacementRoom: newRoomID,
 		},
 	}
 }

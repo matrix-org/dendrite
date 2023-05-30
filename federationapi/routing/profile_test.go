@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	fedAPI "github.com/matrix-org/dendrite/federationapi"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
@@ -35,6 +36,8 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
@@ -43,8 +46,8 @@ type fakeUserAPI struct {
 	userAPI.FederationUserAPI
 }
 
-func (u *fakeUserAPI) QueryProfile(ctx context.Context, req *userAPI.QueryProfileRequest, res *userAPI.QueryProfileResponse) error {
-	return nil
+func (u *fakeUserAPI) QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error) {
+	return &authtypes.Profile{}, nil
 }
 
 func TestHandleQueryProfile(t *testing.T) {
@@ -68,14 +71,14 @@ func TestHandleQueryProfile(t *testing.T) {
 		if !ok {
 			panic("This is a programming error.")
 		}
-		routing.Setup(routers, cfg, nil, r, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, nil, caching.DisableMetrics)
+		routing.Setup(routers, cfg, nil, r, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, caching.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryProfileRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
 		keyID := signing.KeyID
 		pk := sk.Public().(ed25519.PublicKey)
-		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-		req := gomatrixserverlib.NewFederationRequest("GET", serverName, testOrigin, "/query/profile?user_id="+url.QueryEscape("@user:"+string(testOrigin)))
+		serverName := spec.ServerName(hex.EncodeToString(pk))
+		req := fclient.NewFederationRequest("GET", serverName, testOrigin, "/query/profile?user_id="+url.QueryEscape("@user:"+string(testOrigin)))
 		type queryContent struct{}
 		content := queryContent{}
 		err := req.SetContent(content)

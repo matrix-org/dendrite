@@ -12,6 +12,13 @@ spec:
     matchLabels:
       {{- include "dendrite.selectorLabels" . | nindent 6 }}
   replicas: 1
+  strategy:
+    type: {{ $.Values.strategy.type }}
+    {{- if eq $.Values.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ $.Values.strategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ $.Values.strategy.rollingUpdate.maxUnavailable }}
+    {{- end }}
   template:
     metadata:
       labels:
@@ -40,6 +47,9 @@ spec:
       - name: {{ include "dendrite.fullname" . }}-search
         persistentVolumeClaim:
           claimName: {{ default (print ( include "dendrite.fullname" . ) "-search-pvc") $.Values.persistence.search.existingClaim | quote }}
+      {{- with .Values.extraVolumes }}
+      {{ . | toYaml | nindent 6 }}
+      {{- end }}
       containers:
       - name: {{ .Chart.Name }}
         {{- include "image.name" . | nindent 8 }}
@@ -73,6 +83,9 @@ spec:
           name: {{ include "dendrite.fullname" . }}-jetstream
         - mountPath: {{ .Values.dendrite_config.sync_api.search.index_path }}
           name: {{ include "dendrite.fullname" . }}-search
+        {{- with .Values.extraVolumeMounts }}
+        {{ . | toYaml | nindent 8 }}
+        {{- end }}
         livenessProbe:
           initialDelaySeconds: 10
           periodSeconds: 10

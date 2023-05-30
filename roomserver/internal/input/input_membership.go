@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -54,7 +55,7 @@ func (r *Inputer) updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := updater.Events(ctx, nil, eventNIDs)
+	events, err := updater.Events(ctx, "", eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (r *Inputer) updateMembership(
 ) ([]api.OutputEvent, error) {
 	var err error
 	// Default the membership to Leave if no event was added or removed.
-	newMembership := gomatrixserverlib.Leave
+	newMembership := spec.Leave
 	if add != nil {
 		newMembership, err = add.Membership()
 		if err != nil {
@@ -120,13 +121,13 @@ func (r *Inputer) updateMembership(
 	}
 
 	switch newMembership {
-	case gomatrixserverlib.Invite:
+	case spec.Invite:
 		return helpers.UpdateToInviteMembership(mu, add, updates, updater.RoomVersion())
-	case gomatrixserverlib.Join:
+	case spec.Join:
 		return updateToJoinMembership(mu, add, updates)
-	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
+	case spec.Leave, spec.Ban:
 		return updateToLeaveMembership(mu, add, newMembership, updates)
-	case gomatrixserverlib.Knock:
+	case spec.Knock:
 		return updateToKnockMembership(mu, add, updates)
 	default:
 		panic(fmt.Errorf(
@@ -160,7 +161,7 @@ func updateToJoinMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
+				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetUserID:     *add.StateKey(),
 			},

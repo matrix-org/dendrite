@@ -23,19 +23,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 var (
 	cacheMu          sync.Mutex
-	publicRoomsCache []gomatrixserverlib.PublicRoom
+	publicRoomsCache []fclient.PublicRoom
 )
 
 type PublicRoomReq struct {
@@ -56,7 +56,7 @@ type filter struct {
 func GetPostPublicRooms(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var request PublicRoomReq
@@ -67,11 +67,11 @@ func GetPostPublicRooms(
 	if request.IncludeAllNetworks && request.NetworkID != "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
+			JSON: spec.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
 		}
 	}
 
-	serverName := gomatrixserverlib.ServerName(request.Server)
+	serverName := spec.ServerName(request.Server)
 	if serverName != "" && !cfg.Matrix.IsLocalServerName(serverName) {
 		res, err := federation.GetPublicRoomsFiltered(
 			req.Context(), cfg.Matrix.ServerName, serverName,
@@ -81,7 +81,10 @@ func GetPostPublicRooms(
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -92,7 +95,10 @@ func GetPostPublicRooms(
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -102,10 +108,10 @@ func GetPostPublicRooms(
 
 func publicRooms(
 	ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.ClientRoomserverAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
-) (*gomatrixserverlib.RespPublicRooms, error) {
+) (*fclient.RespPublicRooms, error) {
 
-	response := gomatrixserverlib.RespPublicRooms{
-		Chunk: []gomatrixserverlib.PublicRoom{},
+	response := fclient.RespPublicRooms{
+		Chunk: []fclient.PublicRoom{},
 	}
 	var limit int64
 	var offset int64
@@ -122,7 +128,7 @@ func publicRooms(
 	}
 	err = nil
 
-	var rooms []gomatrixserverlib.PublicRoom
+	var rooms []fclient.PublicRoom
 	if request.Since == "" {
 		rooms = refreshPublicRoomCache(ctx, rsAPI, extRoomsProvider, request)
 	} else {
@@ -146,14 +152,14 @@ func publicRooms(
 	return &response, err
 }
 
-func filterRooms(rooms []gomatrixserverlib.PublicRoom, searchTerm string) []gomatrixserverlib.PublicRoom {
+func filterRooms(rooms []fclient.PublicRoom, searchTerm string) []fclient.PublicRoom {
 	if searchTerm == "" {
 		return rooms
 	}
 
 	normalizedTerm := strings.ToLower(searchTerm)
 
-	result := make([]gomatrixserverlib.PublicRoom, 0)
+	result := make([]fclient.PublicRoom, 0)
 	for _, room := range rooms {
 		if strings.Contains(strings.ToLower(room.Name), normalizedTerm) ||
 			strings.Contains(strings.ToLower(room.Topic), normalizedTerm) ||
@@ -172,7 +178,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 	if httpReq.Method != "GET" && httpReq.Method != "POST" {
 		return &util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
+			JSON: spec.NotFound("Bad method"),
 		}
 	}
 	if httpReq.Method == "GET" {
@@ -183,7 +189,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON("limit param is not a number"),
+				JSON: spec.BadJSON("limit param is not a number"),
 			}
 		}
 		request.Limit = int64(limit)
@@ -214,7 +220,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 //	 limit=3&since=6  => G     (prev='3', next='')
 //
 //	A value of '-1' for prev/next indicates no position.
-func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int64) (subset []gomatrixserverlib.PublicRoom, prev, next int) {
+func sliceInto(slice []fclient.PublicRoom, since int64, limit int64) (subset []fclient.PublicRoom, prev, next int) {
 	prev = -1
 	next = -1
 
@@ -241,10 +247,10 @@ func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int64) (
 func refreshPublicRoomCache(
 	ctx context.Context, rsAPI roomserverAPI.ClientRoomserverAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
 	request PublicRoomReq,
-) []gomatrixserverlib.PublicRoom {
+) []fclient.PublicRoom {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
-	var extraRooms []gomatrixserverlib.PublicRoom
+	var extraRooms []fclient.PublicRoom
 	if extRoomsProvider != nil {
 		extraRooms = extRoomsProvider.Rooms()
 	}
@@ -269,7 +275,7 @@ func refreshPublicRoomCache(
 		util.GetLogger(ctx).WithError(err).Error("PopulatePublicRooms failed")
 		return publicRoomsCache
 	}
-	publicRoomsCache = []gomatrixserverlib.PublicRoom{}
+	publicRoomsCache = []fclient.PublicRoom{}
 	publicRoomsCache = append(publicRoomsCache, pubRooms...)
 	publicRoomsCache = append(publicRoomsCache, extraRooms...)
 	publicRoomsCache = dedupeAndShuffle(publicRoomsCache)
@@ -281,16 +287,16 @@ func refreshPublicRoomCache(
 	return publicRoomsCache
 }
 
-func getPublicRoomsFromCache() []gomatrixserverlib.PublicRoom {
+func getPublicRoomsFromCache() []fclient.PublicRoom {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	return publicRoomsCache
 }
 
-func dedupeAndShuffle(in []gomatrixserverlib.PublicRoom) []gomatrixserverlib.PublicRoom {
+func dedupeAndShuffle(in []fclient.PublicRoom) []fclient.PublicRoom {
 	// de-duplicate rooms with the same room ID. We can join the room via any of these aliases as we know these servers
 	// are alive and well, so we arbitrarily pick one (purposefully shuffling them to spread the load a bit)
-	var publicRooms []gomatrixserverlib.PublicRoom
+	var publicRooms []fclient.PublicRoom
 	haveRoomIDs := make(map[string]bool)
 	rand.Shuffle(len(in), func(i, j int) {
 		in[i], in[j] = in[j], in[i]

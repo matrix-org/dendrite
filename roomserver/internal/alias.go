@@ -25,7 +25,9 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -139,10 +141,10 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	}
 
 	if creatorID != request.UserID {
-		var plEvent *gomatrixserverlib.HeaderedEvent
+		var plEvent *types.HeaderedEvent
 		var pls *gomatrixserverlib.PowerLevelContent
 
-		plEvent, err = r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
+		plEvent, err = r.DB.GetStateEvent(ctx, roomID, spec.MRoomPowerLevels, "")
 		if err != nil {
 			return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 		}
@@ -152,13 +154,13 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			return fmt.Errorf("plEvent.PowerLevels: %w", err)
 		}
 
-		if pls.UserLevel(request.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+		if pls.UserLevel(request.UserID) < pls.EventLevel(spec.MRoomCanonicalAlias, true) {
 			response.Removed = false
 			return nil
 		}
 	}
 
-	ev, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomCanonicalAlias, "")
+	ev, err := r.DB.GetStateEvent(ctx, roomID, spec.MRoomCanonicalAlias, "")
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	} else if ev != nil {
@@ -185,7 +187,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			builder := &gomatrixserverlib.EventBuilder{
+			proto := &gomatrixserverlib.ProtoEvent{
 				Sender:   sender,
 				RoomID:   ev.RoomID(),
 				Type:     ev.Type(),
@@ -193,7 +195,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				Content:  res,
 			}
 
-			eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+			eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
 			if err != nil {
 				return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 			}
@@ -206,12 +208,12 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			newEvent, err := eventutil.BuildEvent(ctx, builder, &r.Cfg.Global, identity, time.Now(), &eventsNeeded, stateRes)
+			newEvent, err := eventutil.BuildEvent(ctx, proto, &r.Cfg.Global, identity, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}
 
-			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r, api.KindNew, []*types.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}

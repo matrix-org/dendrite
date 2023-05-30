@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const queuePDUsSchema = `
@@ -100,7 +101,7 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 	ctx context.Context,
 	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	nid int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueuePDUStmt)
@@ -115,7 +116,7 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 
 func (s *queuePDUsStatements) DeleteQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
 	deleteSQL := strings.Replace(deleteQueuePDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
@@ -136,7 +137,7 @@ func (s *queuePDUsStatements) DeleteQueuePDUs(
 }
 
 func (s *queuePDUsStatements) SelectQueuePDUNextTransactionID(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) (gomatrixserverlib.TransactionID, error) {
 	var transactionID gomatrixserverlib.TransactionID
 	stmt := sqlutil.TxStmt(txn, s.selectQueueNextTransactionIDStmt)
@@ -161,7 +162,7 @@ func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 
 func (s *queuePDUsStatements) SelectQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsStmt)
@@ -184,16 +185,16 @@ func (s *queuePDUsStatements) SelectQueuePDUs(
 
 func (s *queuePDUsStatements) SelectQueuePDUServerNames(
 	ctx context.Context, txn *sql.Tx,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueServerNamesStmt)
 	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-	var result []gomatrixserverlib.ServerName
+	var result []spec.ServerName
 	for rows.Next() {
-		var serverName gomatrixserverlib.ServerName
+		var serverName spec.ServerName
 		if err = rows.Scan(&serverName); err != nil {
 			return nil, err
 		}

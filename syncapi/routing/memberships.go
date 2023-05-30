@@ -19,17 +19,18 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 type getMembershipResponse struct {
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+	Chunk []synctypes.ClientEvent `json:"chunk"`
 }
 
 // https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-rooms-roomid-joined-members
@@ -66,26 +67,32 @@ func GetMemberships(
 	var queryRes api.QueryMembershipForUserResponse
 	if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !queryRes.HasBeenInRoom {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
+			JSON: spec.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
 		}
 	}
 
 	if joinedOnly && !queryRes.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
+			JSON: spec.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
 		}
 	}
 
 	db, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	defer db.Rollback() // nolint: errcheck
 
@@ -97,7 +104,10 @@ func GetMemberships(
 			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("unable to get 'atToken'")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 		}
 	}
@@ -105,13 +115,19 @@ func GetMemberships(
 	eventIDs, err := db.SelectMemberships(req.Context(), roomID, atToken, membership, notMembership)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("db.SelectMemberships failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	qryRes := &api.QueryEventsByIDResponse{}
 	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	result := qryRes.Events
@@ -123,7 +139,10 @@ func GetMemberships(
 			var content databaseJoinedMember
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			res.Joined[ev.Sender()] = joinedMember(content)
 		}
@@ -134,6 +153,6 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{gomatrixserverlib.HeaderedToClientEvents(result, gomatrixserverlib.FormatAll)},
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll)},
 	}
 }

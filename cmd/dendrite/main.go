@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -96,9 +96,9 @@ func main() {
 	}
 
 	// create DNS cache
-	var dnsCache *gomatrixserverlib.DNSCache
+	var dnsCache *fclient.DNSCache
 	if cfg.Global.DNSCache.Enabled {
-		dnsCache = gomatrixserverlib.NewDNSCache(
+		dnsCache = fclient.NewDNSCache(
 			cfg.Global.DNSCache.CacheSize,
 			cfg.Global.DNSCache.CacheLifetime,
 		)

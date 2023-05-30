@@ -9,12 +9,15 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -96,7 +99,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -111,7 +114,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilterUnknown,
 						},
 					},
@@ -126,7 +129,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 						IncludeState: true,
@@ -143,7 +146,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -160,7 +163,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -176,7 +179,7 @@ func TestSearch(t *testing.T) {
 				SearchCategories: SearchCategories{
 					RoomEvents: RoomEvents{
 						SearchTerm: "hello",
-						Filter: gomatrixserverlib.RoomEventFilter{
+						Filter: synctypes.RoomEventFilter{
 							Rooms: &roomsFilter,
 						},
 					},
@@ -213,9 +216,9 @@ func TestSearch(t *testing.T) {
 		// store the events in the database
 		var sp types.StreamPosition
 		for _, x := range room.Events() {
-			var stateEvents []*gomatrixserverlib.HeaderedEvent
+			var stateEvents []*rstypes.HeaderedEvent
 			var stateEventIDs []string
-			if x.Type() == gomatrixserverlib.MRoomMember {
+			if x.Type() == spec.MRoomMember {
 				stateEvents = append(stateEvents, x)
 				stateEventIDs = append(stateEventIDs, x.EventID())
 			}

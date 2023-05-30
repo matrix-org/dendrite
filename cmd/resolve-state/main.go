@@ -91,14 +91,14 @@ func main() {
 		}
 
 		var eventEntries []types.Event
-		eventEntries, err = roomserverDB.Events(ctx, roomInfo, eventNIDs)
+		eventEntries, err = roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 		if err != nil {
 			panic(err)
 		}
 
-		events := make(map[types.EventNID]*gomatrixserverlib.Event, len(eventEntries))
+		events := make(map[types.EventNID]gomatrixserverlib.PDU, len(eventEntries))
 		for _, entry := range eventEntries {
-			events[entry.EventNID] = entry.Event
+			events[entry.EventNID] = entry.PDU
 		}
 
 		if len(removed) > 0 {
@@ -149,15 +149,15 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(eventNIDMap), "state events")
-	eventEntries, err := roomserverDB.Events(ctx, roomInfo, eventNIDs)
+	eventEntries, err := roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		panic(err)
 	}
 
 	authEventIDMap := make(map[string]struct{})
-	events := make([]*gomatrixserverlib.Event, len(eventEntries))
+	events := make([]gomatrixserverlib.PDU, len(eventEntries))
 	for i := range eventEntries {
-		events[i] = eventEntries[i].Event
+		events[i] = eventEntries[i].PDU
 		for _, authEventID := range eventEntries[i].AuthEventIDs() {
 			authEventIDMap[authEventID] = struct{}{}
 		}
@@ -174,17 +174,15 @@ func main() {
 		panic(err)
 	}
 
-	authEvents := make([]*gomatrixserverlib.Event, len(authEventEntries))
+	authEvents := make([]gomatrixserverlib.PDU, len(authEventEntries))
 	for i := range authEventEntries {
-		authEvents[i] = authEventEntries[i].Event
+		authEvents[i] = authEventEntries[i].PDU
 	}
 
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
-		gomatrixserverlib.RoomVersion(*roomVersion),
-		events,
-		authEvents,
+		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents,
 	)
 	if err != nil {
 		panic(err)
@@ -208,7 +206,7 @@ func main() {
 	fmt.Println("Returned", count, "state events after filtering")
 }
 
-type Events []*gomatrixserverlib.Event
+type Events []gomatrixserverlib.PDU
 
 func (e Events) Len() int {
 	return len(e)

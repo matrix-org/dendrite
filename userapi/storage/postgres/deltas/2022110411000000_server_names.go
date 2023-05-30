@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var serverNamesTables = []string{
@@ -42,7 +42,7 @@ var serverNamesDropIndex = []string{
 // PostgreSQL doesn't expect the table name to be specified as a substituted
 // argument in that way so it results in a syntax error in the query.
 
-func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib.ServerName) error {
+func UpServerNames(ctx context.Context, tx *sql.Tx, serverName spec.ServerName) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
 			"ALTER TABLE IF EXISTS %s ADD COLUMN IF NOT EXISTS server_name TEXT NOT NULL DEFAULT '';",

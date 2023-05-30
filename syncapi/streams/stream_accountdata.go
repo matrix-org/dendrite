@@ -3,11 +3,11 @@ package streams
 import (
 	"context"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type AccountDataStreamProvider struct {
@@ -82,9 +82,9 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 				if globalData, ok := dataRes.GlobalAccountData[dataType]; ok {
 					req.Response.AccountData.Events = append(
 						req.Response.AccountData.Events,
-						gomatrixserverlib.ClientEvent{
+						synctypes.ClientEvent{
 							Type:    dataType,
-							Content: gomatrixserverlib.RawJSON(globalData),
+							Content: spec.RawJSON(globalData),
 						},
 					)
 				}
@@ -96,9 +96,9 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 					}
 					joinData.AccountData.Events = append(
 						joinData.AccountData.Events,
-						gomatrixserverlib.ClientEvent{
+						synctypes.ClientEvent{
 							Type:    dataType,
-							Content: gomatrixserverlib.RawJSON(roomData),
+							Content: spec.RawJSON(roomData),
 						},
 					)
 					req.Response.Rooms.Join[roomID] = joinData

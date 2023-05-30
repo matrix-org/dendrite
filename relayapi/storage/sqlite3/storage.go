@@ -21,7 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Database stores information needed by the federation sender
@@ -36,7 +36,7 @@ func NewDatabase(
 	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	isLocalServerName func(spec.ServerName) bool,
 ) (*Database, error) {
 	var d Database
 	var err error

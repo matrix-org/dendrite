@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const relayServersSchema = `
@@ -77,8 +77,8 @@ func NewSQLiteRelayServersTable(db *sql.DB) (s *relayServersStatements, err erro
 func (s *relayServersStatements) InsertRelayServers(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
-	relayServers []gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
+	relayServers []spec.ServerName,
 ) error {
 	for _, relayServer := range relayServers {
 		stmt := sqlutil.TxStmt(txn, s.insertRelayServersStmt)
@@ -92,8 +92,8 @@ func (s *relayServersStatements) InsertRelayServers(
 func (s *relayServersStatements) SelectRelayServers(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
-) ([]gomatrixserverlib.ServerName, error) {
+	serverName spec.ServerName,
+) ([]spec.ServerName, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRelayServersStmt)
 	rows, err := stmt.QueryContext(ctx, serverName)
 	if err != nil {
@@ -101,13 +101,13 @@ func (s *relayServersStatements) SelectRelayServers(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRelayServers: rows.close() failed")
 
-	var result []gomatrixserverlib.ServerName
+	var result []spec.ServerName
 	for rows.Next() {
 		var relayServer string
 		if err = rows.Scan(&relayServer); err != nil {
 			return nil, err
 		}
-		result = append(result, gomatrixserverlib.ServerName(relayServer))
+		result = append(result, spec.ServerName(relayServer))
 	}
 	return result, nil
 }
@@ -115,8 +115,8 @@ func (s *relayServersStatements) SelectRelayServers(
 func (s *relayServersStatements) DeleteRelayServers(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
-	relayServers []gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
+	relayServers []spec.ServerName,
 ) error {
 	deleteSQL := strings.Replace(deleteRelayServersSQL, "($2)", sqlutil.QueryVariadicOffset(len(relayServers), 1), 1)
 	deleteStmt, err := s.db.Prepare(deleteSQL)
@@ -138,7 +138,7 @@ func (s *relayServersStatements) DeleteRelayServers(
 func (s *relayServersStatements) DeleteAllRelayServers(
 	ctx context.Context,
 	txn *sql.Tx,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteAllRelayServersStmt)
 	if _, err := stmt.ExecContext(ctx, serverName); err != nil {

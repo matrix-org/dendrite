@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
@@ -46,7 +47,7 @@ type SyncAPIProducer struct {
 
 func (p *SyncAPIProducer) SendReceipt(
 	ctx context.Context,
-	userID, roomID, eventID, receiptType string, timestamp gomatrixserverlib.Timestamp,
+	userID, roomID, eventID, receiptType string, timestamp spec.Timestamp,
 ) error {
 	m := &nats.Msg{
 		Subject: p.TopicReceiptEvent,
@@ -155,7 +156,7 @@ func (p *SyncAPIProducer) SendPresence(
 	if statusMsg != nil {
 		m.Header.Set("status_msg", *statusMsg)
 	}
-	lastActiveTS := gomatrixserverlib.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
+	lastActiveTS := spec.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(lastActiveTS)))
 	log.Tracef("Sending presence to syncAPI: %+v", m.Header)
@@ -164,7 +165,7 @@ func (p *SyncAPIProducer) SendPresence(
 }
 
 func (p *SyncAPIProducer) SendDeviceListUpdate(
-	ctx context.Context, deviceListUpdate gomatrixserverlib.RawJSON, origin gomatrixserverlib.ServerName,
+	ctx context.Context, deviceListUpdate spec.RawJSON, origin spec.ServerName,
 ) (err error) {
 	m := nats.NewMsg(p.TopicDeviceListUpdate)
 	m.Header.Set("origin", string(origin))
@@ -175,7 +176,7 @@ func (p *SyncAPIProducer) SendDeviceListUpdate(
 }
 
 func (p *SyncAPIProducer) SendSigningKeyUpdate(
-	ctx context.Context, data gomatrixserverlib.RawJSON, origin gomatrixserverlib.ServerName,
+	ctx context.Context, data spec.RawJSON, origin spec.ServerName,
 ) (err error) {
 	m := nats.NewMsg(p.TopicSigningKeyUpdate)
 	m.Header.Set("origin", string(origin))

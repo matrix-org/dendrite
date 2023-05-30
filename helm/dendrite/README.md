@@ -1,6 +1,7 @@
+
 # dendrite
 
-![Version: 0.12.0](https://img.shields.io/badge/Version-0.12.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.12.0](https://img.shields.io/badge/AppVersion-0.12.0-informational?style=flat-square)
+![Version: 0.12.2](https://img.shields.io/badge/Version-0.12.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.12.0](https://img.shields.io/badge/AppVersion-0.12.0-informational?style=flat-square)
 Dendrite Matrix Homeserver
 
 Status: **NOT PRODUCTION READY**
@@ -54,6 +55,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | persistence.media.capacity | string | `"1Gi"` | PVC Storage Request for the media volume |
 | persistence.search.existingClaim | string | `""` | Use an existing volume claim for the fulltext search index |
 | persistence.search.capacity | string | `"1Gi"` | PVC Storage Request for the search volume |
+| extraVolumes | list | `[]` | Add additional volumes to the Dendrite Pod |
+| extraVolumeMounts | list | `[]` | Configure additional mount points volumes in the Dendrite Pod |
+| strategy.type | string | `"RollingUpdate"` | Strategy to use for rolling updates (e.g. Recreate, RollingUpdate) If you are using ReadWriteOnce volumes, you should probably use Recreate |
+| strategy.rollingUpdate.maxUnavailable | string | `"25%"` | Maximum number of pods that can be unavailable during the update process |
+| strategy.rollingUpdate.maxSurge | string | `"25%"` | Maximum number of pods that can be scheduled above the desired number of pods |
 | dendrite_config.version | int | `2` |  |
 | dendrite_config.global.server_name | string | `""` | **REQUIRED** Servername for this Dendrite deployment. |
 | dendrite_config.global.private_key | string | `"/etc/dendrite/secrets/signing.key"` | The private key to use. (**NOTE**: This is overriden in Helm) |
@@ -157,10 +163,15 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 ## Monitoring
 
-[![Grafana Dashboard](https://grafana.com/api/dashboards/13916/images/9894/image)](https://grafana.com/grafana/dashboards/13916-dendrite/)
+![Grafana Dashboard](grafana_dashboards/dendrite-rev2.png)
 
 * Works well with [Prometheus Operator](https://prometheus-operator.dev/) ([Helmchart](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)) and their setup of [Grafana](https://grafana.com/grafana/), by enabling the following values:
 ```yaml
+dendrite_config:
+  global:
+    metrics:
+      enabled: true
+
 prometheus:
   servicemonitor:
     enabled: true

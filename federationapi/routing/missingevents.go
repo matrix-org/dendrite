@@ -16,9 +16,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -33,7 +34,7 @@ type getMissingEventRequest struct {
 // Events are fetched from room DAG starting from latest_events until we reach earliest_events or the limit.
 func GetMissingEvents(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
@@ -41,7 +42,7 @@ func GetMissingEvents(
 	if err := json.Unmarshal(request.Content(), &gme); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
@@ -62,13 +63,16 @@ func GetMissingEvents(
 		&eventsResponse,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryMissingEvents failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	eventsResponse.Events = filterEvents(eventsResponse.Events, roomID)
 
-	resp := gomatrixserverlib.RespMissingEvents{
-		Events: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(eventsResponse.Events),
+	resp := fclient.RespMissingEvents{
+		Events: types.NewEventJSONsFromHeaderedEvents(eventsResponse.Events),
 	}
 
 	return util.JSONResponse{
@@ -79,8 +83,8 @@ func GetMissingEvents(
 
 // filterEvents returns only those events with matching roomID
 func filterEvents(
-	events []*gomatrixserverlib.HeaderedEvent, roomID string,
-) []*gomatrixserverlib.HeaderedEvent {
+	events []*types.HeaderedEvent, roomID string,
+) []*types.HeaderedEvent {
 	ref := events[:0]
 	for _, ev := range events {
 		if ev.RoomID() == roomID {

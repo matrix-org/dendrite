@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/relayapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -29,23 +29,23 @@ import (
 // This endpoint can be extracted into a separate relay server service.
 func GetTransactionFromRelay(
 	httpReq *http.Request,
-	fedReq *gomatrixserverlib.FederationRequest,
+	fedReq *fclient.FederationRequest,
 	relayAPI api.RelayInternalAPI,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing relay_txn for %s", userID.Raw())
+	logrus.Infof("Processing relay_txn for %s", userID.String())
 
-	var previousEntry gomatrixserverlib.RelayEntry
+	var previousEntry fclient.RelayEntry
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("invalid json provided"),
+			JSON: spec.BadJSON("invalid json provided"),
 		}
 	}
 	if previousEntry.EntryID < 0 {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Invalid entry id provided. Must be >= 0."),
+			JSON: spec.BadJSON("Invalid entry id provided. Must be >= 0."),
 		}
 	}
 	logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
@@ -59,7 +59,7 @@ func GetTransactionFromRelay(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespGetRelayTransaction{
+		JSON: fclient.RespGetRelayTransaction{
 			Transaction:   response.Transaction,
 			EntryID:       response.EntryID,
 			EntriesQueued: response.EntriesQueued,

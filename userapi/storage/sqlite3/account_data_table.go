@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const accountDataSchema = `
@@ -76,7 +76,7 @@ func NewSQLiteAccountDataTable(db *sql.DB) (tables.AccountDataTable, error) {
 
 func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	roomID, dataType string, content json.RawMessage,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, serverName, roomID, dataType, content)
@@ -85,7 +85,7 @@ func (s *accountDataStatements) InsertAccountData(
 
 func (s *accountDataStatements) SelectAccountData(
 	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) (
 	/* global */ map[string]json.RawMessage,
 	/* rooms */ map[string]map[string]json.RawMessage,
@@ -123,7 +123,7 @@ func (s *accountDataStatements) SelectAccountData(
 
 func (s *accountDataStatements) SelectAccountDataByType(
 	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	var bytes []byte

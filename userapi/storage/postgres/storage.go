@@ -20,19 +20,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err
