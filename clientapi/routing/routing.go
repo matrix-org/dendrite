@@ -20,8 +20,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/setup/base"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -29,6 +27,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/matrix-org/dendrite/setup/base"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -85,6 +86,12 @@ func Setup(
 		unstableFeatures["org.matrix."+msc] = true
 	}
 
+	// singleflight protects /join endpoints from being invoked
+	// multiple times from the same user and room, otherwise
+	// a state reset can occur. This also avoids unneeded
+	// state calculations.
+	// TODO: actually fix this in the roomserver, as there are
+	// 		 possibly other ways that can result in a stat reset.
 	sf := singleflight.Group{}
 
 	if cfg.Matrix.WellKnownClientName != "" {
@@ -267,11 +274,15 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
+			// Only execute a join for roomIDOrAlias and UserID once. If there is a join in progress
+			// it waits for it to complete and returns that result for subsequent requests.
 			resp, _, _ := sf.Do(vars["roomIDOrAlias"]+device.UserID, func() (any, error) {
 				return JoinRoomByIDOrAlias(
 					req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
 				), nil
 			})
+			// once all joins are processed, drop them from the cache. Further requests
+			// will be processed as usual.
 			sf.Forget(vars["roomIDOrAlias"] + device.UserID)
 			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
@@ -307,11 +318,15 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
+			// Only execute a join for roomID and UserID once. If there is a join in progress
+			// it waits for it to complete and returns that result for subsequent requests.
 			resp, _, _ := sf.Do(vars["roomID"]+device.UserID, func() (any, error) {
 				return JoinRoomByIDOrAlias(
 					req, device, rsAPI, userAPI, vars["roomID"],
 				), nil
 			})
+			// once all joins are processed, drop them from the cache. Further requests
+			// will be processed as usual.
 			sf.Forget(vars["roomID"] + device.UserID)
 			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
