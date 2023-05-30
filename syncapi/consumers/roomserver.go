@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -51,7 +52,7 @@ type OutputRoomEventConsumer struct {
 	pduStream    streams.StreamProvider
 	inviteStream streams.StreamProvider
 	notifier     *notifier.Notifier
-	fts          *fulltext.Search
+	fts          fulltext.Indexer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -108,7 +109,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		// Ignore redaction events. We will add them to the database when they are
 		// validated (when we receive OutputTypeRedactedEvent)
 		event := output.NewRoomEvent.Event
-		if event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil {
+		if event.Type() == spec.MRoomRedaction && event.StateKey() == nil {
 			// in the special case where the event redacts itself, just pass the message through because
 			// we will never see the other part of the pair
 			if event.Redacts() != event.EventID() {
@@ -212,6 +213,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	// Finally, work out if there are any more events missing.
 	if len(missingEventIDs) > 0 {
 		eventsReq := &api.QueryEventsByIDRequest{
+			RoomID:   ev.RoomID(),
 			EventIDs: missingEventIDs,
 		}
 		eventsRes := &api.QueryEventsByIDResponse{}
@@ -316,7 +318,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		ev,
-		[]*gomatrixserverlib.HeaderedEvent{},
+		[]*rstypes.HeaderedEvent{},
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
@@ -360,8 +362,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
-	if ev.Type() != gomatrixserverlib.MRoomMember {
+func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rstypes.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
+	if ev.Type() != spec.MRoomMember {
 		return sp, nil
 	}
 	membership, err := ev.Membership()
@@ -369,7 +371,7 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 		return sp, fmt.Errorf("ev.Membership: %w", err)
 	}
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
-	if membership == gomatrixserverlib.Join {
+	if membership == spec.Join {
 		// check it's a local join
 		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
 			return sp, nil
@@ -432,7 +434,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// Only notify clients about retired invite events, if the user didn't accept the invite.
 	// The PDU stream will also receive an event about accepting the invitation, so there should
 	// be a "smooth" transition from invite -> join, and not invite -> leave -> join
-	if msg.Membership == gomatrixserverlib.Join {
+	if msg.Membership == spec.Join {
 		return
 	}
 
@@ -494,7 +496,7 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 	}
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent) (*rstypes.HeaderedEvent, error) {
 	if event.StateKey() == nil {
 		return event, nil
 	}
@@ -524,12 +526,12 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 		PrevSender:    prevEvent.Sender(),
 	}
 
-	event.Event, err = event.SetUnsigned(prev)
+	event.PDU, err = event.SetUnsigned(prev)
 	succeeded = true
 	return event, err
 }
 
-func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, pduPosition types.StreamPosition) error {
+func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPosition types.StreamPosition) error {
 	if !s.cfg.Fulltext.Enabled {
 		return nil
 	}
@@ -543,11 +545,11 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, 
 	switch ev.Type() {
 	case "m.room.message":
 		e.Content = gjson.GetBytes(ev.Content(), "body").String()
-	case gomatrixserverlib.MRoomName:
+	case spec.MRoomName:
 		e.Content = gjson.GetBytes(ev.Content(), "name").String()
-	case gomatrixserverlib.MRoomTopic:
+	case spec.MRoomTopic:
 		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
-	case gomatrixserverlib.MRoomRedaction:
+	case spec.MRoomRedaction:
 		log.Tracef("Redacting event: %s", ev.Redacts())
 		if err := s.fts.Delete(ev.Redacts()); err != nil {
 			return fmt.Errorf("failed to delete entry from fulltext index: %w", err)

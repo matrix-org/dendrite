@@ -17,26 +17,21 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-
+	"github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 // GetCapabilities returns information about the server's supported feature set
 // and other relevant capabilities to an authenticated user.
-func GetCapabilities(
-	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
-) util.JSONResponse {
-	roomVersionsQueryReq := roomserverAPI.QueryRoomVersionCapabilitiesRequest{}
-	roomVersionsQueryRes := roomserverAPI.QueryRoomVersionCapabilitiesResponse{}
-	if err := rsAPI.QueryRoomVersionCapabilities(
-		req.Context(),
-		&roomVersionsQueryReq,
-		&roomVersionsQueryRes,
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryRoomVersionCapabilities failed")
-		return jsonerror.InternalServerError()
+func GetCapabilities() util.JSONResponse {
+	versionsMap := map[gomatrixserverlib.RoomVersion]string{}
+	for v, desc := range version.SupportedRoomVersions() {
+		if desc.Stable() {
+			versionsMap[v] = "stable"
+		} else {
+			versionsMap[v] = "unstable"
+		}
 	}
 
 	response := map[string]interface{}{
@@ -44,7 +39,10 @@ func GetCapabilities(
 			"m.change_password": map[string]bool{
 				"enabled": true,
 			},
-			"m.room_versions": roomVersionsQueryRes,
+			"m.room_versions": map[string]interface{}{
+				"default":   version.DefaultRoomVersion(),
+				"available": versionsMap,
+			},
 		},
 	}
 

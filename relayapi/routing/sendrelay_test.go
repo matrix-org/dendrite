@@ -26,11 +26,13 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
+	testOrigin = spec.ServerName("kaer.morhen")
 )
 
 func createTransaction() gomatrixserverlib.Transaction {
@@ -43,15 +45,15 @@ func createTransaction() gomatrixserverlib.Transaction {
 }
 
 func createFederationRequest(
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 	txnID gomatrixserverlib.TransactionID,
-	origin gomatrixserverlib.ServerName,
-	destination gomatrixserverlib.ServerName,
+	origin spec.ServerName,
+	destination spec.ServerName,
 	content interface{},
-) gomatrixserverlib.FederationRequest {
+) fclient.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
-	path := federationPathPrefixV1 + "/send_relay/" + string(txnID) + "/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("PUT", origin, destination, path)
+	path := federationPathPrefixV1 + "/send_relay/" + string(txnID) + "/" + userID.String()
+	request := fclient.NewFederationRequest("PUT", origin, destination, path)
 	request.SetContent(content)
 
 	return request
@@ -65,7 +67,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	txn := createTransaction()
@@ -88,7 +90,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
@@ -117,7 +119,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
@@ -151,7 +153,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
@@ -161,7 +163,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 		Field: []gomatrixserverlib.EDU{},
 	}
 	for i := 0; i < 101; i++ {
-		content.Field = append(content.Field, gomatrixserverlib.EDU{Type: gomatrixserverlib.MTyping})
+		content.Field = append(content.Field, gomatrixserverlib.EDU{Type: spec.MTyping})
 	}
 	assert.Greater(t, len(content.Field), 100)
 
@@ -185,7 +187,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
-	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	userID, err := spec.NewUserID("@local:domain", false)
 	assert.NoError(t, err, "Invalid userID")
 
 	txn := createTransaction()

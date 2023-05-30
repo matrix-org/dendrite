@@ -4,17 +4,17 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
-func pubRoom(name string) gomatrixserverlib.PublicRoom {
-	return gomatrixserverlib.PublicRoom{
+func pubRoom(name string) fclient.PublicRoom {
+	return fclient.PublicRoom{
 		Name: name,
 	}
 }
 
 func TestSliceInto(t *testing.T) {
-	slice := []gomatrixserverlib.PublicRoom{
+	slice := []fclient.PublicRoom{
 		pubRoom("a"), pubRoom("b"), pubRoom("c"), pubRoom("d"), pubRoom("e"), pubRoom("f"), pubRoom("g"),
 	}
 	limit := int64(3)
@@ -22,7 +22,7 @@ func TestSliceInto(t *testing.T) {
 		since      int64
 		wantPrev   int
 		wantNext   int
-		wantSubset []gomatrixserverlib.PublicRoom
+		wantSubset []fclient.PublicRoom
 	}{
 		{
 			since:      0,

@@ -4,7 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '**.go'                 # only execute on changes to go files
+      - 'go.sum'                # or dependency updates
+      - '.github/workflows/**'  # or workflow changes
   pull_request:
+    paths:
+      - '**.go'
+      - 'go.sum'                # or dependency updates
+      - '.github/workflows/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -59,6 +67,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
@@ -93,6 +103,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
         uses: actions/setup-go@v3
         with:
@@ -224,6 +236,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
         uses: actions/setup-go@v3
         with:
@@ -385,7 +399,7 @@ jobs:
         # See https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md specifically GOROOT_1_17_X64
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
-          go get -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+          go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
       - name: Run actions/checkout@v3 for dendrite
         uses: actions/checkout@v3
         with:

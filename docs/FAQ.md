@@ -18,13 +18,13 @@ Mostly, although there are still bugs and missing features. If you are a confide
 
 ## Is Dendrite feature-complete?
 
-No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](../README.md) at the root of the repository for more information.
+No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](https://github.com/matrix-org/dendrite/blob/main/README.md) at the root of the repository for more information.
 
 ## Why doesn't Dendrite have "x" yet?
 
 Dendrite development is currently supported by a small team of developers and due to those limited resources, the majority of the effort is focused on getting Dendrite to be 
 specification complete. If there are major features you're requesting (e.g. new administration endpoints), we'd like to strongly encourage you to join the community in supporting 
-the development efforts through [contributing](https://matrix-org.github.io/dendrite/development/contributing). 
+the development efforts through [contributing](../development/contributing). 
 
 ## Is there a migration path from Synapse to Dendrite?
 
@@ -103,7 +103,7 @@ This can be done by performing a room upgrade. Use the command `/upgraderoom <ve
 
 ## How do I reset somebody's password on my server?
 
-Use the admin endpoint [resetpassword](https://matrix-org.github.io/dendrite/administration/adminapi#post-_dendriteadminresetpassworduserid)
+Use the admin endpoint [resetpassword](./administration/adminapi#post-_dendriteadminresetpassworduserid)
 
 ## Should I use PostgreSQL or SQLite for my databases?
 
@@ -157,7 +157,7 @@ You may need to revisit the connection limit of your PostgreSQL server and/or ma
 
 ## VOIP and Video Calls don't appear to work on Dendrite
 
-There is likely an issue with your STUN/TURN configuration on the server. If you believe your configuration to be correct, please see the [troubleshooting](administration/5_troubleshooting.md) for troubleshooting recommendations.
+There is likely an issue with your STUN/TURN configuration on the server. If you believe your configuration to be correct, please see the [troubleshooting](administration/6_troubleshooting.md) for troubleshooting recommendations.
 
 ## What is being reported when enabling phone-home statistics?
 

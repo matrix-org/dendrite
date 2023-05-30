@@ -21,11 +21,12 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	relayInternal "github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -44,7 +45,7 @@ func Setup(
 
 	v1fedmux.Handle("/send_relay/{txnID}/{userID}", MakeRelayAPI(
 		"send_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
-		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
 			logrus.Infof("Handling send_relay from: %s", request.Origin())
 			if !relayAPI.RelayingEnabled() {
 				logrus.Warnf("Dropping send_relay from: %s", request.Origin())
@@ -53,11 +54,11 @@ func Setup(
 				}
 			}
 
-			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
+			userID, err := spec.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Username was invalid"),
+					JSON: spec.InvalidUsername("Username was invalid"),
 				}
 			}
 			return SendTransactionToRelay(
@@ -69,7 +70,7 @@ func Setup(
 
 	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
 		"get_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
-		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
 			logrus.Infof("Handling relay_txn from: %s", request.Origin())
 			if !relayAPI.RelayingEnabled() {
 				logrus.Warnf("Dropping relay_txn from: %s", request.Origin())
@@ -78,11 +79,11 @@ func Setup(
 				}
 			}
 
-			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
+			userID, err := spec.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Username was invalid"),
+					JSON: spec.InvalidUsername("Username was invalid"),
 				}
 			}
 			return GetTransactionFromRelay(httpReq, request, relayAPI, *userID)
@@ -92,13 +93,13 @@ func Setup(
 
 // MakeRelayAPI makes an http.Handler that checks matrix relay authentication.
 func MakeRelayAPI(
-	metricsName string, serverName gomatrixserverlib.ServerName,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	metricsName string, serverName spec.ServerName,
+	isLocalServerName func(spec.ServerName) bool,
 	keyRing gomatrixserverlib.JSONVerifier,
-	f func(*http.Request, *gomatrixserverlib.FederationRequest, map[string]string) util.JSONResponse,
+	f func(*http.Request, *fclient.FederationRequest, map[string]string) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
+		fedReq, errResp := fclient.VerifyHTTPRequest(
 			req, time.Now(), serverName, isLocalServerName, keyRing,
 		)
 		if fedReq == nil {
@@ -121,7 +122,7 @@ func MakeRelayAPI(
 		}()
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
-			return util.MatrixErrorResponse(400, "M_UNRECOGNISED", "badly encoded query params")
+			return util.MatrixErrorResponse(400, string(spec.ErrorUnrecognized), "badly encoded query params")
 		}
 
 		jsonRes := f(req, fedReq, vars)

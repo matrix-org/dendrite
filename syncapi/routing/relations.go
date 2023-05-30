@@ -18,23 +18,24 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type RelationsResponse struct {
-	Chunk     []gomatrixserverlib.ClientEvent `json:"chunk"`
-	NextBatch string                          `json:"next_batch,omitempty"`
-	PrevBatch string                          `json:"prev_batch,omitempty"`
+	Chunk     []synctypes.ClientEvent `json:"chunk"`
+	NextBatch string                  `json:"next_batch,omitempty"`
+	PrevBatch string                  `json:"prev_batch,omitempty"`
 }
 
 // nolint:gocyclo
@@ -72,20 +73,23 @@ func Relations(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: spec.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to get snapshot for relations")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	res := &RelationsResponse{
-		Chunk: []gomatrixserverlib.ClientEvent{},
+		Chunk: []synctypes.ClientEvent{},
 	}
 	var events []types.StreamEvent
 	events, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
@@ -95,7 +99,7 @@ func Relations(
 		return util.ErrorResponse(err)
 	}
 
-	headeredEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	headeredEvents := make([]*rstypes.HeaderedEvent, 0, len(events))
 	for _, event := range events {
 		headeredEvents = append(headeredEvents, event.HeaderedEvent)
 	}
@@ -108,11 +112,11 @@ func Relations(
 
 	// Convert the events into client events, and optionally filter based on the event
 	// type if it was specified.
-	res.Chunk = make([]gomatrixserverlib.ClientEvent, 0, len(filteredEvents))
+	res.Chunk = make([]synctypes.ClientEvent, 0, len(filteredEvents))
 	for _, event := range filteredEvents {
 		res.Chunk = append(
 			res.Chunk,
-			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll),
 		)
 	}
 

@@ -3,25 +3,28 @@ package helpers
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/matrix-org/dendrite/setup/base"
-
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/dendrite/roomserver/types"
 
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/test"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, base.Caches)
+func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	conStr, close := test.PrepareDBConnectionString(t, dbType)
+	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
-	return base, db, close
+	return db, close
 }
 
 func TestIsInvitePendingWithoutNID(t *testing.T) {
@@ -31,16 +34,16 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
 	_ = bob
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		_, db, close := mustCreateDatabase(t, dbType)
+		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 
 		// store all events
 		var authNIDs []types.EventNID
 		for _, x := range room.Events() {
 
-			roomNID, err := db.GetOrCreateRoomNID(context.Background(), x.Unwrap())
+			roomInfo, err := db.GetOrCreateRoomInfo(context.Background(), x.PDU)
 			assert.NoError(t, err)
-			assert.Greater(t, roomNID, types.RoomNID(0))
+			assert.NotNil(t, roomInfo)
 
 			eventTypeNID, err := db.GetOrCreateEventTypeNID(context.Background(), x.Type())
 			assert.NoError(t, err)
@@ -49,7 +52,7 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 			eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(context.Background(), x.StateKey())
 			assert.NoError(t, err)
 
-			evNID, _, _, _, err := db.StoreEvent(context.Background(), x.Event, roomNID, eventTypeNID, eventStateKeyNID, authNIDs, false)
+			evNID, _, err := db.StoreEvent(context.Background(), x.PDU, roomInfo, eventTypeNID, eventStateKeyNID, authNIDs, false)
 			assert.NoError(t, err)
 			authNIDs = append(authNIDs, evNID)
 		}

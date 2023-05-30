@@ -21,15 +21,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -38,10 +36,10 @@ type Database struct {
 }
 
 // Open a sqlite database.
-func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
-	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
+	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
@@ -62,7 +60,7 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 
 	// Special case, since this migration uses several tables, so it needs to
 	// be sure that all tables are created first.
-	if err = executeMigration(base.Context(), db); err != nil {
+	if err = executeMigration(ctx, db); err != nil {
 		return nil, err
 	}
 
@@ -203,24 +201,29 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	}
 
 	d.Database = shared.Database{
-		DB:                  db,
-		Cache:               cache,
-		Writer:              writer,
-		EventsTable:         events,
-		EventTypesTable:     eventTypes,
-		EventStateKeysTable: eventStateKeys,
-		EventJSONTable:      eventJSON,
-		RoomsTable:          rooms,
-		StateBlockTable:     stateBlock,
-		StateSnapshotTable:  stateSnapshot,
-		PrevEventsTable:     prevEvents,
-		RoomAliasesTable:    roomAliases,
-		InvitesTable:        invites,
-		MembershipTable:     membership,
-		PublishedTable:      published,
-		RedactionsTable:     redactions,
-		GetRoomUpdaterFn:    d.GetRoomUpdater,
-		Purge:               purge,
+		DB: db,
+		EventDatabase: shared.EventDatabase{
+			DB:                  db,
+			Cache:               cache,
+			Writer:              writer,
+			EventsTable:         events,
+			EventTypesTable:     eventTypes,
+			EventStateKeysTable: eventStateKeys,
+			EventJSONTable:      eventJSON,
+			PrevEventsTable:     prevEvents,
+			RedactionsTable:     redactions,
+		},
+		Cache:              cache,
+		Writer:             writer,
+		RoomsTable:         rooms,
+		StateBlockTable:    stateBlock,
+		StateSnapshotTable: stateSnapshot,
+		RoomAliasesTable:   roomAliases,
+		InvitesTable:       invites,
+		MembershipTable:    membership,
+		PublishedTable:     published,
+		GetRoomUpdaterFn:   d.GetRoomUpdater,
+		Purge:              purge,
 	}
 	return nil
 }

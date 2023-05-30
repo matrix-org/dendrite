@@ -18,9 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -29,19 +30,19 @@ import (
 // This endpoint can be extracted into a separate relay server service.
 func SendTransactionToRelay(
 	httpReq *http.Request,
-	fedReq *gomatrixserverlib.FederationRequest,
+	fedReq *fclient.FederationRequest,
 	relayAPI api.RelayInternalAPI,
 	txnID gomatrixserverlib.TransactionID,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing send_relay for %s", userID.Raw())
+	logrus.Infof("Processing send_relay for %s", userID.String())
 
-	var txnEvents gomatrixserverlib.RelayEvents
+	var txnEvents fclient.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
 		logrus.Info("The request body could not be decoded into valid JSON." + err.Error())
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON." + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON." + err.Error()),
 		}
 	}
 
@@ -50,7 +51,7 @@ func SendTransactionToRelay(
 	if len(txnEvents.PDUs) > 50 || len(txnEvents.EDUs) > 100 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("max 50 pdus / 100 edus"),
+			JSON: spec.BadJSON("max 50 pdus / 100 edus"),
 		}
 	}
 
@@ -67,7 +68,7 @@ func SendTransactionToRelay(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("could not store the transaction for forwarding"),
+			JSON: spec.BadJSON("could not store the transaction for forwarding"),
 		}
 	}
 

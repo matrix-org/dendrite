@@ -18,9 +18,12 @@
 package fulltext
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	// side effect imports to allow all possible languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
@@ -45,7 +48,6 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/sv"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/tr"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -53,6 +55,14 @@ import (
 // Search contains all existing bleve.Index
 type Search struct {
 	FulltextIndex bleve.Index
+}
+
+type Indexer interface {
+	Index(elements ...IndexElement) error
+	Delete(eventID string) error
+	Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (*bleve.SearchResult, error)
+	GetHighlights(result *bleve.SearchResult) []string
+	Close() error
 }
 
 // IndexElement describes the layout of an element to index
@@ -69,20 +79,27 @@ func (i *IndexElement) SetContentType(v string) {
 	switch v {
 	case "m.room.message":
 		i.ContentType = "content.body"
-	case gomatrixserverlib.MRoomName:
+	case spec.MRoomName:
 		i.ContentType = "content.name"
-	case gomatrixserverlib.MRoomTopic:
+	case spec.MRoomTopic:
 		i.ContentType = "content.topic"
 	}
 }
 
 // New opens a new/existing fulltext index
-func New(cfg config.Fulltext) (fts *Search, err error) {
+func New(processCtx *process.ProcessContext, cfg config.Fulltext) (fts *Search, err error) {
 	fts = &Search{}
 	fts.FulltextIndex, err = openIndex(cfg)
 	if err != nil {
 		return nil, err
 	}
+	go func() {
+		processCtx.ComponentStarted()
+		// Wait for the processContext to be done, indicating that Dendrite is shutting down.
+		<-processCtx.WaitForShutdown()
+		_ = fts.Close()
+		processCtx.ComponentFinished()
+	}()
 	return fts, nil
 }
 
@@ -107,6 +124,47 @@ func (f *Search) Index(elements ...IndexElement) error {
 // Delete deletes an indexed element by the eventID
 func (f *Search) Delete(eventID string) error {
 	return f.FulltextIndex.Delete(eventID)
+}
+
+var highlightMatcher = regexp.MustCompile("<mark>(.*?)</mark>")
+
+// GetHighlights extracts the highlights from a SearchResult.
+func (f *Search) GetHighlights(result *bleve.SearchResult) []string {
+	if result == nil {
+		return []string{}
+	}
+
+	seenMatches := make(map[string]struct{})
+
+	for _, hit := range result.Hits {
+		if hit.Fragments == nil {
+			continue
+		}
+		fragments, ok := hit.Fragments["Content"]
+		if !ok {
+			continue
+		}
+		for _, x := range fragments {
+			substringMatches := highlightMatcher.FindAllStringSubmatch(x, -1)
+			for _, matches := range substringMatches {
+				for i := range matches {
+					if i == 0 { // skip first match, this is the complete substring match
+						continue
+					}
+					if _, ok := seenMatches[matches[i]]; ok {
+						continue
+					}
+					seenMatches[matches[i]] = struct{}{}
+				}
+			}
+		}
+	}
+
+	res := make([]string, 0, len(seenMatches))
+	for m := range seenMatches {
+		res = append(res, m)
+	}
+	return res
 }
 
 // Search searches the index given a search term, roomIDs and keys.
@@ -147,6 +205,10 @@ func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, or
 	if orderByStreamPos {
 		s.SortBy([]string{"-StreamPosition"})
 	}
+
+	// Highlight some words
+	s.Highlight = bleve.NewHighlight()
+	s.Highlight.Fields = []string{"Content"}
 
 	return f.FulltextIndex.Search(s)
 }

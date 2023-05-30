@@ -7,36 +7,39 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	b, baseClose := testrig.CreateBaseDendrite(t, dbType)
+	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewDatabase(b, &config.DatabaseOptions{
+	ctx := context.Background()
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, b.Caches, func(server gomatrixserverlib.ServerName) bool { return server == "localhost" })
+	}, caches, func(server spec.ServerName) bool { return server == "localhost" })
 	if err != nil {
 		t.Fatalf("NewDatabase returned %s", err)
 	}
 	return db, func() {
 		dbClose()
-		baseClose()
 	}
 }
 
 func TestExpireEDUs(t *testing.T) {
 	var expireEDUTypes = map[string]time.Duration{
-		gomatrixserverlib.MReceipt: 0,
+		spec.MReceipt: 0,
 	}
 
 	ctx := context.Background()
-	destinations := map[gomatrixserverlib.ServerName]struct{}{"localhost": {}}
+	destinations := map[spec.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateFederationDatabase(t, dbType)
 		defer close()
@@ -45,7 +48,7 @@ func TestExpireEDUs(t *testing.T) {
 			receipt, err := db.StoreJSON(ctx, "{}")
 			assert.NoError(t, err)
 
-			err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, gomatrixserverlib.MReceipt, expireEDUTypes)
+			err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, spec.MReceipt, expireEDUTypes)
 			assert.NoError(t, err)
 		}
 		// add data without expiry
@@ -69,7 +72,7 @@ func TestExpireEDUs(t *testing.T) {
 		receipt, err = db.StoreJSON(ctx, "{}")
 		assert.NoError(t, err)
 
-		err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, gomatrixserverlib.MDirectToDevice, expireEDUTypes)
+		err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, spec.MDirectToDevice, expireEDUTypes)
 		assert.NoError(t, err)
 
 		err = db.DeleteExpiredEDUs(ctx)
@@ -247,8 +250,8 @@ func TestInboundPeeking(t *testing.T) {
 }
 
 func TestServersAssumedOffline(t *testing.T) {
-	server1 := gomatrixserverlib.ServerName("server1")
-	server2 := gomatrixserverlib.ServerName("server2")
+	server1 := spec.ServerName("server1")
+	server2 := spec.ServerName("server2")
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
@@ -303,29 +306,29 @@ func TestServersAssumedOffline(t *testing.T) {
 }
 
 func TestRelayServersStored(t *testing.T) {
-	server := gomatrixserverlib.ServerName("server")
-	relayServer1 := gomatrixserverlib.ServerName("relayserver1")
-	relayServer2 := gomatrixserverlib.ServerName("relayserver2")
+	server := spec.ServerName("server")
+	relayServer1 := spec.ServerName("relayserver1")
+	relayServer2 := spec.ServerName("relayserver2")
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
 		defer closeDB()
 
-		err := db.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1})
+		err := db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)
 
 		relayServers, err := db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Equal(t, relayServer1, relayServers[0])
 
-		err = db.P2PRemoveRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1})
+		err = db.P2PRemoveRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)
 
 		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Zero(t, len(relayServers))
 
-		err = db.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1, relayServer2})
+		err = db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1, relayServer2})
 		assert.Nil(t, err)
 
 		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)

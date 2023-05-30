@@ -19,14 +19,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -41,17 +41,16 @@ const eventsSchema = `
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
     depth INTEGER NOT NULL,
     event_id TEXT NOT NULL UNIQUE,
-    reference_sha256 BLOB NOT NULL,
 	auth_event_nids TEXT NOT NULL DEFAULT '[]',
 	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
   );
 `
 
 const insertEventSQL = `
-	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7)
 	  ON CONFLICT DO UPDATE
-	  SET is_rejected = $8 WHERE is_rejected = 1
+	  SET is_rejected = $7 WHERE is_rejected = 1
 	  RETURNING event_nid, state_snapshot_nid;
 `
 
@@ -100,11 +99,8 @@ const selectEventIDSQL = "" +
 	"SELECT event_id FROM roomserver_events WHERE event_nid = $1"
 
 const bulkSelectStateAtEventAndReferenceSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id" +
 	" FROM roomserver_events WHERE event_nid IN ($1)"
-
-const bulkSelectEventReferenceSQL = "" +
-	"SELECT event_id, reference_sha256 FROM roomserver_events WHERE event_nid IN ($1)"
 
 const bulkSelectEventIDSQL = "" +
 	"SELECT event_nid, event_id FROM roomserver_events WHERE event_nid IN ($1)"
@@ -137,7 +133,6 @@ type eventStatements struct {
 	updateEventSentToOutputStmt                   *sql.Stmt
 	selectEventIDStmt                             *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
-	bulkSelectEventReferenceStmt                  *sql.Stmt
 	bulkSelectEventIDStmt                         *sql.Stmt
 	selectEventRejectedStmt                       *sql.Stmt
 	//bulkSelectEventNIDStmt               *sql.Stmt
@@ -147,7 +142,32 @@ type eventStatements struct {
 
 func CreateEventsTable(db *sql.DB) error {
 	_, err := db.Exec(eventsSchema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// check if the column exists
+	var cName string
+	migrationName := "roomserver: drop column reference_sha from roomserver_events"
+	err = db.QueryRowContext(context.Background(), `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'roomserver_events' AND p.name = 'reference_sha256'`).Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(context.Background(), db, migrationName); err != nil {
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+			}
+			return nil
+		}
+		return err
+	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: migrationName,
+			Up:      deltas.UpDropEventReferenceSHA,
+		},
+	}...)
+	return m.Up(context.Background())
 }
 
 func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
@@ -167,7 +187,6 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
 		{&s.selectEventIDStmt, selectEventIDSQL},
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
-		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		//{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
@@ -183,7 +202,6 @@ func (s *eventStatements) InsertEvent(
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
 	eventID string,
-	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 	depth int64,
 	isRejected bool,
@@ -194,7 +212,7 @@ func (s *eventStatements) InsertEvent(
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 	err := insertStmt.QueryRowContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
-		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth, isRejected,
+		eventID, eventNIDsAsArray(authEventNIDs), depth, isRejected,
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -475,11 +493,10 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		eventNID         int64
 		stateSnapshotNID int64
 		eventID          string
-		eventSHA256      []byte
 	)
 	for ; rows.Next(); i++ {
 		if err = rows.Scan(
-			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID, &eventSHA256,
+			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID,
 		); err != nil {
 			return nil, err
 		}
@@ -489,43 +506,6 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		result.EventNID = types.EventNID(eventNID)
 		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
 		result.EventID = eventID
-		result.EventSHA256 = eventSHA256
-	}
-	if i != len(eventNIDs) {
-		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
-	}
-	return results, nil
-}
-
-func (s *eventStatements) BulkSelectEventReference(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
-) ([]gomatrixserverlib.EventReference, error) {
-	///////////////
-	iEventNIDs := make([]interface{}, len(eventNIDs))
-	for k, v := range eventNIDs {
-		iEventNIDs[k] = v
-	}
-	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
-	if err != nil {
-		return nil, err
-	}
-	defer selectPrep.Close() // nolint:errcheck
-	///////////////
-
-	selectStmt := sqlutil.TxStmt(txn, selectPrep)
-	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
-	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
-	i := 0
-	for ; rows.Next(); i++ {
-		result := &results[i]
-		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
-			return nil, err
-		}
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))

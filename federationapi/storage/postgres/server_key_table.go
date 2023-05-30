@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const serverSigningKeysSchema = `
@@ -72,18 +73,15 @@ func NewPostgresServerSigningKeysTable(db *sql.DB) (s *serverSigningKeyStatement
 	if err != nil {
 		return
 	}
-	if s.bulkSelectServerKeysStmt, err = db.Prepare(bulkSelectServerSigningKeysSQL); err != nil {
-		return
-	}
-	if s.upsertServerKeysStmt, err = db.Prepare(upsertServerSigningKeysSQL); err != nil {
-		return
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.bulkSelectServerKeysStmt, bulkSelectServerSigningKeysSQL},
+		{&s.upsertServerKeysStmt, upsertServerSigningKeysSQL},
+	}.Prepare(db)
 }
 
 func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 	ctx context.Context, txn *sql.Tx,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	var nameAndKeyIDs []string
 	for request := range requests {
@@ -106,7 +104,7 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 			return nil, err
 		}
 		r := gomatrixserverlib.PublicKeyLookupRequest{
-			ServerName: gomatrixserverlib.ServerName(serverName),
+			ServerName: spec.ServerName(serverName),
 			KeyID:      gomatrixserverlib.KeyID(keyID),
 		}
 		vk := gomatrixserverlib.VerifyKey{}
@@ -116,8 +114,8 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 		}
 		results[r] = gomatrixserverlib.PublicKeyLookupResult{
 			VerifyKey:    vk,
-			ValidUntilTS: gomatrixserverlib.Timestamp(validUntilTS),
-			ExpiredTS:    gomatrixserverlib.Timestamp(expiredTS),
+			ValidUntilTS: spec.Timestamp(validUntilTS),
+			ExpiredTS:    spec.Timestamp(expiredTS),
 		}
 	}
 	return results, rows.Err()

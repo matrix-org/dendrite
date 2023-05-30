@@ -16,7 +16,16 @@ package main
 
 import (
 	"flag"
+	"time"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -30,6 +39,12 @@ import (
 )
 
 var (
+	unixSocket = flag.String("unix-socket", "",
+		"EXPERIMENTAL(unstable): The HTTP listening unix socket for the server (disables http[s]-bind-address feature)",
+	)
+	unixSocketPermission = flag.String("unix-socket-permission", "755",
+		"EXPERIMENTAL(unstable): The HTTP listening unix socket permission for the server (in chmod format like 755)",
+	)
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
 	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
@@ -38,26 +53,111 @@ var (
 
 func main() {
 	cfg := setup.ParseFlags(true)
-	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
-	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
-	options := []basepkg.BaseDendriteOptions{}
+	httpAddr := config.ServerAddress{}
+	httpsAddr := config.ServerAddress{}
+	if *unixSocket == "" {
+		http, err := config.HTTPAddress("http://" + *httpBindAddr)
+		if err != nil {
+			logrus.WithError(err).Fatalf("Failed to parse http address")
+		}
+		httpAddr = http
+		https, err := config.HTTPAddress("https://" + *httpsBindAddr)
+		if err != nil {
+			logrus.WithError(err).Fatalf("Failed to parse https address")
+		}
+		httpsAddr = https
+	} else {
+		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
+		if err != nil {
+			logrus.WithError(err).Fatalf("Failed to parse unix socket")
+		}
+		httpAddr = socket
+	}
 
-	base := basepkg.NewBaseDendrite(cfg, options...)
-	defer base.Close() // nolint: errcheck
+	configErrors := &config.ConfigErrors{}
+	cfg.Verify(configErrors)
+	if len(*configErrors) > 0 {
+		for _, err := range *configErrors {
+			logrus.Errorf("Configuration error: %s", err)
+		}
+		logrus.Fatalf("Failed to start due to configuration errors")
+	}
+	processCtx := process.NewProcessContext()
 
-	federation := base.CreateFederationClient()
+	internal.SetupStdLogging()
+	internal.SetupHookLogging(cfg.Logging)
+	internal.SetupPprof()
 
-	rsAPI := roomserver.NewInternalAPI(base)
+	basepkg.PlatformSanityChecks()
 
+	logrus.Infof("Dendrite version %s", internal.VersionString())
+	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
+		logrus.Warn("Open registration is enabled")
+	}
+
+	// create DNS cache
+	var dnsCache *fclient.DNSCache
+	if cfg.Global.DNSCache.Enabled {
+		dnsCache = fclient.NewDNSCache(
+			cfg.Global.DNSCache.CacheSize,
+			cfg.Global.DNSCache.CacheLifetime,
+		)
+		logrus.Infof(
+			"DNS cache enabled (size %d, lifetime %s)",
+			cfg.Global.DNSCache.CacheSize,
+			cfg.Global.DNSCache.CacheLifetime,
+		)
+	}
+
+	// setup tracing
+	closer, err := cfg.SetupTracing()
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to start opentracing")
+	}
+	defer closer.Close() // nolint: errcheck
+
+	// setup sentry
+	if cfg.Global.Sentry.Enabled {
+		logrus.Info("Setting up Sentry for debugging...")
+		err = sentry.Init(sentry.ClientOptions{
+			Dsn:              cfg.Global.Sentry.DSN,
+			Environment:      cfg.Global.Sentry.Environment,
+			Debug:            true,
+			ServerName:       string(cfg.Global.ServerName),
+			Release:          "dendrite@" + internal.VersionString(),
+			AttachStacktrace: true,
+		})
+		if err != nil {
+			logrus.WithError(err).Panic("failed to start Sentry")
+		}
+		go func() {
+			processCtx.ComponentStarted()
+			<-processCtx.WaitForShutdown()
+			if !sentry.Flush(time.Second * 5) {
+				logrus.Warnf("failed to flush all Sentry events!")
+			}
+			processCtx.ComponentFinished()
+		}()
+	}
+
+	federationClient := basepkg.CreateFederationClient(cfg, dnsCache)
+	httpClient := basepkg.CreateClient(cfg, dnsCache)
+
+	// prepare required dependencies
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	routers := httputil.NewRouters()
+
+	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.EnableMetrics)
+	natsInstance := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, nil, false,
+		processCtx, cfg, cm, &natsInstance, federationClient, rsAPI, caches, nil, false,
 	)
 
 	keyRing := fsAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(base, rsAPI, federation)
-
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient)
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
@@ -67,9 +167,9 @@ func main() {
 	rsAPI.SetUserAPI(userAPI)
 
 	monolith := setup.Monolith{
-		Config:    base.Cfg,
-		Client:    base.CreateClient(),
-		FedClient: federation,
+		Config:    cfg,
+		Client:    httpClient,
+		FedClient: federationClient,
 		KeyRing:   keyRing,
 
 		AppserviceAPI: asAPI,
@@ -79,25 +179,25 @@ func main() {
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
 	}
-	monolith.AddAllPublicRoutes(base)
+	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 
-	if len(base.Cfg.MSCs.MSCs) > 0 {
-		if err := mscs.Enable(base, &monolith); err != nil {
+	if len(cfg.MSCs.MSCs) > 0 {
+		if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
 			logrus.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		base.SetupAndServeHTTP(httpAddr, nil, nil)
+		basepkg.SetupAndServeHTTP(processCtx, cfg, routers, httpAddr, nil, nil)
 	}()
 	// Handle HTTPS if certificate and key are provided
-	if *certFile != "" && *keyFile != "" {
+	if *unixSocket == "" && *certFile != "" && *keyFile != "" {
 		go func() {
-			base.SetupAndServeHTTP(httpsAddr, certFile, keyFile)
+			basepkg.SetupAndServeHTTP(processCtx, cfg, routers, httpsAddr, certFile, keyFile)
 		}()
 	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	base.WaitForShutdown()
+	basepkg.WaitForShutdown(processCtx)
 }

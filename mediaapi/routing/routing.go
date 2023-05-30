@@ -25,7 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -35,7 +36,7 @@ import (
 // configResponse is the response to GET /_matrix/media/r0/config
 // https://matrix.org/docs/spec/client_server/latest#get-matrix-media-r0-config
 type configResponse struct {
-	UploadSize *config.FileSizeBytes `json:"m.upload.size"`
+	UploadSize *config.FileSizeBytes `json:"m.upload.size,omitempty"`
 }
 
 // Setup registers the media API HTTP handlers
@@ -45,13 +46,12 @@ type configResponse struct {
 // nolint: gocyclo
 func Setup(
 	publicAPIMux *mux.Router,
-	cfg *config.MediaAPI,
-	rateLimit *config.RateLimiting,
+	cfg *config.Dendrite,
 	db storage.Database,
 	userAPI userapi.MediaUserAPI,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 ) {
-	rateLimits := httputil.NewRateLimits(rateLimit)
+	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
 
 	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v1|v3)}/").Subrouter()
 
@@ -65,7 +65,7 @@ func Setup(
 			if r := rateLimits.Limit(req, dev); r != nil {
 				return *r
 			}
-			return Upload(req, cfg, dev, db, activeThumbnailGeneration)
+			return Upload(req, &cfg.MediaAPI, dev, db, activeThumbnailGeneration)
 		},
 	)
 
@@ -73,8 +73,8 @@ func Setup(
 		if r := rateLimits.Limit(req, device); r != nil {
 			return *r
 		}
-		respondSize := &cfg.MaxFileSizeBytes
-		if cfg.MaxFileSizeBytes == 0 {
+		respondSize := &cfg.MediaAPI.MaxFileSizeBytes
+		if cfg.MediaAPI.MaxFileSizeBytes == 0 {
 			respondSize = nil
 		}
 		return util.JSONResponse{
@@ -90,12 +90,12 @@ func Setup(
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 
-	downloadHandler := makeDownloadAPI("download", cfg, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration)
+	downloadHandler := makeDownloadAPI("download", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration)
 	v3mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 	v3mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/thumbnail/{serverName}/{mediaId}",
-		makeDownloadAPI("thumbnail", cfg, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration),
+		makeDownloadAPI("thumbnail", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods(http.MethodGet, http.MethodOptions)
 }
 
@@ -104,7 +104,7 @@ func makeDownloadAPI(
 	cfg *config.MediaAPI,
 	rateLimits *httputil.RateLimits,
 	db storage.Database,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
@@ -140,7 +140,7 @@ func makeDownloadAPI(
 		}
 
 		vars, _ := httputil.URLDecodeMapValues(mux.Vars(req))
-		serverName := gomatrixserverlib.ServerName(vars["serverName"])
+		serverName := spec.ServerName(vars["serverName"])
 
 		// For the purposes of loop avoidance, we will return a 404 if allow_remote is set to
 		// false in the query string and the target server name isn't our own.

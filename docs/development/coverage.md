@@ -1,78 +1,130 @@
 ---
 title: Coverage
 parent: Development
+nav_order: 3
 permalink: /development/coverage
 ---
 
-To generate a test coverage report for Sytest, a small patch needs to be applied to the Sytest repository to compile and use the instrumented binary:
-```patch
-diff --git a/lib/SyTest/Homeserver/Dendrite.pm b/lib/SyTest/Homeserver/Dendrite.pm
-index 8f0e209c..ad057e52 100644
---- a/lib/SyTest/Homeserver/Dendrite.pm
-+++ b/lib/SyTest/Homeserver/Dendrite.pm
-@@ -337,7 +337,7 @@ sub _start_monolith
- 
-    $output->diag( "Starting monolith server" );
-    my @command = (
--      $self->{bindir} . '/dendrite-monolith-server',
-+      $self->{bindir} . '/dendrite-monolith-server', '--test.coverprofile=' . $self->{hs_dir} . '/integrationcover.log', "DEVEL",
-       '--config', $self->{paths}{config},
-       '--http-bind-address', $self->{bind_host} . ':' . $self->unsecure_port,
-       '--https-bind-address', $self->{bind_host} . ':' . $self->secure_port,
-diff --git a/scripts/dendrite_sytest.sh b/scripts/dendrite_sytest.sh
-index f009332b..7ea79869 100755
---- a/scripts/dendrite_sytest.sh
-+++ b/scripts/dendrite_sytest.sh
-@@ -34,7 +34,8 @@ export GOBIN=/tmp/bin
- echo >&2 "--- Building dendrite from source"
- cd /src
- mkdir -p $GOBIN
--go install -v ./cmd/dendrite-monolith-server
-+# go install -v ./cmd/dendrite-monolith-server
-+go test -c -cover -covermode=atomic -o $GOBIN/dendrite-monolith-server -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server
- go install -v ./cmd/generate-keys
- cd -
- ```
+## Running unit tests with coverage enabled
 
- Then run Sytest. This will generate a new file `integrationcover.log` in each server's directory e.g `server-0/integrationcover.log`. To parse it,
- ensure your working directory is under the Dendrite repository then run:
+Running unit tests with coverage enabled can be done with the following commands, this will generate a `integrationcover.log`
+```bash
+go test -covermode=atomic -coverpkg=./... -coverprofile=integrationcover.log $(go list ./... | grep -v '/cmd/')
+go tool cover -func=integrationcover.log
+```
+
+## Running Sytest with coverage enabled
+
+To run Sytest with coverage enabled:
+
+```bash 
+docker run --rm --name sytest -v "/Users/kegan/github/sytest:/sytest" \
+  -v "/Users/kegan/github/dendrite:/src" -v "$(pwd)/sytest_logs:/logs" \
+  -v "/Users/kegan/go/:/gopath" -e "POSTGRES=1" \
+  -e "COVER=1" \
+  matrixdotorg/sytest-dendrite:latest
+  
+# to get a more accurate coverage you may also need to run Sytest using SQLite as the database:
+docker run --rm --name sytest -v "/Users/kegan/github/sytest:/sytest" \
+  -v "/Users/kegan/github/dendrite:/src" -v "$(pwd)/sytest_logs:/logs" \
+  -v "/Users/kegan/go/:/gopath" \
+  -e "COVER=1" \
+  matrixdotorg/sytest-dendrite:latest
+```
+
+This will generate a folder `covdatafiles` in each server's directory, e.g `server-0/covdatafiles`. To parse them,
+ensure your working directory is under the Dendrite repository then run:
+
  ```bash
- go tool cover -func=/path/to/server-0/integrationcover.log
+ go tool covdata func -i="$(find -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
  ```
  which will produce an output like:
  ```
  ...
- github.com/matrix-org/util/json.go:83:											NewJSONRequestHandler				100.0%
-github.com/matrix-org/util/json.go:90:											Protect						57.1%
-github.com/matrix-org/util/json.go:110:											RequestWithLogging				100.0%
-github.com/matrix-org/util/json.go:132:											MakeJSONAPI					70.0%
-github.com/matrix-org/util/json.go:151:											respond						61.5%
-github.com/matrix-org/util/json.go:180:											WithCORSOptions					0.0%
-github.com/matrix-org/util/json.go:191:											SetCORSHeaders					100.0%
-github.com/matrix-org/util/json.go:202:											RandomString					100.0%
-github.com/matrix-org/util/json.go:210:											init						100.0%
-github.com/matrix-org/util/unique.go:13:										Unique						91.7%
-github.com/matrix-org/util/unique.go:48:										SortAndUnique					100.0%
-github.com/matrix-org/util/unique.go:55:										UniqueStrings					100.0%
-total:															(statements)					53.7%
+github.com/matrix-org/util/json.go:132:   MakeJSONAPI         70.0%
+github.com/matrix-org/util/json.go:151:   respond             84.6%
+github.com/matrix-org/util/json.go:180:   WithCORSOptions      0.0%
+github.com/matrix-org/util/json.go:191:   SetCORSHeaders     100.0%
+github.com/matrix-org/util/json.go:202:   RandomString       100.0%
+github.com/matrix-org/util/json.go:210:   init               100.0%
+github.com/matrix-org/util/unique.go:13:  Unique              91.7%
+github.com/matrix-org/util/unique.go:48:  SortAndUnique      100.0%
+github.com/matrix-org/util/unique.go:55:  UniqueStrings      100.0%
+total                                    (statements)         64.0%
 ```
-The total coverage for this run is the last line at the bottom. However, this value is misleading because Dendrite can run in many different configurations,
-which will never be tested in a single test run (e.g sqlite or postgres). To get a more accurate value, additional processing is required
-to remove packages which will never be tested and extension MSCs:
+(after running Sytest for Postgres _and_ SQLite)
+
+The total coverage for this run is the last line at the bottom. However, this value is misleading because Dendrite can run in different configurations,
+which will never be tested in a single test run (e.g sqlite or postgres). To get a more accurate value, you'll need run Sytest for Postgres and SQLite (see commands above).
+Additional processing is required also to remove packages which will never be tested and extension MSCs:
+
 ```bash
-# These commands are all similar but change which package paths are _removed_ from the output.
+# If you executed both commands from above, you can get the total coverage using the following commands  
+go tool covdata textfmt -i="$(find -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o sytest.cov
+grep -Ev 'relayapi|setup/mscs' sytest.cov > final.cov
+go tool cover -func=final.cov
 
-# For Postgres
-go tool cover -func=/path/to/server-0/integrationcover.log | grep 'github.com/matrix-org/dendrite' | grep -Ev 'inthttp|sqlite|setup/mscs|api_trace' > coverage.txt
+# If you only executed the one for Postgres:
+go tool covdata textfmt -i="$(find -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o sytest.cov
+grep -Ev 'relayapi|sqlite|setup/mscs' sytest.cov > final.cov
+go tool cover -func=final.cov
 
-# For SQLite
-go tool cover -func=/path/to/server-0/integrationcover.log | grep 'github.com/matrix-org/dendrite' | grep -Ev 'inthttp|postgres|setup/mscs|api_trace' > coverage.txt
+# If you only executed the one for SQLite:
+go tool covdata textfmt -i="$(find -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o sytest.cov
+grep -Ev 'relayapi|postgres|setup/mscs' sytest.cov > final.cov
+go tool cover -func=final.cov
 ```
 
-A total value can then be calculated using:
+## Getting coverage from Complement
+
+Getting the coverage for Complement runs is a bit more involved.
+
+First you'll need a docker image compatible with Complement, one can be built using
 ```bash
-cat coverage.txt | awk -F '\t+' '{x = x + $3} END {print x/NR}'
+docker build -t complement-dendrite -f build/scripts/Complement.Dockerfile .
+```
+from within the Dendrite repository.
+
+Clone complement to a directory of your liking:
+```bash
+git clone https://github.com/matrix-org/complement.git
+cd complement
 ```
 
+Next we'll need a script to execute after a test finishes, create a new file `posttest.sh`, make the file executable (`chmod +x posttest.sh`) 
+and add the following content:
+```bash
+#!/bin/bash
 
-We currently do not have a way to combine Sytest/Complement/Unit Tests into a single coverage report.
+mkdir -p /tmp/Complement/logs/$2/$1/
+docker cp $1:/tmp/covdatafiles/. /tmp/Complement/logs/$2/$1/
+```
+This will copy the `covdatafiles` files from each container to something like 
+`/tmp/Complement/logs/TestLogin/94f9c428de95779d2b62a3ccd8eab9d5ddcf65cc259a40ece06bdc61687ffed3/`. (`$1` is the containerID, `$2` the test name)
+
+Now that we have set up everything we need, we can finally execute Complement:
+```bash
+COMPLEMENT_BASE_IMAGE=complement-dendrite \
+COMPLEMENT_SHARE_ENV_PREFIX=COMPLEMENT_DENDRITE_ \
+COMPLEMENT_DENDRITE_COVER=1 \
+COMPLEMENT_POST_TEST_SCRIPT=$(pwd)/posttest.sh \
+  go test -tags dendrite_blacklist ./tests/... -count=1 -v -timeout=30m -failfast=false
+```
+
+Once this is done, you can copy the resulting `covdatafiles` files to your Dendrite repository for the next step.
+```bash
+cp -pr /tmp/Complement/logs PathToYourDendriteRepository
+```
+
+You can also run the following to get the coverage for Complement runs alone:
+```bash
+go tool covdata func -i="$(find /tmp/Complement -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
+```
+
+## Combining the results of (almost) all runs
+
+Now that we have all our `covdatafiles` files within the Dendrite repository, you can now execute the following command, to get the coverage
+overall (excluding unit tests):
+```bash
+go tool covdata func -i="$(find -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
+```

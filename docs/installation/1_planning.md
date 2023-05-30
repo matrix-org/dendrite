@@ -7,23 +7,13 @@ permalink: /installation/planning
 
 # Planning your installation
 
-## Modes
-
-Dendrite consists of several components, each responsible for a different aspect of the Matrix protocol.
-Users can run Dendrite in one of two modes which dictate how these components are executed and communicate.
-
-* **Monolith mode** runs all components in a single process. Components communicate through an internal NATS
-  server with generally low overhead. This mode dramatically simplifies deployment complexity and offers the
-  best balance between performance and resource usage for low-to-mid volume deployments.
-
-
-## Databases
+## Database
 
 Dendrite can run with either a PostgreSQL or a SQLite backend. There are considerable tradeoffs
 to consider:
 
 * **PostgreSQL**: Needs to run separately to Dendrite, needs to be installed and configured separately
-  and and will use more resources over all, but will be **considerably faster** than SQLite. PostgreSQL
+  and will use more resources over all, but will be **considerably faster** than SQLite. PostgreSQL
   has much better write concurrency which will allow Dendrite to process more tasks in parallel. This
   will be necessary for federated deployments to perform adequately.
 
@@ -80,18 +70,17 @@ If using the PostgreSQL database engine, you should install PostgreSQL 12 or lat
 ### NATS Server
 
 Dendrite comes with a built-in [NATS Server](https://github.com/nats-io/nats-server) and
-therefore does not need this to be manually installed. If you are planning a monolith installation, you
-do not need to do anything.
+therefore does not need this to be manually installed.
 
 
 ### Reverse proxy
 
 A reverse proxy such as [Caddy](https://caddyserver.com), [NGINX](https://www.nginx.com) or
-[HAProxy](http://www.haproxy.org) is useful for deployments. Configuring those is not covered in this documentation, although sample configurations
+[HAProxy](http://www.haproxy.org) is useful for deployments. Configuring this is not covered in this documentation, although sample configurations
 for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy) and
 [NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx) are provided.
 
 ### Windows
 
-Finally, if you want to build Dendrite on Windows, you will need need `gcc` in the path. The best
+Finally, if you want to build Dendrite on Windows, you will need `gcc` in the path. The best
 way to achieve this is by installing and building Dendrite under [MinGW-w64](https://www.mingw-w64.org/).

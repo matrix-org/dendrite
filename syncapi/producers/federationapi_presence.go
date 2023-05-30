@@ -20,7 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 )
 
@@ -37,7 +37,7 @@ func (f *FederationAPIPresenceProducer) SendPresence(
 	msg.Header.Set(jetstream.UserID, userID)
 	msg.Header.Set("presence", presence.String())
 	msg.Header.Set("from_sync", "true") // only update last_active_ts and presence
-	msg.Header.Set("last_active_ts", strconv.Itoa(int(gomatrixserverlib.AsTimestamp(time.Now()))))
+	msg.Header.Set("last_active_ts", strconv.Itoa(int(spec.AsTimestamp(time.Now()))))
 
 	if statusMsg != nil {
 		msg.Header.Set("status_msg", *statusMsg)

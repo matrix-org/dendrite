@@ -15,14 +15,17 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -40,7 +43,6 @@ func JoinRoomByIDOrAlias(
 		IsGuest:       device.AccountType == api.AccountTypeGuest,
 		Content:       map[string]interface{}{},
 	}
-	joinRes := roomserverAPI.PerformJoinResponse{}
 
 	// Check to see if any ?server_name= query parameters were
 	// given in the request.
@@ -48,7 +50,7 @@ func JoinRoomByIDOrAlias(
 		for _, serverName := range serverNames {
 			joinReq.ServerNames = append(
 				joinReq.ServerNames,
-				gomatrixserverlib.ServerName(serverName),
+				spec.ServerName(serverName),
 			)
 		}
 	}
@@ -61,58 +63,84 @@ func JoinRoomByIDOrAlias(
 	// Work out our localpart for the client profile request.
 
 	// Request our profile content to populate the request content with.
-	res := &api.QueryProfileResponse{}
-	err := profileAPI.QueryProfile(req.Context(), &api.QueryProfileRequest{UserID: device.UserID}, res)
-	if err != nil || !res.UserExists {
-		if !res.UserExists {
-			util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("Unable to query user profile, no profile found."),
-			}
-		}
+	profile, err := profileAPI.QueryProfile(req.Context(), device.UserID)
 
-		util.GetLogger(req.Context()).WithError(err).Error("UserProfileAPI.QueryProfile failed")
-	} else {
-		joinReq.Content["displayname"] = res.DisplayName
-		joinReq.Content["avatar_url"] = res.AvatarURL
+	switch err {
+	case nil:
+		joinReq.Content["displayname"] = profile.DisplayName
+		joinReq.Content["avatar_url"] = profile.AvatarURL
+	case appserviceAPI.ErrProfileNotExists:
+		util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("Unable to query user profile, no profile found."),
+		}
+	default:
 	}
 
 	// Ask the roomserver to perform the join.
 	done := make(chan util.JSONResponse, 1)
 	go func() {
 		defer close(done)
-		if err := rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes); err != nil {
-			done <- jsonerror.InternalAPIError(req.Context(), err)
-		} else if joinRes.Error != nil {
-			if joinRes.Error.Code == roomserverAPI.PerformErrorNotAllowed && device.AccountType == api.AccountTypeGuest {
-				done <- util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.GuestAccessForbidden(joinRes.Error.Msg),
-				}
-			} else {
-				done <- joinRes.Error.JSONResponse()
-			}
-		} else {
-			done <- util.JSONResponse{
+		roomID, _, err := rsAPI.PerformJoin(req.Context(), &joinReq)
+		var response util.JSONResponse
+
+		switch e := err.(type) {
+		case nil: // success case
+			response = util.JSONResponse{
 				Code: http.StatusOK,
 				// TODO: Put the response struct somewhere internal.
 				JSON: struct {
 					RoomID string `json:"room_id"`
-				}{joinRes.RoomID},
+				}{roomID},
+			}
+		case roomserverAPI.ErrInvalidID:
+			response = util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown(e.Error()),
+			}
+		case roomserverAPI.ErrNotAllowed:
+			jsonErr := spec.Forbidden(e.Error())
+			if device.AccountType == api.AccountTypeGuest {
+				jsonErr = spec.GuestAccessForbidden(e.Error())
+			}
+			response = util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonErr,
+			}
+		case *gomatrix.HTTPError: // this ensures we proxy responses over federation to the client
+			response = util.JSONResponse{
+				Code: e.Code,
+				JSON: json.RawMessage(e.Message),
+			}
+		case eventutil.ErrRoomNoExists:
+			response = util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound(e.Error()),
+			}
+		default:
+			response = util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
 			}
 		}
+		done <- response
 	}()
 
 	// Wait either for the join to finish, or for us to hit a reasonable
 	// timeout, at which point we'll just return a 200 to placate clients.
+	timer := time.NewTimer(time.Second * 20)
 	select {
-	case <-time.After(time.Second * 20):
+	case <-timer.C:
 		return util.JSONResponse{
 			Code: http.StatusAccepted,
-			JSON: jsonerror.Unknown("The room join will continue in the background."),
+			JSON: spec.Unknown("The room join will continue in the background."),
 		}
 	case result := <-done:
+		// Stop and drain the timer
+		if !timer.Stop() {
+			<-timer.C
+		}
 		return result
 	}
 }

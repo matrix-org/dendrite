@@ -16,9 +16,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -37,7 +38,10 @@ func GetUserDevices(
 	}
 	if res.Error != nil {
 		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	sigReq := &api.QuerySignaturesRequest{
@@ -49,14 +53,12 @@ func GetUserDevices(
 	for _, dev := range res.Devices {
 		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
 	}
-	if err := keyAPI.QuerySignatures(req.Context(), sigReq, sigRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
+	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
 
-	response := gomatrixserverlib.RespUserDevices{
+	response := fclient.RespUserDevices{
 		UserID:   userID,
 		StreamID: res.StreamID,
-		Devices:  []gomatrixserverlib.RespUserDevice{},
+		Devices:  []fclient.RespUserDevice{},
 	}
 
 	if masterKey, ok := sigRes.MasterKeys[userID]; ok {
@@ -67,7 +69,7 @@ func GetUserDevices(
 	}
 
 	for _, dev := range res.Devices {
-		var key gomatrixserverlib.RespUserDeviceKeys
+		var key fclient.RespUserDeviceKeys
 		err := json.Unmarshal(dev.DeviceKeys.KeyJSON, &key)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Warnf("malformed device key: %s", string(dev.DeviceKeys.KeyJSON))
@@ -79,7 +81,7 @@ func GetUserDevices(
 			displayName = gjson.GetBytes(dev.DeviceKeys.KeyJSON, "unsigned.device_display_name").Str
 		}
 
-		device := gomatrixserverlib.RespUserDevice{
+		device := fclient.RespUserDevice{
 			DeviceID:    dev.DeviceID,
 			DisplayName: displayName,
 			Keys:        key,
@@ -90,10 +92,10 @@ func GetUserDevices(
 				for sourceUserID, forSourceUser := range targetKey {
 					for sourceKeyID, sourceKey := range forSourceUser {
 						if device.Keys.Signatures == nil {
-							device.Keys.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+							device.Keys.Signatures = map[string]map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 						}
 						if _, ok := device.Keys.Signatures[sourceUserID]; !ok {
-							device.Keys.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+							device.Keys.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 						}
 						device.Keys.Signatures[sourceUserID][sourceKeyID] = sourceKey
 					}

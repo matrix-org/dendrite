@@ -15,8 +15,11 @@
 package clientapi
 
 import (
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -25,41 +28,41 @@ import (
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
-	base *base.BaseDendrite,
-	federation *gomatrixserverlib.FederationClient,
+	processContext *process.ProcessContext,
+	routers httputil.Routers,
+	cfg *config.Dendrite,
+	natsInstance *jetstream.NATSInstance,
+	federation fclient.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.ClientFederationAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
-	extRoomsProvider api.ExtraPublicRoomsProvider,
+	extRoomsProvider api.ExtraPublicRoomsProvider, enableMetrics bool,
 ) {
-	cfg := &base.Cfg.ClientAPI
-	mscCfg := &base.Cfg.MSCs
-	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
-		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		UserAPI:                userAPI,
-		ServerName:             cfg.Matrix.ServerName,
+		ServerName:             cfg.Global.ServerName,
 	}
 
 	routing.Setup(
-		base,
+		routers,
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI,
-		extRoomsProvider, mscCfg, natsClient,
+		extRoomsProvider, natsClient, enableMetrics,
 	)
 }

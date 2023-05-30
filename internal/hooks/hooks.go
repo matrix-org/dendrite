@@ -16,20 +16,22 @@
 // Hooks can only be run in monolith mode.
 package hooks
 
-import "sync"
+import (
+	"sync"
+)
 
 const (
-	// KindNewEventPersisted is a hook which is called with *gomatrixserverlib.HeaderedEvent
+	// KindNewEventPersisted is a hook which is called with *types.HeaderedEvent
 	// It is run when a new event is persisted in the roomserver.
 	// Usage:
 	//   hooks.Attach(hooks.KindNewEventPersisted, func(headeredEvent interface{}) { ... })
 	KindNewEventPersisted = "new_event_persisted"
-	// KindNewEventReceived is a hook which is called with *gomatrixserverlib.HeaderedEvent
+	// KindNewEventReceived is a hook which is called with *types.HeaderedEvent
 	// It is run before a new event is processed by the roomserver. This hook can be used
 	// to modify the event before it is persisted by adding data to `unsigned`.
 	// Usage:
 	//   hooks.Attach(hooks.KindNewEventReceived, func(headeredEvent interface{}) {
-	//     ev := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
+	//     ev := headeredEvent.(*types.HeaderedEvent)
 	//     _ = ev.SetUnsignedField("key", "val")
 	//   })
 	KindNewEventReceived = "new_event_received"

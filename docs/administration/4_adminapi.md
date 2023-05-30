@@ -1,6 +1,7 @@
 ---
 title: Supported admin APIs
 parent: Administration
+nav_order: 4
 permalink: /administration/adminapi
 ---
 
@@ -22,23 +23,26 @@ curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint
 An `access_token` can be obtained through most Element-based matrix clients by going to `Settings` -> `Help & About` -> `Advanced` -> `Access Token`.
 Be aware that an `access_token` allows a client to perform actions as an user and should be kept **secret**.
 
-The user must be an administrator in the `account_accounts` table in order to use these endpoints.
+The user must be an administrator in the `userapi_accounts` table in order to use these endpoints.
 
-Existing user accounts can be set to administrative accounts by changing `account_type` to `3` in `account_accounts`
+Existing user accounts can be set to administrative accounts by changing `account_type` to `3` in `userapi_accounts`
 
 ```
-UPDATE account_accounts SET account_type = 3 WHERE localpart = '$localpart';
+UPDATE userapi_accounts SET account_type = 3 WHERE localpart = '$localpart';
 ```
 
 Where `$localpart` is the username only (e.g. `alice`).
 
-## GET `/_dendrite/admin/evacuateRoom/{roomID}`
+## POST `/_dendrite/admin/evacuateRoom/{roomID}`
 
 This endpoint will instruct Dendrite to part all local users from the given `roomID`
 in the URL. It may take some time to complete. A JSON body will be returned containing
 the user IDs of all affected users.
 
-## GET `/_dendrite/admin/evacuateUser/{userID}`
+If the room has an alias set (e.g. is published), the room's ID will not be visible in the URL, but it can
+be found as the room's "internal ID" in Element Web (Settings -> Advanced)
+
+## POST `/_dendrite/admin/evacuateUser/{userID}`
 
 This endpoint will instruct Dendrite to part the given local `userID` in the URL from
 all rooms which they are currently joined. A JSON body will be returned containing
@@ -46,13 +50,17 @@ the room IDs of all affected rooms.
 
 ## POST `/_dendrite/admin/resetPassword/{userID}`
 
-Reset the password of a local user.
+Reset the password of a local user. 
+
+**If `logout_devices` is set to `true`, all `access_tokens` will be invalidated, resulting
+in the potential loss of encrypted messages**
 
 Request body format:
 
-```
+```json
 {
-    "password": "new_password_here"
+    "password": "new_password_here",
+    "logout_devices": false
 }
 ```
 
@@ -65,11 +73,14 @@ Indexing is done in the background, the server logs every 1000 events (or below)
 
 This endpoint instructs Dendrite to immediately query `/devices/{userID}` on a federated server. An empty JSON body will be returned on success, updating all locally stored user devices/keys. This can be used to possibly resolve E2EE issues, where the remote user can't decrypt messages.
 
+## POST `/_dendrite/admin/purgeRoom/{roomID}`
+
+This endpoint instructs Dendrite to remove the given room from its database. Before doing so, it will evacuate all local users from the room. It does **NOT** remove media files. Depending on the size of the room, this may take a while. Will return an empty JSON once other components were instructed to delete the room.
 
 ## POST `/_synapse/admin/v1/send_server_notice`
 
 Request body format:
-```
+```json
 {
     "user_id": "@target_user:server_name",
     "content": {
@@ -82,7 +93,7 @@ Request body format:
 Send a server notice to a specific user. See the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#server-notices) for additional details on server notice behaviour.
 If successfully sent, the API will return the following response:
 
-```
+```json
 {
      "event_id": "<event_id>"
 }

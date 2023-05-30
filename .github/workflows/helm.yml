@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'helm/**' # only execute if we have helm chart changes
+  workflow_dispatch:
 
 jobs:
   release:
@@ -37,3 +38,4 @@ jobs:
         with:
           config: helm/cr.yaml
           charts_dir: helm/
+          mark_as_latest: false

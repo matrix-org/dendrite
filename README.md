@@ -13,7 +13,7 @@ It intends to provide an **efficient**, **reliable** and **scalable** alternativ
 
 Dendrite is **beta** software, which means:
 
-- Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
+- Dendrite is ready for early adopters. We recommend running Dendrite with a PostgreSQL database.
 - Dendrite has periodic releases. We intend to release new versions as we fix bugs and land significant features.
 - Dendrite supports database schema upgrades between releases. This means you should never lose your messages when upgrading Dendrite.
 
@@ -21,7 +21,7 @@ This does not mean:
 
 - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
 - Dendrite is feature-complete. There may be client or federation APIs that are not implemented.
-- Dendrite is ready for massive homeserver deployments. There is no sharding of microservices (although it is possible to run them on separate machines) and there is no high-availability/clustering support.
+- Dendrite is ready for massive homeserver deployments. There is no high-availability/clustering support.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
 
@@ -60,7 +60,7 @@ The following instructions are enough to get Dendrite started as a non-federatin
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
 $ cd dendrite
-$ ./build.sh
+$ go build -o bin/ ./cmd/...
 
 # Generate a Matrix signing key for federation (required)
 $ ./bin/generate-keys --private-key matrix_key.pem
@@ -71,10 +71,10 @@ $ ./bin/generate-keys --tls-cert server.crt --tls-key server.key
 
 # Copy and modify the config file - you'll need to set a server name and paths to the keys
 # at the very least, along with setting up the database connection strings.
-$ cp dendrite-sample.monolith.yaml dendrite.yaml
+$ cp dendrite-sample.yaml dendrite.yaml
 
 # Build and run the server:
-$ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+$ ./bin/dendrite --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 
 # Create an user account (add -admin for an admin user).
 # Specify the localpart only, e.g. 'alice' for '@alice:domain.com'
@@ -85,7 +85,7 @@ Then point your favourite Matrix client at `http://localhost:8008` or `https://l
 
 ## Progress
 
-We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
+We use a script called "Are We Synapse Yet" which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
 updates with CI. As of January 2023, we have 100% server-server parity with Synapse, and the client-server parity is at 93% , though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse

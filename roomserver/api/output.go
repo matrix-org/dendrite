@@ -15,7 +15,9 @@
 package api
 
 import (
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // An OutputType is a type of roomserver output.
@@ -106,7 +108,7 @@ const (
 // prev_events.
 type OutputNewRoomEvent struct {
 	// The Event.
-	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *types.HeaderedEvent `json:"event"`
 	// Does the event completely rewrite the room state? If so, then AddsStateEventIDs
 	// will contain the entire room state.
 	RewritesState bool `json:"rewrites_state,omitempty"`
@@ -169,8 +171,8 @@ type OutputNewRoomEvent struct {
 	HistoryVisibility gomatrixserverlib.HistoryVisibility `json:"history_visibility"`
 }
 
-func (o *OutputNewRoomEvent) NeededStateEventIDs() ([]*gomatrixserverlib.HeaderedEvent, []string) {
-	addsStateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, 1)
+func (o *OutputNewRoomEvent) NeededStateEventIDs() ([]*types.HeaderedEvent, []string) {
+	addsStateEvents := make([]*types.HeaderedEvent, 0, 1)
 	missingEventIDs := make([]string, 0, len(o.AddsStateEventIDs))
 	for _, eventID := range o.AddsStateEventIDs {
 		if eventID != o.Event.EventID() {
@@ -193,7 +195,7 @@ func (o *OutputNewRoomEvent) NeededStateEventIDs() ([]*gomatrixserverlib.Headere
 // should build their current room state up from OutputNewRoomEvents only.
 type OutputOldRoomEvent struct {
 	// The Event.
-	Event             *gomatrixserverlib.HeaderedEvent    `json:"event"`
+	Event             *types.HeaderedEvent                `json:"event"`
 	HistoryVisibility gomatrixserverlib.HistoryVisibility `json:"history_visibility"`
 }
 
@@ -204,7 +206,7 @@ type OutputNewInviteEvent struct {
 	// The room version of the invited room.
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The "m.room.member" invite event.
-	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *types.HeaderedEvent `json:"event"`
 }
 
 // An OutputRetireInviteEvent is written whenever an existing invite is no longer
@@ -231,7 +233,7 @@ type OutputRedactedEvent struct {
 	// The event ID that was redacted
 	RedactedEventID string
 	// The value of `unsigned.redacted_because` - the redaction event itself
-	RedactedBecause *gomatrixserverlib.HeaderedEvent
+	RedactedBecause *types.HeaderedEvent
 }
 
 // An OutputNewPeek is written whenever a user starts peeking into a room
@@ -250,7 +252,7 @@ type OutputNewInboundPeek struct {
 	// a race between tracking the state returned by /peek and emitting subsequent
 	// peeked events)
 	LatestEventID string
-	ServerName    gomatrixserverlib.ServerName
+	ServerName    spec.ServerName
 	// how often we told the peeking server to renew the peek
 	RenewalInterval int64
 }

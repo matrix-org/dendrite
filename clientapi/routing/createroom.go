@@ -22,13 +22,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -46,7 +49,6 @@ type createRoomRequest struct {
 	CreationContent           json.RawMessage               `json:"creation_content"`
 	InitialState              []fledglingEvent              `json:"initial_state"`
 	RoomAliasName             string                        `json:"room_alias_name"`
-	GuestCanJoin              bool                          `json:"guest_can_join"`
 	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
 	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
 	IsDirect                  bool                          `json:"is_direct"`
@@ -72,7 +74,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	if strings.ContainsAny(r.RoomAliasName, whitespace+":") {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace or ':'"),
+			JSON: spec.BadJSON("room_alias_name cannot contain whitespace or ':'"),
 		}
 	}
 	for _, userID := range r.Invite {
@@ -84,7 +86,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		if _, _, err := gomatrixserverlib.SplitID('@', userID); err != nil {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),
+				JSON: spec.BadJSON("user id must be in the form @localpart:domain"),
 			}
 		}
 	}
@@ -93,7 +95,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	default:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
+			JSON: spec.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
 		}
 	}
 
@@ -105,7 +107,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("malformed creation_content"),
+			JSON: spec.BadJSON("malformed creation_content"),
 		}
 	}
 
@@ -114,7 +116,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("malformed creation_content"),
+			JSON: spec.BadJSON("malformed creation_content"),
 		}
 	}
 
@@ -153,7 +155,7 @@ func CreateRoom(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			JSON: spec.InvalidParam(err.Error()),
 		}
 	}
 	return createRoom(req.Context(), r, device, cfg, profileAPI, rsAPI, asAPI, evTime)
@@ -172,12 +174,15 @@ func createRoom(
 	_, userDomain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !cfg.Matrix.IsLocalServerName(userDomain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(fmt.Sprintf("User domain %q not configured locally", userDomain)),
+			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userDomain)),
 		}
 	}
 
@@ -197,7 +202,7 @@ func createRoom(
 		if roomVersionError != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UnsupportedRoomVersion(roomVersionError.Error()),
+				JSON: spec.UnsupportedRoomVersion(roomVersionError.Error()),
 			}
 		}
 		roomVersion = candidateVersion
@@ -216,7 +221,10 @@ func createRoom(
 	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	createContent := map[string]interface{}{}
@@ -225,7 +233,7 @@ func createRoom(
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for creation_content failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("invalid create content"),
+				JSON: spec.BadJSON("invalid create content"),
 			}
 		}
 	}
@@ -233,7 +241,7 @@ func createRoom(
 	createContent["room_version"] = roomVersion
 	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
-		JoinRule: gomatrixserverlib.Invite,
+		JoinRule: spec.Invite,
 	}
 	historyVisibilityContent := gomatrixserverlib.HistoryVisibilityContent{
 		HistoryVisibility: historyVisibilityShared,
@@ -246,47 +254,50 @@ func createRoom(
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
+				JSON: spec.BadJSON("malformed power_level_content_override"),
 			}
 		}
 	}
 
+	var guestsCanJoin bool
 	switch r.Preset {
 	case presetPrivateChat:
-		joinRuleContent.JoinRule = gomatrixserverlib.Invite
+		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
+		guestsCanJoin = true
 	case presetTrustedPrivateChat:
-		joinRuleContent.JoinRule = gomatrixserverlib.Invite
+		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 		for _, invitee := range r.Invite {
 			powerLevelContent.Users[invitee] = 100
 		}
+		guestsCanJoin = true
 	case presetPublicChat:
-		joinRuleContent.JoinRule = gomatrixserverlib.Public
+		joinRuleContent.JoinRule = spec.Public
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 	}
 
 	createEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomCreate,
+		Type:    spec.MRoomCreate,
 		Content: createContent,
 	}
 	powerLevelEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomPowerLevels,
+		Type:    spec.MRoomPowerLevels,
 		Content: powerLevelContent,
 	}
 	joinRuleEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomJoinRules,
+		Type:    spec.MRoomJoinRules,
 		Content: joinRuleContent,
 	}
 	historyVisibilityEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomHistoryVisibility,
+		Type:    spec.MRoomHistoryVisibility,
 		Content: historyVisibilityContent,
 	}
 	membershipEvent := fledglingEvent{
-		Type:     gomatrixserverlib.MRoomMember,
+		Type:     spec.MRoomMember,
 		StateKey: userID,
 		Content: gomatrixserverlib.MemberContent{
-			Membership:  gomatrixserverlib.Join,
+			Membership:  spec.Join,
 			DisplayName: profile.DisplayName,
 			AvatarURL:   profile.AvatarURL,
 		},
@@ -299,7 +310,7 @@ func createRoom(
 
 	if r.Name != "" {
 		nameEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomName,
+			Type: spec.MRoomName,
 			Content: eventutil.NameContent{
 				Name: r.Name,
 			},
@@ -308,16 +319,16 @@ func createRoom(
 
 	if r.Topic != "" {
 		topicEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomTopic,
+			Type: spec.MRoomTopic,
 			Content: eventutil.TopicContent{
 				Topic: r.Topic,
 			},
 		}
 	}
 
-	if r.GuestCanJoin {
+	if guestsCanJoin {
 		guestAccessEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomGuestAccess,
+			Type: spec.MRoomGuestAccess,
 			Content: eventutil.GuestAccessContent{
 				GuestAccess: "can_join",
 			},
@@ -337,17 +348,20 @@ func createRoom(
 		err = rsAPI.GetRoomIDForAlias(ctx, &hasAliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if aliasResp.RoomID != "" {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.RoomInUse("Room ID already exists."),
+				JSON: spec.RoomInUse("Room ID already exists."),
 			}
 		}
 
 		aliasEvent = &fledglingEvent{
-			Type: gomatrixserverlib.MRoomCanonicalAlias,
+			Type: spec.MRoomCanonicalAlias,
 			Content: eventutil.CanonicalAlias{
 				Alias: roomAlias,
 			},
@@ -362,25 +376,25 @@ func createRoom(
 		}
 
 		switch r.InitialState[i].Type {
-		case gomatrixserverlib.MRoomCreate:
+		case spec.MRoomCreate:
 			continue
 
-		case gomatrixserverlib.MRoomPowerLevels:
+		case spec.MRoomPowerLevels:
 			powerLevelEvent = r.InitialState[i]
 
-		case gomatrixserverlib.MRoomJoinRules:
+		case spec.MRoomJoinRules:
 			joinRuleEvent = r.InitialState[i]
 
-		case gomatrixserverlib.MRoomHistoryVisibility:
+		case spec.MRoomHistoryVisibility:
 			historyVisibilityEvent = r.InitialState[i]
 
-		case gomatrixserverlib.MRoomGuestAccess:
+		case spec.MRoomGuestAccess:
 			guestAccessEvent = &r.InitialState[i]
 
-		case gomatrixserverlib.MRoomName:
+		case spec.MRoomName:
 			nameEvent = &r.InitialState[i]
 
-		case gomatrixserverlib.MRoomTopic:
+		case spec.MRoomTopic:
 			topicEvent = &r.InitialState[i]
 
 		default:
@@ -427,44 +441,71 @@ func createRoom(
 	// TODO: invite events
 	// TODO: 3pid invite events
 
-	var builtEvents []*gomatrixserverlib.HeaderedEvent
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("unknown room version"),
+		}
+	}
+
+	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
-		builder := gomatrixserverlib.EventBuilder{
+		builder := verImpl.NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
 			Sender:   userID,
 			RoomID:   roomID,
 			Type:     e.Type,
 			StateKey: &e.StateKey,
 			Depth:    int64(depth),
-		}
+		})
 		err = builder.SetContent(e.Content)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if i > 0 {
-			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
+			builder.PrevEvents = []string{builtEvents[i-1].EventID()}
 		}
-		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, userDomain, &authEvents, cfg, evTime, roomVersion)
+		var ev gomatrixserverlib.PDU
+		if err = builder.AddAuthEvents(&authEvents); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("AddAuthEvents failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+		ev, err = builder.Build(evTime, userDomain, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, ev.Headered(roomVersion))
+		builtEvents = append(builtEvents, &types.HeaderedEvent{PDU: ev})
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("authEvents.AddEvent failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -479,7 +520,10 @@ func createRoom(
 	}
 	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, device.UserDomain(), inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// TODO(#269): Reserve room alias while we create the room. This stops us
@@ -496,13 +540,16 @@ func createRoom(
 		err = rsAPI.SetRoomAlias(ctx, &aliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("aliasAPI.SetRoomAlias failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		if aliasResp.AliasExists {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.RoomInUse("Room alias already exists."),
+				JSON: spec.RoomInUse("Room alias already exists."),
 			}
 		}
 	}
@@ -510,39 +557,40 @@ func createRoom(
 	// If this is a direct message then we should invite the participants.
 	if len(r.Invite) > 0 {
 		// Build some stripped state for the invite.
-		var globalStrippedState []gomatrixserverlib.InviteV2StrippedState
+		var globalStrippedState []fclient.InviteV2StrippedState
 		for _, event := range builtEvents {
 			// Chosen events from the spec:
 			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
 			switch event.Type() {
-			case gomatrixserverlib.MRoomCreate:
+			case spec.MRoomCreate:
 				fallthrough
-			case gomatrixserverlib.MRoomName:
+			case spec.MRoomName:
 				fallthrough
-			case gomatrixserverlib.MRoomAvatar:
+			case spec.MRoomAvatar:
 				fallthrough
-			case gomatrixserverlib.MRoomTopic:
+			case spec.MRoomTopic:
 				fallthrough
-			case gomatrixserverlib.MRoomCanonicalAlias:
+			case spec.MRoomCanonicalAlias:
 				fallthrough
-			case gomatrixserverlib.MRoomEncryption:
+			case spec.MRoomEncryption:
 				fallthrough
-			case gomatrixserverlib.MRoomMember:
+			case spec.MRoomMember:
 				fallthrough
-			case gomatrixserverlib.MRoomJoinRules:
-				ev := event.Event
+			case spec.MRoomJoinRules:
+				ev := event.PDU
 				globalStrippedState = append(
 					globalStrippedState,
-					gomatrixserverlib.NewInviteV2StrippedState(ev),
+					fclient.NewInviteV2StrippedState(ev),
 				)
 			}
 		}
 
 		// Process the invites.
+		var inviteEvent *types.HeaderedEvent
 		for _, invitee := range r.Invite {
 			// Build the invite event.
-			inviteEvent, err := buildMembershipEvent(
-				ctx, invitee, "", profileAPI, device, gomatrixserverlib.Invite,
+			inviteEvent, err = buildMembershipEvent(
+				ctx, invitee, "", profileAPI, device, spec.Invite,
 				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
 			)
 			if err != nil {
@@ -551,41 +599,50 @@ func createRoom(
 			}
 			inviteStrippedState := append(
 				globalStrippedState,
-				gomatrixserverlib.NewInviteV2StrippedState(inviteEvent.Event),
+				fclient.NewInviteV2StrippedState(inviteEvent.PDU),
 			)
 			// Send the invite event to the roomserver.
-			var inviteRes roomserverAPI.PerformInviteResponse
-			event := inviteEvent.Headered(roomVersion)
-			if err := rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
+			event := inviteEvent
+			err = rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
-				RoomVersion:     event.RoomVersion,
+				RoomVersion:     event.Version(),
 				SendAsServer:    string(userDomain),
-			}, &inviteRes); err != nil {
+			})
+			switch e := err.(type) {
+			case roomserverAPI.ErrInvalidID:
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.Unknown(e.Error()),
+				}
+			case roomserverAPI.ErrNotAllowed:
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: spec.Forbidden(e.Error()),
+				}
+			case nil:
+			default:
 				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+				sentry.CaptureException(err)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
-					JSON: jsonerror.InternalServerError(),
+					JSON: spec.InternalServerError{},
 				}
-			}
-			if inviteRes.Error != nil {
-				return inviteRes.Error.JSONResponse()
 			}
 		}
 	}
 
-	if r.Visibility == "public" {
+	if r.Visibility == spec.Public {
 		// expose this room in the published room list
-		var pubRes roomserverAPI.PerformPublishResponse
-		if err := rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
+		if err = rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
 			RoomID:     roomID,
-			Visibility: "public",
-		}, &pubRes); err != nil {
-			return jsonerror.InternalAPIError(ctx, err)
-		}
-		if pubRes.Error != nil {
-			// treat as non-fatal since the room is already made by this point
-			util.GetLogger(ctx).WithError(pubRes.Error).Error("failed to visibility:public")
+			Visibility: spec.Public,
+		}); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("failed to publish room")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
@@ -598,32 +655,4 @@ func createRoom(
 		Code: 200,
 		JSON: response,
 	}
-}
-
-// buildEvent fills out auth_events for the builder then builds the event
-func buildEvent(
-	builder *gomatrixserverlib.EventBuilder,
-	serverName gomatrixserverlib.ServerName,
-	provider gomatrixserverlib.AuthEventProvider,
-	cfg *config.ClientAPI,
-	evTime time.Time,
-	roomVersion gomatrixserverlib.RoomVersion,
-) (*gomatrixserverlib.Event, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
-	if err != nil {
-		return nil, err
-	}
-	refs, err := eventsNeeded.AuthEventReferences(provider)
-	if err != nil {
-		return nil, err
-	}
-	builder.AuthEvents = refs
-	event, err := builder.Build(
-		evTime, serverName, cfg.Matrix.KeyID,
-		cfg.Matrix.PrivateKey, roomVersion,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
-	}
-	return event, nil
 }

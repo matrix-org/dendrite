@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 type yggroundtripper struct {
@@ -17,9 +17,7 @@ func (y *yggroundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return y.inner.RoundTrip(req)
 }
 
-func (n *Node) CreateClient(
-	base *base.BaseDendrite,
-) *gomatrixserverlib.Client {
+func (n *Node) CreateClient() *fclient.Client {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
@@ -33,14 +31,14 @@ func (n *Node) CreateClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(tr),
+	return fclient.NewClient(
+		fclient.WithTransport(tr),
 	)
 }
 
 func (n *Node) CreateFederationClient(
-	base *base.BaseDendrite,
-) *gomatrixserverlib.FederationClient {
+	cfg *config.Dendrite,
+) fclient.FederationClient {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
@@ -54,8 +52,8 @@ func (n *Node) CreateFederationClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewFederationClient(
-		base.Cfg.Global.SigningIdentities(),
-		gomatrixserverlib.WithTransport(tr),
+	return fclient.NewFederationClient(
+		cfg.Global.SigningIdentities(),
+		fclient.WithTransport(tr),
 	)
 }
