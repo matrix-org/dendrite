@@ -123,7 +123,8 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 		}
 	}
 	request := struct {
-		Password string `json:"password"`
+		Password      string `json:"password"`
+		LogoutDevices bool   `json:"logout_devices"`
 	}{}
 	if err = json.NewDecoder(req.Body).Decode(&request); err != nil {
 		return util.JSONResponse{
@@ -146,7 +147,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 		Localpart:     localpart,
 		ServerName:    serverName,
 		Password:      request.Password,
-		LogoutDevices: true,
+		LogoutDevices: request.LogoutDevices,
 	}
 	updateRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), updateReq, updateRes); err != nil {

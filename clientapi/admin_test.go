@@ -133,7 +133,11 @@ func TestPurgeRoom(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
+		defer func() {
+			// give components the time to process purge requests
+			time.Sleep(time.Millisecond * 50)
+			close()
+		}()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
