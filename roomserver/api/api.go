@@ -197,7 +197,6 @@ type UserRoomserverAPI interface {
 }
 
 type FederationRoomserverAPI interface {
-	gomatrixserverlib.LatestStateQuerier
 	InputRoomEventsAPI
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
