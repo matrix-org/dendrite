@@ -69,7 +69,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 	switch r.Preset {
-	case roomserverAPI.PresetPrivateChat, roomserverAPI.PresetTrustedPrivateChat, roomserverAPI.PresetPublicChat, "":
+	case spec.PresetPrivateChat, spec.PresetTrustedPrivateChat, spec.PresetPublicChat, "":
 	default:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,

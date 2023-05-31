@@ -45,6 +45,14 @@ type Creator struct {
 // PerformCreateRoom handles all the steps necessary to create a new room.
 // nolint: gocyclo
 func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest) (string, *util.JSONResponse) {
+	verImpl, err := gomatrixserverlib.GetRoomVersion(createRequest.RoomVersion)
+	if err != nil {
+		return "", &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("unknown room version"),
+		}
+	}
+
 	createContent := map[string]interface{}{}
 	if len(createRequest.CreationContent) > 0 {
 		if err := json.Unmarshal(createRequest.CreationContent, &createContent); err != nil {
@@ -79,18 +87,18 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	var guestsCanJoin bool
 	switch createRequest.StatePreset {
-	case api.PresetPrivateChat:
+	case spec.PresetPrivateChat:
 		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 		guestsCanJoin = true
-	case api.PresetTrustedPrivateChat:
+	case spec.PresetTrustedPrivateChat:
 		joinRuleContent.JoinRule = spec.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 		for _, invitee := range createRequest.InvitedUsers {
 			powerLevelContent.Users[invitee] = 100
 		}
 		guestsCanJoin = true
-	case api.PresetPublicChat:
+	case spec.PresetPublicChat:
 		joinRuleContent.JoinRule = spec.Public
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 	}
@@ -156,7 +164,8 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	var roomAlias string
 	if createRequest.RoomAliasName != "" {
 		roomAlias = fmt.Sprintf("#%s:%s", createRequest.RoomAliasName, userID.Domain())
-		// check it's free TODO: This races but is better than nothing
+		// check it's free
+		// TODO: This races but is better than nothing
 		hasAliasReq := api.GetRoomIDForAliasRequest{
 			Alias:              roomAlias,
 			IncludeAppservices: false,
@@ -258,14 +267,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	// TODO: invite events
 	// TODO: 3pid invite events
-
-	verImpl, err := gomatrixserverlib.GetRoomVersion(createRequest.RoomVersion)
-	if err != nil {
-		return "", &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("unknown room version"),
-		}
-	}
 
 	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)

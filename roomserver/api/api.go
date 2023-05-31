@@ -13,13 +13,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-// TODO: Move to GMSL?
-const (
-	PresetPrivateChat        = "private_chat"
-	PresetTrustedPrivateChat = "trusted_private_chat"
-	PresetPublicChat         = "public_chat"
-)
-
 // ErrInvalidID is an error returned if the userID is invalid
 type ErrInvalidID struct {
 	Err error
