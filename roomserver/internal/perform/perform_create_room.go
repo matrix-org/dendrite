@@ -55,7 +55,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	createContent := map[string]interface{}{}
 	if len(createRequest.CreationContent) > 0 {
-		if err := json.Unmarshal(createRequest.CreationContent, &createContent); err != nil {
+		if err = json.Unmarshal(createRequest.CreationContent, &createContent); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for creation_content failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusBadRequest,
@@ -75,7 +75,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	if createRequest.PowerLevelContentOverride != nil {
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
-		err := json.Unmarshal(createRequest.PowerLevelContentOverride, &powerLevelContent)
+		err = json.Unmarshal(createRequest.PowerLevelContentOverride, &powerLevelContent)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
 			return "", &util.JSONResponse{
@@ -172,7 +172,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 
 		var aliasResp api.GetRoomIDForAliasResponse
-		err := c.RSAPI.GetRoomIDForAlias(ctx, &hasAliasReq, &aliasResp)
+		err = c.RSAPI.GetRoomIDForAlias(ctx, &hasAliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return "", &util.JSONResponse{
