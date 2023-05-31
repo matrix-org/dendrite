@@ -135,7 +135,6 @@ func CreateRoom(
 // createRoom implements /createRoom
 func createRoom(
 	ctx context.Context,
-	// TODO: remove dependency on createRoomRequest
 	createRequest createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,

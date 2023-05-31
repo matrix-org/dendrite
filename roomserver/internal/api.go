@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -132,6 +133,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB:      r.DB,
 		Cfg:     &r.Cfg.RoomServer,
 		FSAPI:   r.fsAPI,
+		RSAPI:   r,
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
@@ -213,6 +215,24 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 	r.asAPI = asAPI
 }
 
+func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error) {
+	return r.Inviter.IsKnownRoom(ctx, roomID)
+}
+
+func (r *RoomserverInternalAPI) StateQuerier() gomatrixserverlib.StateQuerier {
+	return r.Inviter.StateQuerier()
+}
+
+func (r *RoomserverInternalAPI) HandleInvite(
+	ctx context.Context, inviteEvent *types.HeaderedEvent,
+) error {
+	outputEvents, err := r.Inviter.ProcessInviteMembership(ctx, inviteEvent)
+	if err != nil {
+		return err
+	}
+	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
+}
+
 func (r *RoomserverInternalAPI) PerformCreateRoom(
 	ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest,
 ) (string, *util.JSONResponse) {
@@ -223,14 +243,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 ) error {
-	outputEvents, err := r.Inviter.PerformInvite(ctx, req)
-	if err != nil {
-		return err
-	}
-	if len(outputEvents) == 0 {
-		return nil
-	}
-	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
+	return r.Inviter.PerformInvite(ctx, req)
 }
 
 func (r *RoomserverInternalAPI) PerformLeave(

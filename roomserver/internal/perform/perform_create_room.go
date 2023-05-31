@@ -376,7 +376,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// If this is a direct message then we should invite the participants.
 	if len(createRequest.InvitedUsers) > 0 {
 		// Build some stripped state for the invite.
-		var globalStrippedState []fclient.InviteV2StrippedState
+		var globalStrippedState []gomatrixserverlib.InviteStrippedState
 		for _, event := range builtEvents {
 			// Chosen events from the spec:
 			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
@@ -399,7 +399,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				ev := event.PDU
 				globalStrippedState = append(
 					globalStrippedState,
-					fclient.NewInviteV2StrippedState(ev),
+					gomatrixserverlib.NewInviteStrippedState(ev),
 				)
 			}
 		}
@@ -443,7 +443,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 			inviteStrippedState := append(
 				globalStrippedState,
-				fclient.NewInviteV2StrippedState(inviteEvent.PDU),
+				gomatrixserverlib.NewInviteStrippedState(inviteEvent.PDU),
 			)
 			// Send the invite event to the roomserver.
 			event := inviteEvent
