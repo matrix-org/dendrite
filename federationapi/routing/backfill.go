@@ -95,7 +95,7 @@ func Backfill(
 		}
 	}
 
-	// Query the roomserver.
+	// Query the Roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
 		return util.JSONResponse{

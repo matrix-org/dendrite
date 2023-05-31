@@ -372,22 +372,14 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 	ctx context.Context,
 	joinReq *rsAPI.PerformJoinRequest,
 ) (string, error) {
-	req := &api.QueryRestrictedJoinAllowedRequest{
-		UserID: joinReq.UserID,
-		RoomID: joinReq.RoomIDOrAlias,
+	roomID, err := spec.NewRoomID(joinReq.RoomIDOrAlias)
+	if err != nil {
+		return "", err
 	}
-	res := &api.QueryRestrictedJoinAllowedResponse{}
-	if err := r.Queryer.QueryRestrictedJoinAllowed(ctx, req, res); err != nil {
-		return "", fmt.Errorf("r.Queryer.QueryRestrictedJoinAllowed: %w", err)
+	userID, err := spec.NewUserID(joinReq.UserID, true)
+	if err != nil {
+		return "", err
 	}
-	if !res.Restricted {
-		return "", nil
-	}
-	if !res.Resident {
-		return "", nil
-	}
-	if !res.Allowed {
-		return "", rsAPI.ErrNotAllowed{Err: fmt.Errorf("the join to room %s was not allowed", joinReq.RoomIDOrAlias)}
-	}
-	return res.AuthorisedVia, nil
+
+	return r.Queryer.QueryRestrictedJoinAllowed(ctx, *roomID, *userID)
 }

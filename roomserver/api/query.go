@@ -17,12 +17,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -456,4 +458,51 @@ type QueryLeftUsersRequest struct {
 // QueryLeftUsersResponse is the response to QueryLeftUsersRequest.
 type QueryLeftUsersResponse struct {
 	LeftUsers []string `json:"user_ids"`
+}
+
+type JoinRoomQuerier struct {
+	Roomserver RestrictedJoinAPI
+}
+
+func (rq *JoinRoomQuerier) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
+	return rq.Roomserver.CurrentStateEvent(ctx, roomID, eventType, stateKey)
+}
+
+func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
+	return rq.Roomserver.InvitePending(ctx, roomID, userID)
+}
+
+func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, userID spec.UserID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
+	roomInfo, err := rq.Roomserver.QueryRoomInfo(ctx, roomID)
+	if err != nil || roomInfo == nil || roomInfo.IsStub() {
+		return nil, err
+	}
+
+	req := QueryServerJoinedToRoomRequest{
+		ServerName: localServerName,
+		RoomID:     roomID.String(),
+	}
+	res := QueryServerJoinedToRoomResponse{}
+	if err = rq.Roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
+	}
+
+	userJoinedToRoom, err := rq.Roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	locallyJoinedUsers, err := rq.Roomserver.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	return &gomatrixserverlib.RestrictedRoomJoinInfo{
+		LocalServerInRoom: res.RoomExists && res.IsInRoom,
+		UserJoinedToRoom:  userJoinedToRoom,
+		JoinedUsers:       locallyJoinedUsers,
+	}, nil
 }

@@ -200,7 +200,7 @@ func processInvite(
 		string(domain), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
-	// Add the invite event to the roomserver.
+	// Add the invite event to the Roomserver.
 	inviteEvent := &types.HeaderedEvent{PDU: signedEvent}
 	request := &api.PerformInviteRequest{
 		Event:           inviteEvent,

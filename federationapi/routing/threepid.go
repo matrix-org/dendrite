@@ -223,7 +223,7 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
-	// Send the event to the roomserver
+	// Send the event to the Roomserver
 	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
 		api.KindNew,
@@ -324,7 +324,7 @@ func buildMembershipEvent(
 		return nil, errors.New("expecting state tuples for event builder, got none")
 	}
 
-	// Ask the roomserver for information about this room
+	// Ask the Roomserver for information about this room
 	queryReq := api.QueryLatestEventsAndStateRequest{
 		RoomID:       protoEvent.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),

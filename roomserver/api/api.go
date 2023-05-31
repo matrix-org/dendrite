@@ -31,6 +31,16 @@ func (e ErrNotAllowed) Error() string {
 	return e.Err.Error()
 }
 
+type RestrictedJoinAPI interface {
+	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
+	InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error)
+	RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, userID spec.UserID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error)
+	QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error)
+	QueryServerJoinedToRoom(ctx context.Context, req *QueryServerJoinedToRoomRequest, res *QueryServerJoinedToRoomResponse) error
+	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, userID spec.UserID) (bool, error)
+	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
+}
+
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
 	SyncRoomserverAPI
@@ -197,6 +207,7 @@ type UserRoomserverAPI interface {
 }
 
 type FederationRoomserverAPI interface {
+	RestrictedJoinAPI
 	InputRoomEventsAPI
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
@@ -221,7 +232,7 @@ type FederationRoomserverAPI interface {
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(ctx context.Context, serverName spec.ServerName, eventID string) (allowed bool, err error)
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
-	QueryRestrictedJoinAllowed(ctx context.Context, req *QueryRestrictedJoinAllowedRequest, res *QueryRestrictedJoinAllowedResponse) error
+	QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error)
 	PerformInboundPeek(ctx context.Context, req *PerformInboundPeekRequest, res *PerformInboundPeekResponse) error
 	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	// Query a given amount (or less) of events prior to a given set of events.
