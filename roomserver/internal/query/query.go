@@ -868,7 +868,7 @@ func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types
 }
 
 func (r *Queryer) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
-	res, err := r.DB.GetStateEvent(ctx, roomID.String(), eventType, "")
+	res, err := r.DB.GetStateEvent(ctx, roomID.String(), eventType, stateKey)
 	if res == nil {
 		return nil, err
 	}
