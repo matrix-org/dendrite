@@ -1,6 +1,7 @@
 ---
 title: Supported admin APIs
 parent: Administration
+nav_order: 4
 permalink: /administration/adminapi
 ---
 
@@ -49,13 +50,17 @@ the room IDs of all affected rooms.
 
 ## POST `/_dendrite/admin/resetPassword/{userID}`
 
-Reset the password of a local user.
+Reset the password of a local user. 
+
+**If `logout_devices` is set to `true`, all `access_tokens` will be invalidated, resulting
+in the potential loss of encrypted messages**
 
 Request body format:
 
-```
+```json
 {
-    "password": "new_password_here"
+    "password": "new_password_here",
+    "logout_devices": false
 }
 ```
 
@@ -68,11 +73,14 @@ Indexing is done in the background, the server logs every 1000 events (or below)
 
 This endpoint instructs Dendrite to immediately query `/devices/{userID}` on a federated server. An empty JSON body will be returned on success, updating all locally stored user devices/keys. This can be used to possibly resolve E2EE issues, where the remote user can't decrypt messages.
 
+## POST `/_dendrite/admin/purgeRoom/{roomID}`
+
+This endpoint instructs Dendrite to remove the given room from its database. Before doing so, it will evacuate all local users from the room. It does **NOT** remove media files. Depending on the size of the room, this may take a while. Will return an empty JSON once other components were instructed to delete the room.
 
 ## POST `/_synapse/admin/v1/send_server_notice`
 
 Request body format:
-```
+```json
 {
     "user_id": "@target_user:server_name",
     "content": {
@@ -85,7 +93,7 @@ Request body format:
 Send a server notice to a specific user. See the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#server-notices) for additional details on server notice behaviour.
 If successfully sent, the API will return the following response:
 
-```
+```json
 {
      "event_id": "<event_id>"
 }
