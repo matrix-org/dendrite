@@ -293,7 +293,7 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, &queryRes)
 	switch specificErr := err.(type) {
 	case nil:
 	case eventutil.ErrRoomNoExists:

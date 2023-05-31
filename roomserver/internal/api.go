@@ -6,6 +6,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -41,6 +42,7 @@ type RoomserverInternalAPI struct {
 	*perform.Forgetter
 	*perform.Upgrader
 	*perform.Admin
+	*perform.Creator
 	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.Dendrite
@@ -193,6 +195,11 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Queryer: r.Queryer,
 		Leaver:  r.Leaver,
 	}
+	r.Creator = &perform.Creator{
+		DB:    r.DB,
+		Cfg:   &r.Cfg.RoomServer,
+		RSAPI: r,
+	}
 
 	if err := r.Inputer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
@@ -224,6 +231,12 @@ func (r *RoomserverInternalAPI) HandleInvite(
 		return err
 	}
 	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
+}
+
+func (r *RoomserverInternalAPI) PerformCreateRoom(
+	ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest,
+) (string, *util.JSONResponse) {
+	return r.Creator.PerformCreateRoom(ctx, userID, roomID, createRequest)
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(

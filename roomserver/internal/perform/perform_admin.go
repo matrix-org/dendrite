@@ -119,7 +119,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			continue
 		}
 
-		event, err = eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
+		event, err = eventutil.BuildEvent(ctx, fledglingEvent, identity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +136,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 	inputReq := &api.InputRoomEventsRequest{
 		InputRoomEvents: inputEvents,
-		Asynchronous:    true,
+		Asynchronous:    false,
 	}
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
@@ -200,10 +200,16 @@ func (r *Admin) PerformAdminPurgeRoom(
 	}
 
 	// Evacuate the room before purging it from the database
-	if _, err := r.PerformAdminEvacuateRoom(ctx, roomID); err != nil {
+	evacAffected, err := r.PerformAdminEvacuateRoom(ctx, roomID)
+	if err != nil {
 		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to evacuate room before purging")
 		return err
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"room_id":         roomID,
+		"evacuated_users": len(evacAffected),
+	}).Warn("Evacuated room, purging room from roomserver now")
 
 	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
@@ -211,7 +217,7 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver")
+	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
 	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
 		{
@@ -306,7 +312,7 @@ func (r *Admin) PerformAdminDownloadState(
 		return err
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, proto, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
+	ev, err := eventutil.BuildEvent(ctx, proto, identity, time.Now(), &eventsNeeded, queryRes)
 	if err != nil {
 		return fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}

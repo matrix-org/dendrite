@@ -121,7 +121,7 @@ func MakeJoin(
 		queryRes := api.QueryLatestEventsAndStateResponse{
 			RoomVersion: roomVersion,
 		}
-		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
 		switch e := err.(type) {
 		case nil:
 		case eventutil.ErrRoomNoExists:
