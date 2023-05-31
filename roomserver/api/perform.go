@@ -12,14 +12,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// TODO: Move to GMSL
-// FledglingEvent is a helper representation of an event used when creating many events in succession.
-type FledglingEvent struct {
-	Type     string      `json:"type"`
-	StateKey string      `json:"state_key"`
-	Content  interface{} `json:"content"`
-}
-
 type PerformCreateRoomRequest struct {
 	InvitedUsers              []string
 	RoomName                  string
@@ -27,7 +19,7 @@ type PerformCreateRoomRequest struct {
 	Topic                     string
 	StatePreset               string
 	CreationContent           json.RawMessage
-	InitialState              []FledglingEvent
+	InitialState              []gomatrixserverlib.FledglingEvent
 	RoomAliasName             string
 	RoomVersion               gomatrixserverlib.RoomVersion
 	PowerLevelContentOverride json.RawMessage

@@ -34,9 +34,6 @@ import (
 
 const (
 	historyVisibilityShared = "shared"
-	// TODO: These should be implemented once history visibility is implemented
-	// historyVisibilityWorldReadable = "world_readable"
-	// historyVisibilityInvited       = "invited"
 )
 
 type Creator struct {
@@ -96,23 +93,23 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
 	}
 
-	createEvent := api.FledglingEvent{
+	createEvent := gomatrixserverlib.FledglingEvent{
 		Type:    spec.MRoomCreate,
 		Content: createContent,
 	}
-	powerLevelEvent := api.FledglingEvent{
+	powerLevelEvent := gomatrixserverlib.FledglingEvent{
 		Type:    spec.MRoomPowerLevels,
 		Content: powerLevelContent,
 	}
-	joinRuleEvent := api.FledglingEvent{
+	joinRuleEvent := gomatrixserverlib.FledglingEvent{
 		Type:    spec.MRoomJoinRules,
 		Content: joinRuleContent,
 	}
-	historyVisibilityEvent := api.FledglingEvent{
+	historyVisibilityEvent := gomatrixserverlib.FledglingEvent{
 		Type:    spec.MRoomHistoryVisibility,
 		Content: historyVisibilityContent,
 	}
-	membershipEvent := api.FledglingEvent{
+	membershipEvent := gomatrixserverlib.FledglingEvent{
 		Type:     spec.MRoomMember,
 		StateKey: userID.String(),
 		Content: gomatrixserverlib.MemberContent{
@@ -122,13 +119,13 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		},
 	}
 
-	var nameEvent *api.FledglingEvent
-	var topicEvent *api.FledglingEvent
-	var guestAccessEvent *api.FledglingEvent
-	var aliasEvent *api.FledglingEvent
+	var nameEvent *gomatrixserverlib.FledglingEvent
+	var topicEvent *gomatrixserverlib.FledglingEvent
+	var guestAccessEvent *gomatrixserverlib.FledglingEvent
+	var aliasEvent *gomatrixserverlib.FledglingEvent
 
 	if createRequest.RoomName != "" {
-		nameEvent = &api.FledglingEvent{
+		nameEvent = &gomatrixserverlib.FledglingEvent{
 			Type: spec.MRoomName,
 			Content: eventutil.NameContent{
 				Name: createRequest.RoomName,
@@ -137,7 +134,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 
 	if createRequest.Topic != "" {
-		topicEvent = &api.FledglingEvent{
+		topicEvent = &gomatrixserverlib.FledglingEvent{
 			Type: spec.MRoomTopic,
 			Content: eventutil.TopicContent{
 				Topic: createRequest.Topic,
@@ -146,7 +143,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 
 	if guestsCanJoin {
-		guestAccessEvent = &api.FledglingEvent{
+		guestAccessEvent = &gomatrixserverlib.FledglingEvent{
 			Type: spec.MRoomGuestAccess,
 			Content: eventutil.GuestAccessContent{
 				GuestAccess: "can_join",
@@ -179,7 +176,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 
-		aliasEvent = &api.FledglingEvent{
+		aliasEvent = &gomatrixserverlib.FledglingEvent{
 			Type: spec.MRoomCanonicalAlias,
 			Content: eventutil.CanonicalAlias{
 				Alias: roomAlias,
@@ -187,7 +184,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 	}
 
-	var initialStateEvents []api.FledglingEvent
+	var initialStateEvents []gomatrixserverlib.FledglingEvent
 	for i := range createRequest.InitialState {
 		if createRequest.InitialState[i].StateKey != "" {
 			initialStateEvents = append(initialStateEvents, createRequest.InitialState[i])
@@ -238,7 +235,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
-	eventsToMake := []api.FledglingEvent{
+	eventsToMake := []gomatrixserverlib.FledglingEvent{
 		createEvent, membershipEvent, powerLevelEvent, joinRuleEvent, historyVisibilityEvent,
 	}
 	if guestAccessEvent != nil {

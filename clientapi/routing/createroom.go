@@ -37,17 +37,17 @@ import (
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
-	Invite                    []string                       `json:"invite"`
-	Name                      string                         `json:"name"`
-	Visibility                string                         `json:"visibility"`
-	Topic                     string                         `json:"topic"`
-	Preset                    string                         `json:"preset"`
-	CreationContent           json.RawMessage                `json:"creation_content"`
-	InitialState              []roomserverAPI.FledglingEvent `json:"initial_state"`
-	RoomAliasName             string                         `json:"room_alias_name"`
-	RoomVersion               gomatrixserverlib.RoomVersion  `json:"room_version"`
-	PowerLevelContentOverride json.RawMessage                `json:"power_level_content_override"`
-	IsDirect                  bool                           `json:"is_direct"`
+	Invite                    []string                           `json:"invite"`
+	Name                      string                             `json:"name"`
+	Visibility                string                             `json:"visibility"`
+	Topic                     string                             `json:"topic"`
+	Preset                    string                             `json:"preset"`
+	CreationContent           json.RawMessage                    `json:"creation_content"`
+	InitialState              []gomatrixserverlib.FledglingEvent `json:"initial_state"`
+	RoomAliasName             string                             `json:"room_alias_name"`
+	RoomVersion               gomatrixserverlib.RoomVersion      `json:"room_version"`
+	PowerLevelContentOverride json.RawMessage                    `json:"power_level_content_override"`
+	IsDirect                  bool                               `json:"is_direct"`
 }
 
 func (r createRoomRequest) Validate() *util.JSONResponse {
