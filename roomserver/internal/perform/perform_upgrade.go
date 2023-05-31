@@ -35,13 +35,6 @@ type Upgrader struct {
 	URSAPI api.RoomserverInternalAPI
 }
 
-// fledglingEvent is a helper representation of an event used when creating many events in succession.
-type fledglingEvent struct {
-	Type     string      `json:"type"`
-	StateKey string      `json:"state_key"`
-	Content  interface{} `json:"content"`
-}
-
 // PerformRoomUpgrade upgrades a room from one version to another
 func (r *Upgrader) PerformRoomUpgrade(
 	ctx context.Context,
@@ -154,7 +147,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 	restrictedPowerLevelContent.EventsDefault = restrictedDefaultPowerLevel
 	restrictedPowerLevelContent.Invite = restrictedDefaultPowerLevel
 
-	restrictedPowerLevelsHeadered, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, fledglingEvent{
+	restrictedPowerLevelsHeadered, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, api.FledglingEvent{
 		Type:     spec.MRoomPowerLevels,
 		StateKey: "",
 		Content:  restrictedPowerLevelContent,
@@ -216,7 +209,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 		}
 	}
 
-	emptyCanonicalAliasEvent, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, fledglingEvent{
+	emptyCanonicalAliasEvent, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, api.FledglingEvent{
 		Type:    spec.MRoomCanonicalAlias,
 		Content: map[string]interface{}{},
 	})
@@ -298,7 +291,7 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 }
 
 // nolint:gocyclo
-func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, userID, roomID string, newVersion gomatrixserverlib.RoomVersion, tombstoneEvent *types.HeaderedEvent) ([]fledglingEvent, error) {
+func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, userID, roomID string, newVersion gomatrixserverlib.RoomVersion, tombstoneEvent *types.HeaderedEvent) ([]api.FledglingEvent, error) {
 	state := make(map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent, len(oldRoom.StateEvents))
 	for _, event := range oldRoom.StateEvents {
 		if event.StateKey() == nil {
@@ -361,7 +354,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 		EventID: tombstoneEvent.EventID(),
 		RoomID:  roomID,
 	}
-	newCreateEvent := fledglingEvent{
+	newCreateEvent := api.FledglingEvent{
 		Type:     spec.MRoomCreate,
 		StateKey: "",
 		Content:  newCreateContent,
@@ -374,7 +367,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	newMembershipContent := map[string]interface{}{}
 	_ = json.Unmarshal(oldMembershipEvent.Content(), &newMembershipContent)
 	newMembershipContent["membership"] = spec.Join
-	newMembershipEvent := fledglingEvent{
+	newMembershipEvent := api.FledglingEvent{
 		Type:     spec.MRoomMember,
 		StateKey: userID,
 		Content:  newMembershipContent,
@@ -400,13 +393,13 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 		"join_rule": spec.Invite, // sane default
 	}
 	_ = json.Unmarshal(oldJoinRulesEvent.Content(), &newJoinRulesContent)
-	newJoinRulesEvent := fledglingEvent{
+	newJoinRulesEvent := api.FledglingEvent{
 		Type:     spec.MRoomJoinRules,
 		StateKey: "",
 		Content:  newJoinRulesContent,
 	}
 
-	eventsToMake := make([]fledglingEvent, 0, len(state))
+	eventsToMake := make([]api.FledglingEvent, 0, len(state))
 	eventsToMake = append(
 		eventsToMake, newCreateEvent, newMembershipEvent,
 		tempPowerLevelsEvent, newJoinRulesEvent,
@@ -415,7 +408,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// For some reason Sytest expects there to be a guest access event.
 	// Create one if it doesn't exist.
 	if _, ok := state[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomGuestAccess, StateKey: ""}]; !ok {
-		eventsToMake = append(eventsToMake, fledglingEvent{
+		eventsToMake = append(eventsToMake, api.FledglingEvent{
 			Type: spec.MRoomGuestAccess,
 			Content: map[string]string{
 				"guest_access": "forbidden",
@@ -430,7 +423,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			// are already in `eventsToMake`.
 			continue
 		}
-		newEvent := fledglingEvent{
+		newEvent := api.FledglingEvent{
 			Type:     tuple.EventType,
 			StateKey: tuple.StateKey,
 		}
@@ -444,7 +437,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// If we sent a temporary power level event into the room before,
 	// override that now by restoring the original power levels.
 	if powerLevelsOverridden {
-		eventsToMake = append(eventsToMake, fledglingEvent{
+		eventsToMake = append(eventsToMake, api.FledglingEvent{
 			Type:    spec.MRoomPowerLevels,
 			Content: powerLevelContent,
 		})
@@ -452,7 +445,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	return eventsToMake, nil
 }
 
-func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID string, userDomain spec.ServerName, newRoomID string, newVersion gomatrixserverlib.RoomVersion, eventsToMake []fledglingEvent) error {
+func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID string, userDomain spec.ServerName, newRoomID string, newVersion gomatrixserverlib.RoomVersion, eventsToMake []api.FledglingEvent) error {
 	var err error
 	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
@@ -527,14 +520,14 @@ func (r *Upgrader) makeTombstoneEvent(
 		"body":             "This room has been replaced",
 		"replacement_room": newRoomID,
 	}
-	event := fledglingEvent{
+	event := api.FledglingEvent{
 		Type:    "m.room.tombstone",
 		Content: content,
 	}
 	return r.makeHeaderedEvent(ctx, evTime, userID, roomID, event)
 }
 
-func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, userID, roomID string, event fledglingEvent) (*types.HeaderedEvent, error) {
+func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, userID, roomID string, event api.FledglingEvent) (*types.HeaderedEvent, error) {
 	proto := gomatrixserverlib.ProtoEvent{
 		Sender:   userID,
 		RoomID:   roomID,
@@ -581,7 +574,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	return headeredEvent, nil
 }
 
-func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) (fledglingEvent, bool) {
+func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) (api.FledglingEvent, bool) {
 	// Work out what power level we need in order to be able to send events
 	// of all types into the room.
 	neededPowerLevel := powerLevelContent.StateDefault
@@ -612,7 +605,7 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 	}
 
 	// Then return the temporary power levels event.
-	return fledglingEvent{
+	return api.FledglingEvent{
 		Type:    spec.MRoomPowerLevels,
 		Content: tempPowerLevelContent,
 	}, powerLevelsOverridden

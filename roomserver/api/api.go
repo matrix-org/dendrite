@@ -5,11 +5,19 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+)
+
+// TODO: Move to GMSL?
+const (
+	PresetPrivateChat        = "private_chat"
+	PresetTrustedPrivateChat = "trusted_private_chat"
+	PresetPublicChat         = "public_chat"
 )
 
 // ErrInvalidID is an error returned if the userID is invalid
@@ -169,6 +177,7 @@ type ClientRoomserverAPI interface {
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
 	GetAliasesForRoomID(ctx context.Context, req *GetAliasesForRoomIDRequest, res *GetAliasesForRoomIDResponse) error
 
+	PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *PerformCreateRoomRequest) (string, *util.JSONResponse)
 	// PerformRoomUpgrade upgrades a room to a newer version
 	PerformRoomUpgrade(ctx context.Context, roomID, userID string, roomVersion gomatrixserverlib.RoomVersion) (newRoomID string, err error)
 	PerformAdminEvacuateRoom(ctx context.Context, roomID string) (affected []string, err error)

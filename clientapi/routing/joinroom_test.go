@@ -14,6 +14,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/roomserver"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
@@ -63,7 +64,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			IsDirect:      true,
 			Topic:         "testing",
 			Visibility:    "public",
-			Preset:        presetPublicChat,
+			Preset:        roomserverAPI.PresetPublicChat,
 			RoomAliasName: "alias",
 			Invite:        []string{bob.ID},
 		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
@@ -78,7 +79,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			IsDirect:   true,
 			Topic:      "testing",
 			Visibility: "public",
-			Preset:     presetPublicChat,
+			Preset:     roomserverAPI.PresetPublicChat,
 			Invite:     []string{charlie.ID},
 		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crRespWithGuestAccess, ok := resp.JSON.(createRoomResponse)
