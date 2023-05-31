@@ -337,7 +337,11 @@ func buildMembershipEventDirect(
 		return nil, err
 	}
 
-	identity := &fclient.SigningIdentity{senderDomain, keyID, privateKey}
+	identity := &fclient.SigningIdentity{
+		ServerName: senderDomain,
+		KeyID:      keyID,
+		PrivateKey: privateKey,
+	}
 	return eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, nil)
 }
 

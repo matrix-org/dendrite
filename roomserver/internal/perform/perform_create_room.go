@@ -42,6 +42,8 @@ type Creator struct {
 	RSAPI api.RoomserverInternalAPI
 }
 
+// PerformCreateRoom handles all the steps necessary to create a new room.
+// nolint: gocyclo
 func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest) (string, *util.JSONResponse) {
 	createContent := map[string]interface{}{}
 	if len(createRequest.CreationContent) > 0 {
@@ -419,7 +421,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				IsDirect:    createRequest.IsDirect,
 			}
 
-			if err := proto.SetContent(content); err != nil {
+			if err = proto.SetContent(content); err != nil {
 				return "", &util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

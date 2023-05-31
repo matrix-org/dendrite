@@ -133,7 +133,6 @@ func CreateRoom(
 }
 
 // createRoom implements /createRoom
-// nolint: gocyclo
 func createRoom(
 	ctx context.Context,
 	// TODO: remove dependency on createRoomRequest
