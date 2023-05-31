@@ -380,7 +380,7 @@ func emit3PIDInviteEvent(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.QueryAndBuildEvent(ctx, proto, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, proto, identity, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}

@@ -1,12 +1,36 @@
 package api
 
 import (
+	"crypto/ed25519"
+	"encoding/json"
+	"time"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
+
+type PerformCreateRoomRequest struct {
+	InvitedUsers              []string
+	RoomName                  string
+	Visibility                string
+	Topic                     string
+	StatePreset               string
+	CreationContent           json.RawMessage
+	InitialState              []gomatrixserverlib.FledglingEvent
+	RoomAliasName             string
+	RoomVersion               gomatrixserverlib.RoomVersion
+	PowerLevelContentOverride json.RawMessage
+	IsDirect                  bool
+
+	UserDisplayName string
+	UserAvatarURL   string
+	KeyID           gomatrixserverlib.KeyID
+	PrivateKey      ed25519.PrivateKey
+	EventTime       time.Time
+}
 
 type PerformJoinRequest struct {
 	RoomIDOrAlias string                 `json:"room_id_or_alias"`

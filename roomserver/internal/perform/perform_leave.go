@@ -183,7 +183,7 @@ func (r *Leaver) performLeaveRoomByID(
 	if err != nil {
 		return nil, fmt.Errorf("SigningIdentityFor: %w", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
 	if err != nil {
 		return nil, fmt.Errorf("eventutil.QueryAndBuildEvent: %w", err)
 	}
