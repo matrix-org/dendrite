@@ -233,10 +233,17 @@ func (s *appserviceState) backoffAndPause(err error) error {
 //
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
+	userID, err := event.UserID()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"appservice": appservice.ID,
+			"room_id":    event.RoomID(),
+		}).WithError(err).Errorf("invalid userID")
+	}
 	switch {
 	case appservice.URL == "":
 		return false
-	case appservice.IsInterestedInUserID(event.Sender()):
+	case appservice.IsInterestedInUserID(userID.String()):
 		return true
 	case appservice.IsInterestedInRoomID(event.RoomID()):
 		return true

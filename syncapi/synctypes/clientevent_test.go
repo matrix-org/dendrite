@@ -62,8 +62,8 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	if !bytes.Equal(ce.Unsigned, ev.Unsigned()) {
 		t.Errorf("ClientEvent.Unsigned: wanted %s, got %s", string(ev.Unsigned()), string(ce.Unsigned))
 	}
-	if ce.Sender != ev.Sender() {
-		t.Errorf("ClientEvent.Sender: wanted %s, got %s", ev.Sender(), ce.Sender)
+	if ce.Sender != ev.SenderID() {
+		t.Errorf("ClientEvent.Sender: wanted %s, got %s", ev.SenderID(), ce.Sender)
 	}
 	j, err := json.Marshal(ce)
 	if err != nil {

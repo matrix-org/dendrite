@@ -509,7 +509,7 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', event.Sender())
+	originUser, err := event.UserID()
 	if err != nil {
 		return nil, err
 	}
@@ -542,7 +542,7 @@ func (r *FederationInternalAPI) SendInvite(
 		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
-	inviteRes, err := r.federation.SendInviteV2(ctx, origin, destination, inviteReq)
+	inviteRes, err := r.federation.SendInviteV2(ctx, originUser.Domain(), destination, inviteReq)
 	if err != nil {
 		return nil, fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}

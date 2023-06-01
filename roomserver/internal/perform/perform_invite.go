@@ -125,7 +125,7 @@ func (r *Inviter) PerformInvite(
 ) error {
 	event := req.Event
 
-	sender, err := spec.NewUserID(event.Sender(), true)
+	sender, err := event.UserID()
 	if err != nil {
 		return spec.InvalidParam("The user ID is invalid")
 	}

@@ -484,9 +484,11 @@ FindSuccessor:
 	// Store the server names in a temporary map to avoid duplicates.
 	serverSet := make(map[spec.ServerName]bool)
 	for _, event := range memberEvents {
-		if _, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender()); err == nil {
-			serverSet[senderDomain] = true
+		sender, err := event.UserID()
+		if err != nil {
+			continue
 		}
+		serverSet[sender.Domain()] = true
 	}
 	var servers []spec.ServerName
 	for server := range serverSet {

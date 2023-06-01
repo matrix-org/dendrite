@@ -108,7 +108,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	}
 
 	if s.cfg.Matrix.ReportStats.Enabled {
-		go s.storeMessageStats(ctx, event.Type(), event.Sender(), event.RoomID())
+		go s.storeMessageStats(ctx, event.Type(), event.SenderID(), event.RoomID())
 	}
 
 	log.WithFields(log.Fields{
@@ -615,7 +615,11 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
-	if event.Sender() == mem.UserID {
+	userID, err := event.UserID()
+	if err != nil {
+		return nil, err
+	}
+	if userID.String() == mem.UserID {
 		// SPEC: Homeservers MUST NOT notify the Push Gateway for
 		// events that the user has sent themselves.
 		return nil, nil
@@ -632,7 +636,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		if err != nil {
 			return nil, err
 		}
-		sender := event.Sender()
+		sender := event.SenderID()
 		if _, ok := ignored.List[sender]; ok {
 			return nil, fmt.Errorf("user %s is ignored", sender)
 		}
@@ -767,7 +771,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				ID:       event.EventID(),
 				RoomID:   event.RoomID(),
 				RoomName: roomName,
-				Sender:   event.Sender(),
+				Sender:   event.SenderID(),
 				Type:     event.Type(),
 			},
 		}

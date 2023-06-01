@@ -144,7 +144,7 @@ func GetMemberships(
 					JSON: spec.InternalServerError{},
 				}
 			}
-			res.Joined[ev.Sender()] = joinedMember(content)
+			res.Joined[ev.SenderID()] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,

@@ -113,7 +113,7 @@ func ruleMatches(rule *Rule, kind Kind, event gomatrixserverlib.PDU, ec Evaluati
 		return rule.RuleID == event.RoomID(), nil
 
 	case SenderKind:
-		return rule.RuleID == event.Sender(), nil
+		return rule.RuleID == event.SenderID(), nil
 
 	default:
 		return false, nil
@@ -143,7 +143,7 @@ func conditionMatches(cond *Condition, event gomatrixserverlib.PDU, ec Evaluatio
 		return cmp(n), nil
 
 	case SenderNotificationPermissionCondition:
-		return ec.HasPowerLevel(event.Sender(), cond.Key)
+		return ec.HasPowerLevel(event.SenderID(), cond.Key)
 
 	default:
 		return false, nil

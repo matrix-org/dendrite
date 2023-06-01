@@ -425,7 +425,7 @@ func applyHistoryVisibilityFilter(
 	for _, ev := range recentEvents {
 		if ev.StateKey() != nil {
 			stateTypes = append(stateTypes, ev.Type())
-			senders = append(senders, ev.Sender())
+			senders = append(senders, ev.SenderID())
 		}
 	}
 
@@ -577,8 +577,8 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	// Add all users the client doesn't know about yet to a list
 	for _, event := range timelineEvents {
 		// Membership is not yet cached, add it to the list
-		if _, ok := p.lazyLoadCache.IsLazyLoadedUserCached(device, roomID, event.Sender()); !ok {
-			timelineUsers[event.Sender()] = struct{}{}
+		if _, ok := p.lazyLoadCache.IsLazyLoadedUserCached(device, roomID, event.SenderID()); !ok {
+			timelineUsers[event.SenderID()] = struct{}{}
 		}
 	}
 	// Preallocate with the same amount, even if it will end up with fewer values

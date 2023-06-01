@@ -173,8 +173,8 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			sender := request.UserID
-			if request.UserID != ev.Sender() {
-				sender = ev.Sender()
+			if sender != ev.SenderID() {
+				sender = ev.SenderID()
 			}
 
 			_, senderDomain, err := r.Cfg.Global.SplitLocalID('@', sender)

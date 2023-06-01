@@ -204,11 +204,11 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 		profileInfos := make(map[string]ProfileInfoResponse)
 		for _, ev := range append(eventsBefore, eventsAfter...) {
-			profile, ok := knownUsersProfiles[event.Sender()]
+			profile, ok := knownUsersProfiles[event.SenderID()]
 			if !ok {
-				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, ev.Sender())
+				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, ev.SenderID())
 				if err != nil {
-					logrus.WithError(err).WithField("user_id", event.Sender()).Warn("failed to query userprofile")
+					logrus.WithError(err).WithField("user_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
 				}
 				if stateEvent == nil {
@@ -218,9 +218,9 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 					AvatarURL:   gjson.GetBytes(stateEvent.Content(), "avatar_url").Str,
 					DisplayName: gjson.GetBytes(stateEvent.Content(), "displayname").Str,
 				}
-				knownUsersProfiles[event.Sender()] = profile
+				knownUsersProfiles[event.SenderID()] = profile
 			}
-			profileInfos[ev.Sender()] = profile
+			profileInfos[ev.SenderID()] = profile
 		}
 
 		results = append(results, Result{
