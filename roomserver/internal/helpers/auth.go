@@ -70,7 +70,7 @@ func CheckForSoftFail(
 	)
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, roomInfo.RoomVersion, stateNeeded, authStateEntries)
 	if err != nil {
 		return true, fmt.Errorf("loadAuthEvents: %w", err)
 	}
@@ -83,15 +83,14 @@ func CheckForSoftFail(
 	return false, nil
 }
 
-// CheckAuthEvents checks that the event passes authentication checks
-// Returns the numeric IDs for the auth events.
-func CheckAuthEvents(
+// GetAuthEvents returns the numeric IDs for the auth events.
+func GetAuthEvents(
 	ctx context.Context,
 	db storage.RoomDatabase,
-	roomInfo *types.RoomInfo,
-	event *types.HeaderedEvent,
+	roomVersion gomatrixserverlib.RoomVersion,
+	event gomatrixserverlib.PDU,
 	authEventIDs []string,
-) ([]types.EventNID, error) {
+) (gomatrixserverlib.AuthEventProvider, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
 	authStateEntries, err := db.StateEntriesForEventIDs(ctx, authEventIDs, true)
 	if err != nil {
@@ -100,25 +99,14 @@ func CheckAuthEvents(
 	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event.PDU})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, roomInfo, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, roomVersion, stateNeeded, authStateEntries)
 	if err != nil {
 		return nil, fmt.Errorf("loadAuthEvents: %w", err)
 	}
-
-	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents); err != nil {
-		return nil, err
-	}
-
-	// Return the numeric IDs for the auth events.
-	result := make([]types.EventNID, len(authStateEntries))
-	for i := range authStateEntries {
-		result[i] = authStateEntries[i].EventNID
-	}
-	return result, nil
+	return &authEvents, nil
 }
 
 type authEvents struct {
@@ -196,7 +184,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) g
 func loadAuthEvents(
 	ctx context.Context,
 	db state.StateResolutionStorage,
-	roomInfo *types.RoomInfo,
+	roomVersion gomatrixserverlib.RoomVersion,
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
 ) (result authEvents, err error) {
@@ -220,11 +208,7 @@ func loadAuthEvents(
 		}
 	}
 
-	if roomInfo == nil {
-		err = types.ErrorInvalidRoomInfo
-		return
-	}
-	if result.events, err = db.Events(ctx, roomInfo.RoomVersion, eventNIDs); err != nil {
+	if result.events, err = db.Events(ctx, roomVersion, eventNIDs); err != nil {
 		return
 	}
 	roomID := ""

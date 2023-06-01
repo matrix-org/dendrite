@@ -872,7 +872,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			return err
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, r.SigningIdentity, time.Now(), &eventsNeeded, latestRes)
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.SigningIdentity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			return err
 		}

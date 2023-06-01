@@ -152,8 +152,16 @@ func Setup(
 					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
+
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
 			return InviteV1(
-				httpReq, request, vars["roomID"], vars["eventID"],
+				httpReq, request, *roomID, vars["eventID"],
 				cfg, rsAPI, keys,
 			)
 		},
@@ -168,8 +176,16 @@ func Setup(
 					JSON: spec.Forbidden("Forbidden by server ACLs"),
 				}
 			}
+
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
 			return InviteV2(
-				httpReq, request, vars["roomID"], vars["eventID"],
+				httpReq, request, *roomID, vars["eventID"],
 				cfg, rsAPI, keys,
 			)
 		},

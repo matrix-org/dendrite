@@ -387,7 +387,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, cfg.Matrix, identity, evTime, rsAPI, nil)
+		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -62,7 +62,7 @@ type RoomserverFederationAPI interface {
 	// Handle an instruction to make_leave & send_leave with a remote server.
 	PerformLeave(ctx context.Context, request *PerformLeaveRequest, response *PerformLeaveResponse) error
 	// Handle sending an invite to a remote server.
-	PerformInvite(ctx context.Context, request *PerformInviteRequest, response *PerformInviteResponse) error
+	SendInvite(ctx context.Context, event gomatrixserverlib.PDU, strippedState []gomatrixserverlib.InviteStrippedState) (gomatrixserverlib.PDU, error)
 	// Handle an instruction to peek a room on a remote server.
 	PerformOutboundPeek(ctx context.Context, request *PerformOutboundPeekRequest, response *PerformOutboundPeekResponse) error
 	// Query the server names of the joined hosts in a room.
@@ -190,9 +190,9 @@ type PerformLeaveResponse struct {
 }
 
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion   `json:"room_version"`
-	Event           *rstypes.HeaderedEvent          `json:"event"`
-	InviteRoomState []fclient.InviteV2StrippedState `json:"invite_room_state"`
+	RoomVersion     gomatrixserverlib.RoomVersion           `json:"room_version"`
+	Event           *rstypes.HeaderedEvent                  `json:"event"`
+	InviteRoomState []gomatrixserverlib.InviteStrippedState `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {
