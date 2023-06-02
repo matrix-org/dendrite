@@ -173,7 +173,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			sender := request.UserID
-			if sender != ev.SenderID() {
+			if request.UserID != ev.SenderID() {
 				sender = ev.SenderID()
 			}
 

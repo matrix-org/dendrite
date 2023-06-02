@@ -76,14 +76,7 @@ func SendRedaction(
 	// "Users may redact their own events, and any user with a power level greater than or equal
 	// to the redact power level of the room may redact events there"
 	// https://matrix.org/docs/spec/client_server/r0.6.1#put-matrix-client-r0-rooms-roomid-redact-eventid-txnid
-	userID, err := ev.UserID()
-	if err != nil {
-		return util.JSONResponse{
-			Code: 400,
-			JSON: spec.BadJSON("invalid userID"),
-		}
-	}
-	allowedToRedact := userID.String() == device.UserID
+	allowedToRedact := ev.SenderID() == device.UserID
 	if !allowedToRedact {
 		plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
 			EventType: spec.MRoomPowerLevels,
@@ -126,7 +119,7 @@ func SendRedaction(
 		Type:    spec.MRoomRedaction,
 		Redacts: eventID,
 	}
-	err = proto.SetContent(r)
+	err := proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
 		return util.JSONResponse{

@@ -195,14 +195,7 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].HeaderedEvent
 		if device != nil && in[i].TransactionID != nil {
-			userID, err := in[i].UserID()
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"event_id": out[i].EventID(),
-				}).WithError(err).Warnf("Event has invalid userID")
-				continue
-			}
-			if device.UserID == userID.String() && device.SessionID == in[i].TransactionID.SessionID {
+			if device.UserID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
 				err := out[i].SetUnsignedField(
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)

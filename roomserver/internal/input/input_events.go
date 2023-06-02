@@ -128,7 +128,7 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
-	sender, err := event.UserID()
+	_, senderDomain, err := gomatrixserverlib.SplitID('@', event.SenderID())
 	if err != nil {
 		return fmt.Errorf("event has invalid sender %q", event.SenderID())
 	}
@@ -193,9 +193,9 @@ func (r *Inputer) processRoomEvent(
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if sender.Domain() != input.Origin && sender.Domain() != r.Cfg.Matrix.ServerName {
-			serverRes.ServerNames = append(serverRes.ServerNames, sender.Domain())
-			delete(servers, sender.Domain())
+		if senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
+			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
+			delete(servers, senderDomain)
 		}
 		for server := range servers {
 			serverRes.ServerNames = append(serverRes.ServerNames, server)
@@ -451,7 +451,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Handle remote room upgrades, e.g. remove published room
-	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
+	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
 		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
 			return fmt.Errorf("failed to handle remote room upgrade: %w", err)
 		}
