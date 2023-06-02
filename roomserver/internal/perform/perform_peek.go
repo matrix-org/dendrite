@@ -157,7 +157,7 @@ func (r *Peeker) performPeekRoomByID(
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
-			return
+			return "", err
 		}
 		if visibility, ok := content["history_visibility"]; ok {
 			worldReadable = visibility == "world_readable"
@@ -185,7 +185,7 @@ func (r *Peeker) performPeekRoomByID(
 		},
 	})
 	if err != nil {
-		return
+		return "", err
 	}
 
 	// By this point, if req.RoomIDOrAlias contained an alias, then
