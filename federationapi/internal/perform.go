@@ -509,9 +509,14 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', event.SenderID())
+	inviter, err := event.UserID()
 	if err != nil {
 		return nil, err
+	}
+	// For portable accounts, we need to verify the inviter domain is still associated with this server.
+	// The userID of the inviter may have changed to another server in which case we cannot send the invite.
+	if !r.cfg.Matrix.IsLocalServerName(inviter.Domain()) {
+		return nil, fmt.Errorf("the invite must be from a local user")
 	}
 
 	if event.StateKey() == nil {
@@ -542,7 +547,7 @@ func (r *FederationInternalAPI) SendInvite(
 		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
-	inviteRes, err := r.federation.SendInviteV2(ctx, origin, destination, inviteReq)
+	inviteRes, err := r.federation.SendInviteV2(ctx, inviter.Domain(), destination, inviteReq)
 	if err != nil {
 		return nil, fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}

@@ -223,13 +223,13 @@ func SendLeave(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	var serverName spec.ServerName
-	if _, serverName, err = gomatrixserverlib.SplitID('@', event.SenderID()); err != nil {
+	sender, err := event.UserID()
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("The sender of the join is invalid"),
 		}
-	} else if serverName != request.Origin() {
+	} else if sender.Domain() != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("The sender does not match the server that originated the request"),
@@ -291,7 +291,7 @@ func SendLeave(
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             serverName,
+		ServerName:             sender.Domain(),
 		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
