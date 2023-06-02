@@ -51,6 +51,7 @@ func TestUserRoomKeysTable(t *testing.T) {
 
 		// again, this shouldn't result in an error, but return the existing key
 		_, key2, err := ed25519.GenerateKey(nil)
+		assert.NoError(t, err)
 		gotKey, err = tab.InsertUserRoomKey(context.Background(), nil, userNID, roomNID, key2)
 		assert.NoError(t, err)
 		assert.Equal(t, gotKey, key)
