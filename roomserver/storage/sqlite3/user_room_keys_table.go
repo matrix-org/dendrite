@@ -26,7 +26,7 @@ import (
 )
 
 const userRoomKeysSchema = `
-CREATE TABLE roomserver_user_room_keys (     
+CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (     
     user_nid    INTEGER NOT NULL,
     room_nid    INTEGER NOT NULL,
     pseudo_id_key TEXT NOT NULL,
