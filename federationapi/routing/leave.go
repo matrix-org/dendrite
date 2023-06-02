@@ -165,8 +165,32 @@ func SendLeave(
 		}
 	}
 
-	event, err := gomatrixserverlib.HandleSendLeave(
-		httpReq.Context(), request.Content(), request.Origin(), roomVersion, eventID, roomID, rsAPI, keys,
+	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
+	// Decode the incomingEvent JSON from the request.
+	incomingEvent, err := verImpl.NewEventFromUntrustedJSON(request.Content())
+	switch err.(type) {
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON(err.Error()),
+		}
+	case nil:
+	default:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+
+	leaveEvent, err := verImpl.HandleSendLeave(
+		httpReq.Context(), incomingEvent, request.Origin(), eventID, roomID, rsAPI, keys,
 	)
 
 	switch e := err.(type) {
@@ -211,7 +235,7 @@ func SendLeave(
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
-				Event:         &types.HeaderedEvent{PDU: event},
+				Event:         &types.HeaderedEvent{PDU: leaveEvent},
 				SendAsServer:  string(cfg.Matrix.ServerName),
 				TransactionID: nil,
 			},
