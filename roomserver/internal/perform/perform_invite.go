@@ -125,9 +125,9 @@ func (r *Inviter) PerformInvite(
 ) error {
 	event := req.Event
 
-	sender, err := spec.NewUserID(event.SenderID(), true)
+	sender, err := event.UserID()
 	if err != nil {
-		return spec.InvalidParam("The user ID is invalid")
+		return spec.InvalidParam("The sender user ID is invalid")
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
 		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}

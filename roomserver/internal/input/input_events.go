@@ -128,7 +128,7 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
-	_, senderDomain, err := gomatrixserverlib.SplitID('@', event.SenderID())
+	sender, err := event.UserID()
 	if err != nil {
 		return fmt.Errorf("event has invalid sender %q", event.SenderID())
 	}
@@ -193,9 +193,9 @@ func (r *Inputer) processRoomEvent(
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
-			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
-			delete(servers, senderDomain)
+		if sender.Domain() != input.Origin && sender.Domain() != r.Cfg.Matrix.ServerName {
+			serverRes.ServerNames = append(serverRes.ServerNames, sender.Domain())
+			delete(servers, sender.Domain())
 		}
 		for server := range servers {
 			serverRes.ServerNames = append(serverRes.ServerNames, server)
@@ -451,7 +451,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Handle remote room upgrades, e.g. remove published room
-	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
+	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
 		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
 			return fmt.Errorf("failed to handle remote room upgrade: %w", err)
 		}
@@ -828,11 +828,13 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			continue
 		}
 
+		// TODO: pseudoIDs: get userID for room using state key (which is now senderID)
 		localpart, senderDomain, err := gomatrixserverlib.SplitID('@', *memberEvent.StateKey())
 		if err != nil {
 			continue
 		}
 
+		// TODO: pseudoIDs: query account by state key (which is now senderID)
 		accountRes := &userAPI.QueryAccountByLocalpartResponse{}
 		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{
 			Localpart:  localpart,

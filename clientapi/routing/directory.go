@@ -189,7 +189,7 @@ func SetLocalAlias(
 		}
 	}
 
-	deviceSenderID, err := rsAPI.QuerySenderIDForRoom(req.Context(), alias, *userID)
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), alias, *userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -238,7 +238,7 @@ func RemoveLocalAlias(
 		}
 	}
 
-	deviceSenderID, err := rsAPI.QuerySenderIDForRoom(req.Context(), alias, *userID)
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), alias, *userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
