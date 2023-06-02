@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -1592,21 +1593,25 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 }
 
 // InsertUserRoomKey inserts a new user room key for the given user and room.
-// Returns an error if a database error occurred, also if the primary constraint was violated.
-func (d *Database) InsertUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.UserRoomKeyTable.InsertUserRoomKey(ctx, txn, userNID, roomNID, key)
+// Returns the newly inserted private key or an existing private key. If there is
+// an error talking to the database, returns that error.
+func (d *Database) InsertUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		var iErr error
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomKey(ctx, txn, userNID, roomNID, key)
+		return iErr
 	})
+	return result, err
 }
 
-// SelectUserRoomKey queries the user room key for a given user.
-// Returns the key and an error.
-// TODO: should we handle absent keys (sql.ErrNoRows) as non-fatal?
+// SelectUserRoomKey queries the users room private key.
+// If no key exists, returns no key and no error. Otherwise returns
+// the key and a database error, if any.
 func (d *Database) SelectUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var sErr error
 		key, sErr = d.UserRoomKeyTable.SelectUserRoomKey(ctx, txn, userNID, roomNID)
-		if sErr != nil {
+		if !errors.Is(sErr, sql.ErrNoRows) {
 			return sErr
 		}
 		return nil

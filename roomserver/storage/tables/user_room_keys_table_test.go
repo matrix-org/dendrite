@@ -45,18 +45,23 @@ func TestUserRoomKeysTable(t *testing.T) {
 		roomNID := types.RoomNID(1)
 		_, key, err := ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
-		err = tab.InsertUserRoomKey(context.Background(), nil, userNID, roomNID, key)
+		gotKey, err := tab.InsertUserRoomKey(context.Background(), nil, userNID, roomNID, key)
 		assert.NoError(t, err)
-		// again, this should result in an error now, due to the primary key on userNID/roomNID
-		err = tab.InsertUserRoomKey(context.Background(), nil, userNID, roomNID, key)
-		assert.Error(t, err)
+		assert.Equal(t, gotKey, key)
 
-		gotKey, err := tab.SelectUserRoomKey(context.Background(), nil, userNID, roomNID)
+		// again, this shouldn't result in an error, but return the existing key
+		_, key2, err := ed25519.GenerateKey(nil)
+		gotKey, err = tab.InsertUserRoomKey(context.Background(), nil, userNID, roomNID, key2)
+		assert.NoError(t, err)
+		assert.Equal(t, gotKey, key)
+
+		gotKey, err = tab.SelectUserRoomKey(context.Background(), nil, userNID, roomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
 
 		// Key doesn't exist
-		_, err = tab.SelectUserRoomKey(context.Background(), nil, userNID, 2)
-		assert.Error(t, err)
+		gotKey, err = tab.SelectUserRoomKey(context.Background(), nil, userNID, 2)
+		assert.NoError(t, err)
+		assert.Nil(t, gotKey)
 	})
 }

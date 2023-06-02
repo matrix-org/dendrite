@@ -18,8 +18,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"database/sql"
+	"errors"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -34,7 +34,11 @@ CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (
 );
 `
 
-const insertUserRoomKeySQL = `INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key) VALUES ($1, $2, $3)`
+const insertUserRoomKeySQL = `
+	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key) VALUES ($1, $2, $3)
+	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_key = roomserver_user_room_keys.pseudo_id_key
+	RETURNING (pseudo_id_key)
+`
 const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
 type userRoomKeysStatements struct {
@@ -61,11 +65,10 @@ func (s *userRoomKeysStatements) InsertUserRoomKey(
 	userNID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 	key ed25519.PrivateKey,
-) error {
+) (result ed25519.PrivateKey, err error) {
 	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomKeyStmt)
-	defer internal.CloseAndLogIfError(ctx, stmt, "failed to close statement")
-	_, err := stmt.ExecContext(ctx, userNID, roomNID, key)
-	return err
+	err = stmt.QueryRowContext(ctx, userNID, roomNID, key).Scan(&result)
+	return result, err
 }
 
 func (s *userRoomKeysStatements) SelectUserRoomKey(
@@ -75,8 +78,10 @@ func (s *userRoomKeysStatements) SelectUserRoomKey(
 	roomNID types.RoomNID,
 ) (ed25519.PrivateKey, error) {
 	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomKeyStmt)
-	defer internal.CloseAndLogIfError(ctx, stmt, "failed to close statement")
 	var result ed25519.PrivateKey
 	err := stmt.QueryRowContext(ctx, userNID, roomNID).Scan(&result)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	return result, err
 }

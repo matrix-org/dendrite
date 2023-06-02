@@ -120,19 +120,23 @@ func TestUserRoomKeys(t *testing.T) {
 		_, key, err := ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
 
-		err = db.InsertUserRoomKey(ctx, userNID, roomNID, key)
+		gotKey, err := db.InsertUserRoomKey(ctx, userNID, roomNID, key)
 		assert.NoError(t, err)
+		assert.Equal(t, gotKey, key)
 
-		// again, this should result in an error now, due to the primary key on userNID/roomNID
-		err = db.InsertUserRoomKey(context.Background(), userNID, roomNID, key)
-		assert.Error(t, err)
+		// again, this shouldn't result in an error, but return the existing key
+		_, key2, err := ed25519.GenerateKey(nil)
+		gotKey, err = db.InsertUserRoomKey(context.Background(), userNID, roomNID, key2)
+		assert.NoError(t, err)
+		assert.Equal(t, gotKey, key)
 
-		gotKey, err := db.SelectUserRoomKey(context.Background(), userNID, roomNID)
+		gotKey, err = db.SelectUserRoomKey(context.Background(), userNID, roomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
 
-		// Key doesn't exist
-		_, err = db.SelectUserRoomKey(context.Background(), userNID, 2)
-		assert.Error(t, err)
+		// Key doesn't exist, we shouldn't get anything back
+		gotKey, err = db.SelectUserRoomKey(context.Background(), userNID, 2)
+		assert.NoError(t, err)
+		assert.Nil(t, gotKey)
 	})
 }
