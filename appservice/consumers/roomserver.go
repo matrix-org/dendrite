@@ -233,10 +233,16 @@ func (s *appserviceState) backoffAndPause(err error) error {
 //
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
+	user := ""
+	userID, err := event.UserID()
+	if err == nil {
+		user = userID.String()
+	}
+
 	switch {
 	case appservice.URL == "":
 		return false
-	case appservice.IsInterestedInUserID(event.SenderID()):
+	case appservice.IsInterestedInUserID(user):
 		return true
 	case appservice.IsInterestedInRoomID(event.RoomID()):
 		return true
