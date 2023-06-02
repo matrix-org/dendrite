@@ -682,7 +682,7 @@ func (rse *ruleSetEvalContext) UserDisplayName() string { return rse.mem.Display
 
 func (rse *ruleSetEvalContext) RoomMemberCount() (int, error) { return rse.roomSize, nil }
 
-func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, error) {
+func (rse *ruleSetEvalContext) HasPowerLevel(senderID, levelKey string) (bool, error) {
 	req := &rsapi.QueryLatestEventsAndStateRequest{
 		RoomID: rse.roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
@@ -702,7 +702,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 		if err != nil {
 			return false, err
 		}
-		return plc.UserLevel(userID) >= plc.NotificationLevel(levelKey), nil
+		return plc.UserLevel(senderID) >= plc.NotificationLevel(levelKey), nil
 	}
 	return true, nil
 }
