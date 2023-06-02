@@ -181,10 +181,25 @@ func SetLocalAlias(
 		return *resErr
 	}
 
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "UserID for device is invalid"},
+		}
+	}
+
+	deviceSenderID, err := rsAPI.QuerySenderIDForRoom(req.Context(), alias, *userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "Could not find SenderID for this device"},
+		}
+	}
 	queryReq := roomserverAPI.SetRoomAliasRequest{
-		UserID: device.UserID,
-		RoomID: r.RoomID,
-		Alias:  alias,
+		SenderID: deviceSenderID,
+		RoomID:   r.RoomID,
+		Alias:    alias,
 	}
 	var queryRes roomserverAPI.SetRoomAliasResponse
 	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
@@ -215,9 +230,25 @@ func RemoveLocalAlias(
 	alias string,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "UserID for device is invalid"},
+		}
+	}
+
+	deviceSenderID, err := rsAPI.QuerySenderIDForRoom(req.Context(), alias, *userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "Could not find SenderID for this device"},
+		}
+	}
+
 	queryReq := roomserverAPI.RemoveRoomAliasRequest{
-		Alias:  alias,
-		UserID: device.UserID,
+		Alias:    alias,
+		SenderID: deviceSenderID,
 	}
 	var queryRes roomserverAPI.RemoveRoomAliasResponse
 	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {

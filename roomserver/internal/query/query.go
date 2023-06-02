@@ -1034,3 +1034,8 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	}
 	return nil
 }
+
+func (r *Queryer) QuerySenderIDForRoom(ctx context.Context, roomAliasOrID string, userID spec.UserID) (string, error) {
+	// TODO: implement this properly with pseudoIDs
+	return userID.String(), nil
+}
