@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -41,6 +42,7 @@ type Database struct {
 	MembershipTable    tables.Membership
 	PublishedTable     tables.Published
 	Purge              tables.Purge
+	UserRoomKeyTable   tables.UserRoomKeys
 	GetRoomUpdaterFn   func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
@@ -1587,6 +1589,29 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 		}
 		return nil
 	})
+}
+
+// InsertUserRoomKey inserts a new user room key for the given user and room.
+// Returns an error if a database error occurred, also if the primary constraint was violated.
+func (d *Database) InsertUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.UserRoomKeyTable.InsertUserRoomKey(ctx, txn, userNID, roomNID, key)
+	})
+}
+
+// SelectUserRoomKey queries the user room key for a given user.
+// Returns the key and an error.
+// TODO: should we handle absent keys (sql.ErrNoRows) as non-fatal?
+func (d *Database) SelectUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		var sErr error
+		key, sErr = d.UserRoomKeyTable.SelectUserRoomKey(ctx, txn, userNID, roomNID)
+		if sErr != nil {
+			return sErr
+		}
+		return nil
+	})
+	return
 }
 
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops

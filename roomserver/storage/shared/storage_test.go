@@ -2,10 +2,12 @@ package shared_test
 
 import (
 	"context"
+	"crypto/ed25519"
 	"testing"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -28,23 +30,32 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 
 	var membershipTable tables.Membership
 	var stateKeyTable tables.EventStateKeys
+	var userRoomKeys tables.UserRoomKeys
 	switch dbType {
 	case test.DBTypePostgres:
 		err = postgres.CreateEventStateKeysTable(db)
 		assert.NoError(t, err)
 		err = postgres.CreateMembershipTable(db)
 		assert.NoError(t, err)
+		err = postgres.CreateUserRoomKeysTable(db)
+		assert.NoError(t, err)
 		membershipTable, err = postgres.PrepareMembershipTable(db)
 		assert.NoError(t, err)
 		stateKeyTable, err = postgres.PrepareEventStateKeysTable(db)
+		assert.NoError(t, err)
+		userRoomKeys, err = postgres.PrepareUserRoomKeysTable(db)
 	case test.DBTypeSQLite:
 		err = sqlite3.CreateEventStateKeysTable(db)
 		assert.NoError(t, err)
 		err = sqlite3.CreateMembershipTable(db)
 		assert.NoError(t, err)
+		err = sqlite3.CreateUserRoomKeysTable(db)
+		assert.NoError(t, err)
 		membershipTable, err = sqlite3.PrepareMembershipTable(db)
 		assert.NoError(t, err)
 		stateKeyTable, err = sqlite3.PrepareEventStateKeysTable(db)
+		assert.NoError(t, err)
+		userRoomKeys, err = sqlite3.PrepareUserRoomKeysTable(db)
 	}
 	assert.NoError(t, err)
 
@@ -53,11 +64,12 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache}
 
 	return &shared.Database{
-			DB:              db,
-			EventDatabase:   evDb,
-			MembershipTable: membershipTable,
-			Writer:          sqlutil.NewExclusiveWriter(),
-			Cache:           cache,
+			DB:               db,
+			EventDatabase:    evDb,
+			MembershipTable:  membershipTable,
+			UserRoomKeyTable: userRoomKeys,
+			Writer:           sqlutil.NewExclusiveWriter(),
+			Cache:            cache,
 		}, func() {
 			clearDB()
 			err = db.Close()
@@ -95,5 +107,32 @@ func Test_GetLeftUsers(t *testing.T) {
 		leftUsers, err := db.GetLeftUsers(context.Background(), []string{alice.ID, bob.ID, charlie.ID})
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, expectedUserIDs, leftUsers)
+	})
+}
+
+func TestUserRoomKeys(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateRoomserverDatabase(t, dbType)
+		defer close()
+		userNID := types.EventStateKeyNID(1)
+		roomNID := types.RoomNID(1)
+		_, key, err := ed25519.GenerateKey(nil)
+		assert.NoError(t, err)
+
+		err = db.InsertUserRoomKey(ctx, userNID, roomNID, key)
+		assert.NoError(t, err)
+
+		// again, this should result in an error now, due to the primary key on userNID/roomNID
+		err = db.InsertUserRoomKey(context.Background(), userNID, roomNID, key)
+		assert.Error(t, err)
+
+		gotKey, err := db.SelectUserRoomKey(context.Background(), userNID, roomNID)
+		assert.NoError(t, err)
+		assert.Equal(t, key, gotKey)
+
+		// Key doesn't exist
+		_, err = db.SelectUserRoomKey(context.Background(), userNID, 2)
+		assert.Error(t, err)
 	})
 }

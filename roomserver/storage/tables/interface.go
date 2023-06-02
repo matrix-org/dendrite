@@ -2,6 +2,7 @@ package tables
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"errors"
 
@@ -182,6 +183,11 @@ type Purge interface {
 	PurgeRoom(
 		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, roomID string,
 	) error
+}
+
+type UserRoomKeys interface {
+	InsertUserRoomKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) error
+	SelectUserRoomKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID) (ed25519.PrivateKey, error)
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

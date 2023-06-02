@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -188,6 +189,9 @@ type Database interface {
 	MaybeRedactEvent(
 		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
+
+	InsertUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) error
+	SelectUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error)
 }
 
 type RoomDatabase interface {
