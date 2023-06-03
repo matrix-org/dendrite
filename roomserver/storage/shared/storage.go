@@ -989,13 +989,13 @@ func (d *EventDatabase) MaybeRedactEvent(
 		}
 
 		sender1Domain := ""
-		sender1, err := redactedEvent.UserID()
-		if err == nil {
+		sender1, err1 := redactedEvent.UserID()
+		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
 		sender2Domain := ""
-		sender2, err := redactionEvent.UserID()
-		if err == nil {
+		sender2, err2 := redactionEvent.UserID()
+		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
 		var powerlevels *gomatrixserverlib.PowerLevelContent

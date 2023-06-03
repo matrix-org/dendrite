@@ -224,7 +224,7 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 	return out
 }
 
-func (d *Database) getSenderIDForUser(roomID string, userID spec.UserID) (string, error) {
+func (d *Database) getSenderIDForUser(roomID string, userID spec.UserID) (string, error) { // nolint
 	// TODO: Repalce with actual logic for pseudoIDs
 	return userID.String(), nil
 }

@@ -463,10 +463,10 @@ type MembershipQuerier struct {
 	Roomserver FederationRoomserverAPI
 }
 
-func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error) {
+func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID string) (string, error) {
 	req := QueryMembershipForUserRequest{
 		RoomID: roomID.String(),
-		UserID: userID.String(),
+		UserID: senderID,
 	}
 	res := QueryMembershipForUserResponse{}
 	err := mq.Roomserver.QueryMembershipForUser(ctx, &req, &res)
