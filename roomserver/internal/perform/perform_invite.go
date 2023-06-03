@@ -97,11 +97,12 @@ func (r *Inviter) ProcessInviteMembership(
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
 	var updater *shared.MembershipUpdater
-	_, domain, err := gomatrixserverlib.SplitID('@', *inviteEvent.StateKey())
+
+	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey())
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
 	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
