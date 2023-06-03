@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -23,6 +24,86 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
+
+func AdminCreateNewToken(req *http.Request) util.JSONResponse {
+	request := struct {
+		Token       string `json:"token"`
+		UsesAllowed int32  `json:"uses_allowed"`
+		ExpiryTime  int64  `json:"expiry_time"`
+		Length      int32  `json:"length"`
+	}{}
+
+	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("Failed to decode request body: " + err.Error()),
+		}
+	}
+	token := request.Token
+	if len(token) > 0 {
+		if len(token) > 64 {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"token must not be empty and must not be longer than 64")
+		}
+		is_token_valid, _ := regexp.MatchString("^[[:ascii:][:digit:]_]*$", token)
+		if !is_token_valid {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"token must consist only of characters matched by the regex [A-Za-z0-9-_]")
+		}
+	} else {
+		length := request.Length
+		if length > 0 && length <= 64 {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"length must be greater than zero and not greater than 64")
+		}
+		// TODO: Generate Random Token
+		// token = GenerateRandomToken(length)
+	}
+	uses_allowed := request.UsesAllowed
+	if uses_allowed < 0 {
+		return util.MatrixErrorResponse(
+			http.StatusBadRequest,
+			string(spec.ErrorInvalidParam),
+			"uses_allowed must be a non-negative integer or null")
+	}
+
+	expiry_time := request.ExpiryTime
+	if expiry_time != 0 && expiry_time < time.Now().UnixNano()/int64(time.Millisecond) {
+		return util.MatrixErrorResponse(
+			http.StatusBadRequest,
+			string(spec.ErrorInvalidParam),
+			"expiry_time must not be in the past")
+	}
+	created := CreateToken(token, uses_allowed, expiry_time)
+	if !created {
+		return util.MatrixErrorResponse(
+			http.StatusBadRequest,
+			string(spec.ErrorInvalidParam),
+			fmt.Sprintf("Token alreaady exists: %s", token))
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{
+			"token":        token,
+			"uses_allowed": uses_allowed,
+			"pending":      0,
+			"completed":    0,
+			"expiry_time":  expiry_time,
+		},
+	}
+}
+
+func CreateToken(token string, uses_allowed int32, expiryTime int64) bool {
+	// TODO: Implement Create Token -> Inserts token into table registration_tokens.
+	// Returns true if token created, false if token already exists.
+	return true
+}
 
 func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
