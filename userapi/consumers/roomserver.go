@@ -615,7 +615,12 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
-	if event.SenderID() == mem.UserID {
+	user := ""
+	userID, err := event.UserID()
+	if err == nil {
+		user = userID.String()
+	}
+	if user == mem.UserID {
 		// SPEC: Homeservers MUST NOT notify the Push Gateway for
 		// events that the user has sent themselves.
 		return nil, nil
@@ -767,7 +772,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				ID:       event.EventID(),
 				RoomID:   event.RoomID(),
 				RoomName: roomName,
-				Sender:   event.SenderID(),
+				Sender:   event.SenderID(), // TODO: Should push use UserIDs?
 				Type:     event.Type(),
 			},
 		}
