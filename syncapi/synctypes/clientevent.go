@@ -57,9 +57,14 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat)
 
 // ToClientEvent converts a single server event to a client event.
 func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat) ClientEvent {
+	user := ""
+	userID, err := se.UserID()
+	if err == nil {
+		user = userID.String()
+	}
 	ce := ClientEvent{
 		Content:        spec.RawJSON(se.Content()),
-		Sender:         se.SenderID(),
+		Sender:         user,
 		Type:           se.Type(),
 		StateKey:       se.StateKey(),
 		Unsigned:       spec.RawJSON(se.Unsigned()),
