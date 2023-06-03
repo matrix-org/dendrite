@@ -988,8 +988,16 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return nil
 		}
 
-		_, sender1, _ := gomatrixserverlib.SplitID('@', redactedEvent.SenderID())
-		_, sender2, _ := gomatrixserverlib.SplitID('@', redactionEvent.SenderID())
+		sender1Domain := ""
+		sender1, err := redactedEvent.UserID()
+		if err == nil {
+			sender1Domain = string(sender1.Domain())
+		}
+		sender2Domain := ""
+		sender2, err := redactionEvent.UserID()
+		if err == nil {
+			sender2Domain = string(sender2.Domain())
+		}
 		var powerlevels *gomatrixserverlib.PowerLevelContent
 		powerlevels, err = plResolver.Resolve(ctx, redactionEvent.EventID())
 		if err != nil {
@@ -999,7 +1007,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 		switch {
 		case powerlevels.UserLevel(redactionEvent.SenderID()) >= powerlevels.Redact:
 			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
-		case sender1 == sender2:
+		case sender1Domain == sender2Domain:
 			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
 		default:
 			ignoreRedaction = true
