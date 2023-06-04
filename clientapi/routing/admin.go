@@ -85,7 +85,9 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 			string(spec.ErrorInvalidParam),
 			"expiry_time must not be in the past")
 	}
-	created, err := rsAPI.PerformCreateToken(req.Context(), token, usesAllowed, expiryTime)
+	pending := 0
+	completed := 0
+	created, err := rsAPI.PerformAdminCreateRegistrationToken(req.Context(), token, usesAllowed, int32(pending), int32(completed), expiryTime)
 	if err != nil {
 		return util.MatrixErrorResponse(
 			http.StatusInternalServerError,
@@ -104,8 +106,8 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 		JSON: map[string]interface{}{
 			"token":        token,
 			"uses_allowed": usesAllowed,
-			"pending":      0,
-			"completed":    0,
+			"pending":      pending,
+			"completed":    completed,
 			"expiry_time":  expiryTime,
 		},
 	}
