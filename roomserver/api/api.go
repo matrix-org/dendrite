@@ -173,6 +173,7 @@ type ClientRoomserverAPI interface {
 	PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *PerformCreateRoomRequest) (string, *util.JSONResponse)
 	// PerformRoomUpgrade upgrades a room to a newer version
 	PerformRoomUpgrade(ctx context.Context, roomID, userID string, roomVersion gomatrixserverlib.RoomVersion) (newRoomID string, err error)
+	PerformAdminCreateRegistrationToken(ctx context.Context, token string, usesAllowed, pending, completed int32, expiryTime int64) (bool, error)
 	PerformAdminEvacuateRoom(ctx context.Context, roomID string) (affected []string, err error)
 	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformAdminPurgeRoom(ctx context.Context, roomID string) error

@@ -42,6 +42,15 @@ type Admin struct {
 	Leaver  *Leaver
 }
 
+func (r *Admin) PerformAdminCreateRegistrationToken(
+	ctx context.Context, token string,
+	usesAllowed, pending, completed int32,
+	expiryTime int64) (bool, error) {
+	//TODO: Implement logic to save token in DB.
+	//Return false, if token already exists, else true.
+	return true, nil
+}
+
 // PerformAdminEvacuateRoom will remove all local users from the given room.
 func (r *Admin) PerformAdminEvacuateRoom(
 	ctx context.Context,

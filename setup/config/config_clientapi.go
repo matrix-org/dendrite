@@ -105,10 +105,6 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 			)
 		}
 	}
-
-	if c.RegistrationDisabled && c.RegistrationRequiresToken {
-		configErrs.Add("registration_requires_token cannot be set to true when registration_disabled is true")
-	}
 }
 
 type TURN struct {
