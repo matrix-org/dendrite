@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 )
 
 const registrationTokensSchema = `
@@ -22,6 +21,5 @@ func CreateRegistrationTokensTable(db *sql.DB) error {
 }
 
 func RegistrationTokenExists(ctx context.Context, tx *sql.Tx, token string) (bool, error) {
-	fmt.Println("here!!")
 	return true, nil
 }

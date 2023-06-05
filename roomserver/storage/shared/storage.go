@@ -31,31 +31,31 @@ const redactionsArePermanent = true
 type Database struct {
 	DB *sql.DB
 	EventDatabase
-	Cache              caching.RoomServerCaches
-	Writer             sqlutil.Writer
-	RoomsTable         tables.Rooms
-	StateSnapshotTable tables.StateSnapshot
-	StateBlockTable    tables.StateBlock
-	RoomAliasesTable   tables.RoomAliases
-	InvitesTable       tables.Invites
-	MembershipTable    tables.Membership
-	PublishedTable     tables.Published
-	Purge              tables.Purge
-	GetRoomUpdaterFn   func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
+	Cache                   caching.RoomServerCaches
+	Writer                  sqlutil.Writer
+	RoomsTable              tables.Rooms
+	StateSnapshotTable      tables.StateSnapshot
+	StateBlockTable         tables.StateBlock
+	RoomAliasesTable        tables.RoomAliases
+	InvitesTable            tables.Invites
+	MembershipTable         tables.Membership
+	PublishedTable          tables.Published
+	Purge                   tables.Purge
+	GetRoomUpdaterFn        func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
+	RegistrationTokensTable tables.RegistrationTokens
 }
 
 // EventDatabase contains all tables needed to work with events
 type EventDatabase struct {
-	DB                      *sql.DB
-	Cache                   caching.RoomServerCaches
-	Writer                  sqlutil.Writer
-	EventsTable             tables.Events
-	EventJSONTable          tables.EventJSON
-	EventTypesTable         tables.EventTypes
-	EventStateKeysTable     tables.EventStateKeys
-	PrevEventsTable         tables.PreviousEvents
-	RedactionsTable         tables.Redactions
-	RegistrationTokensTable tables.RegistrationTokens
+	DB                  *sql.DB
+	Cache               caching.RoomServerCaches
+	Writer              sqlutil.Writer
+	EventsTable         tables.Events
+	EventJSONTable      tables.EventJSON
+	EventTypesTable     tables.EventTypes
+	EventStateKeysTable tables.EventStateKeys
+	PrevEventsTable     tables.PreviousEvents
+	RedactionsTable     tables.Redactions
 }
 
 func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (bool, error) {
