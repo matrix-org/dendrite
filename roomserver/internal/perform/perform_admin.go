@@ -46,8 +46,14 @@ func (r *Admin) PerformAdminCreateRegistrationToken(
 	ctx context.Context, token string,
 	usesAllowed, pending, completed int32,
 	expiryTime int64) (bool, error) {
-	//TODO: Implement logic to save token in DB.
-	//Return false, if token already exists, else true.
+	exists, err := r.DB.RegistrationTokenExists(ctx, token)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		fmt.Println(fmt.Sprintf("token: %s already exists", token))
+		return false, fmt.Errorf("token: %s already exists", token)
+	}
 	return true, nil
 }
 

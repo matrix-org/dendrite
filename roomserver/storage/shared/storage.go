@@ -46,15 +46,20 @@ type Database struct {
 
 // EventDatabase contains all tables needed to work with events
 type EventDatabase struct {
-	DB                  *sql.DB
-	Cache               caching.RoomServerCaches
-	Writer              sqlutil.Writer
-	EventsTable         tables.Events
-	EventJSONTable      tables.EventJSON
-	EventTypesTable     tables.EventTypes
-	EventStateKeysTable tables.EventStateKeys
-	PrevEventsTable     tables.PreviousEvents
-	RedactionsTable     tables.Redactions
+	DB                      *sql.DB
+	Cache                   caching.RoomServerCaches
+	Writer                  sqlutil.Writer
+	EventsTable             tables.Events
+	EventJSONTable          tables.EventJSON
+	EventTypesTable         tables.EventTypes
+	EventStateKeysTable     tables.EventStateKeys
+	PrevEventsTable         tables.PreviousEvents
+	RedactionsTable         tables.Redactions
+	RegistrationTokensTable tables.RegistrationTokens
+}
+
+func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (bool, error) {
+	return d.RegistrationTokensTable.RegistrationTokenExists(ctx, nil, token)
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {

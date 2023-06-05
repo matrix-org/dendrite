@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -24,6 +26,17 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
+
+func generateRandomToken(length int) string {
+	allowedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+	rand.Seed(time.Now().UnixNano())
+	var sb strings.Builder
+	for i := 0; i < length; i++ {
+		randomIndex := rand.Intn(len(allowedChars))
+		sb.WriteByte(allowedChars[randomIndex])
+	}
+	return sb.String()
+}
 
 func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	if !cfg.RegistrationRequiresToken {
@@ -47,13 +60,31 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 			"Failed to decode request body:",
 		)
 	}
+
 	token := request.Token
-	if len(token) == 0 || len(token) > 64 {
+	usesAllowed := request.UsesAllowed
+	expiryTime := request.ExpiryTime
+	length := request.Length
+
+	if len(token) == 0 {
+		// Token not present in request body. Hence, generate a random token.
+		if !(length > 0 && length <= 64) {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"length must be greater than zero and not greater than 64")
+		}
+		token = generateRandomToken(int(length))
+	}
+
+	if len(token) > 64 {
+		//Token present in request body, but is too long.
 		return util.MatrixErrorResponse(
 			http.StatusBadRequest,
 			string(spec.ErrorInvalidParam),
-			"token must not be empty and must not be longer than 64")
+			"token must not be longer than 64")
 	}
+
 	isTokenValid, _ := regexp.MatchString("^[[:ascii:][:digit:]_]*$", token)
 	if !isTokenValid {
 		return util.MatrixErrorResponse(
@@ -61,16 +92,8 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 			string(spec.ErrorInvalidParam),
 			"token must consist only of characters matched by the regex [A-Za-z0-9-_]")
 	}
-	length := request.Length
-	if !(length > 0 && length <= 64) {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorInvalidParam),
-			"length must be greater than zero and not greater than 64")
-	}
-	// TODO: Generate Random Token
-	// token = GenerateRandomToken(length)
-	usesAllowed := request.UsesAllowed
+	// At this point, we have a valid token, either through request body or through random generation.
+
 	if usesAllowed < 0 {
 		return util.MatrixErrorResponse(
 			http.StatusBadRequest,
@@ -78,7 +101,6 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 			"uses_allowed must be a non-negative integer or null")
 	}
 
-	expiryTime := request.ExpiryTime
 	if expiryTime != 0 && expiryTime < time.Now().UnixNano()/int64(time.Millisecond) {
 		return util.MatrixErrorResponse(
 			http.StatusBadRequest,
