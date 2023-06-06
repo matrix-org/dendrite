@@ -197,7 +197,9 @@ func (r *Inputer) processRoomEvent(
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
+		// Only perform this check if the sender mxid_mapping can be resolved.
+		// Don't fail processing the event if we have no mxid_maping.
+		if sender != nil && senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
 			delete(servers, senderDomain)
 		}
