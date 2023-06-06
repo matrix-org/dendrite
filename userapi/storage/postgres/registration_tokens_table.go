@@ -58,9 +58,23 @@ func (s *registrationTokenStatements) InsertRegistrationToken(ctx context.Contex
 	stmt := sqlutil.TxStmt(tx, s.insertTokenStatment)
 	pending := 0
 	completed := 0
-	_, err := stmt.ExecContext(ctx, token, nil, expiryTime, pending, completed)
+	_, err := stmt.ExecContext(ctx, token, nullIfZeroInt32(usesAllowed), nullIfZero(expiryTime), pending, completed)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func nullIfZero(value int64) interface{} {
+	if value == 0 {
+		return nil
+	}
+	return value
+}
+
+func nullIfZeroInt32(value int32) interface{} {
+	if value == 0 {
+		return nil
+	}
+	return value
 }

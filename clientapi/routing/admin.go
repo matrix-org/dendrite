@@ -28,17 +28,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-func generateRandomToken(length int) string {
-	allowedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-	rand.Seed(time.Now().UnixNano())
-	var sb strings.Builder
-	for i := 0; i < length; i++ {
-		randomIndex := rand.Intn(len(allowedChars))
-		sb.WriteByte(allowedChars[randomIndex])
-	}
-	return sb.String()
-}
-
 func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	if !cfg.RegistrationRequiresToken {
 		return util.MatrixErrorResponse(
@@ -133,12 +122,37 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 		Code: 200,
 		JSON: map[string]interface{}{
 			"token":        token,
-			"uses_allowed": usesAllowed,
+			"uses_allowed": getReturnValueForUsesAllowed(usesAllowed),
 			"pending":      pending,
 			"completed":    completed,
-			"expiry_time":  expiryTime,
+			"expiry_time":  getReturnValueExpiryTime(expiryTime),
 		},
 	}
+}
+
+func generateRandomToken(length int) string {
+	allowedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+	rand.Seed(time.Now().UnixNano())
+	var sb strings.Builder
+	for i := 0; i < length; i++ {
+		randomIndex := rand.Intn(len(allowedChars))
+		sb.WriteByte(allowedChars[randomIndex])
+	}
+	return sb.String()
+}
+
+func getReturnValueForUsesAllowed(usesAllowed int32) interface{} {
+	if usesAllowed == 0 {
+		return nil
+	}
+	return usesAllowed
+}
+
+func getReturnValueExpiryTime(expiryTime int64) interface{} {
+	if expiryTime == 0 {
+		return nil
+	}
+	return expiryTime
 }
 
 func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
