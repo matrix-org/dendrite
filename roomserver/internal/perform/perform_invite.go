@@ -126,7 +126,7 @@ func (r *Inviter) PerformInvite(
 ) error {
 	event := req.Event
 
-	sender, err := event.UserID()
+	sender, err := r.DB.GetUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return spec.InvalidParam("The sender user ID is invalid")
 	}
@@ -156,6 +156,9 @@ func (r *Inviter) PerformInvite(
 		StrippedState:     req.InviteRoomState,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB},
+		UserIDQuerier: func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		},
 	}
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
 	if err != nil {

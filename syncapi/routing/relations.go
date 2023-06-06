@@ -116,7 +116,9 @@ func Relations(
 	for _, event := range filteredEvents {
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+			}),
 		)
 	}
 

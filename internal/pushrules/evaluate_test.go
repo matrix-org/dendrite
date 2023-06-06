@@ -5,7 +5,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+func UserIDForSender(roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
 
 func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 	ev := mustEventFromJSON(t, `{}`)
@@ -45,7 +50,7 @@ func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			rse := NewRuleSetEvaluator(fakeEvaluationContext{3}, &tst.RuleSet)
-			got, err := rse.MatchEvent(tst.Event)
+			got, err := rse.MatchEvent(tst.Event, UserIDForSender)
 			if err != nil {
 				t.Fatalf("MatchEvent failed: %v", err)
 			}
@@ -90,7 +95,7 @@ func TestRuleMatches(t *testing.T) {
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
-			got, err := ruleMatches(&tst.Rule, tst.Kind, mustEventFromJSON(t, tst.EventJSON), nil)
+			got, err := ruleMatches(&tst.Rule, tst.Kind, mustEventFromJSON(t, tst.EventJSON), nil, UserIDForSender)
 			if err != nil {
 				t.Fatalf("ruleMatches failed: %v", err)
 			}

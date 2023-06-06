@@ -525,6 +525,10 @@ type testRoomserverAPI struct {
 	events            map[string]*types.HeaderedEvent
 }
 
+func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
+
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
 	for _, eventID := range req.EventIDs {
 		ev := r.events[eventID]

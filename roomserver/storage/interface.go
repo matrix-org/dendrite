@@ -166,6 +166,10 @@ type Database interface {
 	GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName spec.ServerName) (bool, error)
 	// GetKnownUsers searches all users that userID knows about.
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
+	// GetKnownUsers tries to obtain the current mxid for a given user.
+	GetUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error)
+	// GetKnownUsers tries to obtain the current senderID for a given user.
+	GetSenderIDForUser(ctx context.Context, roomAliasOrID string, userID spec.UserID) (string, error)
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
@@ -211,6 +215,7 @@ type RoomDatabase interface {
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
+	GetUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error)
 }
 
 type EventDatabase interface {

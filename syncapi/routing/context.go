@@ -193,14 +193,20 @@ func Context(
 		}
 	}
 
-	eventsBeforeClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBeforeFiltered), synctypes.FormatAll)
-	eventsAfterClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfterFiltered), synctypes.FormatAll)
+	eventsBeforeClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBeforeFiltered), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	})
+	eventsAfterClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfterFiltered), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	})
 
 	newState := state
 	if filter.LazyLoadMembers {
 		allEvents := append(eventsBeforeFiltered, eventsAfterFiltered...)
 		allEvents = append(allEvents, &requestedEvent)
-		evs := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(allEvents), synctypes.FormatAll)
+		evs := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(allEvents), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		})
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
 			logrus.WithError(err).Error("unable to load membership events")
@@ -211,12 +217,16 @@ func Context(
 		}
 	}
 
-	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll)
+	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	})
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,
 		EventsBefore: eventsBeforeClient,
-		State:        synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(newState), synctypes.FormatAll),
+		State: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(newState), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		}),
 	}
 
 	if len(response.State) > filter.Limit {

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -44,13 +45,19 @@ func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 	return &types.HeaderedEvent{PDU: ev}
 }
 
+type FakeUserRoomserverAPI struct{ rsapi.UserRoomserverAPI }
+
+func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
+
 func Test_evaluatePushRules(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
-		consumer := OutputRoomEventConsumer{db: db}
+		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
 		testCases := []struct {
 			name         string

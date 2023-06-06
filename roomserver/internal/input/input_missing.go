@@ -473,14 +473,18 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 		stateEventList = append(stateEventList, state.StateEvents...)
 	}
 	resolvedStateEvents, err := gomatrixserverlib.ResolveConflicts(
-		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList),
+		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList), func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return t.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
 	// apply the current event
 retryAllowedState:
-	if err = checkAllowedByState(backwardsExtremity, resolvedStateEvents); err != nil {
+	if err = checkAllowedByState(backwardsExtremity, resolvedStateEvents, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return t.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+	}); err != nil {
 		switch missing := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
 			h, err2 := t.lookupEvent(ctx, roomVersion, backwardsExtremity.RoomID(), missing.AuthEventID, true)
@@ -565,7 +569,9 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	// will be added and duplicates will be removed.
 	missingEvents := make([]gomatrixserverlib.PDU, 0, len(missingResp.Events))
 	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
-		if err = gomatrixserverlib.VerifyEventSignatures(ctx, ev, t.keys); err != nil {
+		if err = gomatrixserverlib.VerifyEventSignatures(ctx, ev, t.keys, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return t.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		}); err != nil {
 			continue
 		}
 		missingEvents = append(missingEvents, t.cacheAndReturn(ev))
@@ -654,7 +660,9 @@ func (t *missingStateReq) lookupMissingStateViaState(
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(ctx, &fclient.RespState{
 		StateEvents: state.GetStateEvents(),
 		AuthEvents:  state.GetAuthEvents(),
-	}, roomVersion, t.keys, nil)
+	}, roomVersion, t.keys, nil, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return t.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -889,14 +897,16 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		t.log.WithField("missing_event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
-	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys); err != nil {
+	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return t.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+	}); err != nil {
 		t.log.WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
 	return t.cacheAndReturn(event), nil
 }
 
-func checkAllowedByState(e gomatrixserverlib.PDU, stateEvents []gomatrixserverlib.PDU) error {
+func checkAllowedByState(e gomatrixserverlib.PDU, stateEvents []gomatrixserverlib.PDU, userIDForSender spec.UserIDForSender) error {
 	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range stateEvents {
 		err := authUsingState.AddEvent(stateEvents[i])
@@ -904,7 +914,7 @@ func checkAllowedByState(e gomatrixserverlib.PDU, stateEvents []gomatrixserverli
 			return err
 		}
 	}
-	return gomatrixserverlib.Allowed(e, &authUsingState)
+	return gomatrixserverlib.Allowed(e, &authUsingState, userIDForSender)
 }
 
 func (t *missingStateReq) hadEvent(eventID string) {

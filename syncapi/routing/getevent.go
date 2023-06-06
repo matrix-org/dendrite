@@ -103,6 +103,8 @@ func GetEvent(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll),
+		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+		}),
 	}
 }

@@ -21,7 +21,12 @@ import (
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+func UserIDForSender(roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
 
 func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
@@ -43,7 +48,7 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
-	ce := ToClientEvent(ev, FormatAll)
+	ce := ToClientEvent(ev, FormatAll, UserIDForSender)
 	if ce.EventID != ev.EventID() {
 		t.Errorf("ClientEvent.EventID: wanted %s, got %s", ev.EventID(), ce.EventID)
 	}
@@ -63,7 +68,7 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 		t.Errorf("ClientEvent.Unsigned: wanted %s, got %s", string(ev.Unsigned()), string(ce.Unsigned))
 	}
 	user := ""
-	userID, err := ev.UserID()
+	userID, err := UserIDForSender("", ev.SenderID())
 	if err == nil {
 		user = userID.String()
 	}
@@ -103,7 +108,7 @@ func TestToClientFormatSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
-	ce := ToClientEvent(ev, FormatSync)
+	ce := ToClientEvent(ev, FormatSync, UserIDForSender)
 	if ce.RoomID != "" {
 		t.Errorf("ClientEvent.RoomID: wanted '', got %s", ce.RoomID)
 	}

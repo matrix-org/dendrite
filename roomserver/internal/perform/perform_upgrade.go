@@ -484,7 +484,9 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 
 		}
 
-		if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
+		if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return r.URSAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		}); err != nil {
 			return fmt.Errorf("Failed to auth new %q event: %w", builder.Type, err)
 		}
 
@@ -567,7 +569,9 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return r.URSAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	}); err != nil {
 		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", proto.Type, err)} // TODO: Is this error string comprehensible to the client?
 	}
 

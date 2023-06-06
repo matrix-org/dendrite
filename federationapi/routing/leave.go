@@ -223,7 +223,7 @@ func SendLeave(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	sender, err := event.UserID()
+	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), event.RoomID(), event.SenderID())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

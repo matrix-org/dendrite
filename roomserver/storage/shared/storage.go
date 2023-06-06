@@ -988,13 +988,15 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return nil
 		}
 
+		// TODO: Don't hack senderID into userID here (pseudoIDs)
 		sender1Domain := ""
-		sender1, err1 := redactedEvent.UserID()
+		sender1, err1 := spec.NewUserID(redactedEvent.SenderID(), true)
 		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
+		// TODO: Don't hack senderID into userID here (pseudoIDs)
 		sender2Domain := ""
-		sender2, err2 := redactionEvent.UserID()
+		sender2, err2 := spec.NewUserID(redactionEvent.SenderID(), true)
 		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
@@ -1520,6 +1522,16 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 		return nil, err
 	}
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
+}
+
+func (d *Database) GetUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	// TODO: Use real logic once DB for pseudoIDs is in place
+	return spec.NewUserID(senderID, true)
+}
+
+func (d *Database) GetSenderIDForUser(ctx context.Context, roomAliasOrID string, userID spec.UserID) (string, error) {
+	// TODO: Use real logic once DB for pseudoIDs is in place
+	return userID.String(), nil
 }
 
 // GetKnownRooms returns a list of all rooms we know about.

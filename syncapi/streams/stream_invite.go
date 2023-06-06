@@ -10,6 +10,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -17,6 +18,7 @@ import (
 
 type InviteStreamProvider struct {
 	DefaultStreamProvider
+	rsAPI api.SyncRoomserverAPI
 }
 
 func (p *InviteStreamProvider) Setup(
@@ -66,7 +68,9 @@ func (p *InviteStreamProvider) IncrementalSync(
 		if _, ok := req.IgnoredUsers.List[inviteEvent.SenderID()]; ok {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent)
+		ir := types.NewInviteResponse(inviteEvent, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return p.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		})
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 

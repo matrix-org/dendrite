@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -43,6 +44,7 @@ type StateResolutionStorage interface {
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error)
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
+	GetUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error)
 }
 
 type StateResolution struct {
@@ -945,7 +947,9 @@ func (v *StateResolution) resolveConflictsV1(
 	}
 
 	// Resolve the conflicts.
-	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents)
+	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return v.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+	})
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
@@ -1057,6 +1061,9 @@ func (v *StateResolution) resolveConflictsV2(
 			conflictedEvents,
 			nonConflictedEvents,
 			authEvents,
+			func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+				return v.db.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+			},
 		)
 	}()
 

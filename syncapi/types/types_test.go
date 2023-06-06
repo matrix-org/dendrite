@@ -8,7 +8,12 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+func UserIDForSender(roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
@@ -56,7 +61,7 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev})
+	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, UserIDForSender)
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)

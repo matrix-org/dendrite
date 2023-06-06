@@ -308,7 +308,9 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 
-		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
+		if err = gomatrixserverlib.Allowed(ev, &authEvents, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return c.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,

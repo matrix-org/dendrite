@@ -40,6 +40,10 @@ type syncRoomserverAPI struct {
 	rooms []*test.Room
 }
 
+func (s *syncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
+
 func (s *syncRoomserverAPI) QueryLatestEventsAndState(ctx context.Context, req *rsapi.QueryLatestEventsAndStateRequest, res *rsapi.QueryLatestEventsAndStateResponse) error {
 	var room *test.Room
 	for _, r := range s.rooms {

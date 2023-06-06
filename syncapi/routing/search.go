@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -38,7 +39,7 @@ import (
 )
 
 // nolint:gocyclo
-func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts fulltext.Indexer, from *string) util.JSONResponse {
+func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts fulltext.Indexer, from *string, rsAPI roomserverAPI.SyncRoomserverAPI) util.JSONResponse {
 	start := time.Now()
 	var (
 		searchReq SearchRequest
@@ -225,14 +226,20 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 		results = append(results, Result{
 			Context: SearchContextResponse{
-				Start:        startToken.String(),
-				End:          endToken.String(),
-				EventsAfter:  synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync),
-				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync),
-				ProfileInfo:  profileInfos,
+				Start: startToken.String(),
+				End:   endToken.String(),
+				EventsAfter: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+				}),
+				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+				}),
+				ProfileInfo: profileInfos,
 			},
-			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll),
+			Rank: eventScore[event.EventID()].Score,
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+			}),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
@@ -247,7 +254,9 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 					JSON: spec.InternalServerError{},
 				}
 			}
-			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync)
+			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+			})
 		}
 	}
 

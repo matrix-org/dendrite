@@ -331,7 +331,9 @@ func generateSendEvent(
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(e.PDU, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(e.PDU, &provider, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	}); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?

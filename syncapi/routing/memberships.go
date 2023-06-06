@@ -153,6 +153,8 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll)},
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+		})},
 	}
 }

@@ -70,6 +70,10 @@ type FakeRsAPI struct {
 	bannedFromRoom  bool
 }
 
+func (r *FakeRsAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
+
 func (r *FakeRsAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
 	roomID string,
@@ -636,6 +640,10 @@ type testRoomserverAPI struct {
 	queryStateAfterEvents     func(*rsAPI.QueryStateAfterEventsRequest) rsAPI.QueryStateAfterEventsResponse
 	queryEventsByID           func(req *rsAPI.QueryEventsByIDRequest) rsAPI.QueryEventsByIDResponse
 	queryLatestEventsAndState func(*rsAPI.QueryLatestEventsAndStateRequest) rsAPI.QueryLatestEventsAndStateResponse
+}
+
+func (t *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
 }
 
 func (t *testRoomserverAPI) InputRoomEvents(
