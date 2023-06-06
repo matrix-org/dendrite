@@ -1605,7 +1605,7 @@ func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userNID types.E
 }
 
 // InsertUserRoomPublicKey inserts a new user room key for the given user and room.
-// Returns the newly inserted public key or an public private key. If there is
+// Returns the newly inserted public key or an existing public key. If there is
 // an error talking to the database, returns that error.
 func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
