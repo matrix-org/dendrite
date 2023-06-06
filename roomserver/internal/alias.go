@@ -119,11 +119,6 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	_, virtualHost, err := r.Cfg.Global.SplitLocalID('@', request.SenderID)
-	if err != nil {
-		return err
-	}
-
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
@@ -133,6 +128,12 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		response.Removed = false
 		return nil
 	}
+
+	sender, err := r.QueryUserIDForSender(ctx, roomID, request.SenderID)
+	if err != nil {
+		return fmt.Errorf("r.QueryUserIDForSender: %w", err)
+	}
+	virtualHost := sender.Domain()
 
 	response.Found = true
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
