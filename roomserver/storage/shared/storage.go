@@ -1604,8 +1604,8 @@ func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userNID types.E
 	return result, err
 }
 
-// InsertUserRoomPrivateKey inserts a new user room key for the given user and room.
-// Returns the newly inserted private key or an existing private key. If there is
+// InsertUserRoomPublicKey inserts a new user room key for the given user and room.
+// Returns the newly inserted public key or an public private key. If there is
 // an error talking to the database, returns that error.
 func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -1645,9 +1645,9 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys []
 		for _, nid := range userNIDKeyMap {
 			nids = append(nids, nid)
 		}
-		nidMAP, seErr := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, txn, nids)
+		nidMAP, seErr := d.EventStateKeys(ctx, nids)
 		if seErr != nil {
-			return err
+			return seErr
 		}
 
 		for publicKey, userNID := range userNIDKeyMap {
