@@ -114,8 +114,7 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 	}
 	pending := 0
 	completed := 0
-	// If usesAllowed or expiryTime is 0, it means they are not present in the request. NULL (indicating
-	// unlimited uses / no expiration will be persisted in DB)
+	// If usesAllowed or expiryTime is 0, it means they are not present in the request. NULL (indicating unlimited uses / no expiration will be persisted in DB)
 	created, err := userAPI.PerformAdminCreateRegistrationToken(req.Context(), token, usesAllowed, expiryTime)
 	if err != nil {
 		return util.MatrixErrorResponse(
