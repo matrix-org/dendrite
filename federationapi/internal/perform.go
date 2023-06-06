@@ -521,11 +521,6 @@ func (r *FederationInternalAPI) SendInvite(
 	if err != nil {
 		return nil, err
 	}
-	// For portable accounts, we need to verify the inviter domain is still associated with this server.
-	// The userID of the inviter may have changed to another server in which case we cannot send the invite.
-	if !r.cfg.Matrix.IsLocalServerName(inviter.Domain()) {
-		return nil, fmt.Errorf("the invite must be from a local user")
-	}
 
 	if event.StateKey() == nil {
 		return nil, errors.New("invite must be a state event")
