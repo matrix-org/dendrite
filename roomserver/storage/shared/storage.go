@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -1595,10 +1596,25 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 // InsertUserRoomPrivateKey inserts a new user room key for the given user and room.
 // Returns the newly inserted private key or an existing private key. If there is
 // an error talking to the database, returns that error.
-func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return eventutil.ErrRoomNoExists{}
+		}
+
 		var iErr error
-		result, iErr = d.UserRoomKeyTable.InsertUserRoomPrivateKey(ctx, txn, userNID, roomNID, key)
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID, key)
 		return iErr
 	})
 	return result, err
@@ -1607,10 +1623,25 @@ func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userNID types.E
 // InsertUserRoomPublicKey inserts a new user room key for the given user and room.
 // Returns the newly inserted public key or an existing public key. If there is
 // an error talking to the database, returns that error.
-func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
+func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return eventutil.ErrRoomNoExists{}
+		}
+
 		var iErr error
-		result, iErr = d.UserRoomKeyTable.InsertUserRoomPublicKey(ctx, txn, userNID, roomNID, key)
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPublicKey(ctx, txn, stateKeyNID, roomInfo.RoomNID, key)
 		return iErr
 	})
 	return result, err
@@ -1619,10 +1650,24 @@ func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userNID types.Ev
 // SelectUserRoomPrivateKey queries the users room private key.
 // If no key exists, returns no key and no error. Otherwise returns
 // the key and a database error, if any.
-func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error) {
+func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var sErr error
-		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, userNID, roomNID)
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return nil
+		}
+
+		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
 		if !errors.Is(sErr, sql.ErrNoRows) {
 			return sErr
 		}
