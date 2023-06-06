@@ -253,6 +253,9 @@ func SendJoin(
 		PrivateKey:        cfg.Matrix.PrivateKey,
 		Verifier:          keys,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+		UserIDQuerier: func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomAliasOrID, senderID)
+		},
 	}
 	response, joinErr := gomatrixserverlib.HandleSendJoin(input)
 	switch e := joinErr.(type) {

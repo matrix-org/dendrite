@@ -95,6 +95,9 @@ func InviteV2(
 			StateQuerier:      rsAPI.StateQuerier(),
 			InviteEvent:       inviteReq.Event(),
 			StrippedState:     inviteReq.InviteRoomState(),
+			UserIDQuerier: func(roomAliasOrID, senderID string) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(httpReq.Context(), roomAliasOrID, senderID)
+			},
 		}
 		event, jsonErr := handleInvite(httpReq.Context(), input, rsAPI)
 		if jsonErr != nil {
