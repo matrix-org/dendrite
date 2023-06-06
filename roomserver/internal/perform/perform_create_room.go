@@ -352,9 +352,9 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// been taken.
 	if roomAlias != "" {
 		aliasReq := api.SetRoomAliasRequest{
-			Alias:    roomAlias,
-			RoomID:   roomID.String(),
-			SenderID: userID.String(),
+			Alias:  roomAlias,
+			RoomID: roomID.String(),
+			UserID: userID.String(),
 		}
 
 		var aliasResp api.SetRoomAliasResponse

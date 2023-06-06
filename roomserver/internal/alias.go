@@ -51,7 +51,7 @@ func (r *RoomserverInternalAPI) SetRoomAlias(
 	response.AliasExists = false
 
 	// Save the new alias
-	if err := r.DB.SetRoomAlias(ctx, request.Alias, request.RoomID, request.SenderID); err != nil {
+	if err := r.DB.SetRoomAlias(ctx, request.Alias, request.RoomID, request.UserID); err != nil {
 		return err
 	}
 

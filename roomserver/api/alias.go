@@ -19,7 +19,7 @@ import "regexp"
 // SetRoomAliasRequest is a request to SetRoomAlias
 type SetRoomAliasRequest struct {
 	// ID of the user setting the alias
-	SenderID string `json:"user_id"`
+	UserID string `json:"user_id"`
 	// New alias for the room
 	Alias string `json:"alias"`
 	// The room ID the alias is referring to

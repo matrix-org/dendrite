@@ -267,7 +267,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		aliasResp := &api.SetRoomAliasResponse{}
-		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", SenderID: alice.ID}, aliasResp); err != nil {
+		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", UserID: alice.ID}, aliasResp); err != nil {
 			t.Fatal(err)
 		}
 		// check the alias is actually there

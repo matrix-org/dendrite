@@ -182,7 +182,7 @@ func moveLocalAliases(ctx context.Context,
 			return fmt.Errorf("Failed to remove old room alias: %w", err)
 		}
 
-		setAliasReq := api.SetRoomAliasRequest{SenderID: userID, Alias: alias, RoomID: newRoomID}
+		setAliasReq := api.SetRoomAliasRequest{UserID: userID, Alias: alias, RoomID: newRoomID}
 		setAliasRes := api.SetRoomAliasResponse{}
 		if err = URSAPI.SetRoomAlias(ctx, &setAliasReq, &setAliasRes); err != nil {
 			return fmt.Errorf("Failed to set new room alias: %w", err)
