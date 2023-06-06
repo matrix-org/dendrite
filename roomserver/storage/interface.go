@@ -192,6 +192,7 @@ type Database interface {
 
 	InsertUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error)
 	SelectUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error)
+	SelectUserIDsForPublicKeys(ctx context.Context, publicKeys [][]byte) (map[string]string, error)
 }
 
 type RoomDatabase interface {

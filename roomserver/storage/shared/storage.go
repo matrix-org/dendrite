@@ -1619,6 +1619,35 @@ func (d *Database) SelectUserRoomKey(ctx context.Context, userNID types.EventSta
 	return
 }
 
+// SelectUserIDsForPublicKeys returns a map from senderKey -> userID
+func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys [][]byte) (result map[string]string, err error) {
+	result = make(map[string]string, len(publicKeys))
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		var sErr error
+		var userNIDKeyMap map[string]types.EventStateKeyNID
+		userNIDKeyMap, sErr = d.UserRoomKeyTable.BulkSelectUserNIDs(ctx, txn, publicKeys)
+		if sErr != nil {
+			return sErr
+		}
+		nids := make([]types.EventStateKeyNID, 0, len(userNIDKeyMap))
+		for _, nid := range userNIDKeyMap {
+			nids = append(nids, nid)
+		}
+		nidMAP, seErr := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, txn, nids)
+		if seErr != nil {
+			return err
+		}
+
+		for publicKey, userNID := range userNIDKeyMap {
+			userID := nidMAP[userNID]
+			result[publicKey] = userID
+		}
+
+		return nil
+	})
+	return result, err
+}
+
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops
 // it should live in this package!
 

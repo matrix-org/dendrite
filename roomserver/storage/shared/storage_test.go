@@ -115,9 +115,14 @@ func TestUserRoomKeys(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateRoomserverDatabase(t, dbType)
 		defer close()
-		userNID := types.EventStateKeyNID(1)
+
 		roomNID := types.RoomNID(1)
 		_, key, err := ed25519.GenerateKey(nil)
+		assert.NoError(t, err)
+
+		// insert dummy event state keys
+		dummy := test.NewUser(t)
+		userNID, err := db.GetOrCreateEventStateKeyNID(ctx, &dummy.ID)
 		assert.NoError(t, err)
 
 		gotKey, err := db.InsertUserRoomKey(ctx, userNID, roomNID, key)
@@ -139,5 +144,9 @@ func TestUserRoomKeys(t *testing.T) {
 		gotKey, err = db.SelectUserRoomKey(context.Background(), userNID, 2)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
+
+		userIDs, err := db.SelectUserIDsForPublicKeys(ctx, [][]byte{key.Public().(ed25519.PublicKey)})
+		assert.NoError(t, err)
+		assert.NotNil(t, userIDs)
 	})
 }
