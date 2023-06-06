@@ -68,13 +68,13 @@ func Test_evaluatePushRules(t *testing.T) {
 		}{
 			{
 				name:         "m.receipt doesn't notify",
-				eventContent: `{"type":"m.receipt","sender":"@test:remotehost"}`,
+				eventContent: `{"type":"m.receipt"}`,
 				wantAction:   pushrules.UnknownAction,
 				wantActions:  nil,
 			},
 			{
 				name:         "m.reaction doesn't notify",
-				eventContent: `{"type":"m.reaction","sender":"@test:remotehost"}`,
+				eventContent: `{"type":"m.reaction"}`,
 				wantAction:   pushrules.DontNotifyAction,
 				wantActions: []*pushrules.Action{
 					{
@@ -84,7 +84,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			},
 			{
 				name:         "m.room.message notifies",
-				eventContent: `{"type":"m.room.message","sender":"@test:remotehost"}`,
+				eventContent: `{"type":"m.room.message"}`,
 				wantNotify:   true,
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{
@@ -93,7 +93,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			},
 			{
 				name:         "m.room.message highlights",
-				eventContent: `{"type":"m.room.message", "content": {"body": "test"},"sender":"@test:remotehost" }`,
+				eventContent: `{"type":"m.room.message", "content": {"body": "test"}}`,
 				wantNotify:   true,
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{

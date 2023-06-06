@@ -620,9 +620,9 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
 	user := ""
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
-		user = userID.String()
+		user = sender.String()
 	}
 	if user == mem.UserID {
 		// SPEC: Homeservers MUST NOT notify the Push Gateway for
@@ -641,9 +641,8 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		if err != nil {
 			return nil, err
 		}
-		sender := event.SenderID()
-		if _, ok := ignored.List[sender]; ok {
-			return nil, fmt.Errorf("user %s is ignored", sender)
+		if _, ok := ignored.List[sender.String()]; ok {
+			return nil, fmt.Errorf("user %s is ignored", sender.String())
 		}
 	}
 	ruleSets, err := s.db.QueryPushRules(ctx, mem.Localpart, mem.Domain)
@@ -767,6 +766,11 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		}
 
 	default:
+		sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to get userID for sender %s", event.SenderID())
+			return nil, err
+		}
 		req = pushgateway.NotifyRequest{
 			Notification: pushgateway.Notification{
 				Content: event.Content(),
@@ -778,7 +782,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				ID:       event.EventID(),
 				RoomID:   event.RoomID(),
 				RoomName: roomName,
-				Sender:   event.SenderID(), // TODO: Should push use UserIDs?
+				Sender:   sender.String(),
 				Type:     event.Type(),
 			},
 		}
