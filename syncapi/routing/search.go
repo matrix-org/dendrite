@@ -205,11 +205,17 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 		profileInfos := make(map[string]ProfileInfoResponse)
 		for _, ev := range append(eventsBefore, eventsAfter...) {
-			profile, ok := knownUsersProfiles[event.SenderID()]
+			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
+			if err != nil {
+				logrus.WithError(err).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
+				continue
+			}
+
+			profile, ok := knownUsersProfiles[userID.String()]
 			if !ok {
 				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, ev.SenderID())
 				if err != nil {
-					logrus.WithError(err).WithField("user_id", event.SenderID()).Warn("failed to query userprofile")
+					logrus.WithError(err).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
 				}
 				if stateEvent == nil {
@@ -219,9 +225,9 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 					AvatarURL:   gjson.GetBytes(stateEvent.Content(), "avatar_url").Str,
 					DisplayName: gjson.GetBytes(stateEvent.Content(), "displayname").Str,
 				}
-				knownUsersProfiles[event.SenderID()] = profile
+				knownUsersProfiles[userID.String()] = profile
 			}
-			profileInfos[ev.SenderID()] = profile
+			profileInfos[userID.String()] = profile
 		}
 
 		results = append(results, Result{
