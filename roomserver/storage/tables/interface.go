@@ -19,10 +19,6 @@ type EventJSONPair struct {
 	EventJSON []byte
 }
 
-type RegistrationTokens interface {
-	RegistrationTokenExists(ctx context.Context, tx *sql.Tx, token string) (bool, error)
-}
-
 type EventJSON interface {
 	// Insert the event JSON. On conflict, replace the event JSON with the new value (for redactions).
 	InsertEventJSON(ctx context.Context, tx *sql.Tx, eventNID types.EventNID, eventJSON []byte) error

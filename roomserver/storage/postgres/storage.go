@@ -92,9 +92,6 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 }
 
 func (d *Database) create(db *sql.DB) error {
-	if err := CreateRegistrationTokensTable(db); err != nil {
-		return err
-	}
 	if err := CreateEventStateKeysTable(db); err != nil {
 		return err
 	}

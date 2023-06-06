@@ -27,7 +27,6 @@ import (
 )
 
 type Database interface {
-	RegistrationTokenExists(ctx context.Context, token string) (bool, error)
 	// Do we support processing input events for more than one room at a time?
 	SupportsConcurrentRoomInputs() bool
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.

@@ -63,6 +63,21 @@ type UserInternalAPI struct {
 	Updater     *DeviceListUpdater
 }
 
+func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (bool, error) {
+	exists, err := a.DB.RegistrationTokenExists(ctx, token)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		return false, fmt.Errorf("token: %s already exists", token)
+	}
+	_, err = a.DB.InsertRegistrationToken(ctx, token, usesAllowed, expiryTime)
+	if err != nil {
+		return false, fmt.Errorf("Error creating token: %s"+err.Error(), token)
+	}
+	return true, nil
+}
+
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {

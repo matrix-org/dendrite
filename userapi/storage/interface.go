@@ -30,6 +30,11 @@ import (
 	"github.com/matrix-org/dendrite/userapi/types"
 )
 
+type RegistrationTokens interface {
+	RegistrationTokenExists(ctx context.Context, token string) (bool, error)
+	InsertRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (bool, error)
+}
+
 type Profile interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) (*authtypes.Profile, error)
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
@@ -144,6 +149,7 @@ type UserDatabase interface {
 	Pusher
 	Statistics
 	ThreePID
+	RegistrationTokens
 }
 
 type KeyChangeDatabase interface {

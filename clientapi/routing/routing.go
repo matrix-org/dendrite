@@ -164,7 +164,7 @@ func Setup(
 	}
 	dendriteAdminRouter.Handle("/admin/registrationTokens/new",
 		httputil.MakeAdminAPI("admin_registration_tokens_new", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminCreateNewRegistrationToken(req, cfg, rsAPI)
+			return AdminCreateNewRegistrationToken(req, cfg, userAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

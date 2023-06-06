@@ -43,6 +43,7 @@ import (
 type Database struct {
 	DB                    *sql.DB
 	Writer                sqlutil.Writer
+	RegistrationTokens    tables.RegistrationTokensTable
 	Accounts              tables.AccountsTable
 	Profiles              tables.ProfileTable
 	AccountDatas          tables.AccountDataTable
@@ -77,6 +78,18 @@ const (
 	deviceIDByteLength   = 6
 	loginTokenByteLength = 32
 )
+
+func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (bool, error) {
+	return d.RegistrationTokens.RegistrationTokenExists(ctx, nil, token)
+}
+
+func (d *Database) InsertRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (created bool, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		created, err = d.RegistrationTokens.InsertRegistrationToken(ctx, txn, token, usesAllowed, expiryTime)
+		return err
+	})
+	return
+}
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.

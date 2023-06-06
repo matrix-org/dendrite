@@ -31,18 +31,17 @@ const redactionsArePermanent = true
 type Database struct {
 	DB *sql.DB
 	EventDatabase
-	Cache                   caching.RoomServerCaches
-	Writer                  sqlutil.Writer
-	RoomsTable              tables.Rooms
-	StateSnapshotTable      tables.StateSnapshot
-	StateBlockTable         tables.StateBlock
-	RoomAliasesTable        tables.RoomAliases
-	InvitesTable            tables.Invites
-	MembershipTable         tables.Membership
-	PublishedTable          tables.Published
-	Purge                   tables.Purge
-	GetRoomUpdaterFn        func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
-	RegistrationTokensTable tables.RegistrationTokens
+	Cache              caching.RoomServerCaches
+	Writer             sqlutil.Writer
+	RoomsTable         tables.Rooms
+	StateSnapshotTable tables.StateSnapshot
+	StateBlockTable    tables.StateBlock
+	RoomAliasesTable   tables.RoomAliases
+	InvitesTable       tables.Invites
+	MembershipTable    tables.Membership
+	PublishedTable     tables.Published
+	Purge              tables.Purge
+	GetRoomUpdaterFn   func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
 // EventDatabase contains all tables needed to work with events
@@ -56,10 +55,6 @@ type EventDatabase struct {
 	EventStateKeysTable tables.EventStateKeys
 	PrevEventsTable     tables.PreviousEvents
 	RedactionsTable     tables.Redactions
-}
-
-func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (bool, error) {
-	return d.RegistrationTokensTable.RegistrationTokenExists(ctx, nil, token)
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {

@@ -29,6 +29,11 @@ import (
 	"github.com/matrix-org/dendrite/userapi/types"
 )
 
+type RegistrationTokensTable interface {
+	RegistrationTokenExists(ctx context.Context, txn *sql.Tx, token string) (bool, error)
+	InsertRegistrationToken(ctx context.Context, txn *sql.Tx, token string, usesAllowed int32, expiryTime int64) (bool, error)
+}
+
 type AccountDataTable interface {
 	InsertAccountData(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, roomID, dataType string, content json.RawMessage) error
 	SelectAccountData(ctx context.Context, localpart string, serverName spec.ServerName) (map[string]json.RawMessage, map[string]map[string]json.RawMessage, error)

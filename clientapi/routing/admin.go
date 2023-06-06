@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 func generateRandomToken(length int) string {
@@ -38,7 +39,7 @@ func generateRandomToken(length int) string {
 	return sb.String()
 }
 
-func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	if !cfg.RegistrationRequiresToken {
 		return util.MatrixErrorResponse(
 			http.StatusForbidden,
@@ -67,7 +68,11 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 	length := request.Length
 
 	if len(token) == 0 {
-		// Token not present in request body. Hence, generate a random token.
+		if length == 0 {
+			// length not provided in request. Assign default value of 16.
+			length = 16
+		}
+		// token not present in request body. Hence, generate a random token.
 		if !(length > 0 && length <= 64) {
 			return util.MatrixErrorResponse(
 				http.StatusBadRequest,
@@ -109,7 +114,9 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, r
 	}
 	pending := 0
 	completed := 0
-	created, err := rsAPI.PerformAdminCreateRegistrationToken(req.Context(), token, usesAllowed, int32(pending), int32(completed), expiryTime)
+	// If usesAllowed or expiryTime is 0, it means they are not present in the request. NULL (indicating
+	// unlimited uses / no expiration will be persisted in DB)
+	created, err := userAPI.PerformAdminCreateRegistrationToken(req.Context(), token, usesAllowed, expiryTime)
 	if err != nil {
 		return util.MatrixErrorResponse(
 			http.StatusInternalServerError,

@@ -94,6 +94,7 @@ type ClientUserAPI interface {
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, userID string) (*pushrules.AccountRuleSets, error)
 	QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error
+	PerformAdminCreateRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (bool, error)
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
