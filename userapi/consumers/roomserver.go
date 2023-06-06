@@ -301,8 +301,8 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 	switch {
 	case event.Type() == spec.MRoomMember:
-		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return s.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+			return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
@@ -536,8 +536,8 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, func(roomAliasOrID string, senderID string) (*spec.UserID, error) {
-			return s.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, func(roomID string, senderID string) (*spec.UserID, error) {
+			return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
@@ -659,8 +659,8 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
-	rule, err := eval.MatchEvent(event.PDU, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-		return s.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	rule, err := eval.MatchEvent(event.PDU, func(roomID, senderID string) (*spec.UserID, error) {
+		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
 		return nil, err

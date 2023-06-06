@@ -276,8 +276,8 @@ func (r *Inputer) processRoomEvent(
 
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
-	if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-		return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+	if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID, senderID string) (*spec.UserID, error) {
+		return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		isRejected = true
 		rejectionErr = err
@@ -581,8 +581,8 @@ func (r *Inputer) processStateBefore(
 	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(
 		gomatrixserverlib.ToPDUs(stateBeforeEvent),
 	)
-	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-		return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth, func(roomID, senderID string) (*spec.UserID, error) {
+		return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 	}); rejectionErr != nil {
 		rejectionErr = fmt.Errorf("Allowed() failed for stateBeforeEvent: %w", rejectionErr)
 		return
@@ -694,8 +694,8 @@ nextAuthEvent:
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
-		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomID, senderID string) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			continue nextAuthEvent
 		}
@@ -712,8 +712,8 @@ nextAuthEvent:
 		}
 
 		// Check if the auth event should be rejected.
-		err := gomatrixserverlib.Allowed(authEvent, auth, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		err := gomatrixserverlib.Allowed(authEvent, auth, func(roomID, senderID string) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 		})
 		if isRejected = err != nil; isRejected {
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())

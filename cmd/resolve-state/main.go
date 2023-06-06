@@ -183,8 +183,8 @@ func main() {
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
-		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return roomserverDB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID, senderID string) (*spec.UserID, error) {
+			return roomserverDB.GetUserIDForSender(ctx, roomID, senderID)
 		},
 	)
 	if err != nil {

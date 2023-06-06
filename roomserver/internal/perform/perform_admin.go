@@ -262,16 +262,16 @@ func (r *Admin) PerformAdminDownloadState(
 			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity, err)
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomID, senderID string) (*spec.UserID, error) {
+				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
 			}
 			authEventMap[authEvent.EventID()] = authEvent
 		}
 		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomID, senderID string) (*spec.UserID, error) {
+				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
 			}

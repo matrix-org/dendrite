@@ -40,7 +40,7 @@ type syncRoomserverAPI struct {
 	rooms []*test.Room
 }
 
-func (s *syncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+func (s *syncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
 	return spec.NewUserID(senderID, true)
 }
 

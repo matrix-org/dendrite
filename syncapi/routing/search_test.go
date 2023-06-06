@@ -25,7 +25,7 @@ import (
 
 type FakeSyncRoomserverAPI struct{ rsapi.SyncRoomserverAPI }
 
-func (f *FakeSyncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+func (f *FakeSyncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
 	return spec.NewUserID(senderID, true)
 }
 

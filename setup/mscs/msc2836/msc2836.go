@@ -94,8 +94,8 @@ type MSC2836EventRelationshipsResponse struct {
 
 func toClientResponse(ctx context.Context, res *MSC2836EventRelationshipsResponse, rsAPI roomserver.RoomserverInternalAPI) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(res.ParsedEvents), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(res.ParsedEvents), synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,

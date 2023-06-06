@@ -95,8 +95,8 @@ func MakeLeave(
 		LocalServerName:    cfg.Matrix.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		BuildEventTemplate: createLeaveTemplate,
-		UserIDQuerier: func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomAliasOrID, senderID)
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 		},
 	}
 

@@ -228,17 +228,17 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			Context: SearchContextResponse{
 				Start: startToken.String(),
 				End:   endToken.String(),
-				EventsAfter: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-					return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+				EventsAfter: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync, func(roomID, senderID string) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 				}),
-				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-					return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync, func(roomID, senderID string) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 				}),
 				ProfileInfo: profileInfos,
 			},
 			Rank: eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 			}),
 		})
 		roomGroup := groups[event.RoomID()]
@@ -254,8 +254,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 					JSON: spec.InternalServerError{},
 				}
 			}
-			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return rsAPI.QueryUserIDForSender(req.Context(), roomAliasOrID, senderID)
+			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomID, senderID string) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 			})
 		}
 	}

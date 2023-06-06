@@ -1524,12 +1524,12 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
 }
 
-func (d *Database) GetUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
+func (d *Database) GetUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
 	// TODO: Use real logic once DB for pseudoIDs is in place
 	return spec.NewUserID(senderID, true)
 }
 
-func (d *Database) GetSenderIDForUser(ctx context.Context, roomAliasOrID string, userID spec.UserID) (string, error) {
+func (d *Database) GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (string, error) {
 	// TODO: Use real logic once DB for pseudoIDs is in place
 	return userID.String(), nil
 }

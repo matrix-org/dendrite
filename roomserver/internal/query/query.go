@@ -122,8 +122,8 @@ func (r *Queryer) QueryStateAfterEvents(
 		}
 
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID, senderID string) (*spec.UserID, error) {
+				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			},
 		)
 		if err != nil {
@@ -351,8 +351,8 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
 		for _, event := range events {
-			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			})
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
 		}
@@ -402,8 +402,8 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	for _, event := range events {
-		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 		})
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
@@ -594,8 +594,8 @@ func (r *Queryer) QueryStateAndAuthChain(
 
 	if request.ResolveState {
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID, senderID string) (*spec.UserID, error) {
+				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			},
 		)
 		if err != nil {
@@ -1043,10 +1043,10 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	return nil
 }
 
-func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomAliasOrID string, userID spec.UserID) (string, error) {
-	return r.DB.GetSenderIDForUser(ctx, roomAliasOrID, userID)
+func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (string, error) {
+	return r.DB.GetSenderIDForUser(ctx, roomID, userID)
 }
 
-func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error) {
-	return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
+	return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 }

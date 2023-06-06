@@ -189,7 +189,7 @@ func SetLocalAlias(
 		}
 	}
 
-	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), alias, *userID)
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), r.RoomID, *userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -238,7 +238,17 @@ func RemoveLocalAlias(
 		}
 	}
 
-	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), alias, *userID)
+	roomIDReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: alias}
+	roomIDRes := roomserverAPI.GetRoomIDForAliasResponse{}
+	err = rsAPI.GetRoomIDForAlias(req.Context(), &roomIDReq, &roomIDRes)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomIDRes.RoomID, *userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

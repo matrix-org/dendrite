@@ -156,8 +156,8 @@ func (r *Inviter) PerformInvite(
 		StrippedState:     req.InviteRoomState,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB},
-		UserIDQuerier: func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomAliasOrID, senderID)
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 		},
 	}
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)

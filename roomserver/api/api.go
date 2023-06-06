@@ -67,9 +67,8 @@ type InputRoomEventsAPI interface {
 }
 
 type QuerySenderIDAPI interface {
-	// Accepts either roomID or alias
-	QuerySenderIDForUser(ctx context.Context, roomAliasOrID string, userID spec.UserID) (string, error)
-	QueryUserIDForSender(ctx context.Context, roomAliasOrID string, senderID string) (*spec.UserID, error)
+	QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (string, error)
+	QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error)
 }
 
 // Query the latest events and state for a room from the room server.

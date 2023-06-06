@@ -181,8 +181,8 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	// Create the transaction body.
 	transaction, err := json.Marshal(
 		ApplicationServiceTransaction{
-			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-				return s.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+				return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 			}),
 		},
 	)

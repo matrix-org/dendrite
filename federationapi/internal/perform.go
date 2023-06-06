@@ -164,11 +164,11 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		PrivateKey: r.cfg.Matrix.PrivateKey,
 		KeyID:      r.cfg.Matrix.KeyID,
 		KeyRing:    r.keyRing,
-		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return r.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID, senderID string) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}),
-		UserIDQuerier: func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-			return r.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
@@ -363,8 +363,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	userIDProvider := func(roomAliasOrID, senderID string) (*spec.UserID, error) {
-		return r.rsAPI.QueryUserIDForSender(ctx, roomAliasOrID, senderID)
+	userIDProvider := func(roomID, senderID string) (*spec.UserID, error) {
+		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
 		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName, userIDProvider), userIDProvider,
