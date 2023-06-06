@@ -99,15 +99,18 @@ func MakeJoin(
 	}
 
 	input := gomatrixserverlib.HandleMakeJoinInput{
-		Context:            httpReq.Context(),
-		UserID:             userID,
-		RoomID:             roomID,
-		RoomVersion:        roomVersion,
-		RemoteVersions:     remoteVersions,
-		RequestOrigin:      request.Origin(),
-		LocalServerName:    cfg.Matrix.ServerName,
-		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
-		RoomQuerier:        &roomQuerier,
+		Context:           httpReq.Context(),
+		UserID:            userID,
+		RoomID:            roomID,
+		RoomVersion:       roomVersion,
+		RemoteVersions:    remoteVersions,
+		RequestOrigin:     request.Origin(),
+		LocalServerName:   cfg.Matrix.ServerName,
+		LocalServerInRoom: res.RoomExists && res.IsInRoom,
+		RoomQuerier:       &roomQuerier,
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 		BuildEventTemplate: createJoinTemplate,
 	}
 	response, internalErr := gomatrixserverlib.HandleMakeJoin(input)
@@ -202,6 +205,9 @@ func SendJoin(
 		PrivateKey:        cfg.Matrix.PrivateKey,
 		Verifier:          keys,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 	}
 	response, joinErr := gomatrixserverlib.HandleSendJoin(input)
 	switch e := joinErr.(type) {

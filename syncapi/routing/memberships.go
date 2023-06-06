@@ -144,7 +144,7 @@ func GetMemberships(
 					JSON: spec.InternalServerError{},
 				}
 			}
-			res.Joined[ev.Sender()] = joinedMember(content)
+			res.Joined[ev.SenderID()] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -153,6 +153,8 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll)},
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		})},
 	}
 }

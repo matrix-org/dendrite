@@ -44,22 +44,27 @@ type ClientEvent struct {
 }
 
 // ToClientEvents converts server events to client events.
-func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat) []ClientEvent {
+func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat, userIDForSender spec.UserIDForSender) []ClientEvent {
 	evs := make([]ClientEvent, 0, len(serverEvs))
 	for _, se := range serverEvs {
 		if se == nil {
 			continue // TODO: shouldn't happen?
 		}
-		evs = append(evs, ToClientEvent(se, format))
+		sender := spec.UserID{}
+		userID, err := userIDForSender(se.RoomID(), se.SenderID())
+		if err == nil && userID != nil {
+			sender = *userID
+		}
+		evs = append(evs, ToClientEvent(se, format, sender))
 	}
 	return evs
 }
 
 // ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat) ClientEvent {
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender spec.UserID) ClientEvent {
 	ce := ClientEvent{
 		Content:        spec.RawJSON(se.Content()),
-		Sender:         se.Sender(),
+		Sender:         sender.String(),
 		Type:           se.Type(),
 		StateKey:       se.StateKey(),
 		Unsigned:       spec.RawJSON(se.Unsigned()),

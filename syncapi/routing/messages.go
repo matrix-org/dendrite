@@ -241,7 +241,7 @@ func OnIncomingMessagesRequest(
 		device:           device,
 	}
 
-	clientEvents, start, end, err := mReq.retrieveEvents()
+	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return util.JSONResponse{
@@ -273,7 +273,9 @@ func OnIncomingMessagesRequest(
 				JSON: spec.InternalServerError{},
 			}
 		}
-		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll)...)
+		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		})...)
 	}
 
 	// If we didn't return any events, set the end to an empty string, so it will be omitted
@@ -310,7 +312,7 @@ func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.
 // homeserver in the room for older events.
 // Returns an error if there was an issue talking to the database or with the
 // remote homeserver.
-func (r *messagesReq) retrieveEvents() (
+func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserverAPI) (
 	clientEvents []synctypes.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
@@ -383,7 +385,9 @@ func (r *messagesReq) retrieveEvents() (
 		"events_before": len(events),
 		"events_after":  len(filteredEvents),
 	}).Debug("applied history visibility (messages)")
-	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll), start, end, err
+	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}), start, end, err
 }
 
 func (r *messagesReq) getStartEnd(events []*rstypes.HeaderedEvent) (start, end types.TopologyToken, err error) {

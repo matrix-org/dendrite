@@ -49,6 +49,7 @@ type RoomserverInternalAPI interface {
 	ClientRoomserverAPI
 	UserRoomserverAPI
 	FederationRoomserverAPI
+	QuerySenderIDAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -73,6 +74,11 @@ type InputRoomEventsAPI interface {
 		req *InputRoomEventsRequest,
 		res *InputRoomEventsResponse,
 	)
+}
+
+type QuerySenderIDAPI interface {
+	QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (string, error)
+	QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error)
 }
 
 // Query the latest events and state for a room from the room server.
@@ -102,6 +108,7 @@ type QueryEventsAPI interface {
 type SyncRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
+	QuerySenderIDAPI
 	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
@@ -142,6 +149,7 @@ type SyncRoomserverAPI interface {
 }
 
 type AppserviceRoomserverAPI interface {
+	QuerySenderIDAPI
 	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
 	// which room to use by querying the first events roomID.
 	QueryEventsByID(
@@ -168,6 +176,7 @@ type ClientRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QueryEventsAPI
+	QuerySenderIDAPI
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
@@ -200,6 +209,7 @@ type ClientRoomserverAPI interface {
 }
 
 type UserRoomserverAPI interface {
+	QuerySenderIDAPI
 	QueryLatestEventsAndStateAPI
 	KeyserverRoomserverAPI
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
@@ -213,6 +223,8 @@ type FederationRoomserverAPI interface {
 	InputRoomEventsAPI
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
+	QuerySenderIDAPI
+
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error

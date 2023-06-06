@@ -95,6 +95,9 @@ func MakeLeave(
 		LocalServerName:    cfg.Matrix.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		BuildEventTemplate: createLeaveTemplate,
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 	}
 
 	response, internalErr := gomatrixserverlib.HandleMakeLeave(input)
@@ -213,7 +216,7 @@ func SendLeave(
 			JSON: spec.BadJSON("No state key was provided in the leave event."),
 		}
 	}
-	if !event.StateKeyEquals(event.Sender()) {
+	if !event.StateKeyEquals(event.SenderID()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("Event state key must match the event sender."),
@@ -223,13 +226,13 @@ func SendLeave(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	var serverName spec.ServerName
-	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), event.RoomID(), event.SenderID())
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("The sender of the join is invalid"),
 		}
-	} else if serverName != request.Origin() {
+	} else if sender.Domain() != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("The sender does not match the server that originated the request"),
@@ -291,7 +294,7 @@ func SendLeave(
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:           serverName,
+		ServerName:           sender.Domain(),
 		Message:              redacted,
 		AtTS:                 event.OriginServerTS(),
 		ValidityCheckingFunc: gomatrixserverlib.StrictValiditySignatureCheck,

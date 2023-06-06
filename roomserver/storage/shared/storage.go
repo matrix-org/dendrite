@@ -988,8 +988,18 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return nil
 		}
 
-		_, sender1, _ := gomatrixserverlib.SplitID('@', redactedEvent.Sender())
-		_, sender2, _ := gomatrixserverlib.SplitID('@', redactionEvent.Sender())
+		// TODO: Don't hack senderID into userID here (pseudoIDs)
+		sender1Domain := ""
+		sender1, err1 := spec.NewUserID(redactedEvent.SenderID(), true)
+		if err1 == nil {
+			sender1Domain = string(sender1.Domain())
+		}
+		// TODO: Don't hack senderID into userID here (pseudoIDs)
+		sender2Domain := ""
+		sender2, err2 := spec.NewUserID(redactionEvent.SenderID(), true)
+		if err2 == nil {
+			sender2Domain = string(sender2.Domain())
+		}
 		var powerlevels *gomatrixserverlib.PowerLevelContent
 		powerlevels, err = plResolver.Resolve(ctx, redactionEvent.EventID())
 		if err != nil {
@@ -997,9 +1007,9 @@ func (d *EventDatabase) MaybeRedactEvent(
 		}
 
 		switch {
-		case powerlevels.UserLevel(redactionEvent.Sender()) >= powerlevels.Redact:
+		case powerlevels.UserLevel(redactionEvent.SenderID()) >= powerlevels.Redact:
 			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
-		case sender1 == sender2:
+		case sender1Domain == sender2Domain:
 			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
 		default:
 			ignoreRedaction = true
@@ -1512,6 +1522,16 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 		return nil, err
 	}
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
+}
+
+func (d *Database) GetUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
+	// TODO: Use real logic once DB for pseudoIDs is in place
+	return spec.NewUserID(senderID, true)
+}
+
+func (d *Database) GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (string, error) {
+	// TODO: Use real logic once DB for pseudoIDs is in place
+	return userID.String(), nil
 }
 
 // GetKnownRooms returns a list of all rooms we know about.

@@ -62,7 +62,7 @@ type GetAliasesForRoomIDResponse struct {
 // RemoveRoomAliasRequest is a request to RemoveRoomAlias
 type RemoveRoomAliasRequest struct {
 	// ID of the user removing the alias
-	UserID string `json:"user_id"`
+	SenderID string `json:"user_id"`
 	// The room alias to remove
 	Alias string `json:"alias"`
 }

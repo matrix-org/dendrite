@@ -171,7 +171,7 @@ func Setup(
 				nb := req.FormValue("next_batch")
 				nextBatch = &nb
 			}
-			return Search(req, device, syncDB, fts, nextBatch)
+			return Search(req, device, syncDB, fts, nextBatch, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
