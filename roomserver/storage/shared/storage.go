@@ -1592,25 +1592,37 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 	})
 }
 
-// InsertUserRoomKey inserts a new user room key for the given user and room.
+// InsertUserRoomPrivateKey inserts a new user room key for the given user and room.
 // Returns the newly inserted private key or an existing private key. If there is
 // an error talking to the database, returns that error.
-func (d *Database) InsertUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var iErr error
-		result, iErr = d.UserRoomKeyTable.InsertUserRoomKey(ctx, txn, userNID, roomNID, key)
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPrivateKey(ctx, txn, userNID, roomNID, key)
 		return iErr
 	})
 	return result, err
 }
 
-// SelectUserRoomKey queries the users room private key.
+// InsertUserRoomPrivateKey inserts a new user room key for the given user and room.
+// Returns the newly inserted private key or an existing private key. If there is
+// an error talking to the database, returns that error.
+func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		var iErr error
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPublicKey(ctx, txn, userNID, roomNID, key)
+		return iErr
+	})
+	return result, err
+}
+
+// SelectUserRoomPrivateKey queries the users room private key.
 // If no key exists, returns no key and no error. Otherwise returns
 // the key and a database error, if any.
-func (d *Database) SelectUserRoomKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error) {
+func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (key ed25519.PrivateKey, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var sErr error
-		key, sErr = d.UserRoomKeyTable.SelectUserRoomKey(ctx, txn, userNID, roomNID)
+		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, userNID, roomNID)
 		if !errors.Is(sErr, sql.ErrNoRows) {
 			return sErr
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/stretchr/testify/assert"
+	ed255192 "golang.org/x/crypto/ed25519"
 )
 
 func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.UserRoomKeys, db *sql.DB, close func()) {
@@ -49,14 +50,14 @@ func TestUserRoomKeysTable(t *testing.T) {
 
 		err = sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			var gotKey, key2, key3 ed25519.PrivateKey
-			gotKey, err = tab.InsertUserRoomKey(context.Background(), txn, userNID, roomNID, key)
+			gotKey, err = tab.InsertUserRoomPrivateKey(context.Background(), txn, userNID, roomNID, key)
 			assert.NoError(t, err)
 			assert.Equal(t, gotKey, key)
 
 			// again, this shouldn't result in an error, but return the existing key
 			_, key2, err = ed25519.GenerateKey(nil)
 			assert.NoError(t, err)
-			gotKey, err = tab.InsertUserRoomKey(context.Background(), txn, userNID, roomNID, key2)
+			gotKey, err = tab.InsertUserRoomPrivateKey(context.Background(), txn, userNID, roomNID, key2)
 			assert.NoError(t, err)
 			assert.Equal(t, gotKey, key)
 
@@ -64,15 +65,15 @@ func TestUserRoomKeysTable(t *testing.T) {
 			_, key3, err = ed25519.GenerateKey(nil)
 			assert.NoError(t, err)
 			userNID2 := types.EventStateKeyNID(2)
-			_, err = tab.InsertUserRoomKey(context.Background(), txn, userNID2, roomNID, key3)
+			_, err = tab.InsertUserRoomPrivateKey(context.Background(), txn, userNID2, roomNID, key3)
 			assert.NoError(t, err)
 
-			gotKey, err = tab.SelectUserRoomKey(context.Background(), txn, userNID, roomNID)
+			gotKey, err = tab.SelectUserRoomPrivateKey(context.Background(), txn, userNID, roomNID)
 			assert.NoError(t, err)
 			assert.Equal(t, key, gotKey)
 
 			// Key doesn't exist
-			gotKey, err = tab.SelectUserRoomKey(context.Background(), txn, userNID, 2)
+			gotKey, err = tab.SelectUserRoomPrivateKey(context.Background(), txn, userNID, 2)
 			assert.NoError(t, err)
 			assert.Nil(t, gotKey)
 
@@ -87,6 +88,15 @@ func TestUserRoomKeysTable(t *testing.T) {
 				string(key3.Public().(ed25519.PublicKey)): userNID2,
 			}
 			assert.Equal(t, wantKeys, gotKeys)
+
+			// insert key that came in over federation
+			var gotPublicKey, key4 ed255192.PublicKey
+			key4, _, err = ed25519.GenerateKey(nil)
+			assert.NoError(t, err)
+			gotPublicKey, err = tab.InsertUserRoomPublicKey(context.Background(), txn, userNID, 2, key4)
+			assert.NoError(t, err)
+			assert.Equal(t, key4, gotPublicKey)
+
 			return nil
 		})
 		assert.NoError(t, err)

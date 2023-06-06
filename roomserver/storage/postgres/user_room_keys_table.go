@@ -31,25 +31,33 @@ const userRoomKeysSchema = `
 CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (     
     user_nid    INTEGER NOT NULL,
     room_nid    INTEGER NOT NULL,
-    pseudo_id_key BYTEA NOT NULL,
+    pseudo_id_key BYTEA NULL, -- may be null for users not local to the server
     pseudo_id_pub_key BYTEA NOT NULL,
     CONSTRAINT roomserver_user_room_keys_pk PRIMARY KEY (user_nid, room_nid)
 );
 `
 
-const insertUserRoomKeySQL = `
+const insertUserRoomPrivateKeySQL = `
 	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key, pseudo_id_pub_key) VALUES ($1, $2, $3, $4)
 	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_key = roomserver_user_room_keys.pseudo_id_key
 	RETURNING (pseudo_id_key)
 `
+
+const insertUserRoomPublicKeySQL = `
+	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_pub_key) VALUES ($1, $2, $3)
+	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_pub_key = roomserver_user_room_keys.pseudo_id_pub_key
+	RETURNING (pseudo_id_pub_key)
+`
+
 const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
 const selectUserNIDsSQL = `SELECT user_nid, pseudo_id_pub_key  FROM roomserver_user_room_keys WHERE pseudo_id_pub_key = ANY($1)`
 
 type userRoomKeysStatements struct {
-	insertUserRoomKeyStmt *sql.Stmt
-	selectUserRoomKeyStmt *sql.Stmt
-	selectUserIDsStmt     *sql.Stmt
+	insertUserRoomPrivateKeyStmt *sql.Stmt
+	insertUserRoomPublicKeyStmt  *sql.Stmt
+	selectUserRoomKeyStmt        *sql.Stmt
+	selectUserNIDsStmt           *sql.Stmt
 }
 
 func CreateUserRoomKeysTable(db *sql.DB) error {
@@ -60,25 +68,26 @@ func CreateUserRoomKeysTable(db *sql.DB) error {
 func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
 	s := &userRoomKeysStatements{}
 	return s, sqlutil.StatementList{
-		{&s.insertUserRoomKeyStmt, insertUserRoomKeySQL},
+		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomPrivateKeySQL},
+		{&s.insertUserRoomPublicKeyStmt, insertUserRoomPublicKeySQL},
 		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
-		{&s.selectUserIDsStmt, selectUserNIDsSQL},
+		{&s.selectUserNIDsStmt, selectUserNIDsSQL},
 	}.Prepare(db)
 }
 
-func (s *userRoomKeysStatements) InsertUserRoomKey(
-	ctx context.Context,
-	txn *sql.Tx,
-	userNID types.EventStateKeyNID,
-	roomNID types.RoomNID,
-	key ed25519.PrivateKey,
-) (result ed25519.PrivateKey, err error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomKeyStmt)
+func (s *userRoomKeysStatements) InsertUserRoomPrivateKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPrivateKeyStmt)
 	err = stmt.QueryRowContext(ctx, userNID, roomNID, key, key.Public()).Scan(&result)
 	return result, err
 }
 
-func (s *userRoomKeysStatements) SelectUserRoomKey(
+func (s *userRoomKeysStatements) InsertUserRoomPublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
+	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPublicKeyStmt)
+	err = stmt.QueryRowContext(ctx, userNID, roomNID, key).Scan(&result)
+	return result, err
+}
+
+func (s *userRoomKeysStatements) SelectUserRoomPrivateKey(
 	ctx context.Context,
 	txn *sql.Tx,
 	userNID types.EventStateKeyNID,
@@ -98,7 +107,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(
 	txn *sql.Tx,
 	senderKeys [][]byte,
 ) (map[string]types.EventStateKeyNID, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserIDsStmt)
+	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserNIDsStmt)
 
 	rows, err := stmt.QueryContext(ctx, pq.Array(senderKeys))
 	if err != nil {

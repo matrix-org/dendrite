@@ -9,6 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/stretchr/testify/assert"
+	ed255192 "golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
@@ -125,28 +126,37 @@ func TestUserRoomKeys(t *testing.T) {
 		userNID, err := db.GetOrCreateEventStateKeyNID(ctx, &dummy.ID)
 		assert.NoError(t, err)
 
-		gotKey, err := db.InsertUserRoomKey(ctx, userNID, roomNID, key)
+		gotKey, err := db.InsertUserRoomPrivateKey(ctx, userNID, roomNID, key)
 		assert.NoError(t, err)
 		assert.Equal(t, gotKey, key)
 
 		// again, this shouldn't result in an error, but return the existing key
 		_, key2, err := ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
-		gotKey, err = db.InsertUserRoomKey(context.Background(), userNID, roomNID, key2)
+		gotKey, err = db.InsertUserRoomPrivateKey(context.Background(), userNID, roomNID, key2)
 		assert.NoError(t, err)
 		assert.Equal(t, gotKey, key)
 
-		gotKey, err = db.SelectUserRoomKey(context.Background(), userNID, roomNID)
+		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), userNID, roomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
 
 		// Key doesn't exist, we shouldn't get anything back
-		gotKey, err = db.SelectUserRoomKey(context.Background(), userNID, 2)
+		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), userNID, 2)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
 
 		userIDs, err := db.SelectUserIDsForPublicKeys(ctx, [][]byte{key.Public().(ed25519.PublicKey)})
 		assert.NoError(t, err)
 		assert.NotNil(t, userIDs)
+
+		// insert key that came in over federation
+		var gotPublicKey, key4 ed255192.PublicKey
+		key4, _, err = ed25519.GenerateKey(nil)
+		assert.NoError(t, err)
+		gotPublicKey, err = db.InsertUserRoomPublicKey(context.Background(), userNID, 2, key4)
+		assert.NoError(t, err)
+		assert.Equal(t, key4, gotPublicKey)
+
 	})
 }
