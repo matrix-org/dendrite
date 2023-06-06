@@ -137,7 +137,7 @@ func SendRedaction(
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(req.Context(), &proto, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(req.Context(), &proto, identity, time.Now(), rsAPI, &queryRes)
 	if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

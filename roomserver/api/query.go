@@ -486,3 +486,22 @@ func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID sp
 		JoinedUsers:       locallyJoinedUsers,
 	}, nil
 }
+
+type MembershipQuerier struct {
+	Roomserver FederationRoomserverAPI
+}
+
+func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error) {
+	req := QueryMembershipForUserRequest{
+		RoomID: roomID.String(),
+		UserID: userID.String(),
+	}
+	res := QueryMembershipForUserResponse{}
+	err := mq.Roomserver.QueryMembershipForUser(ctx, &req, &res)
+
+	membership := ""
+	if err == nil {
+		membership = res.Membership
+	}
+	return membership, err
+}

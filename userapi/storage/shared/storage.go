@@ -644,7 +644,7 @@ func (d *Database) CreateDevice(
 		for i := 1; i <= 5; i++ {
 			newDeviceID, returnErr = generateDeviceID()
 			if returnErr != nil {
-				return
+				return nil, returnErr
 			}
 
 			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -653,7 +653,7 @@ func (d *Database) CreateDevice(
 				return err
 			})
 			if returnErr == nil {
-				return
+				return dev, nil
 			}
 		}
 	}

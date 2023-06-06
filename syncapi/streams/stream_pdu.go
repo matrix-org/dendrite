@@ -489,7 +489,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 
 	stateEvents, err := snapshot.CurrentState(ctx, roomID, stateFilter, excludingEventIDs)
 	if err != nil {
-		return
+		return jr, err
 	}
 
 	jr.Summary, err = snapshot.GetRoomSummary(ctx, roomID, device.UserID)
@@ -542,7 +542,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		}
 		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, event.EventID())
 		if err != nil {
-			return
+			return jr, err
 		}
 		prevBatch = &types.TopologyToken{
 			Depth:       backwardTopologyPos,

@@ -284,7 +284,7 @@ func (r *Joiner) performJoinRoomByID(
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err.(type) {
 	case nil:

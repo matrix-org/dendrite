@@ -155,7 +155,7 @@ func SendServerNotice(
 			Invite:                    []string{r.UserID},
 			Name:                      cfgNotices.RoomName,
 			Visibility:                "private",
-			Preset:                    presetPrivateChat,
+			Preset:                    spec.PresetPrivateChat,
 			CreationContent:           cc,
 			RoomVersion:               roomVersion,
 			PowerLevelContentOverride: pl,

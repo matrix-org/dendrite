@@ -503,60 +503,59 @@ func (r *FederationInternalAPI) PerformLeave(
 	)
 }
 
-// PerformLeaveRequest implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformInvite(
+// SendInvite implements api.FederationInternalAPI
+func (r *FederationInternalAPI) SendInvite(
 	ctx context.Context,
-	request *api.PerformInviteRequest,
-	response *api.PerformInviteResponse,
-) (err error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.Event.Sender())
+	event gomatrixserverlib.PDU,
+	strippedState []gomatrixserverlib.InviteStrippedState,
+) (gomatrixserverlib.PDU, error) {
+	_, origin, err := r.cfg.Matrix.SplitLocalID('@', event.Sender())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if request.Event.StateKey() == nil {
-		return errors.New("invite must be a state event")
+	if event.StateKey() == nil {
+		return nil, errors.New("invite must be a state event")
 	}
 
-	_, destination, err := gomatrixserverlib.SplitID('@', *request.Event.StateKey())
+	_, destination, err := gomatrixserverlib.SplitID('@', *event.StateKey())
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
 
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
 	if !r.shouldAttemptDirectFederation(destination) {
-		return fmt.Errorf("relay servers have no meaningful response for invite.")
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"event_id":     request.Event.EventID(),
-		"user_id":      *request.Event.StateKey(),
-		"room_id":      request.Event.RoomID(),
-		"room_version": request.RoomVersion,
+		"event_id":     event.EventID(),
+		"user_id":      *event.StateKey(),
+		"room_id":      event.RoomID(),
+		"room_version": event.Version(),
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := fclient.NewInviteV2Request(request.Event.PDU, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(event, strippedState)
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
 	inviteRes, err := r.federation.SendInviteV2(ctx, origin, destination, inviteReq)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
+		return nil, fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
-	verImpl, err := gomatrixserverlib.GetRoomVersion(request.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(event.Version())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
+		return nil, fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
-	response.Event = &types.HeaderedEvent{PDU: inviteEvent}
-	return nil
+	return inviteEvent, nil
 }
 
 // PerformServersAlive implements api.FederationInternalAPI

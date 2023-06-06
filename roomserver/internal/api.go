@@ -6,6 +6,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -40,6 +42,7 @@ type RoomserverInternalAPI struct {
 	*perform.Forgetter
 	*perform.Upgrader
 	*perform.Admin
+	*perform.Creator
 	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.Dendrite
@@ -131,6 +134,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB:      r.DB,
 		Cfg:     &r.Cfg.RoomServer,
 		FSAPI:   r.fsAPI,
+		RSAPI:   r,
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
@@ -192,6 +196,11 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Queryer: r.Queryer,
 		Leaver:  r.Leaver,
 	}
+	r.Creator = &perform.Creator{
+		DB:    r.DB,
+		Cfg:   &r.Cfg.RoomServer,
+		RSAPI: r,
+	}
 
 	if err := r.Inputer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
@@ -207,18 +216,35 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 	r.asAPI = asAPI
 }
 
+func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error) {
+	return r.Inviter.IsKnownRoom(ctx, roomID)
+}
+
+func (r *RoomserverInternalAPI) StateQuerier() gomatrixserverlib.StateQuerier {
+	return r.Inviter.StateQuerier()
+}
+
+func (r *RoomserverInternalAPI) HandleInvite(
+	ctx context.Context, inviteEvent *types.HeaderedEvent,
+) error {
+	outputEvents, err := r.Inviter.ProcessInviteMembership(ctx, inviteEvent)
+	if err != nil {
+		return err
+	}
+	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
+}
+
+func (r *RoomserverInternalAPI) PerformCreateRoom(
+	ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest,
+) (string, *util.JSONResponse) {
+	return r.Creator.PerformCreateRoom(ctx, userID, roomID, createRequest)
+}
+
 func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 ) error {
-	outputEvents, err := r.Inviter.PerformInvite(ctx, req)
-	if err != nil {
-		return err
-	}
-	if len(outputEvents) == 0 {
-		return nil
-	}
-	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
+	return r.Inviter.PerformInvite(ctx, req)
 }
 
 func (r *RoomserverInternalAPI) PerformLeave(
