@@ -170,7 +170,7 @@ func (s *FederationInternalAPI) handleDatabaseKeys(
 		// in that case. If the key isn't valid right now, then by
 		// leaving it in the 'requests' map, we'll try to update the
 		// key using the fetchers in handleFetcherKeys.
-		if res.WasValidAt(now, true) {
+		if res.WasValidAt(now, gomatrixserverlib.StrictValiditySignatureCheck) {
 			delete(requests, req)
 		}
 	}

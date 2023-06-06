@@ -28,7 +28,7 @@ func (c Caches) GetServerKey(
 ) (gomatrixserverlib.PublicKeyLookupResult, bool) {
 	key := fmt.Sprintf("%s/%s", request.ServerName, request.KeyID)
 	val, found := c.ServerKeys.Get(key)
-	if found && !val.WasValidAt(timestamp, true) {
+	if found && !val.WasValidAt(timestamp, gomatrixserverlib.StrictValiditySignatureCheck) {
 		// The key wasn't valid at the requested timestamp so don't
 		// return it. The caller will have to work out what to do.
 		c.ServerKeys.Unset(key)
