@@ -94,6 +94,7 @@ func NewRoomserverAPI(
 			Cache:             caches,
 			IsLocalServerName: dendriteCfg.Global.IsLocalServerName,
 			ServerACLs:        serverACLs,
+			Cfg:               dendriteCfg,
 		},
 		enableMetrics: enableMetrics,
 		// perform-er structs get initialised when we have a federation sender to use

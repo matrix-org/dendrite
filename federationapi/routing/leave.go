@@ -294,10 +294,10 @@ func SendLeave(
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             sender.Domain(),
-		Message:                redacted,
-		AtTS:                   event.OriginServerTS(),
-		StrictValidityChecking: true,
+		ServerName:           sender.Domain(),
+		Message:              redacted,
+		AtTS:                 event.OriginServerTS(),
+		ValidityCheckingFunc: gomatrixserverlib.StrictValiditySignatureCheck,
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
