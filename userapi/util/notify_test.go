@@ -23,10 +23,6 @@ import (
 	userUtil "github.com/matrix-org/dendrite/userapi/util"
 )
 
-func UserIDForSender(roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
-}
-
 func TestNotifyUserCountsAsync(t *testing.T) {
 	alice := test.NewUser(t)
 	aliceLocalpart, serverName, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -92,7 +88,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Prepare pusher with our test server URL
-		if err := db.UpsertPusher(ctx, api.Pusher{
+		if err = db.UpsertPusher(ctx, api.Pusher{
 			Kind:    api.HTTPKind,
 			AppID:   appID,
 			PushKey: pushKey,
@@ -104,8 +100,12 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Insert a dummy event
+		sender, err := spec.NewUserID(alice.ID, true)
+		if err != nil {
+			t.Error(err)
+		}
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
-			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, UserIDForSender),
+			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, *sender),
 		}); err != nil {
 			t.Error(err)
 		}

@@ -388,9 +388,12 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
 		for _, event := range events {
-			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
-			})
+			sender := spec.UserID{}
+			userID, queryErr := r.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+			if queryErr == nil && userID != nil {
+				sender = *userID
+			}
+			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender)
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
 		}
 		return nil
@@ -439,9 +442,12 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	for _, event := range events {
-		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
-		})
+		sender := spec.UserID{}
+		userID, err := r.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+		if err == nil && userID != nil {
+			sender = *userID
+		}
+		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
 

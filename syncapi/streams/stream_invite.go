@@ -64,19 +64,17 @@ func (p *InviteStreamProvider) IncrementalSync(
 	}
 
 	for roomID, inviteEvent := range invites {
-		user := ""
+		user := spec.UserID{}
 		sender, err := p.rsAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), inviteEvent.SenderID())
-		if err == nil {
-			user = sender.String()
+		if err == nil && sender != nil {
+			user = *sender
 		}
 
 		// skip ignored user events
-		if _, ok := req.IgnoredUsers.List[user]; ok {
+		if _, ok := req.IgnoredUsers.List[user.String()]; ok {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent, func(roomID, senderID string) (*spec.UserID, error) {
-			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-		})
+		ir := types.NewInviteResponse(inviteEvent, user)
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 

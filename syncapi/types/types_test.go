@@ -61,7 +61,12 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, UserIDForSender)
+	sender, err := spec.NewUserID("@neilalexander:matrix.org", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, *sender)
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)

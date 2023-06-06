@@ -205,17 +205,17 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 		profileInfos := make(map[string]ProfileInfoResponse)
 		for _, ev := range append(eventsBefore, eventsAfter...) {
-			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
-			if err != nil {
-				logrus.WithError(err).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
+			userID, queryErr := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
+			if queryErr != nil {
+				logrus.WithError(queryErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 				continue
 			}
 
 			profile, ok := knownUsersProfiles[userID.String()]
 			if !ok {
-				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, ev.SenderID())
-				if err != nil {
-					logrus.WithError(err).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
+				stateEvent, stateErr := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, ev.SenderID())
+				if stateErr != nil {
+					logrus.WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
 				}
 				if stateEvent == nil {
@@ -230,6 +230,11 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			profileInfos[userID.String()] = profile
 		}
 
+		sender := spec.UserID{}
+		userID, err := rsAPI.QueryUserIDForSender(req.Context(), event.RoomID(), event.SenderID())
+		if err == nil && userID != nil {
+			sender = *userID
+		}
 		results = append(results, Result{
 			Context: SearchContextResponse{
 				Start: startToken.String(),
@@ -242,10 +247,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				}),
 				ProfileInfo: profileInfos,
 			},
-			Rank: eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
-				return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
-			}),
+			Rank:   eventScore[event.EventID()].Score,
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())

@@ -24,10 +24,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func UserIDForSender(roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
-}
-
 func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
@@ -48,7 +44,11 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
-	ce := ToClientEvent(ev, FormatAll, UserIDForSender)
+	userID, err := spec.NewUserID("@test:localhost", true)
+	if err != nil {
+		t.Fatalf("failed to create userID: %s", err)
+	}
+	ce := ToClientEvent(ev, FormatAll, *userID)
 	if ce.EventID != ev.EventID() {
 		t.Errorf("ClientEvent.EventID: wanted %s, got %s", ev.EventID(), ce.EventID)
 	}
@@ -67,13 +67,8 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	if !bytes.Equal(ce.Unsigned, ev.Unsigned()) {
 		t.Errorf("ClientEvent.Unsigned: wanted %s, got %s", string(ev.Unsigned()), string(ce.Unsigned))
 	}
-	user := ""
-	userID, err := UserIDForSender("", ev.SenderID())
-	if err == nil {
-		user = userID.String()
-	}
-	if ce.Sender != user {
-		t.Errorf("ClientEvent.Sender: wanted %s, got %s", user, ce.Sender)
+	if ce.Sender != userID.String() {
+		t.Errorf("ClientEvent.Sender: wanted %s, got %s", userID.String(), ce.Sender)
 	}
 	j, err := json.Marshal(ce)
 	if err != nil {
@@ -108,7 +103,11 @@ func TestToClientFormatSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
-	ce := ToClientEvent(ev, FormatSync, UserIDForSender)
+	userID, err := spec.NewUserID("@test:localhost", true)
+	if err != nil {
+		t.Fatalf("failed to create userID: %s", err)
+	}
+	ce := ToClientEvent(ev, FormatSync, *userID)
 	if ce.RoomID != "" {
 		t.Errorf("ClientEvent.RoomID: wanted '', got %s", ce.RoomID)
 	}
