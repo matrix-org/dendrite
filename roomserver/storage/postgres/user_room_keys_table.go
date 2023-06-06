@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/sirupsen/logrus"
 )
 
 const userRoomKeysSchema = `
@@ -100,7 +99,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(
 	senderKeys [][]byte,
 ) (map[string]types.EventStateKeyNID, error) {
 	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserIDsStmt)
-	logrus.Infof("%#v", senderKeys)
+
 	rows, err := stmt.QueryContext(ctx, pq.Array(senderKeys))
 	if err != nil {
 		return nil, err
