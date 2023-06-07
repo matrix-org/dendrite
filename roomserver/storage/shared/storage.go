@@ -1733,14 +1733,14 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys ma
 			nids = append(nids, nid.EventStateKeyNID)
 		}
 		// get the userIDs
-		nidMAP, seErr := d.EventStateKeys(ctx, nids)
+		nidMap, seErr := d.EventStateKeys(ctx, nids)
 		if seErr != nil {
 			return seErr
 		}
 
 		// build the result map (roomID -> map publicKey -> userID)
 		for publicKey, userRoomKeyPair := range userRoomKeyPairMap {
-			userID := nidMAP[userRoomKeyPair.EventStateKeyNID]
+			userID := nidMap[userRoomKeyPair.EventStateKeyNID]
 			roomID := rooms[userRoomKeyPair.RoomNID]
 			resMap, exists := result[roomID]
 			if !exists {

@@ -51,7 +51,7 @@ const insertUserRoomPublicKeySQL = `
 
 const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
-const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE pseudo_id_pub_key = ANY($1)`
+const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
 
 type userRoomKeysStatements struct {
 	insertUserRoomPrivateKeyStmt *sql.Stmt
@@ -113,7 +113,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 			senders = append(senders, key)
 		}
 	}
-	rows, err := stmt.QueryContext(ctx, pq.Array(senders))
+	rows, err := stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(senders))
 	if err != nil {
 		return nil, err
 	}
