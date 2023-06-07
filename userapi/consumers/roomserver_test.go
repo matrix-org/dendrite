@@ -47,8 +47,8 @@ func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 
 type FakeUserRoomserverAPI struct{ rsapi.UserRoomserverAPI }
 
-func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
+func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 func Test_evaluatePushRules(t *testing.T) {

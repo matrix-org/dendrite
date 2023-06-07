@@ -96,14 +96,15 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			RoomID:     roomID,
 			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
-			Sender:     stateKey,
+			SenderID:   stateKey,
 			PrevEvents: prevEvents,
 		}
 
-		_, senderDomain, err = gomatrixserverlib.SplitID('@', fledglingEvent.Sender)
-		if err != nil {
+		userID, err := r.Queryer.QueryUserIDForSender(ctx, roomID, spec.SenderID(fledglingEvent.SenderID))
+		if err != nil || userID == nil {
 			continue
 		}
+		senderDomain = userID.Domain()
 
 		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
 			return nil, err
@@ -233,10 +234,11 @@ func (r *Admin) PerformAdminDownloadState(
 	ctx context.Context,
 	roomID, userID string, serverName spec.ServerName,
 ) error {
-	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
+	fullUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
 		return err
 	}
+	senderDomain := fullUserID.Domain()
 
 	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -262,7 +264,7 @@ func (r *Admin) PerformAdminDownloadState(
 			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity, err)
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomID, senderID string) (*spec.UserID, error) {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
@@ -270,7 +272,7 @@ func (r *Admin) PerformAdminDownloadState(
 			authEventMap[authEvent.EventID()] = authEvent
 		}
 		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomID, senderID string) (*spec.UserID, error) {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
@@ -291,11 +293,15 @@ func (r *Admin) PerformAdminDownloadState(
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 
+	senderID, err := r.Queryer.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	if err != nil {
+		return err
+	}
 	proto := &gomatrixserverlib.ProtoEvent{
-		Type:    "org.matrix.dendrite.state_download",
-		Sender:  userID,
-		RoomID:  roomID,
-		Content: spec.RawJSON("{}"),
+		Type:     "org.matrix.dendrite.state_download",
+		SenderID: string(senderID),
+		RoomID:   roomID,
+		Content:  spec.RawJSON("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)

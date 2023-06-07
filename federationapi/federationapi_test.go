@@ -36,8 +36,12 @@ type fedRoomserverAPI struct {
 	queryRoomsForUser func(ctx context.Context, req *rsapi.QueryRoomsForUserRequest, res *rsapi.QueryRoomsForUserResponse) error
 }
 
-func (f *fedRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
+func (f *fedRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (f *fedRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
+	return spec.SenderID(userID.String()), nil
 }
 
 // PerformJoin will call this function
@@ -115,12 +119,13 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
 		if r.ID == roomID {
+			senderIDString := userID
 			res.RoomVersion = r.Version
 			res.JoinEvent = gomatrixserverlib.ProtoEvent{
-				Sender:     userID,
+				SenderID:   senderIDString,
 				RoomID:     roomID,
 				Type:       "m.room.member",
-				StateKey:   &userID,
+				StateKey:   &senderIDString,
 				Content:    spec.RawJSON([]byte(`{"membership":"join"}`)),
 				PrevEvents: r.ForwardExtremities(),
 			}

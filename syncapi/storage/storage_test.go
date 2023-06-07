@@ -214,7 +214,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 			}
-			gots := snapshot.StreamEventsToEvents(nil, paginatedEvents)
+			gots := snapshot.StreamEventsToEvents(context.Background(), nil, paginatedEvents, nil)
 			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
 		})
 	})

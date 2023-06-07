@@ -523,7 +523,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	prev := types.PrevEventRef{
 		PrevContent:   prevEvent.Content(),
 		ReplacesState: prevEvent.EventID(),
-		PrevSender:    prevEvent.SenderID(),
+		PrevSenderID:  string(prevEvent.SenderID()),
 	}
 
 	event.PDU, err = event.SetUnsigned(prev)

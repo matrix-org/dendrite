@@ -392,7 +392,7 @@ func TestPurgeRoom(t *testing.T) {
 type fledglingEvent struct {
 	Type       string
 	StateKey   *string
-	Sender     string
+	SenderID   string
 	RoomID     string
 	Redacts    string
 	Depth      int64
@@ -405,7 +405,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:     ev.Sender,
+		SenderID:   ev.SenderID,
 		Type:       ev.Type,
 		StateKey:   ev.StateKey,
 		RoomID:     ev.RoomID,
@@ -444,7 +444,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     alice.ID,
+					SenderID:   alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -461,7 +461,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     alice.ID,
+					SenderID:   alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -478,7 +478,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     bob.ID,
+					SenderID:   bob.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -494,7 +494,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     charlie.ID,
+					SenderID:   charlie.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
