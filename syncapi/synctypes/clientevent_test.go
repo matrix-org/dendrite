@@ -48,7 +48,8 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	if err != nil {
 		t.Fatalf("failed to create userID: %s", err)
 	}
-	ce := ToClientEvent(ev, FormatAll, *userID)
+	sk := ""
+	ce := ToClientEvent(ev, FormatAll, *userID, &sk)
 	if ce.EventID != ev.EventID() {
 		t.Errorf("ClientEvent.EventID: wanted %s, got %s", ev.EventID(), ce.EventID)
 	}
@@ -107,7 +108,8 @@ func TestToClientFormatSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create userID: %s", err)
 	}
-	ce := ToClientEvent(ev, FormatSync, *userID)
+	sk := ""
+	ce := ToClientEvent(ev, FormatSync, *userID, &sk)
 	if ce.RoomID != "" {
 		t.Errorf("ClientEvent.RoomID: wanted '', got %s", ce.RoomID)
 	}

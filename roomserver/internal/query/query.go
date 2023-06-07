@@ -393,7 +393,16 @@ func (r *Queryer) QueryMembershipsForRoom(
 			if queryErr == nil && userID != nil {
 				sender = *userID
 			}
-			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender)
+
+			sk := event.StateKey()
+			if sk != nil && *sk != "" {
+				skUserID, err := r.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+				if err == nil && skUserID != nil {
+					skString := skUserID.String()
+					sk = &skString
+				}
+			}
+			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender, sk)
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
 		}
 		return nil
@@ -447,7 +456,16 @@ func (r *Queryer) QueryMembershipsForRoom(
 		if err == nil && userID != nil {
 			sender = *userID
 		}
-		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender)
+
+		sk := event.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := r.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
+		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender, sk)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
 

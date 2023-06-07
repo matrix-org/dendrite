@@ -55,18 +55,27 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		if err == nil && userID != nil {
 			sender = *userID
 		}
-		evs = append(evs, ToClientEvent(se, format, sender))
+
+		sk := se.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := userIDForSender(se.RoomID(), spec.SenderID(*sk))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
+		evs = append(evs, ToClientEvent(se, format, sender, sk))
 	}
 	return evs
 }
 
 // ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender spec.UserID) ClientEvent {
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender spec.UserID, stateKey *string) ClientEvent {
 	ce := ClientEvent{
 		Content:        spec.RawJSON(se.Content()),
 		Sender:         sender.String(),
 		Type:           se.Type(),
-		StateKey:       se.StateKey(),
+		StateKey:       stateKey,
 		Unsigned:       spec.RawJSON(se.Unsigned()),
 		OriginServerTS: se.OriginServerTS(),
 		EventID:        se.EventID(),

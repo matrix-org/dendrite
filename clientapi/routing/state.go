@@ -145,9 +145,18 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			if err == nil && userID != nil {
 				sender = *userID
 			}
+
+			sk := ev.StateKey()
+			if sk != nil && *sk != "" {
+				skUserID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
+				if err == nil && skUserID != nil {
+					skString := skUserID.String()
+					sk = &skString
+				}
+			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender, sk),
 			)
 		}
 	} else {
@@ -172,9 +181,18 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			if err == nil && userID != nil {
 				sender = *userID
 			}
+
+			sk := ev.StateKey()
+			if sk != nil && *sk != "" {
+				skUserID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
+				if err == nil && skUserID != nil {
+					skString := skUserID.String()
+					sk = &skString
+				}
+			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender, sk),
 			)
 		}
 	}
@@ -349,8 +367,17 @@ func OnIncomingStateTypeRequest(
 	if err == nil && userID != nil {
 		sender = *userID
 	}
+
+	sk := event.StateKey()
+	if sk != nil && *sk != "" {
+		skUserID, err := rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+		if err == nil && skUserID != nil {
+			skString := skUserID.String()
+			sk = &skString
+		}
+	}
 	stateEvent := stateEventInStateResp{
-		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll, sender),
+		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk),
 	}
 
 	var res interface{}

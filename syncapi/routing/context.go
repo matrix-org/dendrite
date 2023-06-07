@@ -222,7 +222,16 @@ func Context(
 	if err == nil && userID != nil {
 		sender = *userID
 	}
-	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll, sender)
+
+	sk := requestedEvent.StateKey()
+	if sk != nil && *sk != "" {
+		skUserID, err := rsAPI.QueryUserIDForSender(ctx, requestedEvent.RoomID(), spec.SenderID(*requestedEvent.StateKey()))
+		if err == nil && skUserID != nil {
+			skString := skUserID.String()
+			sk = &skString
+		}
+	}
+	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll, sender, sk)
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,

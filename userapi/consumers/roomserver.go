@@ -306,7 +306,16 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		if queryErr == nil && userID != nil {
 			sender = *userID
 		}
-		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender)
+
+		sk := event.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
+		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk)
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
@@ -539,12 +548,21 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if err == nil && userID != nil {
 		sender = *userID
 	}
+
+	sk := event.StateKey()
+	if sk != nil && *sk != "" {
+		skUserID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+		if err == nil && skUserID != nil {
+			skString := skUserID.String()
+			sk = &skString
+		}
+	}
 	n := &api.Notification{
 		Actions: actions,
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender),
+		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender, sk),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it
