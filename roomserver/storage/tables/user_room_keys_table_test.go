@@ -50,14 +50,14 @@ func TestUserRoomKeysTable(t *testing.T) {
 
 		err = sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			var gotKey, key2, key3 ed25519.PrivateKey
-			gotKey, err = tab.InsertUserRoomPrivateKey(context.Background(), txn, userNID, roomNID, key)
+			gotKey, err = tab.InsertUserRoomPrivatePublicKey(context.Background(), txn, userNID, roomNID, key)
 			assert.NoError(t, err)
 			assert.Equal(t, gotKey, key)
 
 			// again, this shouldn't result in an error, but return the existing key
 			_, key2, err = ed25519.GenerateKey(nil)
 			assert.NoError(t, err)
-			gotKey, err = tab.InsertUserRoomPrivateKey(context.Background(), txn, userNID, roomNID, key2)
+			gotKey, err = tab.InsertUserRoomPrivatePublicKey(context.Background(), txn, userNID, roomNID, key2)
 			assert.NoError(t, err)
 			assert.Equal(t, gotKey, key)
 
@@ -65,12 +65,18 @@ func TestUserRoomKeysTable(t *testing.T) {
 			_, key3, err = ed25519.GenerateKey(nil)
 			assert.NoError(t, err)
 			userNID2 := types.EventStateKeyNID(2)
-			_, err = tab.InsertUserRoomPrivateKey(context.Background(), txn, userNID2, roomNID, key3)
+			_, err = tab.InsertUserRoomPrivatePublicKey(context.Background(), txn, userNID2, roomNID, key3)
 			assert.NoError(t, err)
 
 			gotKey, err = tab.SelectUserRoomPrivateKey(context.Background(), txn, userNID, roomNID)
 			assert.NoError(t, err)
 			assert.Equal(t, key, gotKey)
+
+			// try to update an existing key, this should only be done for users NOT on this homeserver
+			var gotPubKey ed25519.PublicKey
+			gotPubKey, err = tab.InsertUserRoomPublicKey(context.Background(), txn, userNID, roomNID, key2.Public().(ed25519.PublicKey))
+			assert.NoError(t, err)
+			assert.Equal(t, key2.Public(), gotPubKey)
 
 			// Key doesn't exist
 			gotKey, err = tab.SelectUserRoomPrivateKey(context.Background(), txn, userNID, 2)
@@ -80,7 +86,7 @@ func TestUserRoomKeysTable(t *testing.T) {
 			// query user NIDs for senderKeys
 			var gotKeys map[string]types.UserRoomKeyPair
 			query := map[types.RoomNID][]ed25519.PublicKey{
-				roomNID:          {key.Public().(ed25519.PublicKey), key3.Public().(ed25519.PublicKey)},
+				roomNID:          {key2.Public().(ed25519.PublicKey), key3.Public().(ed25519.PublicKey)},
 				types.RoomNID(2): {key.Public().(ed25519.PublicKey), key3.Public().(ed25519.PublicKey)}, // doesn't exist
 			}
 			gotKeys, err = tab.BulkSelectUserNIDs(context.Background(), txn, query)
@@ -88,7 +94,7 @@ func TestUserRoomKeysTable(t *testing.T) {
 			assert.NotNil(t, gotKeys)
 
 			wantKeys := map[string]types.UserRoomKeyPair{
-				string(key.Public().(ed25519.PublicKey)):  {RoomNID: roomNID, EventStateKeyNID: userNID},
+				string(key2.Public().(ed25519.PublicKey)): {RoomNID: roomNID, EventStateKeyNID: userNID},
 				string(key3.Public().(ed25519.PublicKey)): {RoomNID: roomNID, EventStateKeyNID: userNID2},
 			}
 			assert.Equal(t, wantKeys, gotKeys)

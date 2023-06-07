@@ -1614,7 +1614,7 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 	})
 }
 
-// InsertUserRoomPrivateKey inserts a new user room key for the given user and room.
+// InsertUserRoomPrivatePublicKey inserts a new user room key for the given user and room.
 // Returns the newly inserted private key or an existing private key. If there is
 // an error talking to the database, returns that error.
 func (d *Database) InsertUserRoomPrivatePublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
@@ -1635,7 +1635,7 @@ func (d *Database) InsertUserRoomPrivatePublicKey(ctx context.Context, userID sp
 		}
 
 		var iErr error
-		result, iErr = d.UserRoomKeyTable.InsertUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID, key)
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPrivatePublicKey(ctx, txn, stateKeyNID, roomInfo.RoomNID, key)
 		return iErr
 	})
 	return result, err

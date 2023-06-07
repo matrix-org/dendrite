@@ -45,7 +45,7 @@ const insertUserRoomKeySQL = `
 
 const insertUserRoomPublicKeySQL = `
 	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_pub_key) VALUES ($1, $2, $3)
-	ON CONFLICT DO UPDATE SET pseudo_id_pub_key = roomserver_user_room_keys.pseudo_id_pub_key
+	ON CONFLICT DO UPDATE SET pseudo_id_pub_key = $3
 	RETURNING (pseudo_id_pub_key)
 `
 
@@ -75,7 +75,7 @@ func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
 	}.Prepare(db)
 }
 
-func (s *userRoomKeysStatements) InsertUserRoomPrivateKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+func (s *userRoomKeysStatements) InsertUserRoomPrivatePublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
 	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPrivateKeyStmt)
 	err = stmt.QueryRowContext(ctx, userNID, roomNID, key, key.Public()).Scan(&result)
 	return result, err
