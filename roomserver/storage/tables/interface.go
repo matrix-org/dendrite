@@ -186,9 +186,14 @@ type Purge interface {
 }
 
 type UserRoomKeys interface {
+	// InsertUserRoomPrivatePublicKey inserts the given private key as well as the public key for it. This should be used
+	// when creating keys locally.
 	InsertUserRoomPrivatePublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (ed25519.PrivateKey, error)
+	// InsertUserRoomPublicKey inserts the given public key, this should be used for users NOT local to this server
 	InsertUserRoomPublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (ed25519.PublicKey, error)
+	// SelectUserRoomPrivateKey selects the private key for the given user and room combination
 	SelectUserRoomPrivateKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID) (ed25519.PrivateKey, error)
+	// BulkSelectUserNIDs selects all userIDs for the requested senderKeys. Returns a map from publicKey -> types.UserRoomKeyPair.
 	BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error)
 }
 
