@@ -99,7 +99,41 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*rstypes.He
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
+}
+
+func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Device, in []types.StreamEvent, rsAPI api.SyncRoomserverAPI) []*rstypes.HeaderedEvent {
+	out := make([]*rstypes.HeaderedEvent, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i].HeaderedEvent
+		if device != nil && in[i].TransactionID != nil {
+			userID, err := spec.NewUserID(device.UserID, true)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, in[i].RoomID(), *userID)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			if deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
+				err := out[i].SetUnsignedField(
+					"transaction_id", in[i].TransactionID.TransactionID,
+				)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"event_id": out[i].EventID(),
+					}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}
+			}
+		}
+	}
+	return out
 }
 
 // AddInviteEvent stores a new invite event for a user.
@@ -188,45 +222,6 @@ func (d *Database) UpsertAccountData(
 		return err
 	})
 	return
-}
-
-func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*rstypes.HeaderedEvent {
-	out := make([]*rstypes.HeaderedEvent, len(in))
-	for i := 0; i < len(in); i++ {
-		out[i] = in[i].HeaderedEvent
-		if device != nil && in[i].TransactionID != nil {
-			userID, err := spec.NewUserID(device.UserID, true)
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"event_id": out[i].EventID(),
-				}).WithError(err).Warnf("Failed to add transaction ID to event")
-				continue
-			}
-			deviceSenderID, err := d.getSenderIDForUser(in[i].RoomID(), *userID)
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"event_id": out[i].EventID(),
-				}).WithError(err).Warnf("Failed to add transaction ID to event")
-				continue
-			}
-			if deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
-				err := out[i].SetUnsignedField(
-					"transaction_id", in[i].TransactionID.TransactionID,
-				)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						"event_id": out[i].EventID(),
-					}).WithError(err).Warnf("Failed to add transaction ID to event")
-				}
-			}
-		}
-	}
-	return out
-}
-
-func (d *Database) getSenderIDForUser(roomID string, userID spec.UserID) (spec.SenderID, error) { // nolint
-	// TODO: Replace with actual logic for pseudoIDs
-	return spec.SenderID(userID.String()), nil
 }
 
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of

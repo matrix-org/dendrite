@@ -495,7 +495,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	}
 
 	// Append the events ve previously retrieved locally.
-	events = append(events, r.snapshot.StreamEventsToEvents(nil, streamEvents)...)
+	events = append(events, r.snapshot.StreamEventsToEvents(r.ctx, nil, streamEvents, r.rsAPI)...)
 	sort.Sort(eventsByDepth(events))
 
 	return

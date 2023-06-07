@@ -175,12 +175,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 	eventFilter := req.Filter.Room.Timeline
 
 	if req.WantFullState {
-		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
 			return from
 		}
 	} else {
-		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
 			return from
 		}
@@ -275,7 +275,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	limited := dbEvents[delta.RoomID].Limited
 
 	recEvents := gomatrixserverlib.ReverseTopologicalOrdering(
-		gomatrixserverlib.ToPDUs(snapshot.StreamEventsToEvents(device, recentStreamEvents)),
+		gomatrixserverlib.ToPDUs(snapshot.StreamEventsToEvents(ctx, device, recentStreamEvents, p.rsAPI)),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
 	recentEvents := make([]*rstypes.HeaderedEvent, len(recEvents))
@@ -512,7 +512,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// We don't include a device here as we don't need to send down
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
-	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
+	recentEvents := snapshot.StreamEventsToEvents(ctx, device, recentStreamEvents, p.rsAPI)
 
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
