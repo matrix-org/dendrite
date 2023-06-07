@@ -810,10 +810,20 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				Type:     event.Type(),
 			},
 		}
-		if mem, err := event.Membership(); err == nil {
+		if mem, memberErr := event.Membership(); memberErr == nil {
 			req.Notification.Membership = mem
 		}
-		if event.StateKey() != nil && *event.StateKey() == fmt.Sprintf("@%s:%s", localpart, s.cfg.Matrix.ServerName) {
+		userID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", localpart, s.cfg.Matrix.ServerName), true)
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
+			return nil, err
+		}
+		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, event.RoomID(), *userID)
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
+			return nil, err
+		}
+		if event.StateKey() != nil && *event.StateKey() == string(localSender) {
 			req.Notification.UserIsTarget = true
 		}
 	}
