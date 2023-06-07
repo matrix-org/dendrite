@@ -195,7 +195,21 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].HeaderedEvent
 		if device != nil && in[i].TransactionID != nil {
-			if device.UserID == in[i].Sender() && device.SessionID == in[i].TransactionID.SessionID {
+			userID, err := spec.NewUserID(device.UserID, true)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			deviceSenderID, err := d.getSenderIDForUser(in[i].RoomID(), *userID)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			if deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
 				err := out[i].SetUnsignedField(
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)
@@ -208,6 +222,11 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 		}
 	}
 	return out
+}
+
+func (d *Database) getSenderIDForUser(roomID string, userID spec.UserID) (string, error) { // nolint
+	// TODO: Repalce with actual logic for pseudoIDs
+	return userID.String(), nil
 }
 
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of

@@ -348,7 +348,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		event.EventID(),
 		headeredJSON,
 		event.Type(),
-		event.Sender(),
+		event.SenderID(),
 		containsURL,
 		string(addStateJSON),
 		string(removeStateJSON),

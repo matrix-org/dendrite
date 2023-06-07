@@ -343,7 +343,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		event.RoomID(),
 		event.EventID(),
 		event.Type(),
-		event.Sender(),
+		event.SenderID(),
 		containsURL,
 		*event.StateKey(),
 		headeredJSON,

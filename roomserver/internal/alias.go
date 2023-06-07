@@ -119,11 +119,6 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	_, virtualHost, err := r.Cfg.Global.SplitLocalID('@', request.UserID)
-	if err != nil {
-		return err
-	}
-
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
@@ -134,13 +129,19 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return nil
 	}
 
+	sender, err := r.QueryUserIDForSender(ctx, roomID, request.SenderID)
+	if err != nil {
+		return fmt.Errorf("r.QueryUserIDForSender: %w", err)
+	}
+	virtualHost := sender.Domain()
+
 	response.Found = true
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetCreatorIDForAlias: %w", err)
 	}
 
-	if creatorID != request.UserID {
+	if creatorID != request.SenderID {
 		var plEvent *types.HeaderedEvent
 		var pls *gomatrixserverlib.PowerLevelContent
 
@@ -154,7 +155,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			return fmt.Errorf("plEvent.PowerLevels: %w", err)
 		}
 
-		if pls.UserLevel(request.UserID) < pls.EventLevel(spec.MRoomCanonicalAlias, true) {
+		if pls.UserLevel(request.SenderID) < pls.EventLevel(spec.MRoomCanonicalAlias, true) {
 			response.Removed = false
 			return nil
 		}
@@ -172,9 +173,9 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			sender := request.UserID
-			if request.UserID != ev.Sender() {
-				sender = ev.Sender()
+			sender := request.SenderID
+			if request.SenderID != ev.SenderID() {
+				sender = ev.SenderID()
 			}
 
 			_, senderDomain, err := r.Cfg.Global.SplitLocalID('@', sender)

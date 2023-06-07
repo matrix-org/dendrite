@@ -5,7 +5,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+func UserIDForSender(roomID string, senderID string) (*spec.UserID, error) {
+	return spec.NewUserID(senderID, true)
+}
 
 func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 	ev := mustEventFromJSON(t, `{}`)
@@ -45,7 +50,7 @@ func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			rse := NewRuleSetEvaluator(fakeEvaluationContext{3}, &tst.RuleSet)
-			got, err := rse.MatchEvent(tst.Event)
+			got, err := rse.MatchEvent(tst.Event, UserIDForSender)
 			if err != nil {
 				t.Fatalf("MatchEvent failed: %v", err)
 			}
@@ -82,15 +87,15 @@ func TestRuleMatches(t *testing.T) {
 		{"contentMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("b")}, `{"content":{"body":"abc"}}`, true},
 		{"contentNoMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("d")}, `{"content":{"body":"abc"}}`, false},
 
-		{"roomMatch", RoomKind, Rule{Enabled: true, RuleID: "!room@example.com"}, `{"room_id":"!room@example.com"}`, true},
-		{"roomNoMatch", RoomKind, Rule{Enabled: true, RuleID: "!room@example.com"}, `{"room_id":"!otherroom@example.com"}`, false},
+		{"roomMatch", RoomKind, Rule{Enabled: true, RuleID: "!room:example.com"}, `{"room_id":"!room:example.com"}`, true},
+		{"roomNoMatch", RoomKind, Rule{Enabled: true, RuleID: "!room:example.com"}, `{"room_id":"!otherroom:example.com"}`, false},
 
-		{"senderMatch", SenderKind, Rule{Enabled: true, RuleID: "@user@example.com"}, `{"sender":"@user@example.com"}`, true},
-		{"senderNoMatch", SenderKind, Rule{Enabled: true, RuleID: "@user@example.com"}, `{"sender":"@otheruser@example.com"}`, false},
+		{"senderMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@user:example.com"}`, true},
+		{"senderNoMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@otheruser:example.com"}`, false},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
-			got, err := ruleMatches(&tst.Rule, tst.Kind, mustEventFromJSON(t, tst.EventJSON), nil)
+			got, err := ruleMatches(&tst.Rule, tst.Kind, mustEventFromJSON(t, tst.EventJSON), nil, UserIDForSender)
 			if err != nil {
 				t.Fatalf("ruleMatches failed: %v", err)
 			}

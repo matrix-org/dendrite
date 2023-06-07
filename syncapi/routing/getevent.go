@@ -101,8 +101,13 @@ func GetEvent(
 		}
 	}
 
+	sender := spec.UserID{}
+	senderUserID, err := rsAPI.QueryUserIDForSender(req.Context(), roomID, events[0].SenderID())
+	if err == nil && senderUserID != nil {
+		sender = *senderUserID
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll),
+		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll, sender),
 	}
 }

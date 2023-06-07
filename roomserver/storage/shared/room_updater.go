@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -249,4 +250,8 @@ func (u *RoomUpdater) MarkEventAsSent(eventNID types.EventNID) error {
 
 func (u *RoomUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (*MembershipUpdater, error) {
 	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomInfo.RoomNID, targetUserNID, targetLocal)
+}
+
+func (u *RoomUpdater) GetUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
+	return u.d.GetUserIDForSender(ctx, roomID, senderID)
 }

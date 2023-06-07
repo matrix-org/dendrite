@@ -97,11 +97,12 @@ func (r *Inviter) ProcessInviteMembership(
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
 	var updater *shared.MembershipUpdater
-	_, domain, err := gomatrixserverlib.SplitID('@', *inviteEvent.StateKey())
+
+	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey())
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
 	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
@@ -125,9 +126,9 @@ func (r *Inviter) PerformInvite(
 ) error {
 	event := req.Event
 
-	sender, err := spec.NewUserID(event.Sender(), true)
+	sender, err := r.DB.GetUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
-		return spec.InvalidParam("The user ID is invalid")
+		return spec.InvalidParam("The sender user ID is invalid")
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
 		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
@@ -155,6 +156,9 @@ func (r *Inviter) PerformInvite(
 		StrippedState:     req.InviteRoomState,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB},
+		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+		},
 	}
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
 	if err != nil {

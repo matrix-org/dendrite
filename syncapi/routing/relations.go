@@ -114,9 +114,14 @@ func Relations(
 	// type if it was specified.
 	res.Chunk = make([]synctypes.ClientEvent, 0, len(filteredEvents))
 	for _, event := range filteredEvents {
+		sender := spec.UserID{}
+		userID, err := rsAPI.QueryUserIDForSender(req.Context(), event.RoomID(), event.SenderID())
+		if err == nil && userID != nil {
+			sender = *userID
+		}
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender),
 		)
 	}
 

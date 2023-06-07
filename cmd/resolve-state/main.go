@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -182,7 +183,9 @@ func main() {
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
-		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents,
+		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID, senderID string) (*spec.UserID, error) {
+			return roomserverDB.GetUserIDForSender(ctx, roomID, senderID)
+		},
 	)
 	if err != nil {
 		panic(err)
