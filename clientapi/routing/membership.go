@@ -340,17 +340,18 @@ func sendInvite(
 
 func buildMembershipEventDirect(
 	ctx context.Context,
-	targetUserID, reason string, userDisplayName, userAvatarURL string,
-	sender string, senderDomain spec.ServerName,
+	targetSenderID spec.SenderID, reason string, userDisplayName, userAvatarURL string,
+	sender spec.SenderID, senderDomain spec.ServerName,
 	membership, roomID string, isDirect bool,
 	keyID gomatrixserverlib.KeyID, privateKey ed25519.PrivateKey, evTime time.Time,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) (*types.HeaderedEvent, error) {
+	targetSenderString := string(targetSenderID)
 	proto := gomatrixserverlib.ProtoEvent{
-		SenderID: sender,
+		SenderID: string(sender),
 		RoomID:   roomID,
 		Type:     "m.room.member",
-		StateKey: &targetUserID,
+		StateKey: &targetSenderString,
 	}
 
 	content := gomatrixserverlib.MemberContent{
@@ -391,8 +392,25 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return buildMembershipEventDirect(ctx, targetUserID, reason, profile.DisplayName, profile.AvatarURL,
-		device.UserID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
+	if err != nil {
+		return nil, err
+	}
+
+	targetID, err := spec.NewUserID(targetUserID, true)
+	if err != nil {
+		return nil, err
+	}
+	targetSenderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *targetID)
+	if err != nil {
+		return nil, err
+	}
+	return buildMembershipEventDirect(ctx, targetSenderID, reason, profile.DisplayName, profile.AvatarURL,
+		senderID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
