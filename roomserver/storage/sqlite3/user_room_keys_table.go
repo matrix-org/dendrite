@@ -51,13 +51,13 @@ const insertUserRoomPublicKeySQL = `
 
 const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
-const selectUserNIDsSQL = `SELECT user_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE pseudo_id_pub_key IN ($1)`
+const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid IN ($1) AND pseudo_id_pub_key IN ($2)`
 
 type userRoomKeysStatements struct {
 	insertUserRoomPrivateKeyStmt *sql.Stmt
 	insertUserRoomPublicKeyStmt  *sql.Stmt
 	selectUserRoomKeyStmt        *sql.Stmt
-	selectUserNIDsStmt           *sql.Stmt
+	//selectUserNIDsStmt           *sql.Stmt //prepared at runtime
 }
 
 func CreateUserRoomKeysTable(db *sql.DB) error {
@@ -71,7 +71,7 @@ func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
 		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomKeySQL},
 		{&s.insertUserRoomPublicKeyStmt, insertUserRoomPublicKeySQL},
 		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
-		{&s.selectUserNIDsStmt, selectUserNIDsSQL}, //prepared at runtime
+		//{&s.selectUserNIDsStmt, selectUserNIDsSQL}, //prepared at runtime
 	}.Prepare(db)
 }
 
@@ -102,25 +102,30 @@ func (s *userRoomKeysStatements) SelectUserRoomPrivateKey(
 	return result, err
 }
 
-func (s *userRoomKeysStatements) BulkSelectUserNIDs(
-	ctx context.Context,
-	txn *sql.Tx,
-	senderKeys [][]byte,
-) (map[string]types.EventStateKeyNID, error) {
+func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error) {
 
-	selectSQL := strings.Replace(selectUserNIDsSQL, "($1)", sqlutil.QueryVariadic(len(senderKeys)), 1)
+	roomNIDs := make([]any, 0, len(senderKeys))
+	var senders []any
+	for roomNID := range senderKeys {
+		roomNIDs = append(roomNIDs, roomNID)
+
+		for _, key := range senderKeys[roomNID] {
+			senders = append(senders, []byte(key))
+		}
+	}
+
+	selectSQL := strings.Replace(selectUserNIDsSQL, "($2)", sqlutil.QueryVariadicOffset(len(senders), len(senderKeys)), 1)
+	selectSQL = strings.Replace(selectSQL, "($1)", sqlutil.QueryVariadic(len(senderKeys)), 1) // replace $1 with the roomNIDs
+
 	selectStmt, err := txn.Prepare(selectSQL)
 	if err != nil {
 		return nil, err
 	}
 
-	params := make([]interface{}, len(senderKeys))
-	for i := range senderKeys {
-		params[i] = senderKeys[i]
-	}
+	params := append(roomNIDs, senders...)
 
 	stmt := sqlutil.TxStmt(txn, selectStmt)
-	defer internal.CloseAndLogIfError(ctx, stmt, "failed to close transaction")
+	defer internal.CloseAndLogIfError(ctx, stmt, "failed to close statement")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -128,14 +133,14 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 
-	result := make(map[string]types.EventStateKeyNID, len(senderKeys))
+	result := make(map[string]types.UserRoomKeyPair, len(params))
 	var publicKey []byte
-	var userNID types.EventStateKeyNID
+	userRoomKeyPair := types.UserRoomKeyPair{}
 	for rows.Next() {
-		if err = rows.Scan(&userNID, &publicKey); err != nil {
+		if err = rows.Scan(&userRoomKeyPair.EventStateKeyNID, &userRoomKeyPair.RoomNID, &publicKey); err != nil {
 			return nil, err
 		}
-		result[string(publicKey)] = userNID
+		result[string(publicKey)] = userRoomKeyPair
 	}
 	return result, rows.Err()
 }

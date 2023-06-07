@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -1616,7 +1617,7 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 // InsertUserRoomPrivateKey inserts a new user room key for the given user and room.
 // Returns the newly inserted private key or an existing private key. If there is
 // an error talking to the database, returns that error.
-func (d *Database) InsertUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+func (d *Database) InsertUserRoomPrivatePublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
 	uID := userID.String()
 	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
 	if sErr != nil {
@@ -1696,28 +1697,57 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 	return
 }
 
-// SelectUserIDsForPublicKeys returns a map from senderKey -> userID
-func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys [][]byte) (result map[string]string, err error) {
-	result = make(map[string]string, len(publicKeys))
+// SelectUserIDsForPublicKeys returns a map from roomID -> map from senderKey -> userID
+func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys map[spec.RoomID][]ed25519.PublicKey) (result map[spec.RoomID]map[string]string, err error) {
+	result = make(map[spec.RoomID]map[string]string, len(publicKeys))
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var sErr error
-		var userNIDKeyMap map[string]types.EventStateKeyNID
-		userNIDKeyMap, sErr = d.UserRoomKeyTable.BulkSelectUserNIDs(ctx, txn, publicKeys)
+
+		// map all roomIDs to roomNIDs
+		query := make(map[types.RoomNID][]ed25519.PublicKey)
+		rooms := make(map[types.RoomNID]spec.RoomID)
+		for roomID, keys := range publicKeys {
+			roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID.String())
+			if !ok {
+				roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+				if rErr != nil {
+					return rErr
+				}
+				if roomInfo == nil {
+					logrus.Warnf("missing room info for %s, there will be missing users in the response", roomID.String())
+					continue
+				}
+				roomNID = roomInfo.RoomNID
+			}
+
+			query[roomNID] = keys
+			rooms[roomNID] = roomID
+		}
+
+		// get the user room key pars
+		userRoomKeyPairMap, sErr := d.UserRoomKeyTable.BulkSelectUserNIDs(ctx, txn, query)
 		if sErr != nil {
 			return sErr
 		}
-		nids := make([]types.EventStateKeyNID, 0, len(userNIDKeyMap))
-		for _, nid := range userNIDKeyMap {
-			nids = append(nids, nid)
+		nids := make([]types.EventStateKeyNID, 0, len(userRoomKeyPairMap))
+		for _, nid := range userRoomKeyPairMap {
+			nids = append(nids, nid.EventStateKeyNID)
 		}
+		// get the userIDs
 		nidMAP, seErr := d.EventStateKeys(ctx, nids)
 		if seErr != nil {
 			return seErr
 		}
 
-		for publicKey, userNID := range userNIDKeyMap {
-			userID := nidMAP[userNID]
-			result[publicKey] = userID
+		// build the result map (roomID -> map publicKey -> userID)
+		for publicKey, userRoomKeyPair := range userRoomKeyPairMap {
+			userID := nidMAP[userRoomKeyPair.EventStateKeyNID]
+			roomID := rooms[userRoomKeyPair.RoomNID]
+			resMap, exists := result[roomID]
+			if !exists {
+				resMap = map[string]string{}
+			}
+			resMap[publicKey] = userID
+			result[roomID] = resMap
 		}
 
 		return nil

@@ -78,14 +78,18 @@ func TestUserRoomKeysTable(t *testing.T) {
 			assert.Nil(t, gotKey)
 
 			// query user NIDs for senderKeys
-			var gotKeys map[string]types.EventStateKeyNID
-			gotKeys, err = tab.BulkSelectUserNIDs(context.Background(), txn, [][]byte{key.Public().(ed25519.PublicKey), key3.Public().(ed25519.PublicKey)})
+			var gotKeys map[string]types.UserRoomKeyPair
+			query := map[types.RoomNID][]ed25519.PublicKey{
+				roomNID:          {key.Public().(ed25519.PublicKey), key3.Public().(ed25519.PublicKey)},
+				types.RoomNID(2): {key.Public().(ed25519.PublicKey), key3.Public().(ed25519.PublicKey)}, // doesn't exist
+			}
+			gotKeys, err = tab.BulkSelectUserNIDs(context.Background(), txn, query)
 			assert.NoError(t, err)
 			assert.NotNil(t, gotKeys)
 
-			wantKeys := map[string]types.EventStateKeyNID{
-				string(key.Public().(ed25519.PublicKey)):  userNID,
-				string(key3.Public().(ed25519.PublicKey)): userNID2,
+			wantKeys := map[string]types.UserRoomKeyPair{
+				string(key.Public().(ed25519.PublicKey)):  {RoomNID: roomNID, EventStateKeyNID: userNID},
+				string(key3.Public().(ed25519.PublicKey)): {RoomNID: roomNID, EventStateKeyNID: userNID2},
 			}
 			assert.Equal(t, wantKeys, gotKeys)
 

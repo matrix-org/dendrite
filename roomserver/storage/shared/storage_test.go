@@ -148,14 +148,14 @@ func TestUserRoomKeys(t *testing.T) {
 		_, key, err := ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
 
-		gotKey, err := db.InsertUserRoomPrivateKey(ctx, *userID, *roomID, key)
+		gotKey, err := db.InsertUserRoomPrivatePublicKey(ctx, *userID, *roomID, key)
 		assert.NoError(t, err)
 		assert.Equal(t, gotKey, key)
 
 		// again, this shouldn't result in an error, but return the existing key
 		_, key2, err := ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
-		gotKey, err = db.InsertUserRoomPrivateKey(ctx, *userID, *roomID, key2)
+		gotKey, err = db.InsertUserRoomPrivatePublicKey(ctx, *userID, *roomID, key2)
 		assert.NoError(t, err)
 		assert.Equal(t, gotKey, key)
 
@@ -169,9 +169,18 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
 
-		userIDs, err := db.SelectUserIDsForPublicKeys(ctx, [][]byte{key.Public().(ed25519.PublicKey)})
+		queryUserIDs := map[spec.RoomID][]ed25519.PublicKey{
+			*roomID: {key.Public().(ed25519.PublicKey)},
+		}
+
+		userIDs, err := db.SelectUserIDsForPublicKeys(ctx, queryUserIDs)
 		assert.NoError(t, err)
-		assert.NotNil(t, userIDs)
+		wantKeys := map[spec.RoomID]map[string]string{
+			*roomID: {
+				string(key.Public().(ed25519.PublicKey)): userID.String(),
+			},
+		}
+		assert.Equal(t, wantKeys, userIDs)
 
 		// insert key that came in over federation
 		var gotPublicKey, key4 ed255192.PublicKey
@@ -186,7 +195,7 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = db.InsertUserRoomPublicKey(context.Background(), *userID, *reallyDoesNotExist, key4)
 		assert.Error(t, err)
-		_, err = db.InsertUserRoomPrivateKey(context.Background(), *userID, *reallyDoesNotExist, key)
+		_, err = db.InsertUserRoomPrivatePublicKey(context.Background(), *userID, *reallyDoesNotExist, key)
 		assert.Error(t, err)
 	})
 }
