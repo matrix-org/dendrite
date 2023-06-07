@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"golang.org/x/crypto/bcrypt"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -83,12 +84,16 @@ func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (b
 	return d.RegistrationTokens.RegistrationTokenExists(ctx, nil, token)
 }
 
-func (d *Database) InsertRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (created bool, err error) {
+func (d *Database) InsertRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (created bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		created, err = d.RegistrationTokens.InsertRegistrationToken(ctx, txn, token, usesAllowed, expiryTime)
+		created, err = d.RegistrationTokens.InsertRegistrationToken(ctx, txn, registrationToken)
 		return err
 	})
 	return
+}
+
+func (d *Database) ListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error) {
+	return d.RegistrationTokens.ListRegistrationTokens(ctx, nil, returnAll, valid)
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.

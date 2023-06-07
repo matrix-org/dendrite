@@ -33,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
@@ -63,19 +64,27 @@ type UserInternalAPI struct {
 	Updater     *DeviceListUpdater
 }
 
-func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (bool, error) {
-	exists, err := a.DB.RegistrationTokenExists(ctx, token)
+func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error) {
+	exists, err := a.DB.RegistrationTokenExists(ctx, *registrationToken.Token)
 	if err != nil {
 		return false, err
 	}
 	if exists {
-		return false, fmt.Errorf("token: %s already exists", token)
+		return false, fmt.Errorf("token: %s already exists", *registrationToken.Token)
 	}
-	_, err = a.DB.InsertRegistrationToken(ctx, token, usesAllowed, expiryTime)
+	_, err = a.DB.InsertRegistrationToken(ctx, registrationToken)
 	if err != nil {
-		return false, fmt.Errorf("Error creating token: %s"+err.Error(), token)
+		return false, fmt.Errorf("Error creating token: %s"+err.Error(), *registrationToken.Token)
 	}
 	return true, nil
+}
+
+func (a *UserInternalAPI) PerformAdminListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error) {
+	tokens, err := a.DB.ListRegistrationTokens(ctx, returnAll, valid)
+	if err != nil {
+		return nil, err
+	}
+	return tokens, nil
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {

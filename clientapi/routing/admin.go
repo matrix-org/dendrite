@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -101,13 +103,20 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 			string(spec.ErrorInvalidParam),
 			"expiry_time must not be in the past")
 	}
-	pending := 0
-	completed := 0
+	pending := int32(0)
+	completed := int32(0)
 	// If usesAllowed or expiryTime is 0, it means they are not present in the request. NULL (indicating unlimited uses / no expiration will be persisted in DB)
-	created, err := userAPI.PerformAdminCreateRegistrationToken(req.Context(), token, usesAllowed, expiryTime)
+	registrationToken := &clientapi.RegistrationToken{
+		Token:       &token,
+		UsesAllowed: &usesAllowed,
+		Pending:     &pending,
+		Completed:   &completed,
+		ExpiryTime:  &expiryTime,
+	}
+	created, err := userAPI.PerformAdminCreateRegistrationToken(req.Context(), registrationToken)
 	if err != nil {
 		return util.MatrixErrorResponse(
-			http.StatusInternalServerError,
+			http.StatusBadRequest,
 			string(spec.ErrorUnknown),
 			err.Error(),
 		)
@@ -146,6 +155,38 @@ func getReturnValueForUsesAllowed(usesAllowed int32) interface{} {
 		return nil
 	}
 	return usesAllowed
+}
+
+func AdminListRegistrationTokens(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.MatrixErrorResponse(
+			http.StatusInternalServerError,
+			string(spec.ErrorInvalidParam),
+			"unable to parse query params",
+		)
+	}
+	returnAll := true
+	validQuery, ok := vars["valid"]
+	if ok {
+		returnAll = false
+	}
+	valid, err := strconv.ParseBool(validQuery)
+	tokens, err := userAPI.PerformAdminListRegistrationTokens(req.Context(), returnAll, valid)
+	if err != nil {
+		return util.MatrixErrorResponse(
+			http.StatusInternalServerError,
+			string(spec.ErrorUnknown),
+			"error fetching registration tokens",
+		)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{
+			"registration_tokens": tokens,
+		},
+	}
 }
 
 func getReturnValueExpiryTime(expiryTime int64) interface{} {

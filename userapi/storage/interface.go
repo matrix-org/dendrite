@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -32,7 +33,8 @@ import (
 
 type RegistrationTokens interface {
 	RegistrationTokenExists(ctx context.Context, token string) (bool, error)
-	InsertRegistrationToken(ctx context.Context, token string, usesAllowed int32, expiryTime int64) (bool, error)
+	InsertRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error)
+	ListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error)
 }
 
 type Profile interface {
