@@ -2,6 +2,7 @@ package routing
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -20,6 +22,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
+
+type FakeSyncRoomserverAPI struct{ rsapi.SyncRoomserverAPI }
+
+func (f *FakeSyncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
 
 func TestSearch(t *testing.T) {
 	alice := test.NewUser(t)
@@ -247,7 +255,7 @@ func TestSearch(t *testing.T) {
 				assert.NoError(t, err)
 				req := httptest.NewRequest(http.MethodPost, "/", reqBody)
 
-				res := Search(req, tc.device, db, fts, tc.from)
+				res := Search(req, tc.device, db, fts, tc.from, &FakeSyncRoomserverAPI{})
 				if !tc.wantOK && !res.Is2xx() {
 					return
 				}

@@ -39,6 +39,10 @@ var (
 	roomIDCounter = int64(0)
 )
 
+func UserIDForSender(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 type Room struct {
 	ID           string
 	Version      gomatrixserverlib.RoomVersion
@@ -164,7 +168,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	}
 
 	builder := gomatrixserverlib.MustGetRoomVersion(r.Version).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:   creator.ID,
+		SenderID: creator.ID,
 		RoomID:   r.ID,
 		Type:     eventType,
 		StateKey: mod.stateKey,
@@ -195,7 +199,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to build event: %s", eventType, err)
 	}
-	if err = gomatrixserverlib.Allowed(ev, &r.authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(ev, &r.authEvents, UserIDForSender); err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
 	headeredEvent := &rstypes.HeaderedEvent{PDU: ev}

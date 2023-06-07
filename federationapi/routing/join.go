@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -32,53 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 )
-
-type JoinRoomQuerier struct {
-	roomserver api.FederationRoomserverAPI
-}
-
-func (rq *JoinRoomQuerier) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
-	return rq.roomserver.CurrentStateEvent(ctx, roomID, eventType, stateKey)
-}
-
-func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
-	return rq.roomserver.InvitePending(ctx, roomID, userID)
-}
-
-func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, userID spec.UserID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
-	roomInfo, err := rq.roomserver.QueryRoomInfo(ctx, roomID)
-	if err != nil || roomInfo == nil || roomInfo.IsStub() {
-		return nil, err
-	}
-
-	req := api.QueryServerJoinedToRoomRequest{
-		ServerName: localServerName,
-		RoomID:     roomID.String(),
-	}
-	res := api.QueryServerJoinedToRoomResponse{}
-	if err = rq.roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
-		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
-	}
-
-	userJoinedToRoom, err := rq.roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), userID)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
-		return nil, fmt.Errorf("InternalServerError: %w", err)
-	}
-
-	locallyJoinedUsers, err := rq.roomserver.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
-		return nil, fmt.Errorf("InternalServerError: %w", err)
-	}
-
-	return &gomatrixserverlib.RestrictedRoomJoinInfo{
-		LocalServerInRoom: res.RoomExists && res.IsInRoom,
-		UserJoinedToRoom:  userJoinedToRoom,
-		JoinedUsers:       locallyJoinedUsers,
-	}, nil
-}
 
 // MakeJoin implements the /make_join API
 func MakeJoin(
@@ -103,7 +55,7 @@ func MakeJoin(
 		RoomID:     roomID.String(),
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
-	if err := rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
+	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -112,26 +64,26 @@ func MakeJoin(
 	}
 
 	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
-		if err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Errorf("obtaining signing identity for %s failed", request.Destination())
+		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
+		if signErr != nil {
+			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 
 		queryRes := api.QueryLatestEventsAndStateResponse{
 			RoomVersion: roomVersion,
 		}
-		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
-		switch e := err.(type) {
+		event, signErr := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
+		switch e := signErr.(type) {
 		case nil:
 		case eventutil.ErrRoomNoExists:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(signErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.NotFound("Room does not exist")
 		case gomatrixserverlib.BadJSONError:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(signErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.BadJSON(e.Error())
 		default:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(signErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.InternalServerError{}
 		}
 
@@ -142,20 +94,33 @@ func MakeJoin(
 		return event, stateEvents, nil
 	}
 
-	roomQuerier := JoinRoomQuerier{
-		roomserver: rsAPI,
+	roomQuerier := api.JoinRoomQuerier{
+		Roomserver: rsAPI,
+	}
+
+	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID.String(), userID)
+	if err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	input := gomatrixserverlib.HandleMakeJoinInput{
-		Context:            httpReq.Context(),
-		UserID:             userID,
-		RoomID:             roomID,
-		RoomVersion:        roomVersion,
-		RemoteVersions:     remoteVersions,
-		RequestOrigin:      request.Origin(),
-		LocalServerName:    cfg.Matrix.ServerName,
-		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
-		RoomQuerier:        &roomQuerier,
+		Context:           httpReq.Context(),
+		UserID:            userID,
+		SenderID:          senderID,
+		RoomID:            roomID,
+		RoomVersion:       roomVersion,
+		RemoteVersions:    remoteVersions,
+		RequestOrigin:     request.Origin(),
+		LocalServerName:   cfg.Matrix.ServerName,
+		LocalServerInRoom: res.RoomExists && res.IsInRoom,
+		RoomQuerier:       &roomQuerier,
+		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 		BuildEventTemplate: createJoinTemplate,
 	}
 	response, internalErr := gomatrixserverlib.HandleMakeJoin(input)
@@ -250,6 +215,9 @@ func SendJoin(
 		PrivateKey:        cfg.Matrix.PrivateKey,
 		Verifier:          keys,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 	}
 	response, joinErr := gomatrixserverlib.HandleSendJoin(input)
 	switch e := joinErr.(type) {

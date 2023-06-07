@@ -76,7 +76,9 @@ func CheckForSoftFail(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		return db.GetUserIDForSender(ctx, roomID, senderID)
+	}); err != nil {
 		// return true, nil
 		return true, err
 	}
@@ -137,8 +139,8 @@ func (ae *authEvents) JoinRules() (gomatrixserverlib.PDU, error) {
 }
 
 // Memmber implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) Member(stateKey string) (gomatrixserverlib.PDU, error) {
-	return ae.lookupEvent(types.MRoomMemberNID, stateKey), nil
+func (ae *authEvents) Member(stateKey spec.SenderID) (gomatrixserverlib.PDU, error) {
+	return ae.lookupEvent(types.MRoomMemberNID, string(stateKey)), nil
 }
 
 // ThirdPartyInvite implements gomatrixserverlib.AuthEventProvider

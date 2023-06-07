@@ -73,10 +73,25 @@ func SendRedaction(
 		}
 	}
 
+	fullUserID, userIDErr := spec.NewUserID(device.UserID, true)
+	if userIDErr != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to redact"),
+		}
+	}
+	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	if queryErr != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to redact"),
+		}
+	}
+
 	// "Users may redact their own events, and any user with a power level greater than or equal
 	// to the redact power level of the room may redact events there"
 	// https://matrix.org/docs/spec/client_server/r0.6.1#put-matrix-client-r0-rooms-roomid-redact-eventid-txnid
-	allowedToRedact := ev.Sender() == device.UserID
+	allowedToRedact := ev.SenderID() == senderID // TODO: Should replace device.UserID with device...PerRoomKey
 	if !allowedToRedact {
 		plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
 			EventType: spec.MRoomPowerLevels,
@@ -97,7 +112,7 @@ func SendRedaction(
 				),
 			}
 		}
-		allowedToRedact = pl.UserLevel(device.UserID) >= pl.Redact
+		allowedToRedact = pl.UserLevel(senderID) >= pl.Redact
 	}
 	if !allowedToRedact {
 		return util.JSONResponse{
@@ -114,10 +129,10 @@ func SendRedaction(
 
 	// create the new event and set all the fields we can
 	proto := gomatrixserverlib.ProtoEvent{
-		Sender:  device.UserID,
-		RoomID:  roomID,
-		Type:    spec.MRoomRedaction,
-		Redacts: eventID,
+		SenderID: string(senderID),
+		RoomID:   roomID,
+		Type:     spec.MRoomRedaction,
+		Redacts:  eventID,
 	}
 	err := proto.SetContent(r)
 	if err != nil {

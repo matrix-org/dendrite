@@ -392,7 +392,7 @@ func TestPurgeRoom(t *testing.T) {
 type fledglingEvent struct {
 	Type       string
 	StateKey   *string
-	Sender     string
+	SenderID   string
 	RoomID     string
 	Redacts    string
 	Depth      int64
@@ -405,7 +405,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:     ev.Sender,
+		SenderID:   ev.SenderID,
 		Type:       ev.Type,
 		StateKey:   ev.StateKey,
 		RoomID:     ev.RoomID,
@@ -444,7 +444,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     alice.ID,
+					SenderID:   alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -461,7 +461,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     alice.ID,
+					SenderID:   alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -478,7 +478,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     bob.ID,
+					SenderID:   bob.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -494,7 +494,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     charlie.ID,
+					SenderID:   charlie.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -598,16 +598,15 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 	testCases := []struct {
 		name            string
 		prepareRoomFunc func(t *testing.T) *test.Room
-		wantResponse    api.QueryRestrictedJoinAllowedResponse
+		wantResponse    string
+		wantError       bool
 	}{
 		{
 			name: "public room unrestricted",
 			prepareRoomFunc: func(t *testing.T) *test.Room {
 				return test.NewRoom(t, alice)
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident: true,
-			},
+			wantResponse: "",
 		},
 		{
 			name: "room version without restrictions",
@@ -624,10 +623,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(""))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:   true,
-				Restricted: true,
-			},
+			wantError: true,
 		},
 		{
 			name: "knock_restricted",
@@ -638,10 +634,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(""))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:   true,
-				Restricted: true,
-			},
+			wantError: true,
 		},
 		{
 			name: "restricted with pending invite", // bob should be allowed to join
@@ -655,11 +648,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(bob.ID))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:   true,
-				Restricted: true,
-				Allowed:    true,
-			},
+			wantResponse: "",
 		},
 		{
 			name: "restricted with allowed room_id, but missing room", // bob should not be allowed to join, as we don't know about the room
@@ -680,9 +669,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(bob.ID))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Restricted: true,
-			},
+			wantError: true,
 		},
 		{
 			name: "restricted with allowed room_id", // bob should be allowed to join, as we know about the room
@@ -703,12 +690,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(bob.ID))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:      true,
-				Restricted:    true,
-				Allowed:       true,
-				AuthorisedVia: alice.ID,
-			},
+			wantResponse: alice.ID,
 		},
 	}
 
@@ -738,16 +720,17 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 					t.Errorf("failed to send events: %v", err)
 				}
 
-				req := api.QueryRestrictedJoinAllowedRequest{
-					UserID: bob.ID,
-					RoomID: testRoom.ID,
+				roomID, _ := spec.NewRoomID(testRoom.ID)
+				userID, _ := spec.NewUserID(bob.ID, true)
+				got, err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), *roomID, *userID)
+				if tc.wantError && err == nil {
+					t.Fatal("expected error, got none")
 				}
-				res := api.QueryRestrictedJoinAllowedResponse{}
-				if err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), &req, &res); err != nil {
+				if !tc.wantError && err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(tc.wantResponse, res) {
-					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, res)
+				if !reflect.DeepEqual(tc.wantResponse, got) {
+					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, got)
 				}
 			})
 		}

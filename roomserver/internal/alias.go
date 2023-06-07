@@ -119,11 +119,6 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	_, virtualHost, err := r.Cfg.Global.SplitLocalID('@', request.UserID)
-	if err != nil {
-		return err
-	}
-
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
@@ -134,13 +129,19 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return nil
 	}
 
+	sender, err := r.QueryUserIDForSender(ctx, roomID, request.SenderID)
+	if err != nil || sender == nil {
+		return fmt.Errorf("r.QueryUserIDForSender: %w", err)
+	}
+	virtualHost := sender.Domain()
+
 	response.Found = true
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetCreatorIDForAlias: %w", err)
 	}
 
-	if creatorID != request.UserID {
+	if spec.SenderID(creatorID) != request.SenderID {
 		var plEvent *types.HeaderedEvent
 		var pls *gomatrixserverlib.PowerLevelContent
 
@@ -154,7 +155,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			return fmt.Errorf("plEvent.PowerLevels: %w", err)
 		}
 
-		if pls.UserLevel(request.UserID) < pls.EventLevel(spec.MRoomCanonicalAlias, true) {
+		if pls.UserLevel(request.SenderID) < pls.EventLevel(spec.MRoomCanonicalAlias, true) {
 			response.Removed = false
 			return nil
 		}
@@ -172,15 +173,16 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			sender := request.UserID
-			if request.UserID != ev.Sender() {
-				sender = ev.Sender()
+			senderID := request.SenderID
+			if request.SenderID != ev.SenderID() {
+				senderID = ev.SenderID()
 			}
-
-			_, senderDomain, err := r.Cfg.Global.SplitLocalID('@', sender)
-			if err != nil {
+			sender, err := r.QueryUserIDForSender(ctx, roomID, senderID)
+			if err != nil || sender == nil {
 				return err
 			}
+
+			senderDomain := sender.Domain()
 
 			identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
 			if err != nil {
@@ -188,7 +190,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			proto := &gomatrixserverlib.ProtoEvent{
-				Sender:   sender,
+				SenderID: string(senderID),
 				RoomID:   ev.RoomID(),
 				Type:     ev.Type(),
 				StateKey: ev.StateKey(),

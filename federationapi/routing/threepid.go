@@ -140,22 +140,24 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
-	_, senderDomain, err := cfg.Matrix.SplitLocalID('@', proto.Sender)
-	if err != nil {
+	userID, err := rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, spec.SenderID(proto.SenderID))
+	if err != nil || userID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("Invalid sender ID: " + err.Error()),
+			JSON: spec.BadJSON("Invalid sender ID"),
 		}
 	}
+	senderDomain := userID.Domain()
 
 	// Check that the state key is correct.
-	_, targetDomain, err := gomatrixserverlib.SplitID('@', *proto.StateKey)
-	if err != nil {
+	targetUserID, err := rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, spec.SenderID(*proto.StateKey))
+	if err != nil || targetUserID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("The event's state key isn't a Matrix user ID"),
 		}
 	}
+	targetDomain := targetUserID.Domain()
 
 	// Check that the target user is from the requesting homeserver.
 	if targetDomain != request.Origin() {
@@ -223,7 +225,7 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
-	// Send the event to the roomserver
+	// Send the event to the Roomserver
 	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
 		api.KindNew,
@@ -271,7 +273,7 @@ func createInviteFrom3PIDInvite(
 	// Build the event
 	proto := &gomatrixserverlib.ProtoEvent{
 		Type:     "m.room.member",
-		Sender:   inv.Sender,
+		SenderID: inv.Sender,
 		RoomID:   inv.RoomID,
 		StateKey: &inv.MXID,
 	}
@@ -324,7 +326,7 @@ func buildMembershipEvent(
 		return nil, errors.New("expecting state tuples for event builder, got none")
 	}
 
-	// Ask the roomserver for information about this room
+	// Ask the Roomserver for information about this room
 	queryReq := api.QueryLatestEventsAndStateRequest{
 		RoomID:       protoEvent.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),

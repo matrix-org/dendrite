@@ -343,7 +343,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 type PrevEventRef struct {
 	PrevContent   json.RawMessage `json:"prev_content"`
 	ReplacesState string          `json:"replaces_state"`
-	PrevSender    string          `json:"prev_sender"`
+	PrevSenderID  string          `json:"prev_sender"`
 }
 
 type DeviceLists struct {
@@ -539,7 +539,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event *types.HeaderedEvent) *InviteResponse {
+func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID) *InviteResponse {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -552,7 +552,7 @@ func NewInviteResponse(event *types.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatSync)
+	inviteEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatSync, userID)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)

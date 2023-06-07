@@ -66,7 +66,21 @@ func SendBan(
 	if errRes != nil {
 		return *errRes
 	}
-	allowedToBan := pl.UserLevel(device.UserID) >= pl.Ban
+	fullUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to ban this user, bad userID"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to ban this user, unknown senderID"),
+		}
+	}
+	allowedToBan := pl.UserLevel(senderID) >= pl.Ban
 	if !allowedToBan {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -142,7 +156,21 @@ func SendKick(
 	if errRes != nil {
 		return *errRes
 	}
-	allowedToKick := pl.UserLevel(device.UserID) >= pl.Kick
+	fullUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, unknown senderID"),
+		}
+	}
+	allowedToKick := pl.UserLevel(senderID) >= pl.Kick
 	if !allowedToKick {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -151,7 +179,7 @@ func SendKick(
 	}
 
 	var queryRes roomserverAPI.QueryMembershipForUserResponse
-	err := rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
 		UserID: body.UserID,
 	}, &queryRes)
@@ -319,7 +347,7 @@ func buildMembershipEventDirect(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) (*types.HeaderedEvent, error) {
 	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   sender,
+		SenderID: sender,
 		RoomID:   roomID,
 		Type:     "m.room.member",
 		StateKey: &targetUserID,

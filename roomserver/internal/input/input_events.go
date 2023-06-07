@@ -128,9 +128,13 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
-	_, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender())
+	sender, err := r.DB.GetUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
-		return fmt.Errorf("event has invalid sender %q", input.Event.Sender())
+		return fmt.Errorf("failed getting userID for sender %q. %w", event.SenderID(), err)
+	}
+	senderDomain := spec.ServerName("")
+	if sender != nil {
+		senderDomain = sender.Domain()
 	}
 
 	// If we already know about this outlier and it hasn't been rejected
@@ -193,7 +197,9 @@ func (r *Inputer) processRoomEvent(
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
+		// Only perform this check if the sender mxid_mapping can be resolved.
+		// Don't fail processing the event if we have no mxid_maping.
+		if sender != nil && senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
 			delete(servers, senderDomain)
 		}
@@ -276,7 +282,9 @@ func (r *Inputer) processRoomEvent(
 
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
-	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+	}); err != nil {
 		isRejected = true
 		rejectionErr = err
 		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
@@ -493,7 +501,7 @@ func (r *Inputer) processRoomEvent(
 func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event gomatrixserverlib.PDU) error {
 	oldRoomID := event.RoomID()
 	newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
-	return r.DB.UpgradeRoom(ctx, oldRoomID, newRoomID, event.Sender())
+	return r.DB.UpgradeRoom(ctx, oldRoomID, newRoomID, string(event.SenderID()))
 }
 
 // processStateBefore works out what the state is before the event and
@@ -579,7 +587,9 @@ func (r *Inputer) processStateBefore(
 	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(
 		gomatrixserverlib.ToPDUs(stateBeforeEvent),
 	)
-	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
+	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+	}); rejectionErr != nil {
 		rejectionErr = fmt.Errorf("Allowed() failed for stateBeforeEvent: %w", rejectionErr)
 		return
 	}
@@ -690,7 +700,9 @@ nextAuthEvent:
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
-		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing()); err != nil {
+		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+		}); err != nil {
 			continue nextAuthEvent
 		}
 
@@ -706,7 +718,9 @@ nextAuthEvent:
 		}
 
 		// Check if the auth event should be rejected.
-		err := gomatrixserverlib.Allowed(authEvent, auth)
+		err := gomatrixserverlib.Allowed(authEvent, auth, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+		})
 		if isRejected = err != nil; isRejected {
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
 		}
@@ -828,11 +842,13 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			continue
 		}
 
+		// TODO: pseudoIDs: get userID for room using state key (which is now senderID)
 		localpart, senderDomain, err := gomatrixserverlib.SplitID('@', *memberEvent.StateKey())
 		if err != nil {
 			continue
 		}
 
+		// TODO: pseudoIDs: query account by state key (which is now senderID)
 		accountRes := &userAPI.QueryAccountByLocalpartResponse{}
 		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{
 			Localpart:  localpart,
@@ -859,7 +875,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			RoomID:     event.RoomID(),
 			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
-			Sender:     stateKey,
+			SenderID:   stateKey,
 			PrevEvents: prevEvents,
 		}
 

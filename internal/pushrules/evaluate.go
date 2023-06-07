@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // A RuleSetEvaluator encapsulates context to evaluate an event
@@ -27,7 +28,7 @@ type EvaluationContext interface {
 
 	// HasPowerLevel returns whether the user has at least the given
 	// power in the room of the current event.
-	HasPowerLevel(userID, levelKey string) (bool, error)
+	HasPowerLevel(senderID spec.SenderID, levelKey string) (bool, error)
 }
 
 // A kindAndRules is just here to simplify iteration of the (ordered)
@@ -53,7 +54,7 @@ func NewRuleSetEvaluator(ec EvaluationContext, ruleSet *RuleSet) *RuleSetEvaluat
 
 // MatchEvent returns the first matching rule. Returns nil if there
 // was no match rule.
-func (rse *RuleSetEvaluator) MatchEvent(event gomatrixserverlib.PDU) (*Rule, error) {
+func (rse *RuleSetEvaluator) MatchEvent(event gomatrixserverlib.PDU, userIDForSender spec.UserIDForSender) (*Rule, error) {
 	// TODO: server-default rules have lower priority than user rules,
 	// but they are stored together with the user rules. It's a bit
 	// unclear what the specification (11.14.1.4 Predefined rules)
@@ -68,7 +69,7 @@ func (rse *RuleSetEvaluator) MatchEvent(event gomatrixserverlib.PDU) (*Rule, err
 				if rule.Default != defRules {
 					continue
 				}
-				ok, err := ruleMatches(rule, rsat.Kind, event, rse.ec)
+				ok, err := ruleMatches(rule, rsat.Kind, event, rse.ec, userIDForSender)
 				if err != nil {
 					return nil, err
 				}
@@ -83,7 +84,7 @@ func (rse *RuleSetEvaluator) MatchEvent(event gomatrixserverlib.PDU) (*Rule, err
 	return nil, nil
 }
 
-func ruleMatches(rule *Rule, kind Kind, event gomatrixserverlib.PDU, ec EvaluationContext) (bool, error) {
+func ruleMatches(rule *Rule, kind Kind, event gomatrixserverlib.PDU, ec EvaluationContext, userIDForSender spec.UserIDForSender) (bool, error) {
 	if !rule.Enabled {
 		return false, nil
 	}
@@ -113,7 +114,12 @@ func ruleMatches(rule *Rule, kind Kind, event gomatrixserverlib.PDU, ec Evaluati
 		return rule.RuleID == event.RoomID(), nil
 
 	case SenderKind:
-		return rule.RuleID == event.Sender(), nil
+		userID := ""
+		sender, err := userIDForSender(event.RoomID(), event.SenderID())
+		if err == nil {
+			userID = sender.String()
+		}
+		return rule.RuleID == userID, nil
 
 	default:
 		return false, nil
@@ -143,7 +149,7 @@ func conditionMatches(cond *Condition, event gomatrixserverlib.PDU, ec Evaluatio
 		return cmp(n), nil
 
 	case SenderNotificationPermissionCondition:
-		return ec.HasPowerLevel(event.Sender(), cond.Key)
+		return ec.HasPowerLevel(event.SenderID(), cond.Key)
 
 	default:
 		return false, nil

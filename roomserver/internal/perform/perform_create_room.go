@@ -270,11 +270,19 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	senderID, err := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsapi.QuerySenderIDForUser failed")
+		return "", &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
 		builder := verImpl.NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-			Sender:   userID.String(),
+			SenderID: string(senderID),
 			RoomID:   roomID.String(),
 			Type:     e.Type,
 			StateKey: &e.StateKey,
@@ -308,7 +316,9 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 
-		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
+		if err = gomatrixserverlib.Allowed(ev, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return c.DB.GetUserIDForSender(ctx, roomID, senderID)
+		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -407,11 +417,28 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		// Process the invites.
 		var inviteEvent *types.HeaderedEvent
 		for _, invitee := range createRequest.InvitedUsers {
+			inviteeUserID, userIDErr := spec.NewUserID(invitee, true)
+			if userIDErr != nil {
+				util.GetLogger(ctx).WithError(userIDErr).Error("invalid UserID")
+				return "", &util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
+			}
+			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), *inviteeUserID)
+			if queryErr != nil {
+				util.GetLogger(ctx).WithError(queryErr).Error("rsapi.QuerySenderIDForUser failed")
+				return "", &util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
+			}
+			inviteeString := string(inviteeSenderID)
 			proto := gomatrixserverlib.ProtoEvent{
-				Sender:   userID.String(),
+				SenderID: string(senderID),
 				RoomID:   roomID.String(),
 				Type:     "m.room.member",
-				StateKey: &invitee,
+				StateKey: &inviteeString,
 			}
 
 			content := gomatrixserverlib.MemberContent{

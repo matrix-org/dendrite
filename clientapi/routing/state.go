@@ -140,9 +140,14 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		// use the result of the previous QueryLatestEventsAndState response
 		// to find the state event, if provided.
 		for _, ev := range stateRes.StateEvents {
+			sender := spec.UserID{}
+			userID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), ev.SenderID())
+			if err == nil && userID != nil {
+				sender = *userID
+			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender),
 			)
 		}
 	} else {
@@ -162,9 +167,14 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			}
 		}
 		for _, ev := range stateAfterRes.StateEvents {
+			sender := spec.UserID{}
+			userID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), ev.SenderID())
+			if err == nil && userID != nil {
+				sender = *userID
+			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender),
 			)
 		}
 	}
@@ -334,8 +344,13 @@ func OnIncomingStateTypeRequest(
 		}
 	}
 
+	sender := spec.UserID{}
+	userID, err := rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	if err == nil && userID != nil {
+		sender = *userID
+	}
 	stateEvent := stateEventInStateResp{
-		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll),
+		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll, sender),
 	}
 
 	var res interface{}

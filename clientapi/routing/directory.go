@@ -215,9 +215,35 @@ func RemoveLocalAlias(
 	alias string,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "UserID for device is invalid"},
+		}
+	}
+
+	roomIDReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: alias}
+	roomIDRes := roomserverAPI.GetRoomIDForAliasResponse{}
+	err = rsAPI.GetRoomIDForAlias(req.Context(), &roomIDReq, &roomIDRes)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomIDRes.RoomID, *userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "Could not find SenderID for this device"},
+		}
+	}
+
 	queryReq := roomserverAPI.RemoveRoomAliasRequest{
-		Alias:  alias,
-		UserID: device.UserID,
+		Alias:    alias,
+		SenderID: deviceSenderID,
 	}
 	var queryRes roomserverAPI.RemoveRoomAliasResponse
 	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
@@ -312,7 +338,21 @@ func SetVisibility(
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
-	if power.UserLevel(dev.UserID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
+	fullUserID, err := spec.NewUserID(dev.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+		}
+	}
+	if power.UserLevel(senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),

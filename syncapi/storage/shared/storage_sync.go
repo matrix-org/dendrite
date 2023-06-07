@@ -10,6 +10,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -186,7 +187,7 @@ func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
 }
 
 func (d *DatabaseTransaction) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
@@ -325,7 +326,7 @@ func (d *DatabaseTransaction) GetBackwardTopologyPos(
 func (d *DatabaseTransaction) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
-	stateFilter *synctypes.StateFilter,
+	stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI,
 ) (deltas []types.StateDelta, joinedRoomsIDs []string, err error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -417,7 +418,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		if !peek.Deleted {
 			deltas = append(deltas, types.StateDelta{
 				Membership:  spec.Peek,
-				StateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
+				StateEvents: d.StreamEventsToEvents(ctx, device, state[peek.RoomID], rsAPI),
 				RoomID:      peek.RoomID,
 			})
 		}
@@ -462,7 +463,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 			deltas = append(deltas, types.StateDelta{
 				Membership:    membership,
 				MembershipPos: ev.StreamPosition,
-				StateEvents:   d.StreamEventsToEvents(device, stateFiltered[roomID]),
+				StateEvents:   d.StreamEventsToEvents(ctx, device, stateFiltered[roomID], rsAPI),
 				RoomID:        roomID,
 			})
 			break
@@ -474,7 +475,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  spec.Join,
-			StateEvents: d.StreamEventsToEvents(device, stateFiltered[joinedRoomID]),
+			StateEvents: d.StreamEventsToEvents(ctx, device, stateFiltered[joinedRoomID], rsAPI),
 			RoomID:      joinedRoomID,
 			NewlyJoined: newlyJoinedRooms[joinedRoomID],
 		})
@@ -490,7 +491,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
-	stateFilter *synctypes.StateFilter,
+	stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI,
 ) ([]types.StateDelta, []string, error) {
 	// Look up all memberships for the user. We only care about rooms that a
 	// user has ever interacted with — joined to, kicked/banned from, left.
@@ -531,7 +532,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 			}
 			deltas[peek.RoomID] = types.StateDelta{
 				Membership:  spec.Peek,
-				StateEvents: d.StreamEventsToEvents(device, s),
+				StateEvents: d.StreamEventsToEvents(ctx, device, s, rsAPI),
 				RoomID:      peek.RoomID,
 			}
 		}
@@ -560,7 +561,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 					deltas[roomID] = types.StateDelta{
 						Membership:    membership,
 						MembershipPos: ev.StreamPosition,
-						StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
+						StateEvents:   d.StreamEventsToEvents(ctx, device, stateStreamEvents, rsAPI),
 						RoomID:        roomID,
 					}
 				}
@@ -581,7 +582,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 		}
 		deltas[joinedRoomID] = types.StateDelta{
 			Membership:  spec.Join,
-			StateEvents: d.StreamEventsToEvents(device, s),
+			StateEvents: d.StreamEventsToEvents(ctx, device, s, rsAPI),
 			RoomID:      joinedRoomID,
 		}
 	}

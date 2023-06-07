@@ -175,15 +175,20 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// Prepare the template for the join event.
-	userID := req.UserID
-	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
+	userID, err := spec.NewUserID(req.UserID, true)
 	if err != nil {
-		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", userID, err)}
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
 	}
+	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.RoomIDOrAlias, *userID)
+	if err != nil {
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
+	}
+	senderIDString := string(senderID)
+	userDomain := userID.Domain()
 	proto := gomatrixserverlib.ProtoEvent{
 		Type:     spec.MRoomMember,
-		Sender:   userID,
-		StateKey: &userID,
+		SenderID: senderIDString,
+		StateKey: &senderIDString,
 		RoomID:   req.RoomIDOrAlias,
 		Redacts:  "",
 	}
@@ -295,7 +300,7 @@ func (r *Joiner) performJoinRoomByID(
 		// is really no harm in just sending another membership event.
 		membershipReq := &api.QueryMembershipForUserRequest{
 			RoomID: req.RoomIDOrAlias,
-			UserID: userID,
+			UserID: userID.String(),
 		}
 		membershipRes := &api.QueryMembershipForUserResponse{}
 		_ = r.Queryer.QueryMembershipForUser(ctx, membershipReq, membershipRes)
@@ -372,22 +377,14 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 	ctx context.Context,
 	joinReq *rsAPI.PerformJoinRequest,
 ) (string, error) {
-	req := &api.QueryRestrictedJoinAllowedRequest{
-		UserID: joinReq.UserID,
-		RoomID: joinReq.RoomIDOrAlias,
+	roomID, err := spec.NewRoomID(joinReq.RoomIDOrAlias)
+	if err != nil {
+		return "", err
 	}
-	res := &api.QueryRestrictedJoinAllowedResponse{}
-	if err := r.Queryer.QueryRestrictedJoinAllowed(ctx, req, res); err != nil {
-		return "", fmt.Errorf("r.Queryer.QueryRestrictedJoinAllowed: %w", err)
+	userID, err := spec.NewUserID(joinReq.UserID, true)
+	if err != nil {
+		return "", err
 	}
-	if !res.Restricted {
-		return "", nil
-	}
-	if !res.Resident {
-		return "", nil
-	}
-	if !res.Allowed {
-		return "", rsAPI.ErrNotAllowed{Err: fmt.Errorf("the join to room %s was not allowed", joinReq.RoomIDOrAlias)}
-	}
-	return res.AuthorisedVia, nil
+
+	return r.Queryer.QueryRestrictedJoinAllowed(ctx, *roomID, *userID)
 }
