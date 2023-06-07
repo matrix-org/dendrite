@@ -309,8 +309,8 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 		sk := event.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
-			if err == nil && skUserID != nil {
+			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+			if queryErr == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString
 			}
@@ -551,8 +551,8 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 
 	sk := event.StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
-		if err == nil && skUserID != nil {
+		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+		if queryErr == nil && skUserID != nil {
 			skString := skUserID.String()
 			sk = &skString
 		}

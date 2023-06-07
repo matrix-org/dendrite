@@ -217,21 +217,9 @@ func Context(
 		}
 	}
 
-	sender := spec.UserID{}
-	userID, err := rsAPI.QueryUserIDForSender(ctx, requestedEvent.RoomID(), requestedEvent.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
-
-	sk := requestedEvent.StateKey()
-	if sk != nil && *sk != "" {
-		skUserID, err := rsAPI.QueryUserIDForSender(ctx, requestedEvent.RoomID(), spec.SenderID(*requestedEvent.StateKey()))
-		if err == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
-	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll, sender, sk)
+	ev := synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}, requestedEvent)
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,

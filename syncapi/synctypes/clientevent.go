@@ -86,3 +86,23 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender sp
 	}
 	return ce
 }
+
+// ToClientEvent converts a single server event to a client event.
+// It provides default logic for event.SenderID & event.StateKey -> userID conversions.
+func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserverlib.PDU) ClientEvent {
+	sender := spec.UserID{}
+	userID, err := userIDQuery(event.RoomID(), event.SenderID())
+	if err == nil && userID != nil {
+		sender = *userID
+	}
+
+	sk := event.StateKey()
+	if sk != nil && *sk != "" {
+		skUserID, err := userIDQuery(event.RoomID(), spec.SenderID(*event.StateKey()))
+		if err == nil && skUserID != nil {
+			skString := skUserID.String()
+			sk = &skString
+		}
+	}
+	return ToClientEvent(event, FormatAll, sender, sk)
+}

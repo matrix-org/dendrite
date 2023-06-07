@@ -140,23 +140,11 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		// use the result of the previous QueryLatestEventsAndState response
 		// to find the state event, if provided.
 		for _, ev := range stateRes.StateEvents {
-			sender := spec.UserID{}
-			userID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), ev.SenderID())
-			if err == nil && userID != nil {
-				sender = *userID
-			}
-
-			sk := ev.StateKey()
-			if sk != nil && *sk != "" {
-				skUserID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
-				if err == nil && skUserID != nil {
-					skString := skUserID.String()
-					sk = &skString
-				}
-			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender, sk),
+				synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+				}, ev),
 			)
 		}
 	} else {
@@ -362,22 +350,10 @@ func OnIncomingStateTypeRequest(
 		}
 	}
 
-	sender := spec.UserID{}
-	userID, err := rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
-
-	sk := event.StateKey()
-	if sk != nil && *sk != "" {
-		skUserID, err := rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
-		if err == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
 	stateEvent := stateEventInStateResp{
-		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk),
+		ClientEvent: synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}, event),
 	}
 
 	var res interface{}
