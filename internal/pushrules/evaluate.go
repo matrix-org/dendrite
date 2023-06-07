@@ -28,7 +28,7 @@ type EvaluationContext interface {
 
 	// HasPowerLevel returns whether the user has at least the given
 	// power in the room of the current event.
-	HasPowerLevel(userID, levelKey string) (bool, error)
+	HasPowerLevel(senderID spec.SenderID, levelKey string) (bool, error)
 }
 
 // A kindAndRules is just here to simplify iteration of the (ordered)

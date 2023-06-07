@@ -39,8 +39,8 @@ var (
 	roomIDCounter = int64(0)
 )
 
-func UserIDForSender(roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
+func UserIDForSender(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 type Room struct {
@@ -168,7 +168,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	}
 
 	builder := gomatrixserverlib.MustGetRoomVersion(r.Version).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:   creator.ID,
+		SenderID: creator.ID,
 		RoomID:   r.ID,
 		Type:     eventType,
 		StateKey: mod.stateKey,

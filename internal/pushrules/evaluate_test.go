@@ -8,8 +8,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func UserIDForSender(roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
+func UserIDForSender(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
@@ -158,8 +158,8 @@ type fakeEvaluationContext struct{ memberCount int }
 
 func (fakeEvaluationContext) UserDisplayName() string         { return "Dear User" }
 func (f fakeEvaluationContext) RoomMemberCount() (int, error) { return f.memberCount, nil }
-func (fakeEvaluationContext) HasPowerLevel(userID, levelKey string) (bool, error) {
-	return userID == "@poweruser:example.com" && levelKey == "powerlevel", nil
+func (fakeEvaluationContext) HasPowerLevel(senderID spec.SenderID, levelKey string) (bool, error) {
+	return senderID == "@poweruser:example.com" && levelKey == "powerlevel", nil
 }
 
 func TestPatternMatches(t *testing.T) {

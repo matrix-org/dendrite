@@ -147,16 +147,21 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 
 	user, err := spec.NewUserID(userID, true)
-	if err != nil {
+	if err != nil || user == nil {
 		return err
 	}
 	room, err := spec.NewRoomID(roomID)
 	if err != nil {
 		return err
 	}
+	senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, roomID, *user)
+	if err != nil {
+		return err
+	}
 
 	joinInput := gomatrixserverlib.PerformJoinInput{
 		UserID:     user,
+		SenderID:   senderID,
 		RoomID:     room,
 		ServerName: serverName,
 		Content:    content,
@@ -164,10 +169,10 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		PrivateKey: r.cfg.Matrix.PrivateKey,
 		KeyID:      r.cfg.Matrix.KeyID,
 		KeyRing:    r.keyRing,
-		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID, senderID string) (*spec.UserID, error) {
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}),
-		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	}
@@ -363,7 +368,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	userIDProvider := func(roomID, senderID string) (*spec.UserID, error) {
+	userIDProvider := func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
@@ -414,7 +419,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) (err error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.UserID)
+	userID, err := spec.NewUserID(request.UserID, true)
 	if err != nil {
 		return err
 	}
@@ -433,7 +438,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// request.
 		respMakeLeave, err := r.federation.MakeLeave(
 			ctx,
-			origin,
+			userID.Domain(),
 			serverName,
 			request.RoomID,
 			request.UserID,
@@ -454,9 +459,14 @@ func (r *FederationInternalAPI) PerformLeave(
 
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
+		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, request.RoomID, *userID)
+		if err != nil {
+			return err
+		}
+		senderIDString := string(senderID)
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
-		respMakeLeave.LeaveEvent.Sender = request.UserID
-		respMakeLeave.LeaveEvent.StateKey = &request.UserID
+		respMakeLeave.LeaveEvent.SenderID = senderIDString
+		respMakeLeave.LeaveEvent.StateKey = &senderIDString
 		respMakeLeave.LeaveEvent.RoomID = request.RoomID
 		respMakeLeave.LeaveEvent.Redacts = ""
 		leaveEB := verImpl.NewEventBuilderFromProtoEvent(&respMakeLeave.LeaveEvent)
@@ -478,7 +488,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Build the leave event.
 		event, err := leaveEB.Build(
 			time.Now(),
-			origin,
+			userID.Domain(),
 			r.cfg.Matrix.KeyID,
 			r.cfg.Matrix.PrivateKey,
 		)
@@ -490,7 +500,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Try to perform a send_leave using the newly built event.
 		err = r.federation.SendLeave(
 			ctx,
-			origin,
+			userID.Domain(),
 			serverName,
 			event,
 		)

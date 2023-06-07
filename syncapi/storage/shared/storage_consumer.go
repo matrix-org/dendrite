@@ -224,9 +224,9 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 	return out
 }
 
-func (d *Database) getSenderIDForUser(roomID string, userID spec.UserID) (string, error) { // nolint
-	// TODO: Repalce with actual logic for pseudoIDs
-	return userID.String(), nil
+func (d *Database) getSenderIDForUser(roomID string, userID spec.UserID) (spec.SenderID, error) { // nolint
+	// TODO: Replace with actual logic for pseudoIDs
+	return spec.SenderID(userID.String()), nil
 }
 
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of

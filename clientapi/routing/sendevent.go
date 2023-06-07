@@ -266,16 +266,29 @@ func generateSendEvent(
 	evTime time.Time,
 ) (gomatrixserverlib.PDU, *util.JSONResponse) {
 	// parse the incoming http request
-	userID := device.UserID
+	fullUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil || fullUserID == nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("Bad userID"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("Unable to find senderID for user"),
+		}
+	}
 
 	// create the new event and set all the fields we can
 	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   userID,
+		SenderID: string(senderID),
 		RoomID:   roomID,
 		Type:     eventType,
 		StateKey: stateKey,
 	}
-	err := proto.SetContent(r)
+	err = proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("proto.SetContent failed")
 		return nil, &util.JSONResponse{
@@ -331,7 +344,7 @@ func generateSendEvent(
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(e.PDU, &provider, func(roomID, senderID string) (*spec.UserID, error) {
+	if err = gomatrixserverlib.Allowed(e.PDU, &provider, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		return nil, &util.JSONResponse{

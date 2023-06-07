@@ -252,6 +252,6 @@ func (u *RoomUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, ta
 	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomInfo.RoomNID, targetUserNID, targetLocal)
 }
 
-func (u *RoomUpdater) GetUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
+func (u *RoomUpdater) GetUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 	return u.d.GetUserIDForSender(ctx, roomID, senderID)
 }

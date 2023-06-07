@@ -525,8 +525,8 @@ type testRoomserverAPI struct {
 	events            map[string]*types.HeaderedEvent
 }
 
-func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
+func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
@@ -590,7 +590,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:   ev.Sender,
+		SenderID: ev.Sender,
 		Depth:    999,
 		Type:     ev.Type,
 		StateKey: ev.StateKey,

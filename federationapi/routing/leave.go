@@ -50,7 +50,7 @@ func MakeLeave(
 		RoomID:     roomID.String(),
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
-	if err := rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
+	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -59,24 +59,24 @@ func MakeLeave(
 	}
 
 	createLeaveTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
-		if err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Errorf("obtaining signing identity for %s failed", request.Destination())
+		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
+		if signErr != nil {
+			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 
 		queryRes := api.QueryLatestEventsAndStateResponse{}
-		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
-		switch e := err.(type) {
+		event, buildErr := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
+		switch e := buildErr.(type) {
 		case nil:
 		case eventutil.ErrRoomNoExists:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.NotFound("Room does not exist")
 		case gomatrixserverlib.BadJSONError:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.BadJSON(e.Error())
 		default:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.InternalServerError{}
 		}
 
@@ -87,15 +87,25 @@ func MakeLeave(
 		return event, stateEvents, nil
 	}
 
+	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID.String(), userID)
+	if err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
 	input := gomatrixserverlib.HandleMakeLeaveInput{
 		UserID:             userID,
+		SenderID:           senderID,
 		RoomID:             roomID,
 		RoomVersion:        roomVersion,
 		RequestOrigin:      request.Origin(),
 		LocalServerName:    cfg.Matrix.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		BuildEventTemplate: createLeaveTemplate,
-		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 		},
 	}
@@ -216,7 +226,7 @@ func SendLeave(
 			JSON: spec.BadJSON("No state key was provided in the leave event."),
 		}
 	}
-	if !event.StateKeyEquals(event.SenderID()) {
+	if !event.StateKeyEquals(string(event.SenderID())) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("Event state key must match the event sender."),

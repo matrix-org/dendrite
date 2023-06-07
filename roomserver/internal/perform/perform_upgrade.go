@@ -175,8 +175,16 @@ func moveLocalAliases(ctx context.Context,
 		return fmt.Errorf("Failed to get old room aliases: %w", err)
 	}
 
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return fmt.Errorf("Failed to get userID: %w", err)
+	}
+	senderID, err := URSAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	if err != nil {
+		return fmt.Errorf("Failed to get senderID: %w", err)
+	}
 	for _, alias := range aliasRes.Aliases {
-		removeAliasReq := api.RemoveRoomAliasRequest{SenderID: userID, Alias: alias}
+		removeAliasReq := api.RemoveRoomAliasRequest{SenderID: senderID, Alias: alias}
 		removeAliasRes := api.RemoveRoomAliasResponse{}
 		if err = URSAPI.RemoveRoomAlias(ctx, &removeAliasReq, &removeAliasRes); err != nil {
 			return fmt.Errorf("Failed to remove old room alias: %w", err)
@@ -287,7 +295,15 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 	}
 	// Check for power level required to send tombstone event (marks the current room as obsolete),
 	// if not found, use the StateDefault power level
-	return pl.UserLevel(userID) >= pl.EventLevel("m.room.tombstone", true)
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return false
+	}
+	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	if err != nil {
+		return false
+	}
+	return pl.UserLevel(senderID) >= pl.EventLevel("m.room.tombstone", true)
 }
 
 // nolint:gocyclo
@@ -383,7 +399,16 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 		util.GetLogger(ctx).WithError(err).Error()
 		return nil, fmt.Errorf("Power level event content was invalid")
 	}
-	tempPowerLevelsEvent, powerLevelsOverridden := createTemporaryPowerLevels(powerLevelContent, userID)
+
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	if err != nil {
+		return nil, err
+	}
+	tempPowerLevelsEvent, powerLevelsOverridden := createTemporaryPowerLevels(powerLevelContent, senderID)
 
 	// Now do the join rules event, same as the create and membership
 	// events. We'll set a sane default of "invite" so that if the
@@ -452,8 +477,16 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
+		fullUserID, userIDErr := spec.NewUserID(userID, true)
+		if userIDErr != nil {
+			return userIDErr
+		}
+		senderID, queryErr := r.URSAPI.QuerySenderIDForUser(ctx, newRoomID, *fullUserID)
+		if queryErr != nil {
+			return queryErr
+		}
 		proto := gomatrixserverlib.ProtoEvent{
-			Sender:   userID,
+			SenderID: string(senderID),
 			RoomID:   newRoomID,
 			Type:     e.Type,
 			StateKey: &e.StateKey,
@@ -484,7 +517,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 
 		}
 
-		if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID, senderID string) (*spec.UserID, error) {
+		if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			return fmt.Errorf("Failed to auth new %q event: %w", builder.Type, err)
@@ -530,21 +563,26 @@ func (r *Upgrader) makeTombstoneEvent(
 }
 
 func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, userID, roomID string, event gomatrixserverlib.FledglingEvent) (*types.HeaderedEvent, error) {
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	if err != nil {
+		return nil, err
+	}
 	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   userID,
+		SenderID: string(senderID),
 		RoomID:   roomID,
 		Type:     event.Type,
 		StateKey: &event.StateKey,
 	}
-	err := proto.SetContent(event.Content)
+	err = proto.SetContent(event.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set new %q event content: %w", proto.Type, err)
 	}
 	// Get the sender domain.
-	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', proto.Sender)
-	if serr != nil {
-		return nil, fmt.Errorf("Failed to split user ID %q: %w", proto.Sender, err)
-	}
+	senderDomain := fullUserID.Domain()
 	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing identity for %q: %w", senderDomain, err)
@@ -569,7 +607,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider, func(roomID, senderID string) (*spec.UserID, error) {
+	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", proto.Type, err)} // TODO: Is this error string comprehensible to the client?
@@ -578,7 +616,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	return headeredEvent, nil
 }
 
-func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) (gomatrixserverlib.FledglingEvent, bool) {
+func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, senderID spec.SenderID) (gomatrixserverlib.FledglingEvent, bool) {
 	// Work out what power level we need in order to be able to send events
 	// of all types into the room.
 	neededPowerLevel := powerLevelContent.StateDefault
@@ -603,8 +641,8 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 
 	// If the user who is upgrading the room doesn't already have sufficient
 	// power, then elevate their power levels.
-	if tempPowerLevelContent.UserLevel(userID) < neededPowerLevel {
-		tempPowerLevelContent.Users[userID] = neededPowerLevel
+	if tempPowerLevelContent.UserLevel(senderID) < neededPowerLevel {
+		tempPowerLevelContent.Users[string(senderID)] = neededPowerLevel
 		powerLevelsOverridden = true
 	}
 
