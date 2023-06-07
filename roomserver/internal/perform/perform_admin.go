@@ -235,7 +235,7 @@ func (r *Admin) PerformAdminDownloadState(
 	roomID, userID string, serverName spec.ServerName,
 ) error {
 	fullUserID, err := spec.NewUserID(userID, true)
-	if err != nil || fullUserID == nil {
+	if err != nil {
 		return err
 	}
 	senderDomain := fullUserID.Domain()

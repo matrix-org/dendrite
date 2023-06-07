@@ -74,7 +74,7 @@ func SendRedaction(
 	}
 
 	fullUserID, userIDErr := spec.NewUserID(device.UserID, true)
-	if userIDErr != nil || fullUserID == nil {
+	if userIDErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID doesn't have power level to redact"),

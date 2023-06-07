@@ -147,7 +147,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 
 	user, err := spec.NewUserID(userID, true)
-	if err != nil || user == nil {
+	if err != nil {
 		return err
 	}
 	room, err := spec.NewRoomID(roomID)

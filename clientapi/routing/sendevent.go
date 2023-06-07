@@ -267,7 +267,7 @@ func generateSendEvent(
 ) (gomatrixserverlib.PDU, *util.JSONResponse) {
 	// parse the incoming http request
 	fullUserID, err := spec.NewUserID(device.UserID, true)
-	if err != nil || fullUserID == nil {
+	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("Bad userID"),

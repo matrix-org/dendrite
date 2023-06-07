@@ -339,7 +339,7 @@ func SetVisibility(
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
 	fullUserID, err := spec.NewUserID(dev.UserID, true)
-	if err != nil || fullUserID == nil {
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),

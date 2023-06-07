@@ -67,7 +67,7 @@ func SendBan(
 		return *errRes
 	}
 	fullUserID, err := spec.NewUserID(device.UserID, true)
-	if err != nil || fullUserID == nil {
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You don't have permission to ban this user, bad userID"),
@@ -157,7 +157,7 @@ func SendKick(
 		return *errRes
 	}
 	fullUserID, err := spec.NewUserID(device.UserID, true)
-	if err != nil || fullUserID == nil {
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
