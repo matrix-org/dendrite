@@ -931,6 +931,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 	return roomVersion, err
 }
 
+// nolint:gocyclo
 // MaybeRedactEvent manages the redacted status of events. There's two cases to consider in order to comply with the spec:
 // "servers should not apply or send redactions to clients until both the redaction event and original event have been seen, and are valid."
 // https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
@@ -1009,7 +1010,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 		switch {
 		case powerlevels.UserLevel(redactionEvent.SenderID()) >= powerlevels.Redact:
 			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
-		case sender1Domain == sender2Domain:
+		case sender1Domain != "" && sender2Domain != "" && sender1Domain == sender2Domain:
 			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
 		default:
 			ignoreRedaction = true
