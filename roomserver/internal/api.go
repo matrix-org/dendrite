@@ -235,9 +235,9 @@ func (r *RoomserverInternalAPI) HandleInvite(
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(
-	ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest,
+	ctx context.Context, user api.SenderUserIDPair, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest,
 ) (string, *util.JSONResponse) {
-	return r.Creator.PerformCreateRoom(ctx, userID, roomID, createRequest)
+	return r.Creator.PerformCreateRoom(ctx, user, roomID, createRequest)
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(

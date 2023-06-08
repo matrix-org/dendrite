@@ -189,9 +189,9 @@ type ClientRoomserverAPI interface {
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
 	GetAliasesForRoomID(ctx context.Context, req *GetAliasesForRoomIDRequest, res *GetAliasesForRoomIDResponse) error
 
-	PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *PerformCreateRoomRequest) (string, *util.JSONResponse)
+	PerformCreateRoom(ctx context.Context, user SenderUserIDPair, roomID spec.RoomID, createRequest *PerformCreateRoomRequest) (string, *util.JSONResponse)
 	// PerformRoomUpgrade upgrades a room to a newer version
-	PerformRoomUpgrade(ctx context.Context, roomID, userID string, roomVersion gomatrixserverlib.RoomVersion) (newRoomID string, err error)
+	PerformRoomUpgrade(ctx context.Context, roomID string, user SenderUserIDPair, roomVersion gomatrixserverlib.RoomVersion) (newRoomID string, err error)
 	PerformAdminEvacuateRoom(ctx context.Context, roomID string) (affected []string, err error)
 	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformAdminPurgeRoom(ctx context.Context, roomID string) error

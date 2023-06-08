@@ -822,17 +822,6 @@ func TestUpgrade(t *testing.T) {
 		wantNewRoom  bool
 	}{
 		{
-			name:        "invalid userID",
-			upgradeUser: "!notvalid:test",
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
-				room := test.NewRoom(t, alice)
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
-				}
-				return room.ID
-			},
-		},
-		{
 			name:        "invalid roomID",
 			upgradeUser: alice.ID,
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
@@ -1049,7 +1038,13 @@ func TestUpgrade(t *testing.T) {
 				}
 				roomID := tc.roomFunc(rsAPI)
 
-				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, tc.upgradeUser, version.DefaultRoomVersion())
+				userID, err := spec.NewUserID(tc.upgradeUser, true)
+				if err != nil {
+					t.Fatalf("upgrade userID is invalid")
+				}
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID,
+					api.SenderUserIDPair{SenderID: spec.SenderID(tc.upgradeUser), UserID: *userID},
+					version.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}
