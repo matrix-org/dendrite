@@ -63,9 +63,10 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 	}
-	createContent["creator"] = userID.String()
+	senderID, err := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), userID)
+	createContent["creator"] = senderID
 	createContent["room_version"] = createRequest.RoomVersion
-	powerLevelContent := eventutil.InitialPowerLevelsContent(userID.String())
+	powerLevelContent := eventutil.InitialPowerLevelsContent(string(senderID))
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
 		JoinRule: spec.Invite,
 	}
@@ -121,7 +122,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 	membershipEvent := gomatrixserverlib.FledglingEvent{
 		Type:     spec.MRoomMember,
-		StateKey: userID.String(),
+		StateKey: string(senderID),
 		Content: gomatrixserverlib.MemberContent{
 			Membership:  spec.Join,
 			DisplayName: createRequest.UserDisplayName,
@@ -270,7 +271,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-	senderID, err := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), userID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("rsapi.QuerySenderIDForUser failed")
 		return "", &util.JSONResponse{
