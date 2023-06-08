@@ -373,7 +373,15 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rst
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == spec.Join {
 		// check it's a local join
-		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
+		if ev.StateKey() == nil {
+			return sp, fmt.Errorf("unexpected nil state_key")
+		}
+
+		userID, err := s.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
+		if err != nil || userID == nil {
+			return sp, fmt.Errorf("failed getting userID for sender: %w", err)
+		}
+		if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
 			return sp, nil
 		}
 
@@ -395,9 +403,15 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if msg.Event.StateKey() == nil {
 		return
 	}
-	if _, _, err := s.cfg.Matrix.SplitLocalID('@', *msg.Event.StateKey()); err != nil {
+
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, msg.Event.RoomID(), spec.SenderID(*msg.Event.StateKey()))
+	if err != nil || userID == nil {
 		return
 	}
+	if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		return
+	}
+
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		sentry.CaptureException(err)
