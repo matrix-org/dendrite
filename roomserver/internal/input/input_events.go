@@ -842,17 +842,15 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			continue
 		}
 
-		// TODO: pseudoIDs: get userID for room using state key (which is now senderID)
-		localpart, senderDomain, err := gomatrixserverlib.SplitID('@', *memberEvent.StateKey())
+		memberUserID, err := r.Queryer.QueryUserIDForSender(ctx, memberEvent.RoomID(), spec.SenderID(*memberEvent.StateKey()))
 		if err != nil {
 			continue
 		}
 
-		// TODO: pseudoIDs: query account by state key (which is now senderID)
 		accountRes := &userAPI.QueryAccountByLocalpartResponse{}
 		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{
-			Localpart:  localpart,
-			ServerName: senderDomain,
+			Localpart:  memberUserID.Local(),
+			ServerName: memberUserID.Domain(),
 		}, accountRes); err != nil {
 			return err
 		}
@@ -896,8 +894,8 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 		inputEvents = append(inputEvents, api.InputRoomEvent{
 			Kind:         api.KindNew,
 			Event:        event,
-			Origin:       senderDomain,
-			SendAsServer: string(senderDomain),
+			Origin:       memberUserID.Domain(),
+			SendAsServer: string(memberUserID.Domain()),
 		})
 		prevEvents = []string{event.EventID()}
 	}
