@@ -330,6 +330,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			}
 		}
 		// skip events that rely on a specific user being present
+		// TODO: What to do here for pseudoIDs? It's checking non-member events for state keys with userIDs.
 		sKey := *event.StateKey()
 		if event.Type() != spec.MRoomMember && len(sKey) > 0 && sKey[:1] == "@" {
 			continue
