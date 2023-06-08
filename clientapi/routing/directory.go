@@ -314,30 +314,6 @@ func SetVisibility(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
-	resErr := checkMemberInRoom(req.Context(), rsAPI, dev.UserID, roomID)
-	if resErr != nil {
-		return *resErr
-	}
-
-	queryEventsReq := roomserverAPI.QueryLatestEventsAndStateRequest{
-		RoomID: roomID,
-		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
-			EventType: spec.MRoomPowerLevels,
-			StateKey:  "",
-		}},
-	}
-	var queryEventsRes roomserverAPI.QueryLatestEventsAndStateResponse
-	err := rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
-	if err != nil || len(queryEventsRes.StateEvents) == 0 {
-		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-
-	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
-	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
 	fullUserID, err := spec.NewUserID(dev.UserID, true)
 	if err != nil {
 		return util.JSONResponse{
@@ -352,6 +328,31 @@ func SetVisibility(
 			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
 		}
 	}
+
+	resErr := checkMemberInRoom(req.Context(), rsAPI, senderID, roomID)
+	if resErr != nil {
+		return *resErr
+	}
+
+	queryEventsReq := roomserverAPI.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+			EventType: spec.MRoomPowerLevels,
+			StateKey:  "",
+		}},
+	}
+	var queryEventsRes roomserverAPI.QueryLatestEventsAndStateResponse
+	err = rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	if err != nil || len(queryEventsRes.StateEvents) == 0 {
+		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
 	if power.UserLevel(senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

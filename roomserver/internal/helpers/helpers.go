@@ -55,9 +55,10 @@ func UpdateToInviteMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
+				RoomID:           add.RoomID(),
 				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
+				TargetSenderID:   spec.SenderID(*add.StateKey()),
 			},
 		})
 	}
@@ -99,8 +100,8 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 
 func IsInvitePending(
 	ctx context.Context, db storage.Database,
-	roomID, userID string,
-) (bool, string, string, gomatrixserverlib.PDU, error) {
+	roomID string, senderID spec.SenderID,
+) (bool, spec.SenderID, string, gomatrixserverlib.PDU, error) {
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -111,13 +112,13 @@ func IsInvitePending(
 	}
 
 	// Look up the state key NID for the supplied user ID.
-	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{userID})
+	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{string(senderID)})
 	if err != nil {
 		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
-	targetUserNID, targetUserFound := targetUserNIDs[userID]
+	targetUserNID, targetUserFound := targetUserNIDs[string(senderID)]
 	if !targetUserFound {
-		return false, "", "", nil, fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
+		return false, "", "", nil, fmt.Errorf("missing NID for user %q (%+v)", senderID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
@@ -156,7 +157,7 @@ func IsInvitePending(
 
 	event, err := verImpl.NewEventFromTrustedJSON(eventJSON, false)
 
-	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
+	return true, spec.SenderID(senderUser), userNIDToEventID[senderUserNIDs[0]], event, err
 }
 
 // GetMembershipsAtState filters the state events to

@@ -47,7 +47,22 @@ func SendRedaction(
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
-	resErr := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	fullUserID, userIDErr := spec.NewUserID(device.UserID, true)
+	if userIDErr != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to redact"),
+		}
+	}
+	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	if queryErr != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to redact"),
+		}
+	}
+
+	resErr := checkMemberInRoom(req.Context(), rsAPI, senderID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
@@ -70,21 +85,6 @@ func SendRedaction(
 		return util.JSONResponse{
 			Code: 400,
 			JSON: spec.NotFound("cannot redact event in another room"),
-		}
-	}
-
-	fullUserID, userIDErr := spec.NewUserID(device.UserID, true)
-	if userIDErr != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to redact"),
-		}
-	}
-	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
-	if queryErr != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to redact"),
 		}
 	}
 

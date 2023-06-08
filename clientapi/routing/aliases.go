@@ -55,9 +55,23 @@ func GetAliases(
 		visibility = content.HistoryVisibility
 	}
 	if visibility != spec.WorldReadable {
+		fullUserID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			}
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			}
+		}
 		queryReq := api.QueryMembershipForUserRequest{
-			RoomID: roomID,
-			UserID: device.UserID,
+			RoomID:   roomID,
+			SenderID: senderID,
 		}
 		var queryRes api.QueryMembershipForUserResponse
 		if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {

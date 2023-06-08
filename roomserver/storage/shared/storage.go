@@ -485,10 +485,10 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	})
 }
 
-func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
+func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, string(requestSenderID))
 		return err
 	})
 	if err != nil {

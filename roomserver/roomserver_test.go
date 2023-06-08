@@ -722,7 +722,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 
 				roomID, _ := spec.NewRoomID(testRoom.ID)
 				userID, _ := spec.NewUserID(bob.ID, true)
-				got, err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), *roomID, *userID)
+				got, err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), *roomID, spec.SenderID(userID.String()))
 				if tc.wantError && err == nil {
 					t.Fatal("expected error, got none")
 				}

@@ -155,6 +155,7 @@ type reqCtx struct {
 	db          Database
 	req         *EventRelationshipRequest
 	userID      string
+	senderID    spec.SenderID
 	roomVersion gomatrixserverlib.RoomVersion
 
 	// federated request args
@@ -173,10 +174,25 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 			}
 		}
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+			}
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), relation.RoomID, *userID)
+		if err != nil {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+			}
+		}
 		rc := reqCtx{
 			ctx:                req.Context(),
 			req:                relation,
 			userID:             device.UserID,
+			senderID:           senderID,
 			rsAPI:              rsAPI,
 			fsAPI:              fsAPI,
 			isFederatedRequest: false,
@@ -337,8 +353,8 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent
 	// check the user is joined to that room
 	var queryMemRes roomserver.QueryMembershipForUserResponse
 	err = rc.rsAPI.QueryMembershipForUser(rc.ctx, &roomserver.QueryMembershipForUserRequest{
-		RoomID: roomID,
-		UserID: rc.userID,
+		RoomID:   roomID,
+		SenderID: rc.senderID,
 	}, &queryMemRes)
 	if err != nil {
 		logger.WithError(err).Warn("failed to query membership for user in room")
@@ -538,8 +554,8 @@ func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 	// TODO: This does not honour m.room.create content
 	var queryMembershipRes roomserver.QueryMembershipForUserResponse
 	err := rc.rsAPI.QueryMembershipForUser(rc.ctx, &roomserver.QueryMembershipForUserRequest{
-		RoomID: event.RoomID(),
-		UserID: rc.userID,
+		RoomID:   event.RoomID(),
+		SenderID: rc.senderID,
 	}, &queryMembershipRes)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryMembershipForUser")

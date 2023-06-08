@@ -529,6 +529,10 @@ func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID str
 	return spec.NewUserID(string(senderID), true)
 }
 
+func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
+	return spec.SenderID(userID.String()), nil
+}
+
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
 	for _, eventID := range req.EventIDs {
 		ev := r.events[eventID]
@@ -540,7 +544,7 @@ func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver
 }
 
 func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roomserver.QueryMembershipForUserRequest, res *roomserver.QueryMembershipForUserResponse) error {
-	rooms := r.userToJoinedRooms[req.UserID]
+	rooms := r.userToJoinedRooms[string(req.SenderID)]
 	for _, roomID := range rooms {
 		if roomID == req.RoomID {
 			res.IsInRoom = true

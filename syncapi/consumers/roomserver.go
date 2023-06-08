@@ -454,7 +454,16 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 
 	// Notify any active sync requests that the invite has been retired.
 	s.inviteStream.Advance(pduPos)
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, msg.RoomID, msg.TargetSenderID)
+	if err != nil || userID == nil {
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"sender_id":  msg.TargetSenderID,
+			log.ErrorKey: err,
+		}).Errorf("failed to find userID for sender")
+		return
+	}
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, userID.String())
 }
 
 func (s *OutputRoomEventConsumer) onNewPeek(

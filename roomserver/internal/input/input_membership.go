@@ -161,9 +161,10 @@ func updateToJoinMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
+				RoomID:           add.RoomID(),
 				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
+				TargetSenderID:   spec.SenderID(*add.StateKey()),
 			},
 		})
 	}
@@ -187,9 +188,10 @@ func updateToLeaveMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
+				RoomID:           add.RoomID(),
 				Membership:       newMembership,
 				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
+				TargetSenderID:   spec.SenderID(*add.StateKey()),
 			},
 		})
 	}

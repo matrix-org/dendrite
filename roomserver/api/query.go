@@ -115,7 +115,7 @@ type QueryMembershipForUserRequest struct {
 	// ID of the room to fetch membership from
 	RoomID string `json:"room_id"`
 	// ID of the user for whom membership is requested
-	UserID string `json:"user_id"`
+	SenderID spec.SenderID `json:"user_id"`
 }
 
 // QueryMembershipForUserResponse is a response to QueryMembership
@@ -145,7 +145,7 @@ type QueryMembershipsForRoomRequest struct {
 	// Optional - ID of the user sending the request, for checking if the
 	// user is allowed to see the memberships. If not specified then all
 	// room memberships will be returned.
-	Sender string `json:"sender"`
+	SenderID spec.SenderID `json:"sender"`
 }
 
 // QueryMembershipsForRoomResponse is a response to QueryMembershipsForRoom
@@ -448,11 +448,11 @@ func (rq *JoinRoomQuerier) CurrentStateEvent(ctx context.Context, roomID spec.Ro
 	return rq.Roomserver.CurrentStateEvent(ctx, roomID, eventType, stateKey)
 }
 
-func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error) {
-	return rq.Roomserver.InvitePending(ctx, roomID, userID)
+func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error) {
+	return rq.Roomserver.InvitePending(ctx, roomID, senderID)
 }
 
-func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, userID spec.UserID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
+func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
 	roomInfo, err := rq.Roomserver.QueryRoomInfo(ctx, roomID)
 	if err != nil || roomInfo == nil || roomInfo.IsStub() {
 		return nil, err
@@ -468,7 +468,7 @@ func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID sp
 		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
 	}
 
-	userJoinedToRoom, err := rq.Roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), userID)
+	userJoinedToRoom, err := rq.Roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
@@ -493,8 +493,8 @@ type MembershipQuerier struct {
 
 func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
 	req := QueryMembershipForUserRequest{
-		RoomID: roomID.String(),
-		UserID: string(senderID),
+		RoomID:   roomID.String(),
+		SenderID: senderID,
 	}
 	res := QueryMembershipForUserResponse{}
 	err := mq.Roomserver.QueryMembershipForUser(ctx, &req, &res)

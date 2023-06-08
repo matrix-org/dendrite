@@ -203,7 +203,7 @@ func (r *Joiner) performJoinRoomByID(
 		req.Content = map[string]interface{}{}
 	}
 	req.Content["membership"] = spec.Join
-	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req); aerr != nil {
+	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req, senderID); aerr != nil {
 		return "", "", aerr
 	} else if authorisedVia != "" {
 		req.Content["join_authorised_via_users_server"] = authorisedVia
@@ -226,17 +226,17 @@ func (r *Joiner) performJoinRoomByID(
 
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
-	isInvitePending, inviteSender, _, inviteEvent, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
+	isInvitePending, inviteSender, _, inviteEvent, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, senderID)
 	if err == nil && !serverInRoom && isInvitePending {
-		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
-		if ierr != nil {
-			return "", "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+		inviter, queryErr := r.RSAPI.QueryUserIDForSender(ctx, req.RoomIDOrAlias, inviteSender)
+		if queryErr != nil {
+			return "", "", fmt.Errorf("r.RSAPI.QueryUserIDForSender: %w", queryErr)
 		}
 
 		// If we were invited by someone from another server then we can
 		// assume they are in the room so we can join via them.
-		if !r.Cfg.Matrix.IsLocalServerName(inviterDomain) {
-			req.ServerNames = append(req.ServerNames, inviterDomain)
+		if inviter != nil && !r.Cfg.Matrix.IsLocalServerName(inviter.Domain()) {
+			req.ServerNames = append(req.ServerNames, inviter.Domain())
 			forceFederatedJoin = true
 			memberEvent := gjson.Parse(string(inviteEvent.JSON()))
 			// only set unsigned if we've got a content.membership, which we _should_
@@ -299,8 +299,8 @@ func (r *Joiner) performJoinRoomByID(
 		// fail if we can't find the existing membership) because there
 		// is really no harm in just sending another membership event.
 		membershipReq := &api.QueryMembershipForUserRequest{
-			RoomID: req.RoomIDOrAlias,
-			UserID: userID.String(),
+			RoomID:   req.RoomIDOrAlias,
+			SenderID: senderID,
 		}
 		membershipRes := &api.QueryMembershipForUserResponse{}
 		_ = r.Queryer.QueryMembershipForUser(ctx, membershipReq, membershipRes)
@@ -376,15 +376,12 @@ func (r *Joiner) performFederatedJoinRoomByID(
 func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 	ctx context.Context,
 	joinReq *rsAPI.PerformJoinRequest,
+	senderID spec.SenderID,
 ) (string, error) {
 	roomID, err := spec.NewRoomID(joinReq.RoomIDOrAlias)
 	if err != nil {
 		return "", err
 	}
-	userID, err := spec.NewUserID(joinReq.UserID, true)
-	if err != nil {
-		return "", err
-	}
 
-	return r.Queryer.QueryRestrictedJoinAllowed(ctx, *roomID, *userID)
+	return r.Queryer.QueryRestrictedJoinAllowed(ctx, *roomID, senderID)
 }

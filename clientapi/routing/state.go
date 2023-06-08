@@ -99,9 +99,25 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	if !worldReadable {
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
-			RoomID: roomID,
-			UserID: device.UserID,
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("Device UserID is invalid"),
+			}
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("No matching senderID for this device")
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("Unable to find senderID for user"),
+			}
+		}
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+			RoomID:   roomID,
+			SenderID: senderID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
@@ -265,11 +281,27 @@ func OnIncomingStateTypeRequest(
 	// membershipRes will only be populated if the room is not world-readable.
 	var membershipRes api.QueryMembershipForUserResponse
 	if !worldReadable {
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("Device UserID is invalid"),
+			}
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("No matching senderID for this device")
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("Unable to find senderID for user"),
+			}
+		}
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
-			RoomID: roomID,
-			UserID: device.UserID,
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+			RoomID:   roomID,
+			SenderID: senderID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")

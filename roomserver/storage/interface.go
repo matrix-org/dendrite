@@ -129,7 +129,7 @@ type Database interface {
 	// in this room, along a boolean set to true if the user is still in this room,
 	// false if not.
 	// Returns an error if there was a problem talking to the database.
-	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
+	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
 	// Lookup the membership event numeric IDs for all user that are or have
 	// been members of a given room. Only lookup events of "join" membership if
 	// joinOnly is set to true.

@@ -11,6 +11,11 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type SenderUserIDPair struct {
+	SenderID spec.SenderID
+	UserID   spec.UserID
+}
+
 type PerformCreateRoomRequest struct {
 	InvitedUsers              []string
 	RoomName                  string
@@ -41,8 +46,8 @@ type PerformJoinRequest struct {
 }
 
 type PerformLeaveRequest struct {
-	RoomID string `json:"room_id"`
-	UserID string `json:"user_id"`
+	RoomID string
+	Leaver SenderUserIDPair
 }
 
 type PerformLeaveResponse struct {
