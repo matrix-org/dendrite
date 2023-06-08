@@ -35,6 +35,8 @@ type RegistrationTokens interface {
 	RegistrationTokenExists(ctx context.Context, token string) (bool, error)
 	InsertRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error)
 	ListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error)
+	GetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error)
+	DeleteRegistrationToken(ctx context.Context, tokenString string) error
 }
 
 type Profile interface {

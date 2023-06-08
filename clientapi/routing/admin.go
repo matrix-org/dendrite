@@ -198,6 +198,46 @@ func getReturnValueExpiryTime(expiryTime int64) interface{} {
 	return expiryTime
 }
 
+func AdminGetRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	tokenText := vars["token"]
+	token, err := userAPI.PerformAdminGetRegistrationToken(req.Context(), tokenText)
+	if err != nil {
+		return util.MatrixErrorResponse(
+			http.StatusNotFound,
+			string(spec.ErrorUnknown),
+			fmt.Sprintf("token: %s not found", tokenText),
+		)
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: token,
+	}
+}
+
+func AdminDeleteRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	tokenText := vars["token"]
+	err = userAPI.PerformAdminDeleteRegistrationToken(req.Context(), tokenText)
+	if err != nil {
+		return util.MatrixErrorResponse(
+			http.StatusNotFound,
+			string(spec.ErrorUnknown),
+			fmt.Sprintf("token: %s not found", tokenText),
+		)
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{},
+	}
+}
+
 func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {

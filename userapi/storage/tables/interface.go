@@ -34,6 +34,8 @@ type RegistrationTokensTable interface {
 	RegistrationTokenExists(ctx context.Context, txn *sql.Tx, token string) (bool, error)
 	InsertRegistrationToken(ctx context.Context, txn *sql.Tx, registrationToken *clientapi.RegistrationToken) (bool, error)
 	ListRegistrationTokens(ctx context.Context, txn *sql.Tx, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error)
+	GetRegistrationToken(ctx context.Context, txn *sql.Tx, tokenString string) (*clientapi.RegistrationToken, error)
+	DeleteRegistrationToken(ctx context.Context, txn *sql.Tx, tokenString string) error
 }
 
 type AccountDataTable interface {

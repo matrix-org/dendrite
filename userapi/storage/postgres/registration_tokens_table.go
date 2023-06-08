@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -38,12 +39,20 @@ const listInvalidTokensSQL = "" +
 	"SELECT * FROM userapi_registration_tokens WHERE" +
 	"(uses_allowed <= pending + completed OR expiry_time <= $1)"
 
+const getTokenSQL = "" +
+	"SELECT pending, completed, uses_allowed, expiry_time FROM userapi_registration_tokens WHERE token = $1"
+
+const deleteTokenSQL = "" +
+	"DELETE FROM userapi_registration_tokens WHERE token = $1"
+
 type registrationTokenStatements struct {
 	selectTokenStatement      *sql.Stmt
 	insertTokenStatement      *sql.Stmt
 	listAllTokensStatement    *sql.Stmt
 	listValidTokensStatement  *sql.Stmt
 	listInvalidTokenStatement *sql.Stmt
+	getTokenStatement         *sql.Stmt
+	deleteTokenStatement      *sql.Stmt
 }
 
 func NewPostgresRegistrationTokensTable(db *sql.DB) (tables.RegistrationTokensTable, error) {
@@ -58,6 +67,8 @@ func NewPostgresRegistrationTokensTable(db *sql.DB) (tables.RegistrationTokensTa
 		{&s.listAllTokensStatement, listAllTokensSQL},
 		{&s.listValidTokensStatement, listValidTokensSQL},
 		{&s.listInvalidTokenStatement, listInvalidTokensSQL},
+		{&s.getTokenStatement, getTokenSQL},
+		{&s.deleteTokenStatement, deleteTokenSQL},
 	}.Prepare(db)
 }
 
@@ -129,12 +140,18 @@ func (s *registrationTokenStatements) ListRegistrationTokens(ctx context.Context
 		if err != nil {
 			return tokens, err
 		}
+		tokenString := tokenString.String
+		pending := pending.Int32
+		completed := completed.Int32
+		usesAllowed := getReturnValueForInt32(usesAllowed)
+		expiryTime := getReturnValueForInt64(expiryTime)
+
 		tokenMap := api.RegistrationToken{
-			Token:       &tokenString.String,
-			Pending:     &pending.Int32,
-			Completed:   &pending.Int32,
-			UsesAllowed: getReturnValueForInt32(usesAllowed),
-			ExpiryTime:  getReturnValueForInt64(expiryTime),
+			Token:       &tokenString,
+			Pending:     &pending,
+			Completed:   &completed,
+			UsesAllowed: usesAllowed,
+			ExpiryTime:  expiryTime,
 		}
 		tokens = append(tokens, tokenMap)
 	}
@@ -153,6 +170,40 @@ func getReturnValueForInt64(value sql.NullInt64) *int64 {
 	if value.Valid {
 		returnValue := value.Int64
 		return &returnValue
+	}
+	return nil
+}
+
+func (s *registrationTokenStatements) GetRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) (*api.RegistrationToken, error) {
+	stmt := s.getTokenStatement
+	var pending, completed, usesAllowed sql.NullInt32
+	var expiryTime sql.NullInt64
+	err := stmt.QueryRowContext(ctx, tokenString).Scan(&pending, &completed, &usesAllowed, &expiryTime)
+	if err != nil {
+		return nil, err
+	}
+	token := api.RegistrationToken{
+		Token:       &tokenString,
+		Pending:     &pending.Int32,
+		Completed:   &completed.Int32,
+		UsesAllowed: getReturnValueForInt32(usesAllowed),
+		ExpiryTime:  getReturnValueForInt64(expiryTime),
+	}
+	return &token, nil
+}
+
+func (s *registrationTokenStatements) DeleteRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) error {
+	stmt := s.deleteTokenStatement
+	res, err := stmt.ExecContext(ctx, tokenString)
+	if err != nil {
+		return err
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("token: %s does not exists", tokenString)
 	}
 	return nil
 }
