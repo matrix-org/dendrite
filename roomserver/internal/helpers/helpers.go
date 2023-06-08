@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -265,7 +264,7 @@ func LoadStateEvents(
 }
 
 func CheckServerAllowedToSeeEvent(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName, isServerInRoom bool,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, roomID string, eventID string, serverName spec.ServerName, isServerInRoom bool,
 ) (bool, error) {
 	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
 	switch err {
@@ -274,7 +273,7 @@ func CheckServerAllowedToSeeEvent(
 	case tables.OptimisationNotSupportedError:
 		// The database engine didn't support this optimisation, so fall back to using
 		// the old and slow method
-		stateAtEvent, err = slowGetHistoryVisibilityState(ctx, db, info, eventID, serverName)
+		stateAtEvent, err = slowGetHistoryVisibilityState(ctx, db, info, roomID, eventID, serverName)
 		if err != nil {
 			return false, err
 		}
@@ -293,7 +292,7 @@ func CheckServerAllowedToSeeEvent(
 }
 
 func slowGetHistoryVisibilityState(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, roomID, eventID string, serverName spec.ServerName,
 ) ([]gomatrixserverlib.PDU, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
@@ -320,8 +319,13 @@ func slowGetHistoryVisibilityState(
 	// then we'll filter it out. This does preserve state keys that
 	// are "" since these will contain history visibility etc.
 	for nid, key := range stateKeys {
-		if key != "" && !strings.HasSuffix(key, ":"+string(serverName)) {
-			delete(stateKeys, nid)
+		if key != "" {
+			userID, err := db.GetUserIDForSender(ctx, roomID, spec.SenderID(key))
+			if err == nil && userID != nil {
+				if userID.Domain() != serverName {
+					delete(stateKeys, nid)
+				}
+			}
 		}
 	}
 
@@ -411,7 +415,7 @@ BFSLoop:
 				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, pre, serverName, isServerInRoom)
+					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, ev.RoomID(), pre, serverName, isServerInRoom)
 					if err != nil {
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",

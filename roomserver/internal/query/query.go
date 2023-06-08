@@ -483,6 +483,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
 	serverName spec.ServerName,
 	eventID string,
+	roomID string,
 ) (allowed bool, err error) {
 	events, err := r.DB.EventNIDs(ctx, []string{eventID})
 	if err != nil {
@@ -512,7 +513,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	}
 
 	return helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, info, eventID, serverName, isInRoom,
+		ctx, r.DB, info, roomID, eventID, serverName, isInRoom,
 	)
 }
 
