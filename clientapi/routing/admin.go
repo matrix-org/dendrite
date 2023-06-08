@@ -158,20 +158,22 @@ func getReturnValueForUsesAllowed(usesAllowed int32) interface{} {
 }
 
 func AdminListRegistrationTokens(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-	if err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusInternalServerError,
-			string(spec.ErrorInvalidParam),
-			"unable to parse query params",
-		)
-	}
+	queryParams := req.URL.Query()
 	returnAll := true
-	validQuery, ok := vars["valid"]
+	valid := true
+	validQuery, ok := queryParams["valid"]
 	if ok {
 		returnAll = false
+		validValue, err := strconv.ParseBool(validQuery[0])
+		if err != nil {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"invalid 'valid' query parameter",
+			)
+		}
+		valid = validValue
 	}
-	valid, err := strconv.ParseBool(validQuery)
 	tokens, err := userAPI.PerformAdminListRegistrationTokens(req.Context(), returnAll, valid)
 	if err != nil {
 		return util.MatrixErrorResponse(
