@@ -95,7 +95,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	for i := range events {
 		gmslEvents[i] = events[i].PDU
 	}
-	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, spec.Join), nil
+	return auth.IsAnyUserOnServerWithMembership(ctx, db, serverName, gmslEvents, spec.Join), nil
 }
 
 func IsInvitePending(
@@ -289,7 +289,7 @@ func CheckServerAllowedToSeeEvent(
 			return false, err
 		}
 	}
-	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
+	return auth.IsServerAllowed(ctx, db, serverName, isServerInRoom, stateAtEvent), nil
 }
 
 func slowGetHistoryVisibilityState(
