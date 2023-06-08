@@ -169,12 +169,16 @@ func TrackChangedUsers(
 		if err != nil {
 			return nil, nil, err
 		}
-		for _, state := range stateRes.Rooms {
+		for roomID, state := range stateRes.Rooms {
 			for tuple, membership := range state {
 				if membership != spec.Join {
 					continue
 				}
-				queryRes.UserIDsToCount[tuple.StateKey]--
+				user, queryErr := rsAPI.QueryUserIDForSender(ctx, roomID, spec.SenderID(tuple.StateKey))
+				if queryErr != nil || user == nil {
+					continue
+				}
+				queryRes.UserIDsToCount[user.String()]--
 			}
 		}
 
@@ -211,14 +215,18 @@ func TrackChangedUsers(
 	if err != nil {
 		return nil, left, err
 	}
-	for _, state := range stateRes.Rooms {
+	for roomID, state := range stateRes.Rooms {
 		for tuple, membership := range state {
 			if membership != spec.Join {
 				continue
 			}
 			// new user who we weren't previously sharing rooms with
 			if _, ok := queryRes.UserIDsToCount[tuple.StateKey]; !ok {
-				changed = append(changed, tuple.StateKey) // changed is returned
+				user, err := rsAPI.QueryUserIDForSender(ctx, roomID, spec.SenderID(tuple.StateKey))
+				if err != nil || user == nil {
+					continue
+				}
+				changed = append(changed, user.String()) // changed is returned
 			}
 		}
 	}
