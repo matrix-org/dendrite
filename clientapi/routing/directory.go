@@ -317,15 +317,15 @@ func SetVisibility(
 	fullUserID, err := spec.NewUserID(dev.UserID, true)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("userID for this device is invalid"),
 		}
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("failed to find senderID for this user"),
 		}
 	}
 
