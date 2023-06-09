@@ -170,13 +170,9 @@ func (r *Admin) PerformAdminEvacuateUser(
 	allRooms := append(roomIDs, inviteRoomIDs...)
 	affected = make([]string, 0, len(allRooms))
 	for _, roomID := range allRooms {
-		senderID, err := r.Queryer.QuerySenderIDForUser(ctx, roomID, *fullUserID)
-		if err != nil {
-			return nil, err
-		}
 		leaveReq := &api.PerformLeaveRequest{
 			RoomID: roomID,
-			Leaver: api.SenderUserIDPair{SenderID: senderID, UserID: *fullUserID},
+			Leaver: *fullUserID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
 		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
