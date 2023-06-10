@@ -179,7 +179,7 @@ func Setup(
 			if req.Method == http.MethodGet {
 				return AdminGetRegistrationToken(req, cfg, userAPI)
 			} else if req.Method == http.MethodPut {
-
+				return AdminUpdateRegistrationToken(req, cfg, userAPI)
 			} else if req.Method == http.MethodDelete {
 				return AdminDeleteRegistrationToken(req, cfg, userAPI)
 			}

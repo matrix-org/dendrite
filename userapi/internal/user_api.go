@@ -99,6 +99,14 @@ func (a *UserInternalAPI) PerformAdminDeleteRegistrationToken(ctx context.Contex
 	return a.DB.DeleteRegistrationToken(ctx, tokenString)
 }
 
+func (a *UserInternalAPI) PerformAdminUpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*clientapi.RegistrationToken, error) {
+	token, err := a.DB.UpdateRegistrationToken(ctx, tokenString, newAttributes)
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {

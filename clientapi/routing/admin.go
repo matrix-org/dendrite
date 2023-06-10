@@ -182,7 +182,6 @@ func AdminListRegistrationTokens(req *http.Request, cfg *config.ClientAPI, userA
 			"error fetching registration tokens",
 		)
 	}
-
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
@@ -235,6 +234,67 @@ func AdminDeleteRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{},
+	}
+}
+
+func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	tokenText := vars["token"]
+	request := make(map[string]interface{})
+	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+		return util.MatrixErrorResponse(
+			http.StatusBadRequest,
+			string(spec.ErrorBadJSON),
+			"Failed to decode request body:",
+		)
+	}
+	newAttributes := make(map[string]interface{})
+	usesAllowed, ok := request["uses_allowed"]
+	if ok {
+		// Only add usesAllowed to newAtrributes if it is present and valid
+		// Non numeric values in payload will cause panic during type conversion. But this is the best way to mimic
+		// Synapse's behaviour of updating the field if and only if it is present in request body.
+		if !(usesAllowed == nil || int32(usesAllowed.(float64)) >= 0) {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"uses_allowed must be a non-negative integer or null",
+			)
+		}
+		newAttributes["usesAllowed"] = usesAllowed
+	}
+	expiryTime, ok := request["expiry_time"]
+	if ok {
+		// Only add expiryTime to newAtrributes if it is present and valid
+		// Non numeric values in payload will cause panic during type conversion. But this is the best way to mimic
+		// Synapse's behaviour of updating the field if and only if it is present in request body.
+		if !(expiryTime == nil || int64(expiryTime.(float64)) > time.Now().UnixNano()/int64(time.Millisecond)) {
+			return util.MatrixErrorResponse(
+				http.StatusBadRequest,
+				string(spec.ErrorInvalidParam),
+				"expiry_time must be in the future",
+			)
+		}
+		newAttributes["expiryTime"] = expiryTime
+	}
+	if len(newAttributes) == 0 {
+		// No attributes to update. Return existing token
+		return AdminGetRegistrationToken(req, cfg, userAPI)
+	}
+	updatedToken, err := userAPI.PerformAdminUpdateRegistrationToken(req.Context(), tokenText, newAttributes)
+	if err != nil {
+		return util.MatrixErrorResponse(
+			http.StatusNotFound,
+			string(spec.ErrorUnknown),
+			fmt.Sprintf("token: %s not found", tokenText),
+		)
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: *updatedToken,
 	}
 }
 

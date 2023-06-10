@@ -104,6 +104,14 @@ func (d *Database) DeleteRegistrationToken(ctx context.Context, tokenString stri
 	return d.RegistrationTokens.DeleteRegistrationToken(ctx, nil, tokenString)
 }
 
+func (d *Database) UpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (updatedToken *clientapi.RegistrationToken, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		updatedToken, err = d.RegistrationTokens.UpdateRegistrationToken(ctx, txn, tokenString, newAttributes)
+		return err
+	})
+	return
+}
+
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByPassword(

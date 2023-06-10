@@ -45,14 +45,26 @@ const getTokenSQL = "" +
 const deleteTokenSQL = "" +
 	"DELETE FROM userapi_registration_tokens WHERE token = $1"
 
+const updateTokenUsesAllowedAndExpiryTimeSQL = "" +
+	"UPDATE userapi_registration_tokens SET uses_allowed = $2, expiry_time = $3 WHERE token = $1"
+
+const updateTokenUsesAllowedSQL = "" +
+	"UPDATE userapi_registration_tokens SET uses_allowed = $2 WHERE token = $1"
+
+const updateTokenExpiryTimeSQL = "" +
+	"UPDATE userapi_registration_tokens SET expiry_time = $2 WHERE token = $1"
+
 type registrationTokenStatements struct {
-	selectTokenStatement      *sql.Stmt
-	insertTokenStatement      *sql.Stmt
-	listAllTokensStatement    *sql.Stmt
-	listValidTokensStatement  *sql.Stmt
-	listInvalidTokenStatement *sql.Stmt
-	getTokenStatement         *sql.Stmt
-	deleteTokenStatement      *sql.Stmt
+	selectTokenStatement                         *sql.Stmt
+	insertTokenStatement                         *sql.Stmt
+	listAllTokensStatement                       *sql.Stmt
+	listValidTokensStatement                     *sql.Stmt
+	listInvalidTokenStatement                    *sql.Stmt
+	getTokenStatement                            *sql.Stmt
+	deleteTokenStatement                         *sql.Stmt
+	updateTokenUsesAllowedAndExpiryTimeStatement *sql.Stmt
+	updateTokenUsesAllowedStatement              *sql.Stmt
+	updateTokenExpiryTimeStatement               *sql.Stmt
 }
 
 func NewPostgresRegistrationTokensTable(db *sql.DB) (tables.RegistrationTokensTable, error) {
@@ -69,6 +81,9 @@ func NewPostgresRegistrationTokensTable(db *sql.DB) (tables.RegistrationTokensTa
 		{&s.listInvalidTokenStatement, listInvalidTokensSQL},
 		{&s.getTokenStatement, getTokenSQL},
 		{&s.deleteTokenStatement, deleteTokenSQL},
+		{&s.updateTokenUsesAllowedAndExpiryTimeStatement, updateTokenUsesAllowedAndExpiryTimeSQL},
+		{&s.updateTokenUsesAllowedStatement, updateTokenUsesAllowedSQL},
+		{&s.updateTokenExpiryTimeStatement, updateTokenExpiryTimeSQL},
 	}.Prepare(db)
 }
 
@@ -175,7 +190,7 @@ func getReturnValueForInt64(value sql.NullInt64) *int64 {
 }
 
 func (s *registrationTokenStatements) GetRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) (*api.RegistrationToken, error) {
-	stmt := s.getTokenStatement
+	stmt := sqlutil.TxStmt(tx, s.getTokenStatement)
 	var pending, completed, usesAllowed sql.NullInt32
 	var expiryTime sql.NullInt64
 	err := stmt.QueryRowContext(ctx, tokenString).Scan(&pending, &completed, &usesAllowed, &expiryTime)
@@ -206,4 +221,30 @@ func (s *registrationTokenStatements) DeleteRegistrationToken(ctx context.Contex
 		return fmt.Errorf("token: %s does not exists", tokenString)
 	}
 	return nil
+}
+
+func (s *registrationTokenStatements) UpdateRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string, newAttributes map[string]interface{}) (*api.RegistrationToken, error) {
+	var stmt *sql.Stmt
+	usesAllowed, usesAllowedPresent := newAttributes["usesAllowed"]
+	expiryTime, expiryTimePresent := newAttributes["expiryTime"]
+	if usesAllowedPresent && expiryTimePresent {
+		stmt = sqlutil.TxStmt(tx, s.updateTokenUsesAllowedAndExpiryTimeStatement)
+		_, err := stmt.ExecContext(ctx, tokenString, usesAllowed, expiryTime)
+		if err != nil {
+			return nil, err
+		}
+	} else if usesAllowedPresent {
+		stmt = sqlutil.TxStmt(tx, s.updateTokenUsesAllowedStatement)
+		_, err := stmt.ExecContext(ctx, tokenString, usesAllowed)
+		if err != nil {
+			return nil, err
+		}
+	} else if expiryTimePresent {
+		stmt = sqlutil.TxStmt(tx, s.updateTokenExpiryTimeStatement)
+		_, err := stmt.ExecContext(ctx, tokenString, expiryTime)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return s.GetRegistrationToken(ctx, tx, tokenString)
 }
