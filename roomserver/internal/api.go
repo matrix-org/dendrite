@@ -176,6 +176,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
 		DB:                r.DB,
 		FSAPI:             r.fsAPI,
+		Querier:           r.Queryer,
 		KeyRing:           r.KeyRing,
 		// Perspective servers are trusted to not lie about server keys, so we will also
 		// prefer these servers when backfilling (assuming they are in the room) rather

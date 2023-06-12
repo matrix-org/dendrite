@@ -63,7 +63,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 	}
-	senderID, err := c.DB.GetSenderIDForUser(ctx, roomID.String(), userID)
+	senderID, err := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), userID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
 		return "", &util.JSONResponse{
@@ -324,7 +324,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 
 		if err = gomatrixserverlib.Allowed(ev, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return c.DB.GetUserIDForSender(ctx, roomID, senderID)
+			return c.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return "", &util.JSONResponse{

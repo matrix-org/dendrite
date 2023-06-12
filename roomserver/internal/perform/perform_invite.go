@@ -34,6 +34,7 @@ import (
 
 type QueryState struct {
 	storage.Database
+	querier api.QuerySenderIDAPI
 }
 
 func (q *QueryState) GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error) {
@@ -46,7 +47,7 @@ func (q *QueryState) GetState(ctx context.Context, roomID spec.RoomID, stateWant
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 	if info != nil {
-		roomState := state.NewStateResolution(q.Database, info)
+		roomState := state.NewStateResolution(q.Database, info, q.querier)
 		stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
 			ctx, info.StateSnapshotNID(), stateWanted,
 		)
@@ -126,7 +127,7 @@ func (r *Inviter) PerformInvite(
 ) error {
 	event := req.Event
 
-	sender, err := r.DB.GetUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	sender, err := r.RSAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return spec.InvalidParam("The sender user ID is invalid")
 	}
@@ -161,9 +162,9 @@ func (r *Inviter) PerformInvite(
 		IsTargetLocal:     isTargetLocal,
 		StrippedState:     req.InviteRoomState,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
-		StateQuerier:      &QueryState{r.DB},
+		StateQuerier:      &QueryState{r.DB, r.RSAPI},
 		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+			return r.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	}
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)

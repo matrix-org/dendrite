@@ -265,7 +265,7 @@ func (r *Admin) PerformAdminDownloadState(
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+				return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
 			}
@@ -273,7 +273,7 @@ func (r *Admin) PerformAdminDownloadState(
 		}
 		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
 			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-				return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+				return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
 			}

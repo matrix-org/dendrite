@@ -133,7 +133,7 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	latestRes := api.QueryLatestEventsAndStateResponse{}
-	if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &latestReq, &latestRes); err != nil {
+	if err = helpers.QueryLatestEventsAndState(ctx, r.DB, r.RSAPI, &latestReq, &latestRes); err != nil {
 		return nil, err
 	}
 	if !latestRes.RoomExists {

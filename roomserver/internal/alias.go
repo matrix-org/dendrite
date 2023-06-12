@@ -206,7 +206,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			stateRes := &api.QueryLatestEventsAndStateResponse{}
-			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
+			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, r, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
 				return err
 			}
 

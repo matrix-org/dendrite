@@ -128,7 +128,7 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
-	sender, err := r.DB.GetUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	sender, err := r.Queryer.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return fmt.Errorf("failed getting userID for sender %q. %w", event.SenderID(), err)
 	}
@@ -283,7 +283,7 @@ func (r *Inputer) processRoomEvent(
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
 	if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-		return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+		return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		isRejected = true
 		rejectionErr = err
@@ -321,7 +321,7 @@ func (r *Inputer) processRoomEvent(
 	if input.Kind == api.KindNew && !isCreateEvent {
 		// Check that the event passes authentication checks based on the
 		// current room state.
-		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, roomInfo, headered, input.StateEventIDs)
+		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, roomInfo, headered, input.StateEventIDs, r.Queryer)
 		if err != nil {
 			logger.WithError(err).Warn("Error authing soft-failed event")
 		}
@@ -401,7 +401,7 @@ func (r *Inputer) processRoomEvent(
 		redactedEvent   gomatrixserverlib.PDU
 	)
 	if !isRejected && !isCreateEvent {
-		resolver := state.NewStateResolution(r.DB, roomInfo)
+		resolver := state.NewStateResolution(r.DB, roomInfo, r.Queryer)
 		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver)
 		if err != nil {
 			return err
@@ -588,7 +588,7 @@ func (r *Inputer) processStateBefore(
 		gomatrixserverlib.ToPDUs(stateBeforeEvent),
 	)
 	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-		return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+		return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); rejectionErr != nil {
 		rejectionErr = fmt.Errorf("Allowed() failed for stateBeforeEvent: %w", rejectionErr)
 		return
@@ -701,7 +701,7 @@ nextAuthEvent:
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
 		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			continue nextAuthEvent
 		}
@@ -719,7 +719,7 @@ nextAuthEvent:
 
 		// Check if the auth event should be rejected.
 		err := gomatrixserverlib.Allowed(authEvent, auth, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if isRejected = err != nil; isRejected {
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
@@ -783,7 +783,7 @@ func (r *Inputer) calculateAndSetState(
 		return fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
 	}
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
-	roomState := state.NewStateResolution(updater, roomInfo)
+	roomState := state.NewStateResolution(updater, roomInfo, r.Queryer)
 
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.
