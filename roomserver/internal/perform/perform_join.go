@@ -296,11 +296,6 @@ func (r *Joiner) performJoinRoomByID(
 	case nil:
 		// create user room key if needed
 		if buildRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-			var roomID *spec.RoomID
-			roomID, err = spec.NewRoomID(req.RoomIDOrAlias)
-			if err != nil {
-				return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", req.RoomIDOrAlias, err)}
-			}
 			_, err = r.RSAPI.GetUserRoomPrivateKey(ctx, *userID, *roomID)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("GetUserRoomPrivateKey failed")
