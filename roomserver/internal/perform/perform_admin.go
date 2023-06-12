@@ -149,11 +149,11 @@ func (r *Admin) PerformAdminEvacuateUser(
 	ctx context.Context,
 	userID string,
 ) (affected []string, err error) {
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	fullUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
 		return nil, err
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Matrix.IsLocalServerName(fullUserID.Domain()) {
 		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
@@ -172,7 +172,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 	for _, roomID := range allRooms {
 		leaveReq := &api.PerformLeaveRequest{
 			RoomID: roomID,
-			UserID: userID,
+			Leaver: *fullUserID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
 		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)

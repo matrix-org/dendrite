@@ -134,12 +134,12 @@ func (r *Inviter) PerformInvite(
 		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
 	}
 
-	if event.StateKey() == nil {
+	if event.StateKey() == nil || *event.StateKey() == "" {
 		return fmt.Errorf("invite must be a state event")
 	}
-	invitedUser, err := spec.NewUserID(*event.StateKey(), true)
-	if err != nil {
-		return spec.InvalidParam("The user ID is invalid")
+	invitedUser, err := r.RSAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+	if err != nil || invitedUser == nil {
+		return spec.InvalidParam("Could not find the matching senderID for this user")
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
 

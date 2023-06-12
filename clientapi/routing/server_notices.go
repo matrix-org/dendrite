@@ -52,6 +52,7 @@ type sendServerNoticeRequest struct {
 	StateKey string `json:"state_key,omitempty"`
 }
 
+// nolint:gocyclo
 // SendServerNotice sends a message to a specific user. It can only be invoked by an admin.
 func SendServerNotice(
 	req *http.Request,
@@ -187,9 +188,17 @@ func SendServerNotice(
 		}
 	} else {
 		// we've found a room in common, check the membership
+		deviceUserID, err := spec.NewUserID(r.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			}
+		}
+
 		roomID = commonRooms[0]
 		membershipRes := api.QueryMembershipForUserResponse{}
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: r.UserID, RoomID: roomID}, &membershipRes)
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
 			return util.JSONResponse{
@@ -234,7 +243,7 @@ func SendServerNotice(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{PDU: e},
+			{PDU: e},
 		},
 		device.UserDomain(),
 		cfgClient.Matrix.ServerName,

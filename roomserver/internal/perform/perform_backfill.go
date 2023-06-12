@@ -582,7 +582,7 @@ func joinEventsFromHistoryVisibility(
 	}
 
 	// Can we see events in the room?
-	canSeeEvents := auth.IsServerAllowed(thisServer, true, events)
+	canSeeEvents := auth.IsServerAllowed(ctx, db, thisServer, true, events)
 	visibility := auth.HistoryVisibilityForRoom(events)
 	if !canSeeEvents {
 		logrus.Infof("ServersAtEvent history not visible to us: %s", visibility)

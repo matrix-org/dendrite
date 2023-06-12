@@ -119,9 +119,18 @@ func Relations(
 		if err == nil && userID != nil {
 			sender = *userID
 		}
+
+		sk := event.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := rsAPI.QueryUserIDForSender(req.Context(), event.RoomID(), spec.SenderID(*event.StateKey()))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender, sk),
 		)
 	}
 

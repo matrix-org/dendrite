@@ -154,7 +154,7 @@ type reqCtx struct {
 	rsAPI       roomserver.RoomserverInternalAPI
 	db          Database
 	req         *EventRelationshipRequest
-	userID      string
+	userID      spec.UserID
 	roomVersion gomatrixserverlib.RoomVersion
 
 	// federated request args
@@ -173,10 +173,17 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 			}
 		}
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+			}
+		}
 		rc := reqCtx{
 			ctx:                req.Context(),
 			req:                relation,
-			userID:             device.UserID,
+			userID:             *userID,
 			rsAPI:              rsAPI,
 			fsAPI:              fsAPI,
 			isFederatedRequest: false,
