@@ -990,9 +990,26 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.Ro
 }
 
 func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
-	return r.DB.GetSenderIDForUser(ctx, roomID, userID)
+	roomInfo, err := r.DB.GetOrCreateRoomInfoFromID(ctx, roomID)
+	if err != nil {
+		return "", err
+	}
+	if roomInfo == nil {
+		return "", fmt.Errorf("No room info found for %s", roomID)
+	}
+
+	switch roomInfo.RoomVersion {
+	case gomatrixserverlib.RoomVersionPseudoIDs:
+		return r.DB.GetSenderIDForUser(ctx, roomID, userID)
+	default:
+		return spec.SenderID(userID.String()), nil
+	}
 }
 
 func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	userID, err := spec.NewUserID(string(senderID), true)
+	if err == nil {
+		return userID, nil
+	}
 	return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 }

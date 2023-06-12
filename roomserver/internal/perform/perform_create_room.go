@@ -63,13 +63,12 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 	}
-	senderID, err := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), userID)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
-		return "", &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
+	var senderID spec.SenderID
+	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		// TODO: pseudoIDs - generate senderID kere!
+		senderID = "pseudo_id.sender.key"
+	} else {
+		senderID = spec.SenderID(userID.String())
 	}
 	createContent["creator"] = senderID
 	createContent["room_version"] = createRequest.RoomVersion
