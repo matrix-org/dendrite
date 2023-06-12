@@ -65,8 +65,14 @@ func TestNewInviteResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	skUserID, err := spec.NewUserID("@neilalexander:dendrite.neilalexander.dev", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	skString := skUserID.String()
+	sk := &skString
 
-	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, *sender)
+	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, *sender, sk)
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)

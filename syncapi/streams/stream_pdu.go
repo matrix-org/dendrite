@@ -605,13 +605,17 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			// If this is a gapped incremental sync, we still want this membership
 			isGappedIncremental := limited && incremental
 			// We want this users membership event, keep it in the list
-			stateKey := *event.StateKey()
-			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental || stateKey == device.UserID {
+			userID := ""
+			stateKeyUserID, err := p.rsAPI.QueryUserIDForSender(ctx, roomID, spec.SenderID(*event.StateKey()))
+			if err == nil && stateKeyUserID != nil {
+				userID = stateKeyUserID.String()
+			}
+			if _, ok := timelineUsers[userID]; ok || isGappedIncremental || userID == device.UserID {
 				newStateEvents = append(newStateEvents, event)
 				if !stateFilter.IncludeRedundantMembers {
-					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
+					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, userID, event.EventID())
 				}
-				delete(timelineUsers, stateKey)
+				delete(timelineUsers, userID)
 			}
 		} else {
 			newStateEvents = append(newStateEvents, event)

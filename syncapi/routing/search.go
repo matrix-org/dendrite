@@ -235,6 +235,15 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		if err == nil && userID != nil {
 			sender = *userID
 		}
+
+		sk := event.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := rsAPI.QueryUserIDForSender(req.Context(), event.RoomID(), spec.SenderID(*event.StateKey()))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
 		results = append(results, Result{
 			Context: SearchContextResponse{
 				Start: startToken.String(),
@@ -248,7 +257,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				ProfileInfo: profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender),
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
