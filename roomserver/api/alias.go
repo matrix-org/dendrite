@@ -14,7 +14,11 @@
 
 package api
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/matrix-org/gomatrixserverlib/spec"
+)
 
 // SetRoomAliasRequest is a request to SetRoomAlias
 type SetRoomAliasRequest struct {
@@ -62,7 +66,7 @@ type GetAliasesForRoomIDResponse struct {
 // RemoveRoomAliasRequest is a request to RemoveRoomAlias
 type RemoveRoomAliasRequest struct {
 	// ID of the user removing the alias
-	SenderID string `json:"user_id"`
+	SenderID spec.SenderID `json:"user_id"`
 	// The room alias to remove
 	Alias string `json:"alias"`
 }

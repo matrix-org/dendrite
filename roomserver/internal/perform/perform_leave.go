@@ -152,11 +152,19 @@ func (r *Leaver) performLeaveRoomByID(
 	}
 
 	// Prepare the template for the leave event.
-	userID := req.UserID
+	fullUserID, err := spec.NewUserID(req.UserID, true)
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.RoomID, *fullUserID)
+	if err != nil {
+		return nil, err
+	}
+	senderIDString := string(senderID)
 	proto := gomatrixserverlib.ProtoEvent{
 		Type:     spec.MRoomMember,
-		Sender:   userID,
-		StateKey: &userID,
+		SenderID: senderIDString,
+		StateKey: &senderIDString,
 		RoomID:   req.RoomID,
 		Redacts:  "",
 	}
@@ -168,10 +176,7 @@ func (r *Leaver) performLeaveRoomByID(
 	}
 
 	// Get the sender domain.
-	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', proto.Sender)
-	if serr != nil {
-		return nil, fmt.Errorf("sender %q is invalid", proto.Sender)
-	}
+	senderDomain := fullUserID.Domain()
 
 	// We know that the user is in the room at this point so let's build
 	// a leave event.

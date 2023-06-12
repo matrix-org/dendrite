@@ -995,13 +995,13 @@ func (d *EventDatabase) MaybeRedactEvent(
 
 		// TODO: Don't hack senderID into userID here (pseudoIDs)
 		sender1Domain := ""
-		sender1, err1 := spec.NewUserID(redactedEvent.SenderID(), true)
+		sender1, err1 := spec.NewUserID(string(redactedEvent.SenderID()), true)
 		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
 		// TODO: Don't hack senderID into userID here (pseudoIDs)
 		sender2Domain := ""
-		sender2, err2 := spec.NewUserID(redactionEvent.SenderID(), true)
+		sender2, err2 := spec.NewUserID(string(redactionEvent.SenderID()), true)
 		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
@@ -1529,14 +1529,14 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
 }
 
-func (d *Database) GetUserIDForSender(ctx context.Context, roomID string, senderID string) (*spec.UserID, error) {
+func (d *Database) GetUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 	// TODO: Use real logic once DB for pseudoIDs is in place
-	return spec.NewUserID(senderID, true)
+	return spec.NewUserID(string(senderID), true)
 }
 
-func (d *Database) GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (string, error) {
+func (d *Database) GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
 	// TODO: Use real logic once DB for pseudoIDs is in place
-	return userID.String(), nil
+	return spec.SenderID(userID.String()), nil
 }
 
 // GetKnownRooms returns a list of all rooms we know about.

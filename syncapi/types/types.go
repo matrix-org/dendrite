@@ -343,7 +343,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 type PrevEventRef struct {
 	PrevContent   json.RawMessage `json:"prev_content"`
 	ReplacesState string          `json:"replaces_state"`
-	PrevSender    string          `json:"prev_sender"`
+	PrevSenderID  string          `json:"prev_sender"`
 }
 
 type DeviceLists struct {

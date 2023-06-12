@@ -363,12 +363,21 @@ func buildMembershipEvents(
 ) ([]*types.HeaderedEvent, error) {
 	evs := []*types.HeaderedEvent{}
 
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, err
+	}
 	for _, roomID := range roomIDs {
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+		if err != nil {
+			return nil, err
+		}
+		senderIDString := string(senderID)
 		proto := gomatrixserverlib.ProtoEvent{
-			Sender:   userID,
+			SenderID: senderIDString,
 			RoomID:   roomID,
 			Type:     "m.room.member",
-			StateKey: &userID,
+			StateKey: &senderIDString,
 		}
 
 		content := gomatrixserverlib.MemberContent{
@@ -378,7 +387,7 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err := proto.SetContent(content); err != nil {
+		if err = proto.SetContent(content); err != nil {
 			return nil, err
 		}
 

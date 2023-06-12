@@ -98,7 +98,7 @@ func (r *Inviter) ProcessInviteMembership(
 	var outputUpdates []api.OutputEvent
 	var updater *shared.MembershipUpdater
 
-	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey())
+	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), spec.SenderID(*inviteEvent.StateKey()))
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
@@ -148,15 +148,21 @@ func (r *Inviter) PerformInvite(
 		return err
 	}
 
+	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, event.RoomID(), *invitedUser)
+	if err != nil {
+		return fmt.Errorf("failed looking up senderID for invited user")
+	}
+
 	input := gomatrixserverlib.PerformInviteInput{
 		RoomID:            *validRoomID,
 		InviteEvent:       event.PDU,
 		InvitedUser:       *invitedUser,
+		InvitedSenderID:   invitedSenderID,
 		IsTargetLocal:     isTargetLocal,
 		StrippedState:     req.InviteRoomState,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB},
-		UserIDQuerier: func(roomID, senderID string) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
 		},
 	}

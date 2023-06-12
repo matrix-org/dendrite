@@ -108,7 +108,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	}
 
 	if s.cfg.Matrix.ReportStats.Enabled {
-		go s.storeMessageStats(ctx, event.Type(), event.SenderID(), event.RoomID())
+		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID())
 	}
 
 	log.WithFields(log.Fields{
@@ -664,7 +664,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
-	rule, err := eval.MatchEvent(event.PDU, func(roomID, senderID string) (*spec.UserID, error) {
+	rule, err := eval.MatchEvent(event.PDU, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
@@ -698,7 +698,7 @@ func (rse *ruleSetEvalContext) UserDisplayName() string { return rse.mem.Display
 
 func (rse *ruleSetEvalContext) RoomMemberCount() (int, error) { return rse.roomSize, nil }
 
-func (rse *ruleSetEvalContext) HasPowerLevel(senderID, levelKey string) (bool, error) {
+func (rse *ruleSetEvalContext) HasPowerLevel(senderID spec.SenderID, levelKey string) (bool, error) {
 	req := &rsapi.QueryLatestEventsAndStateRequest{
 		RoomID: rse.roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{

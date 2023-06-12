@@ -144,7 +144,22 @@ func GetMemberships(
 					JSON: spec.InternalServerError{},
 				}
 			}
-			res.Joined[ev.SenderID()] = joinedMember(content)
+
+			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
+			if err != nil || userID == nil {
+				util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
+			}
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: spec.Forbidden("You don't have permission to kick this user, unknown senderID"),
+				}
+			}
+			res.Joined[userID.String()] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -153,7 +168,7 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID, senderID string) (*spec.UserID, error) {
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})},
 	}

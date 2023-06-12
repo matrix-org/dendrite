@@ -58,7 +58,9 @@ func Test_EventAuth(t *testing.T) {
 	}
 
 	// Finally check that the event is NOT allowed
-	if err := gomatrixserverlib.Allowed(ev.PDU, &allower, func(roomID, senderID string) (*spec.UserID, error) { return spec.NewUserID(senderID, true) }); err == nil {
+	if err := gomatrixserverlib.Allowed(ev.PDU, &allower, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		return spec.NewUserID(string(senderID), true)
+	}); err == nil {
 		t.Fatalf("event should not be allowed, but it was")
 	}
 }
