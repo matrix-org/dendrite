@@ -1042,9 +1042,7 @@ func TestUpgrade(t *testing.T) {
 				if err != nil {
 					t.Fatalf("upgrade userID is invalid")
 				}
-				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID,
-					api.SenderUserIDPair{SenderID: spec.SenderID(tc.upgradeUser), UserID: *userID},
-					version.DefaultRoomVersion())
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, version.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}

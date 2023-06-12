@@ -67,17 +67,7 @@ func UpgradeRoom(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *userID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("Failed getting senderID for user")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-	newRoomID, err := rsAPI.PerformRoomUpgrade(req.Context(), roomID, roomserverAPI.SenderUserIDPair{
-		SenderID: senderID, UserID: *userID,
-	}, gomatrixserverlib.RoomVersion(r.NewVersion))
+	newRoomID, err := rsAPI.PerformRoomUpgrade(req.Context(), roomID, *userID, gomatrixserverlib.RoomVersion(r.NewVersion))
 	switch e := err.(type) {
 	case nil:
 	case roomserverAPI.ErrNotAllowed:

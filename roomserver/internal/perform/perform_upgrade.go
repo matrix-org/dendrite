@@ -38,14 +38,14 @@ type Upgrader struct {
 // PerformRoomUpgrade upgrades a room from one version to another
 func (r *Upgrader) PerformRoomUpgrade(
 	ctx context.Context,
-	roomID string, user api.SenderUserIDPair, roomVersion gomatrixserverlib.RoomVersion,
+	roomID string, userID spec.UserID, roomVersion gomatrixserverlib.RoomVersion,
 ) (newRoomID string, err error) {
-	return r.performRoomUpgrade(ctx, roomID, user, roomVersion)
+	return r.performRoomUpgrade(ctx, roomID, userID, roomVersion)
 }
 
 func (r *Upgrader) performRoomUpgrade(
 	ctx context.Context,
-	roomID string, user api.SenderUserIDPair, roomVersion gomatrixserverlib.RoomVersion,
+	roomID string, userID spec.UserID, roomVersion gomatrixserverlib.RoomVersion,
 ) (string, error) {
 	evTime := time.Now()
 
@@ -54,14 +54,20 @@ func (r *Upgrader) performRoomUpgrade(
 		return "", err
 	}
 
+	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, roomID, userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
+		return "", err
+	}
+
 	// 1. Check if the user is authorized to actually perform the upgrade (can send m.room.tombstone)
-	if !r.userIsAuthorized(ctx, user.SenderID, roomID) {
+	if !r.userIsAuthorized(ctx, senderID, roomID) {
 		return "", api.ErrNotAllowed{Err: fmt.Errorf("You don't have permission to upgrade the room, power level too low.")}
 	}
 
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	newRoomID := fmt.Sprintf("!%s:%s", util.RandomString(16), user.UserID.Domain())
+	newRoomID := fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain())
 
 	// Get the existing room state for the old room.
 	oldRoomReq := &api.QueryLatestEventsAndStateRequest{
@@ -73,25 +79,25 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// Make the tombstone event
-	tombstoneEvent, pErr := r.makeTombstoneEvent(ctx, evTime, user.SenderID, user.UserID.Domain(), roomID, newRoomID)
+	tombstoneEvent, pErr := r.makeTombstoneEvent(ctx, evTime, senderID, userID.Domain(), roomID, newRoomID)
 	if pErr != nil {
 		return "", pErr
 	}
 
 	// Generate the initial events we need to send into the new room. This includes copied state events and bans
 	// as well as the power level events needed to set up the room
-	eventsToMake, pErr := r.generateInitialEvents(ctx, oldRoomRes, user.SenderID, roomID, roomVersion, tombstoneEvent)
+	eventsToMake, pErr := r.generateInitialEvents(ctx, oldRoomRes, senderID, roomID, roomVersion, tombstoneEvent)
 	if pErr != nil {
 		return "", pErr
 	}
 
 	// Send the setup events to the new room
-	if pErr = r.sendInitialEvents(ctx, evTime, user.SenderID, user.UserID.Domain(), newRoomID, roomVersion, eventsToMake); pErr != nil {
+	if pErr = r.sendInitialEvents(ctx, evTime, senderID, userID.Domain(), newRoomID, roomVersion, eventsToMake); pErr != nil {
 		return "", pErr
 	}
 
 	// 5. Send the tombstone event to the old room
-	if pErr = r.sendHeaderedEvent(ctx, user.UserID.Domain(), tombstoneEvent, string(user.UserID.Domain())); pErr != nil {
+	if pErr = r.sendHeaderedEvent(ctx, userID.Domain(), tombstoneEvent, string(userID.Domain())); pErr != nil {
 		return "", pErr
 	}
 
@@ -101,17 +107,17 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// If the old room had a canonical alias event, it should be deleted in the old room
-	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, user.SenderID, user.UserID.Domain(), roomID); pErr != nil {
+	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, senderID, userID.Domain(), roomID); pErr != nil {
 		return "", pErr
 	}
 
 	// 4. Move local aliases to the new room
-	if pErr = moveLocalAliases(ctx, roomID, newRoomID, user.SenderID, user.UserID, r.URSAPI); pErr != nil {
+	if pErr = moveLocalAliases(ctx, roomID, newRoomID, senderID, userID, r.URSAPI); pErr != nil {
 		return "", pErr
 	}
 
 	// 6. Restrict power levels in the old room
-	if pErr = r.restrictOldRoomPowerLevels(ctx, evTime, user.SenderID, user.UserID.Domain(), roomID); pErr != nil {
+	if pErr = r.restrictOldRoomPowerLevels(ctx, evTime, senderID, userID.Domain(), roomID); pErr != nil {
 		return "", pErr
 	}
 

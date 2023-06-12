@@ -225,17 +225,7 @@ func createRoom(
 		EventTime:       evTime,
 	}
 
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID.String(), *userID)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-	roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, roomserverAPI.SenderUserIDPair{
-		SenderID: senderID, UserID: *userID,
-	}, *roomID, &req)
+	roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, *userID, *roomID, &req)
 	if createRes != nil {
 		return *createRes
 	}

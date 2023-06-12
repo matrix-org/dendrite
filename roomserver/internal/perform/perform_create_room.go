@@ -44,7 +44,7 @@ type Creator struct {
 
 // PerformCreateRoom handles all the steps necessary to create a new room.
 // nolint: gocyclo
-func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPair, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest) (string, *util.JSONResponse) {
+func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *api.PerformCreateRoomRequest) (string, *util.JSONResponse) {
 	verImpl, err := gomatrixserverlib.GetRoomVersion(createRequest.RoomVersion)
 	if err != nil {
 		return "", &util.JSONResponse{
@@ -63,9 +63,17 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 			}
 		}
 	}
-	createContent["creator"] = user.SenderID
+	senderID, err := c.DB.GetSenderIDForUser(ctx, roomID.String(), userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
+		return "", &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	createContent["creator"] = senderID
 	createContent["room_version"] = createRequest.RoomVersion
-	powerLevelContent := eventutil.InitialPowerLevelsContent(string(user.SenderID))
+	powerLevelContent := eventutil.InitialPowerLevelsContent(string(senderID))
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
 		JoinRule: spec.Invite,
 	}
@@ -121,7 +129,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 	}
 	membershipEvent := gomatrixserverlib.FledglingEvent{
 		Type:     spec.MRoomMember,
-		StateKey: string(user.SenderID),
+		StateKey: string(senderID),
 		Content: gomatrixserverlib.MemberContent{
 			Membership:  spec.Join,
 			DisplayName: createRequest.UserDisplayName,
@@ -163,7 +171,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 
 	var roomAlias string
 	if createRequest.RoomAliasName != "" {
-		roomAlias = fmt.Sprintf("#%s:%s", createRequest.RoomAliasName, user.UserID.Domain())
+		roomAlias = fmt.Sprintf("#%s:%s", createRequest.RoomAliasName, userID.Domain())
 		// check it's free
 		// TODO: This races but is better than nothing
 		hasAliasReq := api.GetRoomIDForAliasRequest{
@@ -281,7 +289,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 		depth := i + 1 // depth starts at 1
 
 		builder := verImpl.NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-			SenderID: string(user.SenderID),
+			SenderID: string(senderID),
 			RoomID:   roomID.String(),
 			Type:     e.Type,
 			StateKey: &e.StateKey,
@@ -306,7 +314,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 				JSON: spec.InternalServerError{},
 			}
 		}
-		ev, err = builder.Build(createRequest.EventTime, user.UserID.Domain(), createRequest.KeyID, createRequest.PrivateKey)
+		ev, err = builder.Build(createRequest.EventTime, userID.Domain(), createRequest.KeyID, createRequest.PrivateKey)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return "", &util.JSONResponse{
@@ -342,11 +350,11 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 		inputs = append(inputs, api.InputRoomEvent{
 			Kind:         api.KindNew,
 			Event:        event,
-			Origin:       user.UserID.Domain(),
+			Origin:       userID.Domain(),
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 	}
-	if err = api.SendInputRoomEvents(ctx, c.RSAPI, user.UserID.Domain(), inputs, false); err != nil {
+	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -361,7 +369,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 		aliasReq := api.SetRoomAliasRequest{
 			Alias:  roomAlias,
 			RoomID: roomID.String(),
-			UserID: user.UserID.String(),
+			UserID: userID.String(),
 		}
 
 		var aliasResp api.SetRoomAliasResponse
@@ -434,7 +442,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 			}
 			inviteeString := string(inviteeSenderID)
 			proto := gomatrixserverlib.ProtoEvent{
-				SenderID: string(user.SenderID),
+				SenderID: string(senderID),
 				RoomID:   roomID.String(),
 				Type:     "m.room.member",
 				StateKey: &inviteeString,
@@ -457,7 +465,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 
 			// Build the invite event.
 			identity := &fclient.SigningIdentity{
-				ServerName: user.UserID.Domain(),
+				ServerName: userID.Domain(),
 				KeyID:      createRequest.KeyID,
 				PrivateKey: createRequest.PrivateKey,
 			}
@@ -477,7 +485,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, user api.SenderUserIDPa
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
 				RoomVersion:     event.Version(),
-				SendAsServer:    string(user.UserID.Domain()),
+				SendAsServer:    string(userID.Domain()),
 			})
 			switch e := err.(type) {
 			case api.ErrInvalidID:

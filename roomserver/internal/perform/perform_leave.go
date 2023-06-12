@@ -91,9 +91,8 @@ func (r *Leaver) performLeaveRoomByID(
 		if serr != nil || sender == nil {
 			return nil, fmt.Errorf("sender %q has no matching userID", senderUser)
 		}
-		inviteSender := api.SenderUserIDPair{SenderID: senderUser, UserID: *sender}
 		if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
-			return r.performFederatedRejectInvite(ctx, req, res, inviteSender.UserID, eventID, leaver)
+			return r.performFederatedRejectInvite(ctx, req, res, *sender, eventID, leaver)
 		}
 		// check that this is not a "server notice room"
 		accData := &userapi.QueryAccountDataResponse{}

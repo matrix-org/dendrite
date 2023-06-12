@@ -11,11 +11,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type SenderUserIDPair struct {
-	SenderID spec.SenderID
-	UserID   spec.UserID
-}
-
 type PerformCreateRoomRequest struct {
 	InvitedUsers              []string
 	RoomName                  string
