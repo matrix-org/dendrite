@@ -1685,7 +1685,7 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 			return rErr
 		}
 		if roomInfo == nil {
-			return nil
+			return eventutil.ErrRoomNoExists{}
 		}
 
 		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)

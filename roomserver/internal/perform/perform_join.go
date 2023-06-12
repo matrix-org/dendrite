@@ -25,6 +25,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -293,6 +294,20 @@ func (r *Joiner) performJoinRoomByID(
 
 	switch err.(type) {
 	case nil:
+		// create user room key if needed
+		if buildRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+			var roomID *spec.RoomID
+			roomID, err = spec.NewRoomID(req.RoomIDOrAlias)
+			if err != nil {
+				return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", req.RoomIDOrAlias, err)}
+			}
+			_, err = r.RSAPI.GetUserRoomPrivateKey(ctx, *userID, *roomID)
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("GetUserRoomPrivateKey failed")
+				return "", "", fmt.Errorf("failed to get user room private key: %w", err)
+			}
+		}
+
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
 		// a member of the room. This is best-effort (as in we won't

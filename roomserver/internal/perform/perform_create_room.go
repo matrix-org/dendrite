@@ -347,7 +347,30 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 	}
-	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs, false); err != nil {
+
+	// first send the `m.room.create` event, so we have a roomNID
+	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs[:1], false); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
+		return "", &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	// create user room key if needed
+	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		_, err = c.RSAPI.GetUserRoomPrivateKey(ctx, userID, roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("GetUserRoomPrivateKey failed")
+			return "", &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+	}
+
+	// send the remaining events
+	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs[1:], false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
