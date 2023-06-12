@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -27,6 +28,7 @@ import (
 )
 
 type Database interface {
+	UserRoomKeys
 	// Do we support processing input events for more than one room at a time?
 	SupportsConcurrentRoomInputs() bool
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
@@ -194,8 +196,22 @@ type Database interface {
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 }
 
+type UserRoomKeys interface {
+	// InsertUserRoomPrivatePublicKey inserts the given private key as well as the public key for it. This should be used
+	// when creating keys locally.
+	InsertUserRoomPrivatePublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error)
+	// InsertUserRoomPublicKey inserts the given public key, this should be used for users NOT local to this server
+	InsertUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PublicKey) (result ed25519.PublicKey, err error)
+	// SelectUserRoomPrivateKey selects the private key for the given user and room combination
+	SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error)
+	// SelectUserIDsForPublicKeys selects all userIDs for the requested senderKeys. Returns a map from roomID -> map from publicKey to userID.
+	// If a senderKey can't be found, it is omitted in the result.
+	SelectUserIDsForPublicKeys(ctx context.Context, publicKeys map[spec.RoomID][]ed25519.PublicKey) (map[spec.RoomID]map[string]string, error)
+}
+
 type RoomDatabase interface {
 	EventDatabase
+	UserRoomKeys
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
 	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	RoomInfoByNID(ctx context.Context, roomNID types.RoomNID) (*types.RoomInfo, error)
