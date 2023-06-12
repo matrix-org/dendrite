@@ -722,7 +722,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 
 				roomID, _ := spec.NewRoomID(testRoom.ID)
 				userID, _ := spec.NewUserID(bob.ID, true)
-				got, err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), *roomID, *userID)
+				got, err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), *roomID, spec.SenderID(userID.String()))
 				if tc.wantError && err == nil {
 					t.Fatal("expected error, got none")
 				}
@@ -821,17 +821,6 @@ func TestUpgrade(t *testing.T) {
 		validateFunc func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI)
 		wantNewRoom  bool
 	}{
-		{
-			name:        "invalid userID",
-			upgradeUser: "!notvalid:test",
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
-				room := test.NewRoom(t, alice)
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
-				}
-				return room.ID
-			},
-		},
 		{
 			name:        "invalid roomID",
 			upgradeUser: alice.ID,
@@ -1049,7 +1038,11 @@ func TestUpgrade(t *testing.T) {
 				}
 				roomID := tc.roomFunc(rsAPI)
 
-				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, tc.upgradeUser, version.DefaultRoomVersion())
+				userID, err := spec.NewUserID(tc.upgradeUser, true)
+				if err != nil {
+					t.Fatalf("upgrade userID is invalid")
+				}
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, version.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}

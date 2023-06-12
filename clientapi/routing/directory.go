@@ -314,7 +314,22 @@ func SetVisibility(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
-	resErr := checkMemberInRoom(req.Context(), rsAPI, dev.UserID, roomID)
+	deviceUserID, err := spec.NewUserID(dev.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("userID for this device is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("failed to find senderID for this user"),
+		}
+	}
+
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
@@ -327,7 +342,7 @@ func SetVisibility(
 		}},
 	}
 	var queryEventsRes roomserverAPI.QueryLatestEventsAndStateResponse
-	err := rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	err = rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
 	if err != nil || len(queryEventsRes.StateEvents) == 0 {
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
 		return util.JSONResponse{
@@ -338,20 +353,6 @@ func SetVisibility(
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
-	fullUserID, err := spec.NewUserID(dev.UserID, true)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
-		}
-	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
-		}
-	}
 	if power.UserLevel(senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

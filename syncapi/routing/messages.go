@@ -296,9 +296,13 @@ func OnIncomingMessagesRequest(
 }
 
 func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (resp api.QueryMembershipForUserResponse, err error) {
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return resp, err
+	}
 	req := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		UserID: userID,
+		UserID: *fullUserID,
 	}
 	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
 		return api.QueryMembershipForUserResponse{}, err

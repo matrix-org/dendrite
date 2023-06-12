@@ -539,7 +539,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID) *InviteResponse {
+func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID, stateKey *string) *InviteResponse {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -552,7 +552,7 @@ func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID) *InviteRe
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatSync, userID)
+	inviteEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatSync, userID, stateKey)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)

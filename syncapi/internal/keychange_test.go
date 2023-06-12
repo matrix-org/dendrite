@@ -64,6 +64,10 @@ type mockRoomserverAPI struct {
 	roomIDToJoinedMembers map[string][]string
 }
 
+func (s *mockRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 // QueryRoomsForUser retrieves a list of room IDs matching the given query.
 func (s *mockRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
 	return nil

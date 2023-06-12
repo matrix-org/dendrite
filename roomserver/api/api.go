@@ -35,11 +35,11 @@ func (e ErrNotAllowed) Error() string {
 
 type RestrictedJoinAPI interface {
 	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
-	InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error)
-	RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, userID spec.UserID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error)
+	InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error)
+	RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error)
 	QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error)
 	QueryServerJoinedToRoom(ctx context.Context, req *QueryServerJoinedToRoomRequest, res *QueryServerJoinedToRoomResponse) error
-	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, userID spec.UserID) (bool, error)
+	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, senderID spec.SenderID) (bool, error)
 	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 }
 
@@ -195,7 +195,7 @@ type ClientRoomserverAPI interface {
 
 	PerformCreateRoom(ctx context.Context, userID spec.UserID, roomID spec.RoomID, createRequest *PerformCreateRoomRequest) (string, *util.JSONResponse)
 	// PerformRoomUpgrade upgrades a room to a newer version
-	PerformRoomUpgrade(ctx context.Context, roomID, userID string, roomVersion gomatrixserverlib.RoomVersion) (newRoomID string, err error)
+	PerformRoomUpgrade(ctx context.Context, roomID string, userID spec.UserID, roomVersion gomatrixserverlib.RoomVersion) (newRoomID string, err error)
 	PerformAdminEvacuateRoom(ctx context.Context, roomID string) (affected []string, err error)
 	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformAdminPurgeRoom(ctx context.Context, roomID string) error
@@ -232,6 +232,7 @@ type FederationRoomserverAPI interface {
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
+	QueryMembershipForSenderID(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
@@ -242,27 +243,19 @@ type FederationRoomserverAPI interface {
 	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
 	// the state and auth chain to return.
 	QueryStateAndAuthChain(ctx context.Context, req *QueryStateAndAuthChainRequest, res *QueryStateAndAuthChainResponse) error
-	// Query if we think we're still in a room.
-	QueryServerJoinedToRoom(ctx context.Context, req *QueryServerJoinedToRoomRequest, res *QueryServerJoinedToRoomResponse) error
 	QueryPublishedRooms(ctx context.Context, req *QueryPublishedRoomsRequest, res *QueryPublishedRoomsResponse) error
 	// Query missing events for a room from roomserver
 	QueryMissingEvents(ctx context.Context, req *QueryMissingEventsRequest, res *QueryMissingEventsResponse) error
 	// Query whether a server is allowed to see an event
-	QueryServerAllowedToSeeEvent(ctx context.Context, serverName spec.ServerName, eventID string) (allowed bool, err error)
+	QueryServerAllowedToSeeEvent(ctx context.Context, serverName spec.ServerName, eventID string, roomID string) (allowed bool, err error)
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
-	QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error)
+	QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error)
 	PerformInboundPeek(ctx context.Context, req *PerformInboundPeekRequest, res *PerformInboundPeekResponse) error
 	HandleInvite(ctx context.Context, event *types.HeaderedEvent) error
 
 	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
-
-	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
-	InvitePending(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (bool, error)
-	QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error)
-	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, userID spec.UserID) (bool, error)
-	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 
 	IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error)
 	StateQuerier() gomatrixserverlib.StateQuerier

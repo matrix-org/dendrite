@@ -99,9 +99,17 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	if !worldReadable {
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("Device UserID is invalid"),
+			}
+		}
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
 			RoomID: roomID,
-			UserID: device.UserID,
+			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
@@ -140,14 +148,11 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		// use the result of the previous QueryLatestEventsAndState response
 		// to find the state event, if provided.
 		for _, ev := range stateRes.StateEvents {
-			sender := spec.UserID{}
-			userID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), ev.SenderID())
-			if err == nil && userID != nil {
-				sender = *userID
-			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender),
+				synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+				}, ev),
 			)
 		}
 	} else {
@@ -172,9 +177,18 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			if err == nil && userID != nil {
 				sender = *userID
 			}
+
+			sk := ev.StateKey()
+			if sk != nil && *sk != "" {
+				skUserID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
+				if err == nil && skUserID != nil {
+					skString := skUserID.String()
+					sk = &skString
+				}
+			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender, sk),
 			)
 		}
 	}
@@ -259,11 +273,19 @@ func OnIncomingStateTypeRequest(
 	// membershipRes will only be populated if the room is not world-readable.
 	var membershipRes api.QueryMembershipForUserResponse
 	if !worldReadable {
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("Device UserID is invalid"),
+			}
+		}
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
 			RoomID: roomID,
-			UserID: device.UserID,
+			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
@@ -344,13 +366,10 @@ func OnIncomingStateTypeRequest(
 		}
 	}
 
-	sender := spec.UserID{}
-	userID, err := rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
 	stateEvent := stateEventInStateResp{
-		ClientEvent: synctypes.ToClientEvent(event, synctypes.FormatAll, sender),
+		ClientEvent: synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}, event),
 	}
 
 	var res interface{}

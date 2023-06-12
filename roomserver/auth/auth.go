@@ -13,6 +13,9 @@
 package auth
 
 import (
+	"context"
+
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -22,6 +25,7 @@ import (
 // IsServerAllowed returns true if the server is allowed to see events in the room
 // at this particular state. This function implements https://matrix.org/docs/spec/client_server/r0.6.0#id87
 func IsServerAllowed(
+	ctx context.Context, db storage.RoomDatabase,
 	serverName spec.ServerName,
 	serverCurrentlyInRoom bool,
 	authEvents []gomatrixserverlib.PDU,
@@ -37,7 +41,7 @@ func IsServerAllowed(
 		return true
 	}
 	// 2. If the user's membership was join, allow.
-	joinedUserExists := IsAnyUserOnServerWithMembership(serverName, authEvents, spec.Join)
+	joinedUserExists := IsAnyUserOnServerWithMembership(ctx, db, serverName, authEvents, spec.Join)
 	if joinedUserExists {
 		return true
 	}
@@ -46,7 +50,7 @@ func IsServerAllowed(
 		return true
 	}
 	// 4. If the user's membership was invite, and the history_visibility was set to invited, allow.
-	invitedUserExists := IsAnyUserOnServerWithMembership(serverName, authEvents, spec.Invite)
+	invitedUserExists := IsAnyUserOnServerWithMembership(ctx, db, serverName, authEvents, spec.Invite)
 	if invitedUserExists && historyVisibility == gomatrixserverlib.HistoryVisibilityInvited {
 		return true
 	}
@@ -70,7 +74,7 @@ func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.PDU) gomatrixserver
 	return visibility
 }
 
-func IsAnyUserOnServerWithMembership(serverName spec.ServerName, authEvents []gomatrixserverlib.PDU, wantMembership string) bool {
+func IsAnyUserOnServerWithMembership(ctx context.Context, db storage.RoomDatabase, serverName spec.ServerName, authEvents []gomatrixserverlib.PDU, wantMembership string) bool {
 	for _, ev := range authEvents {
 		if ev.Type() != spec.MRoomMember {
 			continue
@@ -85,12 +89,12 @@ func IsAnyUserOnServerWithMembership(serverName spec.ServerName, authEvents []go
 			continue
 		}
 
-		_, domain, err := gomatrixserverlib.SplitID('@', *stateKey)
+		userID, err := db.GetUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*stateKey))
 		if err != nil {
 			continue
 		}
 
-		if domain == serverName {
+		if userID.Domain() == serverName {
 			return true
 		}
 	}
