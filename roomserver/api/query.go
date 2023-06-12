@@ -113,9 +113,9 @@ type QueryEventsByIDResponse struct {
 // QueryMembershipForUserRequest is a request to QueryMembership
 type QueryMembershipForUserRequest struct {
 	// ID of the room to fetch membership from
-	RoomID string `json:"room_id"`
+	RoomID string
 	// ID of the user for whom membership is requested
-	SenderID spec.SenderID `json:"user_id"`
+	UserID spec.UserID
 }
 
 // QueryMembershipForUserResponse is a response to QueryMembership
@@ -492,12 +492,8 @@ type MembershipQuerier struct {
 }
 
 func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
-	req := QueryMembershipForUserRequest{
-		RoomID:   roomID.String(),
-		SenderID: senderID,
-	}
 	res := QueryMembershipForUserResponse{}
-	err := mq.Roomserver.QueryMembershipForUser(ctx, &req, &res)
+	err := mq.Roomserver.QueryMembershipForSenderID(ctx, roomID, senderID, &res)
 
 	membership := ""
 	if err == nil {

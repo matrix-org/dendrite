@@ -43,14 +43,7 @@ func SendTyping(
 		}
 	}
 
-	fullUserID, err := spec.NewUserID(userID, true)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
-		}
-	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	deviceUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -59,7 +52,7 @@ func SendTyping(
 	}
 
 	// Verify that the user is a member of this room
-	resErr := checkMemberInRoom(req.Context(), rsAPI, senderID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}

@@ -544,7 +544,7 @@ func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver
 }
 
 func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roomserver.QueryMembershipForUserRequest, res *roomserver.QueryMembershipForUserResponse) error {
-	rooms := r.userToJoinedRooms[string(req.SenderID)]
+	rooms := r.userToJoinedRooms[req.UserID.String()]
 	for _, roomID := range rooms {
 		if roomID == req.RoomID {
 			res.IsInRoom = true

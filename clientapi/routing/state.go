@@ -107,17 +107,9 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 				JSON: spec.Unknown("Device UserID is invalid"),
 			}
 		}
-		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("No matching senderID for this device")
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: spec.NotFound("Unable to find senderID for user"),
-			}
-		}
 		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
-			RoomID:   roomID,
-			SenderID: senderID,
+			RoomID: roomID,
+			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
@@ -289,19 +281,11 @@ func OnIncomingStateTypeRequest(
 				JSON: spec.Unknown("Device UserID is invalid"),
 			}
 		}
-		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("No matching senderID for this device")
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: spec.NotFound("Unable to find senderID for user"),
-			}
-		}
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
 		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
-			RoomID:   roomID,
-			SenderID: senderID,
+			RoomID: roomID,
+			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")

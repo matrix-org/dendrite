@@ -92,16 +92,9 @@ func Context(
 			JSON: spec.InvalidParam("Device UserID is invalid"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *userID)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.Unknown("SenderID for this device is unknown"),
-		}
-	}
 	ctx := req.Context()
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
-	membershipReq := roomserver.QueryMembershipForUserRequest{SenderID: senderID, RoomID: roomID}
+	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: *userID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to query membership")
 		return util.JSONResponse{

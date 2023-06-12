@@ -314,14 +314,14 @@ func SetVisibility(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
-	fullUserID, err := spec.NewUserID(dev.UserID, true)
+	deviceUserID, err := spec.NewUserID(dev.UserID, true)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("userID for this device is invalid"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -329,7 +329,7 @@ func SetVisibility(
 		}
 	}
 
-	resErr := checkMemberInRoom(req.Context(), rsAPI, senderID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}

@@ -300,13 +300,9 @@ func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.
 	if err != nil {
 		return resp, err
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
-	if err != nil {
-		return resp, err
-	}
 	req := api.QueryMembershipForUserRequest{
-		RoomID:   roomID,
-		SenderID: senderID,
+		RoomID: roomID,
+		UserID: *fullUserID,
 	}
 	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
 		return api.QueryMembershipForUserResponse{}, err

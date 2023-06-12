@@ -162,7 +162,7 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// Get the domain part of the room ID.
-	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
+	roomID, err := spec.NewRoomID(req.RoomIDOrAlias)
 	if err != nil {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", req.RoomIDOrAlias, err)}
 	}
@@ -170,8 +170,8 @@ func (r *Joiner) performJoinRoomByID(
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
 	// it to the list of servers to try.
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		req.ServerNames = append(req.ServerNames, domain)
+	if !r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
+		req.ServerNames = append(req.ServerNames, roomID.Domain())
 	}
 
 	// Prepare the template for the join event.
@@ -298,12 +298,8 @@ func (r *Joiner) performJoinRoomByID(
 		// a member of the room. This is best-effort (as in we won't
 		// fail if we can't find the existing membership) because there
 		// is really no harm in just sending another membership event.
-		membershipReq := &api.QueryMembershipForUserRequest{
-			RoomID:   req.RoomIDOrAlias,
-			SenderID: senderID,
-		}
 		membershipRes := &api.QueryMembershipForUserResponse{}
-		_ = r.Queryer.QueryMembershipForUser(ctx, membershipReq, membershipRes)
+		_ = r.Queryer.QueryMembershipForSenderID(ctx, *roomID, senderID, membershipRes)
 
 		// If we haven't already joined the room then send an event
 		// into the room changing our membership status.
@@ -328,7 +324,7 @@ func (r *Joiner) performJoinRoomByID(
 		// The room doesn't exist locally. If the room ID looks like it should
 		// be ours then this probably means that we've nuked our database at
 		// some point.
-		if r.Cfg.Matrix.IsLocalServerName(domain) {
+		if r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
 			// If there are no more server names to try then give up here.
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.

@@ -66,16 +66,9 @@ func GetMemberships(
 			JSON: spec.InvalidParam("Device UserID is invalid"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *userID)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.Unknown("SenderID for this device is unknown"),
-		}
-	}
 	queryReq := api.QueryMembershipForUserRequest{
-		RoomID:   roomID,
-		SenderID: senderID,
+		RoomID: roomID,
+		UserID: *userID,
 	}
 
 	var queryRes api.QueryMembershipForUserResponse

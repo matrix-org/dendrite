@@ -220,13 +220,14 @@ func (r *Queryer) QueryEventsByID(
 	return nil
 }
 
-// QueryMembershipForUser implements api.RoomserverInternalAPI
-func (r *Queryer) QueryMembershipForUser(
+// QueryMembershipForSenderID implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMembershipForSenderID(
 	ctx context.Context,
-	request *api.QueryMembershipForUserRequest,
+	roomID spec.RoomID,
+	senderID spec.SenderID,
 	response *api.QueryMembershipForUserResponse,
 ) error {
-	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
 		return err
 	}
@@ -236,7 +237,7 @@ func (r *Queryer) QueryMembershipForUser(
 	}
 	response.RoomExists = true
 
-	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.SenderID)
+	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, senderID)
 	if err != nil {
 		return err
 	}
@@ -262,6 +263,24 @@ func (r *Queryer) QueryMembershipForUser(
 	response.EventID = evs[0].EventID()
 	response.Membership, err = evs[0].Membership()
 	return err
+}
+
+// QueryMembershipForUser implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMembershipForUser(
+	ctx context.Context,
+	request *api.QueryMembershipForUserRequest,
+	response *api.QueryMembershipForUserResponse,
+) error {
+	senderID, err := r.DB.GetSenderIDForUser(ctx, request.RoomID, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	roomID, err := spec.NewRoomID(request.RoomID)
+	if err != nil {
+		return err
+	}
+	return r.QueryMembershipForSenderID(ctx, *roomID, senderID, response)
 }
 
 // QueryMembershipAtEvent returns the known memberships at a given event.

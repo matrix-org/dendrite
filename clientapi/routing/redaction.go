@@ -47,14 +47,14 @@ func SendRedaction(
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
-	fullUserID, userIDErr := spec.NewUserID(device.UserID, true)
+	deviceUserID, userIDErr := spec.NewUserID(device.UserID, true)
 	if userIDErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID doesn't have power level to redact"),
 		}
 	}
-	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *fullUserID)
+	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
 	if queryErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -62,7 +62,7 @@ func SendRedaction(
 		}
 	}
 
-	resErr := checkMemberInRoom(req.Context(), rsAPI, senderID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
