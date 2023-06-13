@@ -273,7 +273,14 @@ func generateSendEvent(
 			JSON: spec.BadJSON("Bad userID"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,

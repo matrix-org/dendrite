@@ -54,7 +54,14 @@ func SendRedaction(
 			JSON: spec.Forbidden("userID doesn't have power level to redact"),
 		}
 	}
-	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, queryErr := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
 	if queryErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -103,8 +110,8 @@ func SendRedaction(
 				JSON: spec.Forbidden("You don't have permission to redact this event, no power_levels event in this room."),
 			}
 		}
-		pl, err := plEvent.PowerLevels()
-		if err != nil {
+		pl, plErr := plEvent.PowerLevels()
+		if plErr != nil {
 			return util.JSONResponse{
 				Code: 403,
 				JSON: spec.Forbidden(
@@ -134,7 +141,7 @@ func SendRedaction(
 		Type:     spec.MRoomRedaction,
 		Redacts:  eventID,
 	}
-	err := proto.SetContent(r)
+	err = proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
 		return util.JSONResponse{

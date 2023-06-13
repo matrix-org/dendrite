@@ -40,7 +40,7 @@ func (f *fedRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID stri
 	return spec.NewUserID(string(senderID), true)
 }
 
-func (f *fedRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
+func (f *fedRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
 	return spec.SenderID(userID.String()), nil
 }
 

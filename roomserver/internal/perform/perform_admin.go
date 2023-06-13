@@ -293,7 +293,11 @@ func (r *Admin) PerformAdminDownloadState(
 		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 
-	senderID, err := r.Queryer.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	senderID, err := r.Queryer.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return err
 	}

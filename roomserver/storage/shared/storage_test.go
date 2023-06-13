@@ -162,12 +162,17 @@ func TestUserRoomKeys(t *testing.T) {
 		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *roomID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
+		pubKey, err := db.SelectUserRoomPublicKey(context.Background(), *userID, *roomID)
+		assert.NoError(t, err)
+		assert.Equal(t, key.Public(), pubKey)
 
 		// Key doesn't exist, we shouldn't get anything back
-		assert.NoError(t, err)
 		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *doesNotExist)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
+		pubKey, err = db.SelectUserRoomPublicKey(context.Background(), *userID, *doesNotExist)
+		assert.NoError(t, err)
+		assert.Nil(t, pubKey)
 
 		queryUserIDs := map[spec.RoomID][]ed25519.PublicKey{
 			*roomID: {key.Public().(ed25519.PublicKey)},

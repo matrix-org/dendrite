@@ -431,7 +431,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 					JSON: spec.InternalServerError{},
 				}
 			}
-			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), *inviteeUserID)
+			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID, *inviteeUserID)
 			if queryErr != nil {
 				util.GetLogger(ctx).WithError(queryErr).Error("rsapi.QuerySenderIDForUser failed")
 				return "", &util.JSONResponse{

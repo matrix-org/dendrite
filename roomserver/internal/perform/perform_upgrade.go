@@ -54,7 +54,11 @@ func (r *Upgrader) performRoomUpgrade(
 		return "", err
 	}
 
-	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, roomID, userID)
+	fullRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return "", err
+	}
+	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, *fullRoomID, userID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
 		return "", err

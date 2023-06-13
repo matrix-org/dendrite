@@ -170,8 +170,6 @@ type Database interface {
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
 	// GetKnownUsers tries to obtain the current mxid for a given user.
 	GetUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error)
-	// GetKnownUsers tries to obtain the current senderID for a given user.
-	GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error)
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
@@ -205,6 +203,8 @@ type UserRoomKeys interface {
 	InsertUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PublicKey) (result ed25519.PublicKey, err error)
 	// SelectUserRoomPrivateKey selects the private key for the given user and room combination
 	SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error)
+	// SelectUserRoomPublicKey selects the public key for the given user and room combination
+	SelectUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PublicKey, err error)
 	// SelectUserIDsForPublicKeys selects all userIDs for the requested senderKeys. Returns a map from roomID -> map from publicKey to userID.
 	// If a senderKey can't be found, it is omitted in the result.
 	SelectUserIDsForPublicKeys(ctx context.Context, publicKeys map[spec.RoomID][]ed25519.PublicKey) (map[spec.RoomID]map[string]string, error)

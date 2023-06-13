@@ -98,7 +98,7 @@ func MakeJoin(
 		Roomserver: rsAPI,
 	}
 
-	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID.String(), userID)
+	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
 		return util.JSONResponse{

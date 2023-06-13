@@ -818,7 +818,13 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
 			return nil, err
 		}
-		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, event.RoomID(), *userID)
+		roomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			logger.WithError(err).Errorf("event roomID is invalid %s", event.RoomID())
+			return nil, err
+		}
+
+		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
 			return nil, err

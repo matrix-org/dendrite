@@ -271,15 +271,15 @@ func (r *Queryer) QueryMembershipForUser(
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
 ) error {
-	senderID, err := r.QuerySenderIDForUser(ctx, request.RoomID, request.UserID)
-	if err != nil {
-		return err
-	}
-
 	roomID, err := spec.NewRoomID(request.RoomID)
 	if err != nil {
 		return err
 	}
+	senderID, err := r.QuerySenderIDForUser(ctx, *roomID, request.UserID)
+	if err != nil {
+		return err
+	}
+
 	return r.QueryMembershipForSenderID(ctx, *roomID, senderID, response)
 }
 
@@ -989,15 +989,19 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.Ro
 	return verImpl.CheckRestrictedJoin(ctx, r.Cfg.Global.ServerName, &api.JoinRoomQuerier{Roomserver: r}, roomID, senderID)
 }
 
-func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
-	version, err := r.DB.GetRoomVersion(ctx, roomID)
+func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+	version, err := r.DB.GetRoomVersion(ctx, roomID.String())
 	if err != nil {
 		return "", err
 	}
 
 	switch version {
 	case gomatrixserverlib.RoomVersionPseudoIDs:
-		return r.DB.GetSenderIDForUser(ctx, roomID, userID)
+		key, err := r.DB.SelectUserRoomPublicKey(ctx, userID, roomID)
+		if err != nil {
+			return "", err
+		}
+		return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
 	default:
 		return spec.SenderID(userID.String()), nil
 	}

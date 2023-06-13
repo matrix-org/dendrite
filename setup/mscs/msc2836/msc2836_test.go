@@ -529,7 +529,7 @@ func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID str
 	return spec.NewUserID(string(senderID), true)
 }
 
-func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
+func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
 	return spec.SenderID(userID.String()), nil
 }
 

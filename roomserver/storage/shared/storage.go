@@ -1551,11 +1551,6 @@ func (d *Database) GetUserIDForSender(ctx context.Context, roomID string, sender
 	return spec.NewUserID(string(senderID), true)
 }
 
-func (d *Database) GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
-	// TODO: Use real logic once DB for pseudoIDs is in place
-	return spec.SenderID(userID.String()), nil
-}
-
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
 	return d.RoomsTable.SelectRoomIDsWithEvents(ctx, nil)
@@ -1706,6 +1701,35 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 		}
 
 		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
+		if !errors.Is(sErr, sql.ErrNoRows) {
+			return sErr
+		}
+		return nil
+	})
+	return
+}
+
+// SelectUserRoomPublicKey queries the users room public key.
+// If no key exists, returns no key and no error. Otherwise returns
+// the key and a database error, if any.
+func (d *Database) SelectUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PublicKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return nil
+		}
+
+		key, sErr = d.UserRoomKeyTable.SelectUserRoomPublicKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
 		if !errors.Is(sErr, sql.ErrNoRows) {
 			return sErr
 		}

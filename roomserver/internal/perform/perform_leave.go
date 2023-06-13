@@ -78,7 +78,11 @@ func (r *Leaver) performLeaveRoomByID(
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
 ) ([]api.OutputEvent, error) {
-	leaver, err := r.RSAPI.QuerySenderIDForUser(ctx, req.RoomID, req.Leaver)
+	roomID, err := spec.NewRoomID(req.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	leaver, err := r.RSAPI.QuerySenderIDForUser(ctx, *roomID, req.Leaver)
 	if err != nil {
 		return nil, fmt.Errorf("leaver %s has no matching senderID in this room", req.Leaver.String())
 	}

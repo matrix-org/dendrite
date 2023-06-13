@@ -456,7 +456,11 @@ func (r *FederationInternalAPI) PerformLeave(
 
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
-		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, request.RoomID, *userID)
+		roomID, err := spec.NewRoomID(request.RoomID)
+		if err != nil {
+			return err
+		}
+		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			return err
 		}

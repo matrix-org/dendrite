@@ -149,7 +149,7 @@ func (r *Inviter) PerformInvite(
 		return err
 	}
 
-	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, event.RoomID(), *invitedUser)
+	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, *validRoomID, *invitedUser)
 	if err != nil {
 		return fmt.Errorf("failed looking up senderID for invited user")
 	}
