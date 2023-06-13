@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
@@ -201,6 +202,27 @@ func TestUserRoomKeys(t *testing.T) {
 		_, err = db.InsertUserRoomPublicKey(context.Background(), *userID, *reallyDoesNotExist, key4)
 		assert.Error(t, err)
 		_, err = db.InsertUserRoomPrivatePublicKey(context.Background(), *userID, *reallyDoesNotExist, key)
+		assert.Error(t, err)
+	})
+}
+
+func TestAssignRoomNID(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	roomID, err := spec.NewRoomID(room.ID)
+	assert.NoError(t, err)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateRoomserverDatabase(t, dbType)
+		defer close()
+
+		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)
+		assert.NoError(t, err)
+		assert.Greater(t, nid, types.EventNID(0))
+
+		_, err = db.AssignRoomNID(ctx, spec.RoomID{}, "notaroomversion")
 		assert.Error(t, err)
 	})
 }

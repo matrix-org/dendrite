@@ -662,6 +662,26 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 	return d.EventsTable.SelectEventRejected(ctx, nil, roomNID, eventID)
 }
 
+func (d *Database) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error) {
+	// This should already be checked, let's check it anyway.
+	_, err = gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return 0, err
+	}
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomNID, err = d.assignRoomNID(ctx, txn, roomID.String(), roomVersion)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	// Not setting caches, as assignRoomNID already does this
+	return roomNID, err
+}
+
 // GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
 func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserverlib.PDU) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
@@ -1692,7 +1712,7 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 			return rErr
 		}
 		if roomInfo == nil {
-			return nil
+			return eventutil.ErrRoomNoExists{}
 		}
 
 		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
