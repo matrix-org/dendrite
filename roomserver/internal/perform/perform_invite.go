@@ -134,12 +134,12 @@ func (r *Inviter) PerformInvite(
 		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
 	}
 
-	if event.StateKey() == nil {
+	if event.StateKey() == nil || *event.StateKey() == "" {
 		return fmt.Errorf("invite must be a state event")
 	}
-	invitedUser, err := spec.NewUserID(*event.StateKey(), true)
-	if err != nil {
-		return spec.InvalidParam("The user ID is invalid")
+	invitedUser, err := r.RSAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+	if err != nil || invitedUser == nil {
+		return spec.InvalidParam("Could not find the matching senderID for this user")
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
 
@@ -181,6 +181,14 @@ func (r *Inviter) PerformInvite(
 	// send the original invite event to the roomserver.
 	if inviteEvent == nil {
 		inviteEvent = event
+	}
+
+	// if we invited a local user, we can also create a user room key, if it doesn't exist yet.
+	if isTargetLocal && event.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
+		if err != nil {
+			return fmt.Errorf("failed to get user room private key: %w", err)
+		}
 	}
 
 	// Send the invite event to the roomserver input stream. This will

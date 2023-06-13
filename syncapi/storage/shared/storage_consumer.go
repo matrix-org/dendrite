@@ -507,8 +507,20 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev gomatrixserverlib.PDU, userID string) (string, string) {
-	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
+func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userID string, rsAPI api.SyncRoomserverAPI) (string, string) {
+	if ev.StateKey() == nil || *ev.StateKey() == "" {
+		return "", ""
+	}
+	fullUser, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return "", ""
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, ev.RoomID(), *fullUser)
+	if err != nil {
+		return "", ""
+	}
+
+	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(string(senderID)) {
 		return "", ""
 	}
 	membership, err := ev.Membership()

@@ -60,7 +60,7 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
-	notifier := notifier.NewNotifier()
+	notifier := notifier.NewNotifier(rsAPI)
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {

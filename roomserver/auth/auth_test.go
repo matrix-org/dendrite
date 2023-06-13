@@ -1,12 +1,22 @@
 package auth
 
 import (
+	"context"
 	"testing"
 
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+type FakeStorageDB struct {
+	storage.RoomDatabase
+}
+
+func (f *FakeStorageDB) GetUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
 
 func TestIsServerAllowed(t *testing.T) {
 	alice := test.NewUser(t)
@@ -77,7 +87,7 @@ func TestIsServerAllowed(t *testing.T) {
 				authEvents = append(authEvents, ev.PDU)
 			}
 
-			if got := IsServerAllowed(tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {
+			if got := IsServerAllowed(context.Background(), &FakeStorageDB{}, tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {
 				t.Errorf("IsServerAllowed() = %v, want %v", got, tt.want)
 			}
 		})

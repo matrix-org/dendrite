@@ -85,9 +85,16 @@ func Context(
 		*filter.Rooms = append(*filter.Rooms, roomID)
 	}
 
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("Device UserID is invalid"),
+		}
+	}
 	ctx := req.Context()
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
-	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: device.UserID, RoomID: roomID}
+	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: *userID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to query membership")
 		return util.JSONResponse{
@@ -217,12 +224,9 @@ func Context(
 		}
 	}
 
-	sender := spec.UserID{}
-	userID, err := rsAPI.QueryUserIDForSender(ctx, requestedEvent.RoomID(), requestedEvent.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
-	ev := synctypes.ToClientEvent(&requestedEvent, synctypes.FormatAll, sender)
+	ev := synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}, requestedEvent)
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,

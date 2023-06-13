@@ -41,8 +41,8 @@ type PerformJoinRequest struct {
 }
 
 type PerformLeaveRequest struct {
-	RoomID string `json:"room_id"`
-	UserID string `json:"user_id"`
+	RoomID string
+	Leaver spec.UserID
 }
 
 type PerformLeaveResponse struct {

@@ -2,14 +2,18 @@ package shared
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -41,6 +45,7 @@ type Database struct {
 	MembershipTable    tables.Membership
 	PublishedTable     tables.Published
 	Purge              tables.Purge
+	UserRoomKeyTable   tables.UserRoomKeys
 	GetRoomUpdaterFn   func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
@@ -485,10 +490,10 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	})
 }
 
-func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
+func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, string(requestSenderID))
 		return err
 	})
 	if err != nil {
@@ -655,6 +660,26 @@ func (d *Database) GetRoomUpdater(
 
 func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error) {
 	return d.EventsTable.SelectEventRejected(ctx, nil, roomNID, eventID)
+}
+
+func (d *Database) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error) {
+	// This should already be checked, let's check it anyway.
+	_, err = gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return 0, err
+	}
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomNID, err = d.assignRoomNID(ctx, txn, roomID.String(), roomVersion)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	// Not setting caches, as assignRoomNID already does this
+	return roomNID, err
 }
 
 // GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
@@ -931,6 +956,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 	return roomVersion, err
 }
 
+// nolint:gocyclo
 // MaybeRedactEvent manages the redacted status of events. There's two cases to consider in order to comply with the spec:
 // "servers should not apply or send redactions to clients until both the redaction event and original event have been seen, and are valid."
 // https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
@@ -1009,7 +1035,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 		switch {
 		case powerlevels.UserLevel(redactionEvent.SenderID()) >= powerlevels.Redact:
 			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
-		case sender1Domain == sender2Domain:
+		case sender1Domain != "" && sender2Domain != "" && sender1Domain == sender2Domain:
 			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
 		default:
 			ignoreRedaction = true
@@ -1607,6 +1633,147 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 		}
 		return nil
 	})
+}
+
+// InsertUserRoomPrivatePublicKey inserts a new user room key for the given user and room.
+// Returns the newly inserted private key or an existing private key. If there is
+// an error talking to the database, returns that error.
+func (d *Database) InsertUserRoomPrivatePublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return eventutil.ErrRoomNoExists{}
+		}
+
+		var iErr error
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPrivatePublicKey(ctx, txn, stateKeyNID, roomInfo.RoomNID, key)
+		return iErr
+	})
+	return result, err
+}
+
+// InsertUserRoomPublicKey inserts a new user room key for the given user and room.
+// Returns the newly inserted public key or an existing public key. If there is
+// an error talking to the database, returns that error.
+func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return eventutil.ErrRoomNoExists{}
+		}
+
+		var iErr error
+		result, iErr = d.UserRoomKeyTable.InsertUserRoomPublicKey(ctx, txn, stateKeyNID, roomInfo.RoomNID, key)
+		return iErr
+	})
+	return result, err
+}
+
+// SelectUserRoomPrivateKey queries the users room private key.
+// If no key exists, returns no key and no error. Otherwise returns
+// the key and a database error, if any.
+func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return eventutil.ErrRoomNoExists{}
+		}
+
+		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
+		if !errors.Is(sErr, sql.ErrNoRows) {
+			return sErr
+		}
+		return nil
+	})
+	return
+}
+
+// SelectUserIDsForPublicKeys returns a map from roomID -> map from senderKey -> userID
+func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys map[spec.RoomID][]ed25519.PublicKey) (result map[spec.RoomID]map[string]string, err error) {
+	result = make(map[spec.RoomID]map[string]string, len(publicKeys))
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+
+		// map all roomIDs to roomNIDs
+		query := make(map[types.RoomNID][]ed25519.PublicKey)
+		rooms := make(map[types.RoomNID]spec.RoomID)
+		for roomID, keys := range publicKeys {
+			roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID.String())
+			if !ok {
+				roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+				if rErr != nil {
+					return rErr
+				}
+				if roomInfo == nil {
+					logrus.Warnf("missing room info for %s, there will be missing users in the response", roomID.String())
+					continue
+				}
+				roomNID = roomInfo.RoomNID
+			}
+
+			query[roomNID] = keys
+			rooms[roomNID] = roomID
+		}
+
+		// get the user room key pars
+		userRoomKeyPairMap, sErr := d.UserRoomKeyTable.BulkSelectUserNIDs(ctx, txn, query)
+		if sErr != nil {
+			return sErr
+		}
+		nids := make([]types.EventStateKeyNID, 0, len(userRoomKeyPairMap))
+		for _, nid := range userRoomKeyPairMap {
+			nids = append(nids, nid.EventStateKeyNID)
+		}
+		// get the userIDs
+		nidMap, seErr := d.EventStateKeys(ctx, nids)
+		if seErr != nil {
+			return seErr
+		}
+
+		// build the result map (roomID -> map publicKey -> userID)
+		for publicKey, userRoomKeyPair := range userRoomKeyPairMap {
+			userID := nidMap[userRoomKeyPair.EventStateKeyNID]
+			roomID := rooms[userRoomKeyPair.RoomNID]
+			resMap, exists := result[roomID]
+			if !exists {
+				resMap = map[string]string{}
+			}
+			resMap[publicKey] = userID
+			result[roomID] = resMap
+		}
+
+		return nil
+	})
+	return result, err
 }
 
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops

@@ -224,6 +224,7 @@ func createRoom(
 		PrivateKey:      privateKey,
 		EventTime:       evTime,
 	}
+
 	roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, *userID, *roomID, &req)
 	if createRes != nil {
 		return *createRes

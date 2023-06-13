@@ -63,9 +63,17 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 	}
-	createContent["creator"] = userID.String()
+	senderID, err := c.DB.GetSenderIDForUser(ctx, roomID.String(), userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
+		return "", &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	createContent["creator"] = senderID
 	createContent["room_version"] = createRequest.RoomVersion
-	powerLevelContent := eventutil.InitialPowerLevelsContent(userID.String())
+	powerLevelContent := eventutil.InitialPowerLevelsContent(string(senderID))
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
 		JoinRule: spec.Invite,
 	}
@@ -121,7 +129,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 	membershipEvent := gomatrixserverlib.FledglingEvent{
 		Type:     spec.MRoomMember,
-		StateKey: userID.String(),
+		StateKey: string(senderID),
 		Content: gomatrixserverlib.MemberContent{
 			Membership:  spec.Join,
 			DisplayName: createRequest.UserDisplayName,
@@ -270,7 +278,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	var builtEvents []*types.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-	senderID, err := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), userID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("rsapi.QuerySenderIDForUser failed")
 		return "", &util.JSONResponse{
@@ -347,7 +354,30 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 	}
-	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs, false); err != nil {
+
+	// first send the `m.room.create` event, so we have a roomNID
+	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs[:1], false); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
+		return "", &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	// create user room key if needed
+	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		_, err = c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			return "", &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+	}
+
+	// send the remaining events
+	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs[1:], false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,

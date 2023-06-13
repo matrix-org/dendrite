@@ -145,8 +145,16 @@ func SaveReadMarker(
 	userAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	syncProducer *producers.SyncAPIProducer, device *api.Device, roomID string,
 ) util.JSONResponse {
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("userID for this device is invalid"),
+		}
+	}
+
 	// Verify that the user is a member of this room
-	resErr := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
