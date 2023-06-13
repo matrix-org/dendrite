@@ -236,8 +236,8 @@ func RemoveLocalAlias(
 	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomIDRes.RoomID, *userID)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{Err: "Could not find SenderID for this device"},
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
 
