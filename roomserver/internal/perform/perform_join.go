@@ -293,6 +293,15 @@ func (r *Joiner) performJoinRoomByID(
 
 	switch err.(type) {
 	case nil:
+		// create user room key if needed
+		if buildRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+			_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
+			if err != nil {
+				logrus.WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+				return "", "", fmt.Errorf("failed to get user room private key: %w", err)
+			}
+		}
+
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
 		// a member of the room. This is best-effort (as in we won't

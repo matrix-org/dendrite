@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -66,6 +67,9 @@ type RoomserverInternalAPI interface {
 		req *QueryAuthChainRequest,
 		res *QueryAuthChainResponse,
 	) error
+
+	// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
+	GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error)
 }
 
 type InputRoomEventsAPI interface {
