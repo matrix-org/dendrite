@@ -37,6 +37,7 @@ type ClientEvent struct {
 	OriginServerTS spec.Timestamp `json:"origin_server_ts,omitempty"` // OriginServerTS is omitted on receipt events
 	RoomID         string         `json:"room_id,omitempty"`          // RoomID is omitted on /sync responses
 	Sender         string         `json:"sender,omitempty"`           // Sender is omitted on receipt events
+	SenderKey      spec.SenderID  `json:"sender_key,omitempty"`       // The SenderKey for events in pseudo ID rooms
 	StateKey       *string        `json:"state_key,omitempty"`
 	Type           string         `json:"type"`
 	Unsigned       spec.RawJSON   `json:"unsigned,omitempty"`
@@ -83,6 +84,9 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender sp
 	}
 	if format == FormatAll {
 		ce.RoomID = se.RoomID()
+	}
+	if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		ce.SenderKey = se.SenderID()
 	}
 	return ce
 }
