@@ -25,7 +25,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -298,7 +297,7 @@ func (r *Joiner) performJoinRoomByID(
 		if buildRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
 			_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+				logrus.WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
 				return "", "", fmt.Errorf("failed to get user room private key: %w", err)
 			}
 		}
