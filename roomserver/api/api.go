@@ -68,8 +68,8 @@ type RoomserverInternalAPI interface {
 		res *QueryAuthChainResponse,
 	) error
 
-	// GetUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
-	GetUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error)
+	// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
+	GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error)
 }
 
 type InputRoomEventsAPI interface {

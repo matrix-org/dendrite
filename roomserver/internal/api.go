@@ -272,8 +272,8 @@ func (r *RoomserverInternalAPI) PerformForget(
 	return r.Forgetter.PerformForget(ctx, req, resp)
 }
 
-// GetUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
-func (r *RoomserverInternalAPI) GetUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error) {
+// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
+func (r *RoomserverInternalAPI) GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error) {
 	key, err := r.DB.SelectUserRoomPrivateKey(ctx, userID, roomID)
 	if err != nil {
 		return nil, err

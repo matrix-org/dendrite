@@ -366,9 +366,9 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	// create user room key if needed
 	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-		_, err = c.RSAPI.GetUserRoomPrivateKey(ctx, userID, roomID)
+		_, err = c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("GetUserRoomPrivateKey failed")
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

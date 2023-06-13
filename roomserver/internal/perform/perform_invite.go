@@ -185,7 +185,7 @@ func (r *Inviter) PerformInvite(
 
 	// if we invited a local user, we can also create a user room key, if it doesn't exist yet.
 	if isTargetLocal && event.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
-		_, err = r.RSAPI.GetUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
+		_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
 		if err != nil {
 			return fmt.Errorf("failed to get user room private key: %w", err)
 		}
