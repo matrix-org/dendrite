@@ -122,7 +122,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	// Specifically the test "Outbound federation can backfill events"
 	events, err := gomatrixserverlib.RequestBackfill(
 		ctx, req.VirtualHost, requester,
-		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	)
@@ -213,7 +213,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 				continue
 			}
 			loader := gomatrixserverlib.NewEventsLoader(roomVer, r.KeyRing, backfillRequester, backfillRequester.ProvideEvents, false)
-			result, err := loader.LoadAndVerify(ctx, res.PDUs, gomatrixserverlib.TopologicalOrderByPrevEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			result, err := loader.LoadAndVerify(ctx, res.PDUs, gomatrixserverlib.TopologicalOrderByPrevEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 			})
 			if err != nil {
@@ -492,7 +492,11 @@ FindSuccessor:
 	// Store the server names in a temporary map to avoid duplicates.
 	serverSet := make(map[spec.ServerName]bool)
 	for _, event := range memberEvents {
-		if sender, err := b.querier.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID()); err == nil {
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			continue
+		}
+		if sender, err := b.querier.QueryUserIDForSender(ctx, *validRoomID, event.SenderID()); err == nil {
 			serverSet[sender.Domain()] = true
 		}
 	}

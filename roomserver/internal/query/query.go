@@ -159,7 +159,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		}
 
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
 			},
 		)
@@ -407,7 +407,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
 		for _, event := range events {
-			clientEvent := synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			clientEvent := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
 			}, event)
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
@@ -458,7 +458,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	for _, event := range events {
-		clientEvent := synctypes.ToClientEventDefault(func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		clientEvent := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.QueryUserIDForSender(ctx, roomID, senderID)
 		}, event)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
@@ -651,7 +651,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 
 	if request.ResolveState {
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
 			},
 		)
@@ -1007,10 +1007,11 @@ func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, 
 	}
 }
 
-func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	userID, err := spec.NewUserID(string(senderID), true)
 	if err == nil {
 		return userID, nil
 	}
-	return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+	// TODO: pseudoIDs
+	return r.DB.GetUserIDForSender(ctx, roomID.String(), senderID)
 }

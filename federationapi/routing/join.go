@@ -118,7 +118,7 @@ func MakeJoin(
 		LocalServerName:   cfg.Matrix.ServerName,
 		LocalServerInRoom: res.RoomExists && res.IsInRoom,
 		RoomQuerier:       &roomQuerier,
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 		},
 		BuildEventTemplate: createJoinTemplate,
@@ -215,7 +215,7 @@ func SendJoin(
 		PrivateKey:        cfg.Matrix.PrivateKey,
 		Verifier:          keys,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 		},
 	}

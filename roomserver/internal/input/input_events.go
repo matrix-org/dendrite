@@ -128,7 +128,11 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
-	sender, err := r.Queryer.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return err
+	}
+	sender, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 	if err != nil {
 		return fmt.Errorf("failed getting userID for sender %q. %w", event.SenderID(), err)
 	}
@@ -282,7 +286,7 @@ func (r *Inputer) processRoomEvent(
 
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
-	if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		isRejected = true
@@ -587,7 +591,7 @@ func (r *Inputer) processStateBefore(
 	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(
 		gomatrixserverlib.ToPDUs(stateBeforeEvent),
 	)
-	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); rejectionErr != nil {
 		rejectionErr = fmt.Errorf("Allowed() failed for stateBeforeEvent: %w", rejectionErr)
@@ -700,7 +704,7 @@ nextAuthEvent:
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
-		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			continue nextAuthEvent
@@ -718,7 +722,7 @@ nextAuthEvent:
 		}
 
 		// Check if the auth event should be rejected.
-		err := gomatrixserverlib.Allowed(authEvent, auth, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		err := gomatrixserverlib.Allowed(authEvent, auth, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if isRejected = err != nil; isRejected {
@@ -842,7 +846,11 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			continue
 		}
 
-		memberUserID, err := r.Queryer.QueryUserIDForSender(ctx, memberEvent.RoomID(), spec.SenderID(*memberEvent.StateKey()))
+		validRoomID, err := spec.NewRoomID(memberEvent.RoomID())
+		if err != nil {
+			continue
+		}
+		memberUserID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*memberEvent.StateKey()))
 		if err != nil {
 			continue
 		}

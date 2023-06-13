@@ -91,7 +91,7 @@ func (r *Leaver) performLeaveRoomByID(
 	// that.
 	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, leaver)
 	if err == nil && isInvitePending {
-		sender, serr := r.RSAPI.QueryUserIDForSender(ctx, req.RoomID, senderUser)
+		sender, serr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, senderUser)
 		if serr != nil || sender == nil {
 			return nil, fmt.Errorf("sender %q has no matching userID", senderUser)
 		}

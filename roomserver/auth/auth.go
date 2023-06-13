@@ -89,7 +89,11 @@ func IsAnyUserOnServerWithMembership(ctx context.Context, querier api.QuerySende
 			continue
 		}
 
-		userID, err := querier.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*stateKey))
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			continue
+		}
+		userID, err := querier.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*stateKey))
 		if err != nil {
 			continue
 		}

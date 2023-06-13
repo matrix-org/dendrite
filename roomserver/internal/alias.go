@@ -113,6 +113,7 @@ func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 	return nil
 }
 
+// nolint:gocyclo
 // RemoveRoomAlias implements alias.RoomserverInternalAPI
 func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
@@ -129,7 +130,12 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return nil
 	}
 
-	sender, err := r.QueryUserIDForSender(ctx, roomID, request.SenderID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+
+	sender, err := r.QueryUserIDForSender(ctx, *validRoomID, request.SenderID)
 	if err != nil || sender == nil {
 		return fmt.Errorf("r.QueryUserIDForSender: %w", err)
 	}
@@ -177,7 +183,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			if request.SenderID != ev.SenderID() {
 				senderID = ev.SenderID()
 			}
-			sender, err := r.QueryUserIDForSender(ctx, roomID, senderID)
+			sender, err := r.QueryUserIDForSender(ctx, *validRoomID, senderID)
 			if err != nil || sender == nil {
 				return err
 			}

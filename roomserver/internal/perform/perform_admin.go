@@ -74,6 +74,10 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
 		return nil, err
 	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
 
 	prevEvents := latestRes.LatestEvents
 	var senderDomain spec.ServerName
@@ -100,7 +104,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			PrevEvents: prevEvents,
 		}
 
-		userID, err := r.Queryer.QueryUserIDForSender(ctx, roomID, spec.SenderID(fledglingEvent.SenderID))
+		userID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(fledglingEvent.SenderID))
 		if err != nil || userID == nil {
 			continue
 		}
@@ -264,7 +268,7 @@ func (r *Admin) PerformAdminDownloadState(
 			return fmt.Errorf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity, err)
 		}
 		for _, authEvent := range state.GetAuthEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.Inputer.KeyRing, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue
@@ -272,7 +276,7 @@ func (r *Admin) PerformAdminDownloadState(
 			authEventMap[authEvent.EventID()] = authEvent
 		}
 		for _, stateEvent := range state.GetStateEvents().UntrustedEvents(roomInfo.RoomVersion) {
-			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			if err = gomatrixserverlib.VerifyEventSignatures(ctx, stateEvent, r.Inputer.KeyRing, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 			}); err != nil {
 				continue

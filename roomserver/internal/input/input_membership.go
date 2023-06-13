@@ -139,7 +139,11 @@ func (r *Inputer) updateMembership(
 func (r *Inputer) isLocalTarget(ctx context.Context, event *types.Event) bool {
 	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
-		userID, err := r.Queryer.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*statekey))
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return isTargetLocalUser
+		}
+		userID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*statekey))
 		if err != nil || userID == nil {
 			return isTargetLocalUser
 		}

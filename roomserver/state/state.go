@@ -949,7 +949,7 @@ func (v *StateResolution) resolveConflictsV1(
 	}
 
 	// Resolve the conflicts.
-	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 
@@ -1063,7 +1063,7 @@ func (v *StateResolution) resolveConflictsV2(
 			conflictedEvents,
 			nonConflictedEvents,
 			authEvents,
-			func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 			},
 		)

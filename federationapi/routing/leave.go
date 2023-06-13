@@ -105,7 +105,7 @@ func MakeLeave(
 		LocalServerName:    cfg.Matrix.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		BuildEventTemplate: createLeaveTemplate,
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 		},
 	}
@@ -236,7 +236,14 @@ func SendLeave(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("Room ID is invalid."),
+		}
+	}
+	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), *validRoomID, event.SenderID())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

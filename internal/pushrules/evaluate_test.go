@@ -8,7 +8,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func UserIDForSender(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+func UserIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	return spec.NewUserID(string(senderID), true)
 }
 
@@ -73,7 +73,7 @@ func TestRuleMatches(t *testing.T) {
 		{"emptyOverride", OverrideKind, emptyRule, `{}`, true},
 		{"emptyContent", ContentKind, emptyRule, `{}`, false},
 		{"emptyRoom", RoomKind, emptyRule, `{}`, true},
-		{"emptySender", SenderKind, emptyRule, `{}`, true},
+		{"emptySender", SenderKind, emptyRule, `{"room_id":"!room:example.com"}`, true},
 		{"emptyUnderride", UnderrideKind, emptyRule, `{}`, true},
 
 		{"disabled", OverrideKind, Rule{}, `{}`, false},
@@ -90,8 +90,8 @@ func TestRuleMatches(t *testing.T) {
 		{"roomMatch", RoomKind, Rule{Enabled: true, RuleID: "!room:example.com"}, `{"room_id":"!room:example.com"}`, true},
 		{"roomNoMatch", RoomKind, Rule{Enabled: true, RuleID: "!room:example.com"}, `{"room_id":"!otherroom:example.com"}`, false},
 
-		{"senderMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@user:example.com"}`, true},
-		{"senderNoMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@otheruser:example.com"}`, false},
+		{"senderMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@user:example.com","room_id":"!room:example.com"}`, true},
+		{"senderNoMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@otheruser:example.com","room_id":"!room:example.com"}`, false},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {

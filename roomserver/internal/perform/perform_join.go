@@ -215,7 +215,7 @@ func (r *Joiner) performJoinRoomByID(
 	// and we aren't in the room.
 	isInvitePending, inviteSender, _, inviteEvent, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, senderID)
 	if err == nil && !serverInRoom && isInvitePending {
-		inviter, queryErr := r.RSAPI.QueryUserIDForSender(ctx, req.RoomIDOrAlias, inviteSender)
+		inviter, queryErr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, inviteSender)
 		if queryErr != nil {
 			return "", "", fmt.Errorf("r.RSAPI.QueryUserIDForSender: %w", queryErr)
 		}

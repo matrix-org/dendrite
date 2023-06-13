@@ -78,7 +78,7 @@ func CheckForSoftFail(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return querier.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		// return true, nil

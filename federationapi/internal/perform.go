@@ -166,10 +166,10 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		PrivateKey: r.cfg.Matrix.PrivateKey,
 		KeyID:      r.cfg.Matrix.KeyID,
 		KeyRing:    r.keyRing,
-		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}),
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	}
@@ -365,7 +365,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	userIDProvider := func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	userIDProvider := func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
@@ -528,7 +528,11 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return nil, err
+	}
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 	if err != nil {
 		return nil, err
 	}

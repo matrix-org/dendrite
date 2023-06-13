@@ -318,9 +318,13 @@ func slowGetHistoryVisibilityState(
 	// If the event state key doesn't match the given servername
 	// then we'll filter it out. This does preserve state keys that
 	// are "" since these will contain history visibility etc.
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
 	for nid, key := range stateKeys {
 		if key != "" {
-			userID, err := querier.QueryUserIDForSender(ctx, roomID, spec.SenderID(key))
+			userID, err := querier.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(key))
 			if err == nil && userID != nil {
 				if userID.Domain() != serverName {
 					delete(stateKeys, nid)

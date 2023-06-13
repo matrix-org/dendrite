@@ -140,7 +140,14 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
-	userID, err := rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, spec.SenderID(proto.SenderID))
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("Invalid room ID"),
+		}
+	}
+	userID, err := rsAPI.QueryUserIDForSender(httpReq.Context(), *validRoomID, spec.SenderID(proto.SenderID))
 	if err != nil || userID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -150,7 +157,7 @@ func ExchangeThirdPartyInvite(
 	senderDomain := userID.Domain()
 
 	// Check that the state key is correct.
-	targetUserID, err := rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, spec.SenderID(*proto.StateKey))
+	targetUserID, err := rsAPI.QueryUserIDForSender(httpReq.Context(), *validRoomID, spec.SenderID(*proto.StateKey))
 	if err != nil || targetUserID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
