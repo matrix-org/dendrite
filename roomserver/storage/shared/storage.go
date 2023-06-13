@@ -701,23 +701,20 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 	}, err
 }
 
-// GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
-func (d *Database) GetOrCreateRoomInfoFromID(ctx context.Context, roomID string) (roomInfo *types.RoomInfo, err error) {
-	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(roomID)
+func (d *Database) GetRoomVersion(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
 	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(roomID)
-	// if we found both, the roomNID and version in our cache, no need to query the database
-	if nidOK && versionOK {
-		return &types.RoomInfo{
-			RoomNID:     roomNID,
-			RoomVersion: cachedRoomVersion,
-		}, nil
+	if versionOK {
+		return cachedRoomVersion, nil
 	}
 
-	roomInfo, err = d.RoomInfo(ctx, roomID)
+	roomInfo, err := d.RoomInfo(ctx, roomID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return roomInfo, nil
+	if roomInfo == nil {
+		return "", fmt.Errorf("no room info available for %s", roomID)
+	}
+	return roomInfo.RoomVersion, nil
 }
 
 func (d *Database) GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error) {

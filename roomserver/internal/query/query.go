@@ -990,15 +990,12 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.Ro
 }
 
 func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
-	roomInfo, err := r.DB.GetOrCreateRoomInfoFromID(ctx, roomID)
+	version, err := r.DB.GetRoomVersion(ctx, roomID)
 	if err != nil {
 		return "", err
 	}
-	if roomInfo == nil {
-		return "", fmt.Errorf("No room info found for %s", roomID)
-	}
 
-	switch roomInfo.RoomVersion {
+	switch version {
 	case gomatrixserverlib.RoomVersionPseudoIDs:
 		return r.DB.GetSenderIDForUser(ctx, roomID, userID)
 	default:
