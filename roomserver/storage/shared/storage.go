@@ -712,7 +712,7 @@ func (d *Database) GetRoomVersion(ctx context.Context, roomID string) (gomatrixs
 		return "", err
 	}
 	if roomInfo == nil {
-		return "", fmt.Errorf("no room info available for %s", roomID)
+		return "", nil
 	}
 	return roomInfo.RoomVersion, nil
 }
