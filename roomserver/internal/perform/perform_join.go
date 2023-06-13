@@ -174,44 +174,6 @@ func (r *Joiner) performJoinRoomByID(
 		req.ServerNames = append(req.ServerNames, roomID.Domain())
 	}
 
-	// Prepare the template for the join event.
-	userID, err := spec.NewUserID(req.UserID, true)
-	if err != nil {
-		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
-	}
-	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.RoomIDOrAlias, *userID)
-	if err != nil {
-		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
-	}
-	senderIDString := string(senderID)
-	userDomain := userID.Domain()
-	proto := gomatrixserverlib.ProtoEvent{
-		Type:     spec.MRoomMember,
-		SenderID: senderIDString,
-		StateKey: &senderIDString,
-		RoomID:   req.RoomIDOrAlias,
-		Redacts:  "",
-	}
-	if err = proto.SetUnsigned(struct{}{}); err != nil {
-		return "", "", fmt.Errorf("eb.SetUnsigned: %w", err)
-	}
-
-	// It is possible for the request to include some "content" for the
-	// event. We'll always overwrite the "membership" key, but the rest,
-	// like "display_name" or "avatar_url", will be kept if supplied.
-	if req.Content == nil {
-		req.Content = map[string]interface{}{}
-	}
-	req.Content["membership"] = spec.Join
-	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req, senderID); aerr != nil {
-		return "", "", aerr
-	} else if authorisedVia != "" {
-		req.Content["join_authorised_via_users_server"] = authorisedVia
-	}
-	if err = proto.SetContent(req.Content); err != nil {
-		return "", "", fmt.Errorf("eb.SetContent: %w", err)
-	}
-
 	// Force a federated join if we aren't in the room and we've been
 	// given some server names to try joining by.
 	inRoomReq := &rsAPI.QueryServerJoinedToRoomRequest{
@@ -223,6 +185,31 @@ func (r *Joiner) performJoinRoomByID(
 	}
 	serverInRoom := inRoomRes.IsInRoom
 	forceFederatedJoin := len(req.ServerNames) > 0 && !serverInRoom
+
+	userID, err := spec.NewUserID(req.UserID, true)
+	if err != nil {
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
+	}
+
+	var senderID spec.SenderID
+	var roomVersion gomatrixserverlib.RoomVersion
+	if forceFederatedJoin {
+		// TODO: pseudoIDs - lookup room version kere!
+	} else {
+		roomVersion, err = r.RSAPI.QueryRoomVersionForRoom(ctx, roomID.String())
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		// TODO: pseudoIDs - generate senderID kere!
+		senderID = "pseudo_id.sender.key"
+	} else {
+		senderID = spec.SenderID(userID.String())
+	}
+	senderIDString := string(senderID)
+	userDomain := userID.Domain()
 
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
@@ -274,7 +261,7 @@ func (r *Joiner) performJoinRoomByID(
 	// If we should do a forced federated join then do that.
 	var joinedVia spec.ServerName
 	if forceFederatedJoin {
-		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
+		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req, senderID)
 		return req.RoomIDOrAlias, joinedVia, err
 	}
 
@@ -288,6 +275,34 @@ func (r *Joiner) performJoinRoomByID(
 	identity, err := r.Cfg.Matrix.SigningIdentityFor(userDomain)
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
+	}
+
+	// Prepare the template for the join event.
+	proto := gomatrixserverlib.ProtoEvent{
+		Type:     spec.MRoomMember,
+		SenderID: senderIDString,
+		StateKey: &senderIDString,
+		RoomID:   req.RoomIDOrAlias,
+		Redacts:  "",
+	}
+	if err = proto.SetUnsigned(struct{}{}); err != nil {
+		return "", "", fmt.Errorf("eb.SetUnsigned: %w", err)
+	}
+
+	// It is possible for the request to include some "content" for the
+	// event. We'll always overwrite the "membership" key, but the rest,
+	// like "display_name" or "avatar_url", will be kept if supplied.
+	if req.Content == nil {
+		req.Content = map[string]interface{}{}
+	}
+	req.Content["membership"] = spec.Join
+	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req, senderID); aerr != nil {
+		return "", "", aerr
+	} else if authorisedVia != "" {
+		req.Content["join_authorised_via_users_server"] = authorisedVia
+	}
+	if err = proto.SetContent(req.Content); err != nil {
+		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
 	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
 
@@ -334,7 +349,7 @@ func (r *Joiner) performJoinRoomByID(
 		}
 
 		// Perform a federated room join.
-		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
+		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req, senderID)
 		return req.RoomIDOrAlias, joinedVia, err
 
 	default:
@@ -352,14 +367,16 @@ func (r *Joiner) performJoinRoomByID(
 func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
+	senderID spec.SenderID,
 ) (spec.ServerName, error) {
 	// Try joining by all of the supplied server names.
 	fedReq := fsAPI.PerformJoinRequest{
 		RoomID:      req.RoomIDOrAlias, // the room ID to try and join
 		UserID:      req.UserID,        // the user ID joining the room
-		ServerNames: req.ServerNames,   // the server to try joining with
-		Content:     req.Content,       // the membership event content
-		Unsigned:    req.Unsigned,      // the unsigned event content, if any
+		SenderID:    spec.SenderID(senderID),
+		ServerNames: req.ServerNames, // the server to try joining with
+		Content:     req.Content,     // the membership event content
+		Unsigned:    req.Unsigned,    // the unsigned event content, if any
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
 	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)

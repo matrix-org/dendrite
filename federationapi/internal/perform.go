@@ -96,6 +96,7 @@ func (r *FederationInternalAPI) PerformJoin(
 			ctx,
 			request.RoomID,
 			request.UserID,
+			request.SenderID,
 			request.Content,
 			serverName,
 			request.Unsigned,
@@ -137,7 +138,7 @@ func (r *FederationInternalAPI) PerformJoin(
 
 func (r *FederationInternalAPI) performJoinUsingServer(
 	ctx context.Context,
-	roomID, userID string,
+	roomID, userID string, senderID spec.SenderID,
 	content map[string]interface{},
 	serverName spec.ServerName,
 	unsigned map[string]interface{},
@@ -151,10 +152,6 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return err
 	}
 	room, err := spec.NewRoomID(roomID)
-	if err != nil {
-		return err
-	}
-	senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, roomID, *user)
 	if err != nil {
 		return err
 	}

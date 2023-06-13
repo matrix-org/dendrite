@@ -157,8 +157,9 @@ type PerformDirectoryLookupResponse struct {
 }
 
 type PerformJoinRequest struct {
-	RoomID string `json:"room_id"`
-	UserID string `json:"user_id"`
+	RoomID   string `json:"room_id"`
+	UserID   string `json:"user_id"`
+	SenderID spec.SenderID
 	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
 	ServerNames types.ServerNames      `json:"server_names"`
 	Content     map[string]interface{} `json:"content"`

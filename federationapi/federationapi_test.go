@@ -235,6 +235,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{
 		RoomID:      room.ID,
 		UserID:      joiningUser.ID,
+		SenderID:    spec.SenderID(joiningUser.ID),
 		ServerNames: []spec.ServerName{serverA},
 	}, &resp)
 	if resp.JoinedVia != serverA {

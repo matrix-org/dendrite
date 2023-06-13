@@ -717,12 +717,6 @@ func (d *Database) GetOrCreateRoomInfoFromID(ctx context.Context, roomID string)
 	if err != nil {
 		return nil, err
 	}
-	if roomInfo == nil {
-		return nil, fmt.Errorf("Failed to find room info for %s", roomID)
-	}
-
-	d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-	d.Cache.StoreRoomVersion(roomID, roomInfo.RoomVersion)
 	return roomInfo, nil
 }
 
