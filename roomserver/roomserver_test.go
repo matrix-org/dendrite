@@ -517,7 +517,6 @@ func TestRedaction(t *testing.T) {
 		}
 
 		natsInstance := &jetstream.NATSInstance{}
-		_, _ = natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 
 		for _, tc := range testCases {

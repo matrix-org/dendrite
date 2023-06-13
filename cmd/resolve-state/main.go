@@ -69,7 +69,6 @@ func main() {
 	}
 
 	natsInstance := &jetstream.NATSInstance{}
-	_, _ = natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm,
 		natsInstance, caching.NewRistrettoCache(128*1024*1024, time.Hour, true), false)
 
