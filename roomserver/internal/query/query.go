@@ -16,6 +16,7 @@ package query
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -1012,6 +1013,23 @@ func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, 
 	if err == nil {
 		return userID, nil
 	}
-	// TODO: pseudoIDs
-	return r.DB.GetUserIDForSender(ctx, roomID.String(), senderID)
+
+	bytes := spec.Base64Bytes{}
+	err = bytes.Decode(string(senderID))
+	if err != nil {
+		return nil, err
+	}
+	queryMap := map[spec.RoomID][]ed25519.PublicKey{roomID: {ed25519.PublicKey(bytes)}}
+	result, err := r.DB.SelectUserIDsForPublicKeys(ctx, queryMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if userKeys, ok := result[roomID]; ok {
+		if userID, ok := userKeys[string(senderID)]; ok {
+			return spec.NewUserID(userID, true)
+		}
+	}
+
+	return nil, nil
 }
