@@ -65,8 +65,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 	var senderID spec.SenderID
 	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-		// TODO: pseudoIDs - generate senderID kere!
-		senderID = "pseudo_id.sender.key"
+		// create user room key if needed
+		key, err := c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			return "", &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+		senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
 	} else {
 		senderID = spec.SenderID(userID.String())
 	}
@@ -360,18 +368,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
-		}
-	}
-
-	// create user room key if needed
-	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-		_, err = c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
-			return "", &util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError{},
-			}
 		}
 	}
 
