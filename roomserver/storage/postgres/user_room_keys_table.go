@@ -145,7 +145,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 		if err = rows.Scan(&userRoomKeyPair.EventStateKeyNID, &userRoomKeyPair.RoomNID, &publicKey); err != nil {
 			return nil, err
 		}
-		result[string(publicKey)] = userRoomKeyPair
+		result[spec.Base64Bytes(publicKey).Encode()] = userRoomKeyPair
 	}
 	return result, rows.Err()
 }

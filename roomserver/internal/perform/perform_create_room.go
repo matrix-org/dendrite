@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -74,7 +75,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				JSON: spec.InternalServerError{},
 			}
 		}
-		senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
+		senderID = spec.SenderID(spec.Base64Bytes(key.Public().(ed25519.PublicKey)).Encode())
 	} else {
 		senderID = spec.SenderID(userID.String())
 	}
