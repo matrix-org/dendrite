@@ -204,10 +204,10 @@ func (r *Joiner) performJoinRoomByID(
 				checkInvitePending = true
 			} else {
 				// create user room key if needed
-				key, err := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
-				if err != nil {
-					util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
-					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", err)
+				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
+				if keyErr != nil {
+					util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
 				senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
 			}
@@ -222,8 +222,8 @@ func (r *Joiner) performJoinRoomByID(
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
 	if checkInvitePending {
-		isInvitePending, inviteSender, _, inviteEvent, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, senderID)
-		if err == nil && !serverInRoom && isInvitePending {
+		isInvitePending, inviteSender, _, inviteEvent, inviteErr := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, senderID)
+		if inviteErr == nil && !serverInRoom && isInvitePending {
 			inviter, queryErr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, inviteSender)
 			if queryErr != nil {
 				return "", "", fmt.Errorf("r.RSAPI.QueryUserIDForSender: %w", queryErr)

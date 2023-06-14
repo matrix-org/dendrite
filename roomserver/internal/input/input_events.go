@@ -840,16 +840,17 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 		return err
 	}
 
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return err
+	}
+
 	prevEvents := latestRes.LatestEvents
 	for _, memberEvent := range memberEvents {
 		if memberEvent.StateKey() == nil {
 			continue
 		}
 
-		validRoomID, err := spec.NewRoomID(memberEvent.RoomID())
-		if err != nil {
-			continue
-		}
 		memberUserID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*memberEvent.StateKey()))
 		if err != nil {
 			continue
