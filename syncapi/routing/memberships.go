@@ -152,7 +152,15 @@ func GetMemberships(
 				}
 			}
 
-			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
+			validRoomID, err := spec.NewRoomID(ev.RoomID())
+			if err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("roomID is invalid")
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
+			}
+			userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, ev.SenderID())
 			if err != nil || userID == nil {
 				util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
 				return util.JSONResponse{
@@ -175,7 +183,7 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})},
 	}

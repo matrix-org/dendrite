@@ -377,7 +377,11 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rst
 			return sp, fmt.Errorf("unexpected nil state_key")
 		}
 
-		userID, err := s.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			return sp, err
+		}
+		userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*ev.StateKey()))
 		if err != nil || userID == nil {
 			return sp, fmt.Errorf("failed getting userID for sender: %w", err)
 		}
@@ -404,7 +408,11 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		return
 	}
 
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, msg.Event.RoomID(), spec.SenderID(*msg.Event.StateKey()))
+	validRoomID, err := spec.NewRoomID(msg.Event.RoomID())
+	if err != nil {
+		return
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*msg.Event.StateKey()))
 	if err != nil || userID == nil {
 		return
 	}
@@ -454,7 +462,16 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 
 	// Notify any active sync requests that the invite has been retired.
 	s.inviteStream.Advance(pduPos)
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, msg.RoomID, msg.TargetSenderID)
+	validRoomID, err := spec.NewRoomID(msg.RoomID)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"room_id":    msg.RoomID,
+			log.ErrorKey: err,
+		}).Errorf("roomID is invalid")
+		return
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
 	if err != nil || userID == nil {
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,

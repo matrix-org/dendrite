@@ -383,7 +383,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 	defer trace.EndRegion()
 
 	var res parsedRespState
-	roomState := state.NewStateResolution(t.db, t.roomInfo)
+	roomState := state.NewStateResolution(t.db, t.roomInfo, t.inputer.Queryer)
 	stateAtEvents, err := t.db.StateAtEventIDs(ctx, []string{eventID})
 	if err != nil {
 		t.log.WithError(err).Warnf("failed to get state after %s locally", eventID)
@@ -473,8 +473,8 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 		stateEventList = append(stateEventList, state.StateEvents...)
 	}
 	resolvedStateEvents, err := gomatrixserverlib.ResolveConflicts(
-		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList), func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return t.db.GetUserIDForSender(ctx, roomID, senderID)
+		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	)
 	if err != nil {
@@ -482,8 +482,8 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 	}
 	// apply the current event
 retryAllowedState:
-	if err = checkAllowedByState(backwardsExtremity, resolvedStateEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-		return t.db.GetUserIDForSender(ctx, roomID, senderID)
+	if err = checkAllowedByState(backwardsExtremity, resolvedStateEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		switch missing := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
@@ -569,8 +569,8 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	// will be added and duplicates will be removed.
 	missingEvents := make([]gomatrixserverlib.PDU, 0, len(missingResp.Events))
 	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
-		if err = gomatrixserverlib.VerifyEventSignatures(ctx, ev, t.keys, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return t.db.GetUserIDForSender(ctx, roomID, senderID)
+		if err = gomatrixserverlib.VerifyEventSignatures(ctx, ev, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			continue
 		}
@@ -660,8 +660,8 @@ func (t *missingStateReq) lookupMissingStateViaState(
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(ctx, &fclient.RespState{
 		StateEvents: state.GetStateEvents(),
 		AuthEvents:  state.GetAuthEvents(),
-	}, roomVersion, t.keys, nil, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-		return t.db.GetUserIDForSender(ctx, roomID, senderID)
+	}, roomVersion, t.keys, nil, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
 		return nil, err
@@ -897,8 +897,8 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		t.log.WithField("missing_event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
-	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-		return t.db.GetUserIDForSender(ctx, roomID, senderID)
+	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		t.log.WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}

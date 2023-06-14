@@ -516,6 +516,9 @@ func TestRedaction(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		natsInstance := &jetstream.NATSInstance{}
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				authEvents := []types.EventNID{}
@@ -551,7 +554,7 @@ func TestRedaction(t *testing.T) {
 					}
 
 					// Calculate the snapshotNID etc.
-					plResolver := state.NewStateResolution(db, roomInfo)
+					plResolver := state.NewStateResolution(db, roomInfo, rsAPI)
 					stateAtEvent.BeforeStateSnapshotNID, err = plResolver.CalculateAndStoreStateBeforeEvent(ctx, ev.PDU, false)
 					assert.NoError(t, err)
 

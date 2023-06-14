@@ -163,12 +163,17 @@ func TestUserRoomKeys(t *testing.T) {
 		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *roomID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
+		pubKey, err := db.SelectUserRoomPublicKey(context.Background(), *userID, *roomID)
+		assert.NoError(t, err)
+		assert.Equal(t, key.Public(), pubKey)
 
 		// Key doesn't exist, we shouldn't get anything back
-		assert.NoError(t, err)
 		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *doesNotExist)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
+		pubKey, err = db.SelectUserRoomPublicKey(context.Background(), *userID, *doesNotExist)
+		assert.NoError(t, err)
+		assert.Nil(t, pubKey)
 
 		queryUserIDs := map[spec.RoomID][]ed25519.PublicKey{
 			*roomID: {key.Public().(ed25519.PublicKey)},
@@ -178,7 +183,7 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		wantKeys := map[spec.RoomID]map[string]string{
 			*roomID: {
-				string(key.Public().(ed25519.PublicKey)): userID.String(),
+				spec.Base64Bytes(key.Public().(ed25519.PublicKey)).Encode(): userID.String(),
 			},
 		}
 		assert.Equal(t, wantKeys, userIDs)
