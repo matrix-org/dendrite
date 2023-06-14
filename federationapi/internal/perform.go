@@ -171,9 +171,9 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (spec.SenderID, error) {
-			key, err := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
-			if err != nil {
-				return "", err
+			key, keyErr := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", keyErr
 			}
 
 			return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
