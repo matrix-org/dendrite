@@ -37,6 +37,7 @@ type ClientEvent struct {
 	OriginServerTS spec.Timestamp `json:"origin_server_ts,omitempty"` // OriginServerTS is omitted on receipt events
 	RoomID         string         `json:"room_id,omitempty"`          // RoomID is omitted on /sync responses
 	Sender         string         `json:"sender,omitempty"`           // Sender is omitted on receipt events
+	SenderKey      spec.SenderID  `json:"sender_key,omitempty"`       // The SenderKey for events in pseudo ID rooms
 	StateKey       *string        `json:"state_key,omitempty"`
 	Type           string         `json:"type"`
 	Unsigned       spec.RawJSON   `json:"unsigned,omitempty"`
@@ -51,14 +52,18 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 			continue // TODO: shouldn't happen?
 		}
 		sender := spec.UserID{}
-		userID, err := userIDForSender(se.RoomID(), se.SenderID())
+		validRoomID, err := spec.NewRoomID(se.RoomID())
+		if err != nil {
+			continue
+		}
+		userID, err := userIDForSender(*validRoomID, se.SenderID())
 		if err == nil && userID != nil {
 			sender = *userID
 		}
 
 		sk := se.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, err := userIDForSender(se.RoomID(), spec.SenderID(*sk))
+			skUserID, err := userIDForSender(*validRoomID, spec.SenderID(*sk))
 			if err == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString
@@ -84,6 +89,9 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender sp
 	if format == FormatAll {
 		ce.RoomID = se.RoomID()
 	}
+	if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		ce.SenderKey = se.SenderID()
+	}
 	return ce
 }
 
@@ -91,14 +99,18 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender sp
 // It provides default logic for event.SenderID & event.StateKey -> userID conversions.
 func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserverlib.PDU) ClientEvent {
 	sender := spec.UserID{}
-	userID, err := userIDQuery(event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return ClientEvent{}
+	}
+	userID, err := userIDQuery(*validRoomID, event.SenderID())
 	if err == nil && userID != nil {
 		sender = *userID
 	}
 
 	sk := event.StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, err := userIDQuery(event.RoomID(), spec.SenderID(*event.StateKey()))
+		skUserID, err := userIDQuery(*validRoomID, spec.SenderID(*event.StateKey()))
 		if err == nil && skUserID != nil {
 			skString := skUserID.String()
 			sk = &skString

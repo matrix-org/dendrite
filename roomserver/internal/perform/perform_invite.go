@@ -34,6 +34,7 @@ import (
 
 type QueryState struct {
 	storage.Database
+	querier api.QuerySenderIDAPI
 }
 
 func (q *QueryState) GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error) {
@@ -46,7 +47,7 @@ func (q *QueryState) GetState(ctx context.Context, roomID spec.RoomID, stateWant
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 	if info != nil {
-		roomState := state.NewStateResolution(q.Database, info)
+		roomState := state.NewStateResolution(q.Database, info, q.querier)
 		stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
 			ctx, info.StateSnapshotNID(), stateWanted,
 		)
@@ -98,7 +99,11 @@ func (r *Inviter) ProcessInviteMembership(
 	var outputUpdates []api.OutputEvent
 	var updater *shared.MembershipUpdater
 
-	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), spec.SenderID(*inviteEvent.StateKey()))
+	validRoomID, err := spec.NewRoomID(inviteEvent.RoomID())
+	if err != nil {
+		return nil, err
+	}
+	userID, err := r.RSAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*inviteEvent.StateKey()))
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
@@ -126,7 +131,12 @@ func (r *Inviter) PerformInvite(
 ) error {
 	event := req.Event
 
-	sender, err := r.DB.GetUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return err
+	}
+
+	sender, err := r.RSAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 	if err != nil {
 		return spec.InvalidParam("The sender user ID is invalid")
 	}
@@ -137,18 +147,13 @@ func (r *Inviter) PerformInvite(
 	if event.StateKey() == nil || *event.StateKey() == "" {
 		return fmt.Errorf("invite must be a state event")
 	}
-	invitedUser, err := r.RSAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+	invitedUser, err := r.RSAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
 	if err != nil || invitedUser == nil {
 		return spec.InvalidParam("Could not find the matching senderID for this user")
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
 
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return err
-	}
-
-	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, event.RoomID(), *invitedUser)
+	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, *validRoomID, *invitedUser)
 	if err != nil {
 		return fmt.Errorf("failed looking up senderID for invited user")
 	}
@@ -161,9 +166,9 @@ func (r *Inviter) PerformInvite(
 		IsTargetLocal:     isTargetLocal,
 		StrippedState:     req.InviteRoomState,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
-		StateQuerier:      &QueryState{r.DB},
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return r.DB.GetUserIDForSender(ctx, roomID, senderID)
+		StateQuerier:      &QueryState{r.DB, r.RSAPI},
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	}
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
@@ -181,6 +186,14 @@ func (r *Inviter) PerformInvite(
 	// send the original invite event to the roomserver.
 	if inviteEvent == nil {
 		inviteEvent = event
+	}
+
+	// if we invited a local user, we can also create a user room key, if it doesn't exist yet.
+	if isTargetLocal && event.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
+		if err != nil {
+			return fmt.Errorf("failed to get user room private key: %w", err)
+		}
 	}
 
 	// Send the invite event to the roomserver input stream. This will

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
@@ -162,12 +163,17 @@ func TestUserRoomKeys(t *testing.T) {
 		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *roomID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
+		pubKey, err := db.SelectUserRoomPublicKey(context.Background(), *userID, *roomID)
+		assert.NoError(t, err)
+		assert.Equal(t, key.Public(), pubKey)
 
 		// Key doesn't exist, we shouldn't get anything back
-		assert.NoError(t, err)
 		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *doesNotExist)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
+		pubKey, err = db.SelectUserRoomPublicKey(context.Background(), *userID, *doesNotExist)
+		assert.NoError(t, err)
+		assert.Nil(t, pubKey)
 
 		queryUserIDs := map[spec.RoomID][]ed25519.PublicKey{
 			*roomID: {key.Public().(ed25519.PublicKey)},
@@ -177,7 +183,7 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		wantKeys := map[spec.RoomID]map[string]string{
 			*roomID: {
-				string(key.Public().(ed25519.PublicKey)): userID.String(),
+				spec.Base64Bytes(key.Public().(ed25519.PublicKey)).Encode(): userID.String(),
 			},
 		}
 		assert.Equal(t, wantKeys, userIDs)
@@ -196,6 +202,27 @@ func TestUserRoomKeys(t *testing.T) {
 		_, err = db.InsertUserRoomPublicKey(context.Background(), *userID, *reallyDoesNotExist, key4)
 		assert.Error(t, err)
 		_, err = db.InsertUserRoomPrivatePublicKey(context.Background(), *userID, *reallyDoesNotExist, key)
+		assert.Error(t, err)
+	})
+}
+
+func TestAssignRoomNID(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	roomID, err := spec.NewRoomID(room.ID)
+	assert.NoError(t, err)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateRoomserverDatabase(t, dbType)
+		defer close()
+
+		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)
+		assert.NoError(t, err)
+		assert.Greater(t, nid, types.EventNID(0))
+
+		_, err = db.AssignRoomNID(ctx, spec.RoomID{}, "notaroomversion")
 		assert.Error(t, err)
 	})
 }

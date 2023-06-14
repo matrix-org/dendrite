@@ -233,11 +233,18 @@ func RemoveLocalAlias(
 		}
 	}
 
-	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomIDRes.RoomID, *userID)
+	validRoomID, err := spec.NewRoomID(roomIDRes.RoomID)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{Err: "Could not find SenderID for this device"},
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
 
@@ -321,7 +328,15 @@ func SetVisibility(
 			JSON: spec.BadJSON("userID for this device is invalid"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("roomID is invalid")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

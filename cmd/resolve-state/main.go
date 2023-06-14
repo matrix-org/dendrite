@@ -11,11 +11,13 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -66,10 +68,14 @@ func main() {
 		panic(err)
 	}
 
+	natsInstance := &jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm,
+		natsInstance, caching.NewRistrettoCache(128*1024*1024, time.Hour, true), false)
+
 	roomInfo := &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	}
-	stateres := state.NewStateResolution(roomserverDB, roomInfo)
+	stateres := state.NewStateResolution(roomserverDB, roomInfo, rsAPI)
 
 	if *difference {
 		if len(snapshotNIDs) != 2 {
@@ -183,8 +189,8 @@ func main() {
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
-		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return roomserverDB.GetUserIDForSender(ctx, roomID, senderID)
+		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 	)
 	if err != nil {

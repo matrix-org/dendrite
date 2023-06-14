@@ -115,7 +115,11 @@ func ruleMatches(rule *Rule, kind Kind, event gomatrixserverlib.PDU, ec Evaluati
 
 	case SenderKind:
 		userID := ""
-		sender, err := userIDForSender(event.RoomID(), event.SenderID())
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return false, err
+		}
+		sender, err := userIDForSender(*validRoomID, event.SenderID())
 		if err == nil {
 			userID = sender.String()
 		}

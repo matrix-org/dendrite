@@ -139,7 +139,11 @@ func ApplyHistoryVisibilityFilter(
 		if err != nil {
 			return nil, err
 		}
-		senderID, err := rsAPI.QuerySenderIDForUser(ctx, ev.RoomID(), *user)
+		roomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			return nil, err
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *user)
 		if err == nil {
 			if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(string(senderID)) {
 				eventsFiltered = append(eventsFiltered, ev)

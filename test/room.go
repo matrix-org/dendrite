@@ -39,7 +39,7 @@ var (
 	roomIDCounter = int64(0)
 )
 
-func UserIDForSender(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+func UserIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	return spec.NewUserID(string(senderID), true)
 }
 

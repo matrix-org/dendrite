@@ -662,6 +662,26 @@ func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, e
 	return d.EventsTable.SelectEventRejected(ctx, nil, roomNID, eventID)
 }
 
+func (d *Database) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error) {
+	// This should already be checked, let's check it anyway.
+	_, err = gomatrixserverlib.GetRoomVersion(roomVersion)
+	if err != nil {
+		return 0, err
+	}
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomNID, err = d.assignRoomNID(ctx, txn, roomID.String(), roomVersion)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	// Not setting caches, as assignRoomNID already does this
+	return roomNID, err
+}
+
 // GetOrCreateRoomInfo gets or creates a new RoomInfo, which is only safe to use with functions only needing a roomVersion or roomNID.
 func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserverlib.PDU) (roomInfo *types.RoomInfo, err error) {
 	// Get the default room version. If the client doesn't supply a room_version
@@ -699,6 +719,22 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 		RoomVersion: roomVersion,
 		RoomNID:     roomNID,
 	}, err
+}
+
+func (d *Database) GetRoomVersion(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(roomID)
+	if versionOK {
+		return cachedRoomVersion, nil
+	}
+
+	roomInfo, err := d.RoomInfo(ctx, roomID)
+	if err != nil {
+		return "", err
+	}
+	if roomInfo == nil {
+		return "", nil
+	}
+	return roomInfo.RoomVersion, nil
 }
 
 func (d *Database) GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error) {
@@ -1530,16 +1566,6 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
 }
 
-func (d *Database) GetUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-	// TODO: Use real logic once DB for pseudoIDs is in place
-	return spec.NewUserID(string(senderID), true)
-}
-
-func (d *Database) GetSenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error) {
-	// TODO: Use real logic once DB for pseudoIDs is in place
-	return spec.SenderID(userID.String()), nil
-}
-
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
 	return d.RoomsTable.SelectRoomIDsWithEvents(ctx, nil)
@@ -1686,10 +1712,39 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 			return rErr
 		}
 		if roomInfo == nil {
-			return nil
+			return eventutil.ErrRoomNoExists{}
 		}
 
 		key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
+		if !errors.Is(sErr, sql.ErrNoRows) {
+			return sErr
+		}
+		return nil
+	})
+	return
+}
+
+// SelectUserRoomPublicKey queries the users room public key.
+// If no key exists, returns no key and no error. Otherwise returns
+// the key and a database error, if any.
+func (d *Database) SelectUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PublicKey, err error) {
+	uID := userID.String()
+	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
+	if sErr != nil {
+		return nil, sErr
+	}
+	stateKeyNID := stateKeyNIDMap[uID]
+
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
+		if rErr != nil {
+			return rErr
+		}
+		if roomInfo == nil {
+			return nil
+		}
+
+		key, sErr = d.UserRoomKeyTable.SelectUserRoomPublicKey(ctx, txn, stateKeyNID, roomInfo.RoomNID)
 		if !errors.Is(sErr, sql.ErrNoRows) {
 			return sErr
 		}

@@ -154,14 +154,9 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if err != nil {
 		return err
 	}
-	senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, roomID, *user)
-	if err != nil {
-		return err
-	}
 
 	joinInput := gomatrixserverlib.PerformJoinInput{
 		UserID:     user,
-		SenderID:   senderID,
 		RoomID:     room,
 		ServerName: serverName,
 		Content:    content,
@@ -169,11 +164,19 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		PrivateKey: r.cfg.Matrix.PrivateKey,
 		KeyID:      r.cfg.Matrix.KeyID,
 		KeyRing:    r.keyRing,
-		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}),
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (spec.SenderID, error) {
+			key, keyErr := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", keyErr
+			}
+
+			return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
 		},
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
@@ -368,7 +371,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	userIDProvider := func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	userIDProvider := func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
@@ -459,7 +462,11 @@ func (r *FederationInternalAPI) PerformLeave(
 
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
-		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, request.RoomID, *userID)
+		roomID, err := spec.NewRoomID(request.RoomID)
+		if err != nil {
+			return err
+		}
+		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			return err
 		}
@@ -527,7 +534,11 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return nil, err
+	}
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 	if err != nil {
 		return nil, err
 	}

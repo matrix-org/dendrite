@@ -64,7 +64,14 @@ func SendBan(
 			JSON: spec.Forbidden("You don't have permission to ban this user, bad userID"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -155,7 +162,14 @@ func SendKick(
 			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, *deviceUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -428,7 +442,11 @@ func buildMembershipEvent(
 	if err != nil {
 		return nil, err
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +455,7 @@ func buildMembershipEvent(
 	if err != nil {
 		return nil, err
 	}
-	targetSenderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *targetID)
+	targetSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *targetID)
 	if err != nil {
 		return nil, err
 	}

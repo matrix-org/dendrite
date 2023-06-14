@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -176,6 +177,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
 		DB:                r.DB,
 		FSAPI:             r.fsAPI,
+		Querier:           r.Queryer,
 		KeyRing:           r.KeyRing,
 		// Perspective servers are trusted to not lie about server keys, so we will also
 		// prefer these servers when backfilling (assuming they are in the room) rather
@@ -269,4 +271,24 @@ func (r *RoomserverInternalAPI) PerformForget(
 	resp *api.PerformForgetResponse,
 ) error {
 	return r.Forgetter.PerformForget(ctx, req, resp)
+}
+
+// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
+func (r *RoomserverInternalAPI) GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error) {
+	key, err := r.DB.SelectUserRoomPrivateKey(ctx, userID, roomID)
+	if err != nil {
+		return nil, err
+	}
+	// no key found, create one
+	if len(key) == 0 {
+		_, key, err = ed25519.GenerateKey(nil)
+		if err != nil {
+			return nil, err
+		}
+		key, err = r.DB.InsertUserRoomPrivatePublicKey(ctx, userID, roomID, key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return key, nil
 }

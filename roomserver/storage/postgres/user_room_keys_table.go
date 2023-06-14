@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const userRoomKeysSchema = `
@@ -51,12 +52,15 @@ const insertUserRoomPublicKeySQL = `
 
 const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
+const selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
+
 const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
 
 type userRoomKeysStatements struct {
 	insertUserRoomPrivateKeyStmt *sql.Stmt
 	insertUserRoomPublicKeyStmt  *sql.Stmt
 	selectUserRoomKeyStmt        *sql.Stmt
+	selectUserRoomPublicKeyStmt  *sql.Stmt
 	selectUserNIDsStmt           *sql.Stmt
 }
 
@@ -71,6 +75,7 @@ func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
 		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomPrivateKeySQL},
 		{&s.insertUserRoomPublicKeyStmt, insertUserRoomPublicKeySQL},
 		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
+		{&s.selectUserRoomPublicKeyStmt, selectUserRoomPublicKeySQL},
 		{&s.selectUserNIDsStmt, selectUserNIDsSQL},
 	}.Prepare(db)
 }
@@ -102,6 +107,21 @@ func (s *userRoomKeysStatements) SelectUserRoomPrivateKey(
 	return result, err
 }
 
+func (s *userRoomKeysStatements) SelectUserRoomPublicKey(
+	ctx context.Context,
+	txn *sql.Tx,
+	userNID types.EventStateKeyNID,
+	roomNID types.RoomNID,
+) (ed25519.PublicKey, error) {
+	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomPublicKeyStmt)
+	var result ed25519.PublicKey
+	err := stmt.QueryRowContext(ctx, userNID, roomNID).Scan(&result)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return result, err
+}
+
 func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error) {
 	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserNIDsStmt)
 
@@ -126,7 +146,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 		if err = rows.Scan(&userRoomKeyPair.EventStateKeyNID, &userRoomKeyPair.RoomNID, &publicKey); err != nil {
 			return nil, err
 		}
-		result[string(publicKey)] = userRoomKeyPair
+		result[spec.Base64Bytes(publicKey).Encode()] = userRoomKeyPair
 	}
 	return result, rows.Err()
 }
