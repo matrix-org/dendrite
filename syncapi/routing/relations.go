@@ -110,19 +110,24 @@ func Relations(
 		return util.ErrorResponse(err)
 	}
 
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+
 	// Convert the events into client events, and optionally filter based on the event
 	// type if it was specified.
 	res.Chunk = make([]synctypes.ClientEvent, 0, len(filteredEvents))
 	for _, event := range filteredEvents {
 		sender := spec.UserID{}
-		userID, err := rsAPI.QueryUserIDForSender(req.Context(), event.RoomID(), event.SenderID())
+		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, event.SenderID())
 		if err == nil && userID != nil {
 			sender = *userID
 		}
 
 		sk := event.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, err := rsAPI.QueryUserIDForSender(req.Context(), event.RoomID(), spec.SenderID(*event.StateKey()))
+			skUserID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, spec.SenderID(*event.StateKey()))
 			if err == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString

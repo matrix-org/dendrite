@@ -78,7 +78,11 @@ func (r *Leaver) performLeaveRoomByID(
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
 ) ([]api.OutputEvent, error) {
-	leaver, err := r.RSAPI.QuerySenderIDForUser(ctx, req.RoomID, req.Leaver)
+	roomID, err := spec.NewRoomID(req.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	leaver, err := r.RSAPI.QuerySenderIDForUser(ctx, *roomID, req.Leaver)
 	if err != nil {
 		return nil, fmt.Errorf("leaver %s has no matching senderID in this room", req.Leaver.String())
 	}
@@ -87,7 +91,7 @@ func (r *Leaver) performLeaveRoomByID(
 	// that.
 	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, leaver)
 	if err == nil && isInvitePending {
-		sender, serr := r.RSAPI.QueryUserIDForSender(ctx, req.RoomID, senderUser)
+		sender, serr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, senderUser)
 		if serr != nil || sender == nil {
 			return nil, fmt.Errorf("sender %q has no matching userID", senderUser)
 		}
@@ -133,7 +137,7 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	latestRes := api.QueryLatestEventsAndStateResponse{}
-	if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &latestReq, &latestRes); err != nil {
+	if err = helpers.QueryLatestEventsAndState(ctx, r.DB, r.RSAPI, &latestReq, &latestRes); err != nil {
 		return nil, err
 	}
 	if !latestRes.RoomExists {

@@ -273,7 +273,14 @@ func generateSendEvent(
 			JSON: spec.BadJSON("Bad userID"),
 		}
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -344,8 +351,8 @@ func generateSendEvent(
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
 	provider := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
-	if err = gomatrixserverlib.Allowed(e.PDU, &provider, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	if err = gomatrixserverlib.Allowed(e.PDU, &provider, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, *validRoomID, senderID)
 	}); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,

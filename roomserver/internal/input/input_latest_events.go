@@ -213,7 +213,7 @@ func (u *latestEventsUpdater) latestState() error {
 	defer trace.EndRegion()
 
 	var err error
-	roomState := state.NewStateResolution(u.updater, u.roomInfo)
+	roomState := state.NewStateResolution(u.updater, u.roomInfo, u.api.Queryer)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the

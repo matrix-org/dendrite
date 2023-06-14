@@ -63,13 +63,20 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 	}
-	senderID, err := c.DB.GetSenderIDForUser(ctx, roomID.String(), userID)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
-		return "", &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+	var senderID spec.SenderID
+	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		// create user room key if needed
+		key, keyErr := c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+		if keyErr != nil {
+			util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+			return "", &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
+		senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
+	} else {
+		senderID = spec.SenderID(userID.String())
 	}
 	createContent["creator"] = senderID
 	createContent["room_version"] = createRequest.RoomVersion
@@ -323,8 +330,8 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 
-		if err = gomatrixserverlib.Allowed(ev, &authEvents, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
-			return c.DB.GetUserIDForSender(ctx, roomID, senderID)
+		if err = gomatrixserverlib.Allowed(ev, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return c.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return "", &util.JSONResponse{
@@ -361,18 +368,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
-		}
-	}
-
-	// create user room key if needed
-	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-		_, err = c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
-			return "", &util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError{},
-			}
 		}
 	}
 
@@ -455,7 +450,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 					JSON: spec.InternalServerError{},
 				}
 			}
-			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID.String(), *inviteeUserID)
+			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID, *inviteeUserID)
 			if queryErr != nil {
 				util.GetLogger(ctx).WithError(queryErr).Error("rsapi.QuerySenderIDForUser failed")
 				return "", &util.JSONResponse{
