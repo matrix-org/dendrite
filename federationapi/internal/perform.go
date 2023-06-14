@@ -96,7 +96,6 @@ func (r *FederationInternalAPI) PerformJoin(
 			ctx,
 			request.RoomID,
 			request.UserID,
-			request.SenderID,
 			request.Content,
 			serverName,
 			request.Unsigned,
@@ -138,7 +137,7 @@ func (r *FederationInternalAPI) PerformJoin(
 
 func (r *FederationInternalAPI) performJoinUsingServer(
 	ctx context.Context,
-	roomID, userID string, senderID spec.SenderID,
+	roomID, userID string,
 	content map[string]interface{},
 	serverName spec.ServerName,
 	unsigned map[string]interface{},
@@ -158,7 +157,6 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 
 	joinInput := gomatrixserverlib.PerformJoinInput{
 		UserID:     user,
-		SenderID:   senderID,
 		RoomID:     room,
 		ServerName: serverName,
 		Content:    content,

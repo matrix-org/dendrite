@@ -272,7 +272,7 @@ func (r *Joiner) performJoinRoomByID(
 	var joinedVia spec.ServerName
 	if forceFederatedJoin {
 		// TODO : pseudoIDs - pass through userID here since we don't know what the senderID should be yet
-		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req, senderID)
+		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
 		return req.RoomIDOrAlias, joinedVia, err
 	}
 
@@ -362,7 +362,7 @@ func (r *Joiner) performJoinRoomByID(
 		}
 
 		// Perform a federated room join.
-		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req, senderID)
+		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
 		return req.RoomIDOrAlias, joinedVia, err
 
 	default:
@@ -380,16 +380,14 @@ func (r *Joiner) performJoinRoomByID(
 func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
-	senderID spec.SenderID,
 ) (spec.ServerName, error) {
 	// Try joining by all of the supplied server names.
 	fedReq := fsAPI.PerformJoinRequest{
 		RoomID:      req.RoomIDOrAlias, // the room ID to try and join
 		UserID:      req.UserID,        // the user ID joining the room
-		SenderID:    spec.SenderID(senderID),
-		ServerNames: req.ServerNames, // the server to try joining with
-		Content:     req.Content,     // the membership event content
-		Unsigned:    req.Unsigned,    // the unsigned event content, if any
+		ServerNames: req.ServerNames,   // the server to try joining with
+		Content:     req.Content,       // the membership event content
+		Unsigned:    req.Unsigned,      // the unsigned event content, if any
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
 	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)
