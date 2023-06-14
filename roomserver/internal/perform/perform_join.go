@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -24,7 +25,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -208,9 +211,6 @@ func (r *Joiner) performJoinRoomByID(
 	} else if authorisedVia != "" {
 		req.Content["join_authorised_via_users_server"] = authorisedVia
 	}
-	if err = proto.SetContent(req.Content); err != nil {
-		return "", "", fmt.Errorf("eb.SetContent: %w", err)
-	}
 
 	// Force a federated join if we aren't in the room and we've been
 	// given some server names to try joining by.
@@ -289,19 +289,43 @@ func (r *Joiner) performJoinRoomByID(
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
 	}
+
+	// at this point we know we have an existing room
+	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		var pseudoIDKey ed25519.PrivateKey
+		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			return "", "", err
+		}
+
+		mapping := &gomatrixserverlib.MXIDMapping{
+			UserRoomKey: spec.UserRoomKey(pseudoIDKey),
+			UserID:      userID.String(),
+		}
+
+		// Sign the mapping with the server identity
+		if err = mapping.Sign(identity.ServerName, identity.KeyID, identity.PrivateKey); err != nil {
+			return "", "", err
+		}
+		req.Content["mxid_mapping"] = mapping
+
+		// sign the event with the pseudo ID key
+		identity = &fclient.SigningIdentity{
+			ServerName: userID.Domain(),
+			KeyID:      "self",
+			PrivateKey: pseudoIDKey,
+		}
+	}
+
+	if err = proto.SetContent(req.Content); err != nil {
+		return "", "", fmt.Errorf("eb.SetContent: %w", err)
+	}
+
 	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err.(type) {
 	case nil:
-		// create user room key if needed
-		if buildRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-			_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
-			if err != nil {
-				logrus.WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
-				return "", "", fmt.Errorf("failed to get user room private key: %w", err)
-			}
-		}
-
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
 		// a member of the room. This is best-effort (as in we won't

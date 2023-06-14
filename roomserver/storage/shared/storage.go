@@ -1692,6 +1692,7 @@ func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userID spec.User
 // SelectUserRoomPrivateKey queries the users room private key.
 // If no key exists, returns no key and no error. Otherwise returns
 // the key and a database error, if any.
+// TODO: Cache this?
 func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error) {
 	uID := userID.String()
 	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})

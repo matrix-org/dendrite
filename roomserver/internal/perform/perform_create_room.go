@@ -17,11 +17,9 @@ package perform
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -174,7 +172,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 
 		mapping := &gomatrixserverlib.MXIDMapping{
-			UserRoomKey: strings.ToLower(base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(pseudoIDKey.Public().(ed25519.PublicKey))),
+			UserRoomKey: spec.UserRoomKey(pseudoIDKey),
 			UserID:      userID.String(),
 		}
 
