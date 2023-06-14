@@ -221,7 +221,7 @@ func SendServerNotice(
 		"body":    r.Content.Body,
 		"msgtype": r.Content.MsgType,
 	}
-	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
+	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
 		return *resErr
@@ -350,7 +350,7 @@ func getSenderDevice(
 	if len(deviceRes.Devices) > 0 {
 		// If there were changes to the profile, create a new membership event
 		if displayNameChanged || avatarChanged {
-			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, cfg, time.Now())
+			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, time.Now())
 			if err != nil {
 				return nil, err
 			}

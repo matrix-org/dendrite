@@ -285,7 +285,7 @@ func (r *Joiner) performJoinRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(userDomain)
+	identity, err := r.RSAPI.SigningIdentityFor(ctx, *roomID, *userID)
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
 	}
@@ -311,9 +311,9 @@ func (r *Joiner) performJoinRoomByID(
 		req.Content["mxid_mapping"] = mapping
 
 		// sign the event with the pseudo ID key
-		identity = &fclient.SigningIdentity{
-			ServerName: userID.Domain(),
-			KeyID:      "self",
+		identity = fclient.SigningIdentity{
+			ServerName: "self",
+			KeyID:      "ed25519",
 			PrivateKey: pseudoIDKey,
 		}
 	}
@@ -322,7 +322,7 @@ func (r *Joiner) performJoinRoomByID(
 		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
 
-	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err.(type) {
 	case nil:

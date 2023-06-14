@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
@@ -210,6 +211,7 @@ type ClientRoomserverAPI interface {
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 	SetRoomAlias(ctx context.Context, req *SetRoomAliasRequest, res *SetRoomAliasResponse) error
 	RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
+	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 }
 
 type UserRoomserverAPI interface {
@@ -228,7 +230,7 @@ type FederationRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
-
+	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error

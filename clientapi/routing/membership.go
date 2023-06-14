@@ -419,11 +419,6 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
-	if err != nil {
-		return nil, err
-	}
-
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
 		return nil, err
@@ -441,6 +436,17 @@ func buildMembershipEvent(
 	if err != nil {
 		return nil, err
 	}
+
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *userID)
+	if err != nil {
+		return nil, err
+	}
+
 	return buildMembershipEventDirect(ctx, targetSenderID, reason, profile.DisplayName, profile.AvatarURL,
 		senderID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
 }

@@ -173,12 +173,17 @@ func (r *Leaver) performLeaveRoomByID(
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
 
+	validRoomID, err := spec.NewRoomID(req.RoomID)
+	if err != nil {
+		return nil, err
+	}
+
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(req.Leaver.Domain())
+	identity, err := r.RSAPI.SigningIdentityFor(ctx, *validRoomID, req.Leaver)
 	if err != nil {
 		return nil, fmt.Errorf("SigningIdentityFor: %w", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, time.Now(), r.RSAPI, &buildRes)
 	if err != nil {
 		return nil, fmt.Errorf("eventutil.QueryAndBuildEvent: %w", err)
 	}

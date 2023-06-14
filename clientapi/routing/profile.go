@@ -151,7 +151,7 @@ func SetAvatarURL(
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, evTime)
 	if err != nil {
 		return response
 	}
@@ -246,7 +246,7 @@ func SetDisplayName(
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, evTime)
 	if err != nil {
 		return response
 	}
@@ -260,7 +260,7 @@ func SetDisplayName(
 func updateProfile(
 	ctx context.Context, rsAPI api.ClientRoomserverAPI, device *userapi.Device,
 	profile *authtypes.Profile,
-	userID string, cfg *config.ClientAPI, evTime time.Time,
+	userID string, evTime time.Time,
 ) (util.JSONResponse, error) {
 	var res api.QueryRoomsForUserResponse
 	err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
@@ -285,7 +285,7 @@ func updateProfile(
 	}
 
 	events, err := buildMembershipEvents(
-		ctx, device, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
+		ctx, res.RoomIDs, *profile, userID, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -356,9 +356,8 @@ func getProfile(
 
 func buildMembershipEvents(
 	ctx context.Context,
-	device *userapi.Device,
 	roomIDs []string,
-	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
+	newProfile authtypes.Profile, userID string,
 	evTime time.Time, rsAPI api.ClientRoomserverAPI,
 ) ([]*types.HeaderedEvent, error) {
 	evs := []*types.HeaderedEvent{}
@@ -391,12 +390,22 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+		validRoomID, err := spec.NewRoomID(roomID)
 		if err != nil {
 			return nil, err
 		}
 
-		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, nil)
+		user, err := spec.NewUserID(userID, true)
+		if err != nil {
+			return nil, err
+		}
+
+		identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *user)
+		if err != nil {
+			return nil, err
+		}
+
+		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

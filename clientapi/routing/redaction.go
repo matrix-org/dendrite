@@ -143,7 +143,15 @@ func SendRedaction(
 		}
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	identity, err := rsAPI.SigningIdentityFor(req.Context(), *validRoomID, *deviceUserID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -152,7 +160,7 @@ func SendRedaction(
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(req.Context(), &proto, identity, time.Now(), rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(req.Context(), &proto, &identity, time.Now(), rsAPI, &queryRes)
 	if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

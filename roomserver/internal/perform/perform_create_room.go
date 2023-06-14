@@ -150,7 +150,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 
 	// get the signing identity
-	identity, err := c.Cfg.Matrix.SigningIdentityFor(userID.Domain())
+	identity, err := c.Cfg.Matrix.SigningIdentityFor(userID.Domain()) // we MUST use the server signing mxid_mapping
 	if err != nil {
 		logrus.WithError(err).WithField("domain", userID.Domain()).Error("unable to find signing identity for domain")
 		return "", &util.JSONResponse{
@@ -187,8 +187,8 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 		// sign all events with the pseudo ID key
 		identity = &fclient.SigningIdentity{
-			ServerName: userID.Domain(),
-			KeyID:      "self",
+			ServerName: "self",
+			KeyID:      "ed25519",
 			PrivateKey: pseudoIDKey,
 		}
 	}
@@ -404,6 +404,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	inputs := make([]api.InputRoomEvent, 0, len(builtEvents))
 	for _, event := range builtEvents {
+		logrus.Infof("XXX: built event: %s", string(event.JSON()))
 		inputs = append(inputs, api.InputRoomEvent{
 			Kind:         api.KindNew,
 			Event:        event,

@@ -129,7 +129,7 @@ func SendEvent(
 		}
 	}
 
-	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, cfg, rsAPI, evTime)
+	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, rsAPI, evTime)
 	if resErr != nil {
 		return *resErr
 	}
@@ -261,7 +261,6 @@ func generateSendEvent(
 	r map[string]interface{},
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
-	cfg *config.ClientAPI,
 	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) (gomatrixserverlib.PDU, *util.JSONResponse) {
@@ -297,7 +296,15 @@ func generateSendEvent(
 		}
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -306,7 +313,7 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, evTime, rsAPI, &queryRes)
 	switch specificErr := err.(type) {
 	case nil:
 	case eventutil.ErrRoomNoExists:

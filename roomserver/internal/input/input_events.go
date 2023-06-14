@@ -886,7 +886,22 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			return err
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.SigningIdentity, time.Now(), &eventsNeeded, latestRes)
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return err
+		}
+
+		userID, err := spec.NewUserID(stateKey, true)
+		if err != nil {
+			return err
+		}
+
+		signingIdentity, err := r.SigningIdentity(ctx, *validRoomID, *userID)
+		if err != nil {
+			return err
+		}
+
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, &signingIdentity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			return err
 		}
