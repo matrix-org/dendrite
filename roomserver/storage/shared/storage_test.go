@@ -183,7 +183,7 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		wantKeys := map[spec.RoomID]map[string]string{
 			*roomID: {
-				string(key.Public().(ed25519.PublicKey)): userID.String(),
+				spec.Base64Bytes(key.Public().(ed25519.PublicKey)).Encode(): userID.String(),
 			},
 		}
 		assert.Equal(t, wantKeys, userIDs)
