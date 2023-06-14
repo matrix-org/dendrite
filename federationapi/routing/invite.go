@@ -95,7 +95,7 @@ func InviteV2(
 			StateQuerier:      rsAPI.StateQuerier(),
 			InviteEvent:       inviteReq.Event(),
 			StrippedState:     inviteReq.InviteRoomState(),
-			UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+			UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 			},
 		}
@@ -188,7 +188,7 @@ func InviteV1(
 		StateQuerier:      rsAPI.StateQuerier(),
 		InviteEvent:       event,
 		StrippedState:     strippedState,
-		UserIDQuerier: func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 		},
 	}

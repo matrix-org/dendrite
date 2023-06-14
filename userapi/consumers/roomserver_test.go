@@ -47,7 +47,7 @@ func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 
 type FakeUserRoomserverAPI struct{ rsapi.UserRoomserverAPI }
 
-func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	return spec.NewUserID(string(senderID), true)
 }
 
@@ -68,13 +68,13 @@ func Test_evaluatePushRules(t *testing.T) {
 		}{
 			{
 				name:         "m.receipt doesn't notify",
-				eventContent: `{"type":"m.receipt"}`,
+				eventContent: `{"type":"m.receipt","room_id":"!room:example.com"}`,
 				wantAction:   pushrules.UnknownAction,
 				wantActions:  nil,
 			},
 			{
 				name:         "m.reaction doesn't notify",
-				eventContent: `{"type":"m.reaction"}`,
+				eventContent: `{"type":"m.reaction","room_id":"!room:example.com"}`,
 				wantAction:   pushrules.DontNotifyAction,
 				wantActions: []*pushrules.Action{
 					{
@@ -84,7 +84,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			},
 			{
 				name:         "m.room.message notifies",
-				eventContent: `{"type":"m.room.message"}`,
+				eventContent: `{"type":"m.room.message","room_id":"!room:example.com"}`,
 				wantNotify:   true,
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{
@@ -93,7 +93,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			},
 			{
 				name:         "m.room.message highlights",
-				eventContent: `{"type":"m.room.message", "content": {"body": "test"}}`,
+				eventContent: `{"type":"m.room.message", "content": {"body": "test"},"room_id":"!room:example.com"}`,
 				wantNotify:   true,
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{

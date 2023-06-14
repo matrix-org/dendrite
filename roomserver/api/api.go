@@ -52,6 +52,7 @@ type RoomserverInternalAPI interface {
 	UserRoomserverAPI
 	FederationRoomserverAPI
 	QuerySenderIDAPI
+	UserRoomPrivateKeyCreator
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -68,7 +69,9 @@ type RoomserverInternalAPI interface {
 		req *QueryAuthChainRequest,
 		res *QueryAuthChainResponse,
 	) error
+}
 
+type UserRoomPrivateKeyCreator interface {
 	// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
 	GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error)
 }
@@ -82,8 +85,8 @@ type InputRoomEventsAPI interface {
 }
 
 type QuerySenderIDAPI interface {
-	QuerySenderIDForUser(ctx context.Context, roomID string, userID spec.UserID) (spec.SenderID, error)
-	QueryUserIDForSender(ctx context.Context, roomID string, senderID spec.SenderID) (*spec.UserID, error)
+	QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error)
+	QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error)
 }
 
 // Query the latest events and state for a room from the room server.
@@ -230,6 +233,8 @@ type FederationRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
+	UserRoomPrivateKeyCreator
+
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error

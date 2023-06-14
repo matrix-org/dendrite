@@ -367,7 +367,11 @@ func buildMembershipEvents(
 		return nil, err
 	}
 	for _, roomID := range roomIDs {
-		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *fullUserID)
+		validRoomID, err := spec.NewRoomID(roomID)
+		if err != nil {
+			return nil, err
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 		if err != nil {
 			return nil, err
 		}
@@ -387,11 +391,6 @@ func buildMembershipEvents(
 		content.AvatarURL = newProfile.AvatarURL
 
 		if err = proto.SetContent(content); err != nil {
-			return nil, err
-		}
-
-		validRoomID, err := spec.NewRoomID(roomID)
-		if err != nil {
 			return nil, err
 		}
 

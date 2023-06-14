@@ -114,7 +114,14 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 				}).WithError(err).Warnf("Failed to add transaction ID to event")
 				continue
 			}
-			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, in[i].RoomID(), *userID)
+			roomID, err := spec.NewRoomID(in[i].RoomID())
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Room ID is invalid")
+				continue
+			}
+			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 			if err != nil {
 				logrus.WithFields(logrus.Fields{
 					"event_id": out[i].EventID(),
@@ -515,7 +522,11 @@ func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userI
 	if err != nil {
 		return "", ""
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, ev.RoomID(), *fullUser)
+	roomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return "", ""
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *fullUser)
 	if err != nil {
 		return "", ""
 	}

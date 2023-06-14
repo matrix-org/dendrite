@@ -101,13 +101,20 @@ func (n *Notifier) OnNewEvent(
 	n._removeEmptyUserStreams()
 
 	if ev != nil {
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+				"Notifier.OnNewEvent: RoomID is invalid",
+			)
+			return
+		}
 		// Map this event's room_id to a list of joined users, and wake them up.
 		usersToNotify := n._joinedUsers(ev.RoomID())
 		// Map this event's room_id to a list of peeking devices, and wake them up.
 		peekingDevicesToNotify := n._peekingDevices(ev.RoomID())
 		// If this is an invite, also add in the invitee to this list.
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), ev.RoomID(), spec.SenderID(*ev.StateKey()))
+			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), *validRoomID, spec.SenderID(*ev.StateKey()))
 			if err != nil {
 				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
 					"Notifier.OnNewEvent: Failed to find the userID for this event",

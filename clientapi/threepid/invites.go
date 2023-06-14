@@ -359,7 +359,11 @@ func emit3PIDInviteEvent(
 	if err != nil {
 		return err
 	}
-	sender, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *userID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	sender, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
 	if err != nil {
 		return err
 	}

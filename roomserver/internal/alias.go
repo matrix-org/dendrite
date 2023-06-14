@@ -113,6 +113,7 @@ func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 	return nil
 }
 
+// nolint:gocyclo
 // RemoveRoomAlias implements alias.RoomserverInternalAPI
 // nolint: gocyclo
 func (r *RoomserverInternalAPI) RemoveRoomAlias(
@@ -130,7 +131,12 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return nil
 	}
 
-	sender, err := r.QueryUserIDForSender(ctx, roomID, request.SenderID)
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+
+	sender, err := r.QueryUserIDForSender(ctx, *validRoomID, request.SenderID)
 	if err != nil || sender == nil {
 		return fmt.Errorf("r.QueryUserIDForSender: %w", err)
 	}
@@ -178,7 +184,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			if request.SenderID != ev.SenderID() {
 				senderID = ev.SenderID()
 			}
-			sender, err := r.QueryUserIDForSender(ctx, roomID, senderID)
+			sender, err := r.QueryUserIDForSender(ctx, *validRoomID, senderID)
 			if err != nil || sender == nil {
 				return err
 			}
@@ -209,7 +215,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			stateRes := &api.QueryLatestEventsAndStateResponse{}
-			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
+			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, r, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
 				return err
 			}
 

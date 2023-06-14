@@ -302,14 +302,18 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 	switch {
 	case event.Type() == spec.MRoomMember:
 		sender := spec.UserID{}
-		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+		validRoomID, roomErr := spec.NewRoomID(event.RoomID())
+		if roomErr != nil {
+			return roomErr
+		}
+		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 		if queryErr == nil && userID != nil {
 			sender = *userID
 		}
 
 		sk := event.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
 			if queryErr == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString
@@ -544,14 +548,18 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	}
 
 	sender := spec.UserID{}
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return err
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 	if err == nil && userID != nil {
 		sender = *userID
 	}
 
 	sk := event.StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
+		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
 		if queryErr == nil && skUserID != nil {
 			skString := skUserID.String()
 			sk = &skString
@@ -644,7 +652,11 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
 	user := ""
-	sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return nil, err
+	}
+	sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 	if err == nil {
 		user = sender.String()
 	}
@@ -682,7 +694,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
-	rule, err := eval.MatchEvent(event.PDU, func(roomID string, senderID spec.SenderID) (*spec.UserID, error) {
+	rule, err := eval.MatchEvent(event.PDU, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
@@ -790,7 +802,11 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		}
 
 	default:
-		sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return nil, err
+		}
+		sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get userID for sender %s", event.SenderID())
 			return nil, err
@@ -818,7 +834,13 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
 			return nil, err
 		}
-		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, event.RoomID(), *userID)
+		roomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			logger.WithError(err).Errorf("event roomID is invalid %s", event.RoomID())
+			return nil, err
+		}
+
+		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
 			return nil, err

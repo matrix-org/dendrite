@@ -50,6 +50,7 @@ func TestUserRoomKeysTable(t *testing.T) {
 
 		err = sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			var gotKey, key2, key3 ed25519.PrivateKey
+			var pubKey ed25519.PublicKey
 			gotKey, err = tab.InsertUserRoomPrivatePublicKey(context.Background(), txn, userNID, roomNID, key)
 			assert.NoError(t, err)
 			assert.Equal(t, gotKey, key)
@@ -71,6 +72,9 @@ func TestUserRoomKeysTable(t *testing.T) {
 			gotKey, err = tab.SelectUserRoomPrivateKey(context.Background(), txn, userNID, roomNID)
 			assert.NoError(t, err)
 			assert.Equal(t, key, gotKey)
+			pubKey, err = tab.SelectUserRoomPublicKey(context.Background(), txn, userNID, roomNID)
+			assert.NoError(t, err)
+			assert.Equal(t, key.Public(), pubKey)
 
 			// try to update an existing key, this should only be done for users NOT on this homeserver
 			var gotPubKey ed25519.PublicKey
@@ -82,6 +86,9 @@ func TestUserRoomKeysTable(t *testing.T) {
 			gotKey, err = tab.SelectUserRoomPrivateKey(context.Background(), txn, userNID, 2)
 			assert.NoError(t, err)
 			assert.Nil(t, gotKey)
+			pubKey, err = tab.SelectUserRoomPublicKey(context.Background(), txn, userNID, 2)
+			assert.NoError(t, err)
+			assert.Nil(t, pubKey)
 
 			// query user NIDs for senderKeys
 			var gotKeys map[string]types.UserRoomKeyPair

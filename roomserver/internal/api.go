@@ -173,6 +173,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
 		DB:                r.DB,
 		FSAPI:             r.fsAPI,
+		Querier:           r.Queryer,
 		KeyRing:           r.KeyRing,
 		// Perspective servers are trusted to not lie about server keys, so we will also
 		// prefer these servers when backfilling (assuming they are in the room) rather
@@ -304,14 +305,12 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 		if err != nil {
 			return fclient.SigningIdentity{}, err
 		}
-		logrus.Infof("XXX: using user signing key")
 		return fclient.SigningIdentity{
 			PrivateKey: privKey,
 			KeyID:      "ed25519",
 			ServerName: "self",
 		}, nil
 	}
-	logrus.Infof("XXX: using config signing key")
 	identity, err := r.Cfg.Global.SigningIdentityFor(senderID.Domain())
 	if err != nil {
 		return fclient.SigningIdentity{}, err

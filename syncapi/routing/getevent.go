@@ -102,14 +102,28 @@ func GetEvent(
 	}
 
 	sender := spec.UserID{}
-	senderUserID, err := rsAPI.QueryUserIDForSender(req.Context(), roomID, events[0].SenderID())
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("roomID is invalid"),
+		}
+	}
+	senderUserID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, events[0].SenderID())
 	if err == nil && senderUserID != nil {
 		sender = *senderUserID
 	}
 
 	sk := events[0].StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, err := rsAPI.QueryUserIDForSender(ctx, events[0].RoomID(), spec.SenderID(*events[0].StateKey()))
+		evRoomID, err := spec.NewRoomID(events[0].RoomID())
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("roomID is invalid"),
+			}
+		}
+		skUserID, err := rsAPI.QueryUserIDForSender(ctx, *evRoomID, spec.SenderID(*events[0].StateKey()))
 		if err == nil && skUserID != nil {
 			skString := skUserID.String()
 			sk = &skString
