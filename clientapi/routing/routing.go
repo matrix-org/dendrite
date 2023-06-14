@@ -176,19 +176,20 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/registrationTokens/{token}",
 		httputil.MakeAdminAPI("admin_get_registration_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if req.Method == http.MethodGet {
+			switch req.Method {
+			case http.MethodGet:
 				return AdminGetRegistrationToken(req, cfg, userAPI)
-			} else if req.Method == http.MethodPut {
+			case http.MethodPut:
 				return AdminUpdateRegistrationToken(req, cfg, userAPI)
-			} else if req.Method == http.MethodDelete {
+			case http.MethodDelete:
 				return AdminDeleteRegistrationToken(req, cfg, userAPI)
+			default:
+				return util.MatrixErrorResponse(
+					404,
+					string(spec.ErrorNotFound),
+					"unknown method",
+				)
 			}
-			return util.MatrixErrorResponse(
-				404,
-				string(spec.ErrorNotFound),
-				"unknown method",
-			)
-
 		}),
 	).Methods(http.MethodGet, http.MethodPut, http.MethodDelete, http.MethodOptions)
 
@@ -196,7 +197,7 @@ func Setup(
 		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return AdminEvacuateRoom(req, rsAPI)
 		}),
-	).Methods(http.MethodGet, http.MethodOptions)
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
 		httputil.MakeAdminAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

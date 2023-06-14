@@ -3,12 +3,13 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/api"
+	internal "github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"golang.org/x/exp/constraints"
 )
 
 const registrationTokensSchema = `
@@ -89,7 +90,7 @@ func NewSQLiteRegistrationTokensTable(db *sql.DB) (tables.RegistrationTokensTabl
 
 func (s *registrationTokenStatements) RegistrationTokenExists(ctx context.Context, tx *sql.Tx, token string) (bool, error) {
 	var existingToken string
-	stmt := s.selectTokenStatement
+	stmt := sqlutil.TxStmt(tx, s.selectTokenStatement)
 	err := stmt.QueryRowContext(ctx, token).Scan(&existingToken)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -105,7 +106,7 @@ func (s *registrationTokenStatements) InsertRegistrationToken(ctx context.Contex
 	_, err := stmt.ExecContext(
 		ctx,
 		*registrationToken.Token,
-		nullIfZeroInt32(*registrationToken.UsesAllowed),
+		nullIfZero(*registrationToken.UsesAllowed),
 		nullIfZero(*registrationToken.ExpiryTime),
 		*registrationToken.Pending,
 		*registrationToken.Completed)
@@ -115,110 +116,81 @@ func (s *registrationTokenStatements) InsertRegistrationToken(ctx context.Contex
 	return true, nil
 }
 
-func nullIfZero(value int64) interface{} {
-	if value == 0 {
+func nullIfZero[t constraints.Integer](in t) any {
+	if in == 0 {
 		return nil
 	}
-	return value
-}
-
-func nullIfZeroInt32(value int32) interface{} {
-	if value == 0 {
-		return nil
-	}
-	return value
+	return in
 }
 
 func (s *registrationTokenStatements) ListRegistrationTokens(ctx context.Context, tx *sql.Tx, returnAll bool, valid bool) ([]api.RegistrationToken, error) {
 	var stmt *sql.Stmt
 	var tokens []api.RegistrationToken
-	var tokenString sql.NullString
-	var pending, completed, usesAllowed sql.NullInt32
-	var expiryTime sql.NullInt64
+	var tokenString string
+	var pending, completed, usesAllowed *int32
+	var expiryTime *int64
 	var rows *sql.Rows
 	var err error
 	if returnAll {
-		stmt = s.listAllTokensStatement
+		stmt = sqlutil.TxStmt(tx, s.listAllTokensStatement)
 		rows, err = stmt.QueryContext(ctx)
 	} else if valid {
-		stmt = s.listValidTokensStatement
+		stmt = sqlutil.TxStmt(tx, s.listValidTokensStatement)
 		rows, err = stmt.QueryContext(ctx, time.Now().UnixNano()/int64(time.Millisecond))
 	} else {
-		stmt = s.listInvalidTokenStatement
+		stmt = sqlutil.TxStmt(tx, s.listInvalidTokenStatement)
 		rows, err = stmt.QueryContext(ctx, time.Now().UnixNano()/int64(time.Millisecond))
 	}
 	if err != nil {
 		return tokens, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "ListRegistrationTokens: rows.close() failed")
 	for rows.Next() {
 		err = rows.Scan(&tokenString, &pending, &completed, &usesAllowed, &expiryTime)
 		if err != nil {
 			return tokens, err
 		}
-		tokenString := tokenString.String
-		pending := pending.Int32
-		completed := completed.Int32
-		usesAllowed := getReturnValueForInt32(usesAllowed)
-		expiryTime := getReturnValueForInt64(expiryTime)
+		tokenString := tokenString
+		pending := pending
+		completed := completed
+		usesAllowed := usesAllowed
+		expiryTime := expiryTime
 
 		tokenMap := api.RegistrationToken{
 			Token:       &tokenString,
-			Pending:     &pending,
-			Completed:   &completed,
+			Pending:     pending,
+			Completed:   completed,
 			UsesAllowed: usesAllowed,
 			ExpiryTime:  expiryTime,
 		}
 		tokens = append(tokens, tokenMap)
 	}
-	return tokens, nil
-}
-
-func getReturnValueForInt32(value sql.NullInt32) *int32 {
-	if value.Valid {
-		returnValue := value.Int32
-		return &returnValue
-	}
-	return nil
-}
-
-func getReturnValueForInt64(value sql.NullInt64) *int64 {
-	if value.Valid {
-		returnValue := value.Int64
-		return &returnValue
-	}
-	return nil
+	return tokens, rows.Err()
 }
 
 func (s *registrationTokenStatements) GetRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) (*api.RegistrationToken, error) {
 	stmt := sqlutil.TxStmt(tx, s.getTokenStatement)
-	var pending, completed, usesAllowed sql.NullInt32
-	var expiryTime sql.NullInt64
+	var pending, completed, usesAllowed *int32
+	var expiryTime *int64
 	err := stmt.QueryRowContext(ctx, tokenString).Scan(&pending, &completed, &usesAllowed, &expiryTime)
 	if err != nil {
 		return nil, err
 	}
 	token := api.RegistrationToken{
 		Token:       &tokenString,
-		Pending:     &pending.Int32,
-		Completed:   &completed.Int32,
-		UsesAllowed: getReturnValueForInt32(usesAllowed),
-		ExpiryTime:  getReturnValueForInt64(expiryTime),
+		Pending:     pending,
+		Completed:   completed,
+		UsesAllowed: usesAllowed,
+		ExpiryTime:  expiryTime,
 	}
 	return &token, nil
 }
 
 func (s *registrationTokenStatements) DeleteRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) error {
-	stmt := s.deleteTokenStatement
-	res, err := stmt.ExecContext(ctx, tokenString)
+	stmt := sqlutil.TxStmt(tx, s.deleteTokenStatement)
+	_, err := stmt.ExecContext(ctx, tokenString)
 	if err != nil {
 		return err
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return fmt.Errorf("token: %s does not exists", tokenString)
 	}
 	return nil
 }

@@ -80,19 +80,11 @@ func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Contex
 }
 
 func (a *UserInternalAPI) PerformAdminListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error) {
-	tokens, err := a.DB.ListRegistrationTokens(ctx, returnAll, valid)
-	if err != nil {
-		return nil, err
-	}
-	return tokens, nil
+	return a.DB.ListRegistrationTokens(ctx, returnAll, valid)
 }
 
 func (a *UserInternalAPI) PerformAdminGetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error) {
-	token, err := a.DB.GetRegistrationToken(ctx, tokenString)
-	if err != nil {
-		return nil, err
-	}
-	return token, nil
+	return a.DB.GetRegistrationToken(ctx, tokenString)
 }
 
 func (a *UserInternalAPI) PerformAdminDeleteRegistrationToken(ctx context.Context, tokenString string) error {
@@ -100,11 +92,7 @@ func (a *UserInternalAPI) PerformAdminDeleteRegistrationToken(ctx context.Contex
 }
 
 func (a *UserInternalAPI) PerformAdminUpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*clientapi.RegistrationToken, error) {
-	token, err := a.DB.UpdateRegistrationToken(ctx, tokenString, newAttributes)
-	if err != nil {
-		return nil, err
-	}
-	return token, nil
+	return a.DB.UpdateRegistrationToken(ctx, tokenString, newAttributes)
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {

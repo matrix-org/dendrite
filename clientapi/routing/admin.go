@@ -30,13 +30,14 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
+var validRegistrationTokenRegex = regexp.MustCompile("^[[:ascii:][:digit:]_]*$")
+
 func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	if !cfg.RegistrationRequiresToken {
-		return util.MatrixErrorResponse(
-			http.StatusForbidden,
-			string(spec.ErrorForbidden),
-			"Registration via tokens is not enabled on this homeserver",
-		)
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("Registration via tokens is not enabled on this homeserver"),
+		}
 	}
 	request := struct {
 		Token       string `json:"token"`
@@ -46,11 +47,10 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 	}{}
 
 	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorBadJSON),
-			"Failed to decode request body:",
-		)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON(fmt.Sprintf("Failed to decode request body: %s", err)),
+		}
 	}
 
 	token := request.Token
@@ -65,43 +65,43 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 		}
 		// token not present in request body. Hence, generate a random token.
 		if !(length > 0 && length <= 64) {
-			return util.MatrixErrorResponse(
-				http.StatusBadRequest,
-				string(spec.ErrorInvalidParam),
-				"length must be greater than zero and not greater than 64")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("length must be greater than zero and not greater than 64"),
+			}
 		}
 		token = generateRandomToken(int(length))
 	}
 
 	if len(token) > 64 {
 		//Token present in request body, but is too long.
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorInvalidParam),
-			"token must not be longer than 64")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("token must not be longer than 64"),
+		}
 	}
 
-	isTokenValid, _ := regexp.MatchString("^[[:ascii:][:digit:]_]*$", token)
+	isTokenValid := validRegistrationTokenRegex.Match([]byte(token))
 	if !isTokenValid {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorInvalidParam),
-			"token must consist only of characters matched by the regex [A-Za-z0-9-_]")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("token must consist only of characters matched by the regex [A-Za-z0-9-_]"),
+		}
 	}
 	// At this point, we have a valid token, either through request body or through random generation.
 
 	if usesAllowed < 0 {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorInvalidParam),
-			"uses_allowed must be a non-negative integer or null")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("uses_allowed must be a non-negative integer or null"),
+		}
 	}
 
 	if expiryTime != 0 && expiryTime < time.Now().UnixNano()/int64(time.Millisecond) {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorInvalidParam),
-			"expiry_time must not be in the past")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("expiry_time must not be in the past"),
+		}
 	}
 	pending := int32(0)
 	completed := int32(0)
@@ -115,17 +115,16 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 	}
 	created, err := userAPI.PerformAdminCreateRegistrationToken(req.Context(), registrationToken)
 	if err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorUnknown),
-			err.Error(),
-		)
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: err,
+		}
 	}
 	if !created {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorInvalidParam),
-			fmt.Sprintf("Token alreaady exists: %s", token))
+		return util.JSONResponse{
+			Code: http.StatusConflict,
+			JSON: fmt.Sprintf("Token already exists: %s", token),
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -166,21 +165,19 @@ func AdminListRegistrationTokens(req *http.Request, cfg *config.ClientAPI, userA
 		returnAll = false
 		validValue, err := strconv.ParseBool(validQuery[0])
 		if err != nil {
-			return util.MatrixErrorResponse(
-				http.StatusBadRequest,
-				string(spec.ErrorInvalidParam),
-				"invalid 'valid' query parameter",
-			)
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("invalid 'valid' query parameter"),
+			}
 		}
 		valid = validValue
 	}
 	tokens, err := userAPI.PerformAdminListRegistrationTokens(req.Context(), returnAll, valid)
 	if err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusInternalServerError,
-			string(spec.ErrorUnknown),
-			"error fetching registration tokens",
-		)
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.ErrorUnknown,
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -205,11 +202,10 @@ func AdminGetRegistrationToken(req *http.Request, cfg *config.ClientAPI, userAPI
 	tokenText := vars["token"]
 	token, err := userAPI.PerformAdminGetRegistrationToken(req.Context(), tokenText)
 	if err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusNotFound,
-			string(spec.ErrorUnknown),
-			fmt.Sprintf("token: %s not found", tokenText),
-		)
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound(fmt.Sprintf("token: %s not found", tokenText)),
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -225,11 +221,10 @@ func AdminDeleteRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	tokenText := vars["token"]
 	err = userAPI.PerformAdminDeleteRegistrationToken(req.Context(), tokenText)
 	if err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusNotFound,
-			string(spec.ErrorUnknown),
-			fmt.Sprintf("token: %s not found", tokenText),
-		)
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound(fmt.Sprintf("token: %s not found", tokenText)),
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -244,12 +239,11 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	}
 	tokenText := vars["token"]
 	request := make(map[string]interface{})
-	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusBadRequest,
-			string(spec.ErrorBadJSON),
-			"Failed to decode request body:",
-		)
+	if err = json.NewDecoder(req.Body).Decode(&request); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON(fmt.Sprintf("Failed to decode request body: %s", err)),
+		}
 	}
 	newAttributes := make(map[string]interface{})
 	usesAllowed, ok := request["uses_allowed"]
@@ -258,11 +252,10 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 		// Non numeric values in payload will cause panic during type conversion. But this is the best way to mimic
 		// Synapse's behaviour of updating the field if and only if it is present in request body.
 		if !(usesAllowed == nil || int32(usesAllowed.(float64)) >= 0) {
-			return util.MatrixErrorResponse(
-				http.StatusBadRequest,
-				string(spec.ErrorInvalidParam),
-				"uses_allowed must be a non-negative integer or null",
-			)
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("uses_allowed must be a non-negative integer or null"),
+			}
 		}
 		newAttributes["usesAllowed"] = usesAllowed
 	}
@@ -272,11 +265,10 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 		// Non numeric values in payload will cause panic during type conversion. But this is the best way to mimic
 		// Synapse's behaviour of updating the field if and only if it is present in request body.
 		if !(expiryTime == nil || int64(expiryTime.(float64)) > time.Now().UnixNano()/int64(time.Millisecond)) {
-			return util.MatrixErrorResponse(
-				http.StatusBadRequest,
-				string(spec.ErrorInvalidParam),
-				"expiry_time must be in the future",
-			)
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("expiry_time must not be in the past"),
+			}
 		}
 		newAttributes["expiryTime"] = expiryTime
 	}
@@ -286,11 +278,10 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	}
 	updatedToken, err := userAPI.PerformAdminUpdateRegistrationToken(req.Context(), tokenText, newAttributes)
 	if err != nil {
-		return util.MatrixErrorResponse(
-			http.StatusNotFound,
-			string(spec.ErrorUnknown),
-			fmt.Sprintf("token: %s not found", tokenText),
-		)
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound(fmt.Sprintf("token: %s not found", tokenText)),
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,

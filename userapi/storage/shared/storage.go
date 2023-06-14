@@ -100,8 +100,12 @@ func (d *Database) GetRegistrationToken(ctx context.Context, tokenString string)
 	return d.RegistrationTokens.GetRegistrationToken(ctx, nil, tokenString)
 }
 
-func (d *Database) DeleteRegistrationToken(ctx context.Context, tokenString string) error {
-	return d.RegistrationTokens.DeleteRegistrationToken(ctx, nil, tokenString)
+func (d *Database) DeleteRegistrationToken(ctx context.Context, tokenString string) (err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		err = d.RegistrationTokens.DeleteRegistrationToken(ctx, nil, tokenString)
+		return err
+	})
+	return
 }
 
 func (d *Database) UpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (updatedToken *clientapi.RegistrationToken, err error) {
