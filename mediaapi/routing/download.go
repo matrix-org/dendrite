@@ -341,6 +341,7 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	}
 
 	if len(filename) == 0 {
+		w.Header().Set("Content-Disposition", "attachment")
 		return nil
 	}
 
@@ -376,13 +377,13 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 		// that would otherwise be parsed as a control character in the
 		// Content-Disposition header
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`inline; filename=%s%s%s`,
+			`attachment; filename=%s%s%s`,
 			quote, unescaped, quote,
 		))
 	} else {
 		// For UTF-8 filenames, we quote always, as that's the standard
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`inline; filename*=utf-8''%s`,
+			`attachment; filename*=utf-8''%s`,
 			url.QueryEscape(unescaped),
 		))
 	}
