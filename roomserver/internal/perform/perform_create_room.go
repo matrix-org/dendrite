@@ -65,6 +65,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 	}
+
+	_, err = c.DB.AssignRoomNID(ctx, roomID, createRequest.RoomVersion)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("failed to assign roomNID")
+		return "", &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
 	var senderID spec.SenderID
 	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
 		// create user room key if needed
@@ -76,7 +86,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				JSON: spec.InternalServerError{},
 			}
 		}
-		senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
+		senderID = spec.SenderIDFromPseudoIDKey(key)
 	} else {
 		senderID = spec.SenderID(userID.String())
 	}
@@ -99,15 +109,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("malformed power_level_content_override"),
 			}
-		}
-	}
-
-	_, err = c.DB.AssignRoomNID(ctx, roomID, createRequest.RoomVersion)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to assign roomNID")
-		return "", &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
 		}
 	}
 
@@ -179,7 +180,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 
 		mapping := &gomatrixserverlib.MXIDMapping{
-			UserRoomKey: spec.UserRoomKey(pseudoIDKey),
+			UserRoomKey: spec.SenderIDFromPseudoIDKey(pseudoIDKey),
 			UserID:      userID.String(),
 		}
 

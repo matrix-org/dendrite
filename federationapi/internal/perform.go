@@ -176,7 +176,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 				return "", keyErr
 			}
 
-			return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
+			return spec.SenderIDFromPseudoIDKey(key), nil
 		},
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)

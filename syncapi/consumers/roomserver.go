@@ -570,7 +570,8 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 
 	if event.StateKey() != nil {
 		if *event.StateKey() != "" {
-			sku, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
+			var sku *spec.UserID
+			sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
 			if err == nil && sku != nil {
 				sKey := sku.String()
 				event.StateKeyResolved = &sKey

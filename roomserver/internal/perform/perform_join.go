@@ -211,7 +211,7 @@ func (r *Joiner) performJoinRoomByID(
 					util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
 					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
-				senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
+				senderID = spec.SenderIDFromPseudoIDKey(key)
 			}
 		default:
 			checkInvitePending = true
@@ -300,7 +300,7 @@ func (r *Joiner) performJoinRoomByID(
 		}
 
 		mapping := &gomatrixserverlib.MXIDMapping{
-			UserRoomKey: spec.UserRoomKey(pseudoIDKey),
+			UserRoomKey: spec.SenderIDFromPseudoIDKey(pseudoIDKey),
 			UserID:      userID.String(),
 		}
 
