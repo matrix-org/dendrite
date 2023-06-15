@@ -204,7 +204,8 @@ func (r *Joiner) performJoinRoomByID(
 			senderID, err = r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
 			if err == nil {
 				checkInvitePending = true
-			} else {
+			}
+			if senderID == "" {
 				// create user room key if needed
 				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 				if keyErr != nil {

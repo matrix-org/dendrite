@@ -411,7 +411,7 @@ func JoinedHostsFromEvents(ctx context.Context, evs []gomatrixserverlib.PDU, rsA
 		if err != nil {
 			return nil, err
 		}
-		userID, err := rsAPI.QueryUserIDForSender(ctx, *validRoomID, ev.SenderID())
+		userID, err := rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*ev.StateKey()))
 		if err != nil {
 			return nil, err
 		}
