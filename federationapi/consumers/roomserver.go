@@ -192,7 +192,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 		evs[i] = addsStateEvents[i].PDU
 	}
 
-	addsJoinedHosts, err := JoinedHostsFromEvents(evs)
+	addsJoinedHosts, err := JoinedHostsFromEvents(s.ctx, evs, s.rsAPI)
 	if err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		return nil, err
 	}
 
-	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(combinedAddsEvents)
+	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(s.ctx, combinedAddsEvents, s.rsAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 // JoinedHostsFromEvents turns a list of state events into a list of joined hosts.
 // This errors if one of the events was invalid.
 // It should be impossible for an invalid event to get this far in the pipeline.
-func JoinedHostsFromEvents(evs []gomatrixserverlib.PDU) ([]types.JoinedHost, error) {
+func JoinedHostsFromEvents(ctx context.Context, evs []gomatrixserverlib.PDU, rsAPI api.FederationRoomserverAPI) ([]types.JoinedHost, error) {
 	var joinedHosts []types.JoinedHost
 	for _, ev := range evs {
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {
@@ -407,12 +407,17 @@ func JoinedHostsFromEvents(evs []gomatrixserverlib.PDU) ([]types.JoinedHost, err
 		if membership != spec.Join {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
 		if err != nil {
 			return nil, err
 		}
+		userID, err := rsAPI.QueryUserIDForSender(ctx, *validRoomID, ev.SenderID())
+		if err != nil {
+			return nil, err
+		}
+
 		joinedHosts = append(joinedHosts, types.JoinedHost{
-			MemberEventID: ev.EventID(), ServerName: serverName,
+			MemberEventID: ev.EventID(), ServerName: userID.Domain(),
 		})
 	}
 	return joinedHosts, nil
