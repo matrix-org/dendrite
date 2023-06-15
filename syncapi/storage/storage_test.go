@@ -41,6 +41,7 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.Header
 		var addStateEventIDs []string
 		var removeStateEventIDs []string
 		if ev.StateKey() != nil {
+			ev.StateKeyResolved = ev.StateKey()
 			addStateEvents = append(addStateEvents, ev)
 			addStateEventIDs = append(addStateEventIDs, ev.EventID())
 		}
