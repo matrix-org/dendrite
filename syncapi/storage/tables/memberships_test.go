@@ -80,6 +80,7 @@ func TestMembershipsTable(t *testing.T) {
 		defer cancel()
 
 		for _, ev := range userEvents {
+			ev.StateKeyResolved = ev.StateKey()
 			if err := table.UpsertMembership(ctx, nil, ev, types.StreamPosition(ev.Depth()), 1); err != nil {
 				t.Fatalf("failed to upsert membership: %s", err)
 			}
@@ -134,6 +135,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		ev := room.CreateAndInsert(t, user, spec.MRoomMember, map[string]interface{}{
 			"membership": spec.Join,
 		}, test.WithStateKey(user.ID))
+		ev.StateKeyResolved = ev.StateKey()
 		// Insert the same event again, but with different positions, which should get updated
 		if err = table.UpsertMembership(ctx, nil, ev, 2, 2); err != nil {
 			t.Fatalf("failed to upsert membership: %s", err)

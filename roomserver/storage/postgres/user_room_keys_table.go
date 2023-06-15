@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const userRoomKeysSchema = `
@@ -145,7 +146,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 		if err = rows.Scan(&userRoomKeyPair.EventStateKeyNID, &userRoomKeyPair.RoomNID, &publicKey); err != nil {
 			return nil, err
 		}
-		result[string(publicKey)] = userRoomKeyPair
+		result[spec.Base64Bytes(publicKey).Encode()] = userRoomKeyPair
 	}
 	return result, rows.Err()
 }

@@ -230,7 +230,7 @@ func TestSearch(t *testing.T) {
 				stateEvents = append(stateEvents, x)
 				stateEventIDs = append(stateEventIDs, x.EventID())
 			}
-
+			x.StateKeyResolved = x.StateKey()
 			sp, err = db.WriteEvent(processCtx.Context(), x, stateEvents, stateEventIDs, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 			assert.NoError(t, err)
 			if x.Type() != "m.room.message" {
