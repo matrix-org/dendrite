@@ -109,7 +109,7 @@ func (s *membershipsStatements) UpsertMembership(
 	_, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
 		ctx,
 		event.RoomID(),
-		*event.StateKey(),
+		event.UserID.String(),
 		membership,
 		event.EventID(),
 		streamPos,

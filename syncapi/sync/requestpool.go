@@ -503,6 +503,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 		}
 
+		logrus.Infof("%#v", syncReq.Response.Rooms.Join)
+
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: syncReq.Response,
