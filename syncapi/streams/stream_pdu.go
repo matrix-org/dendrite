@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/tidwall/sjson"
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -346,6 +348,42 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Now that we've filtered the timeline, work out which state events are still
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
+
+	for i, ev := range events {
+		if ev.Version() != gomatrixserverlib.RoomVersionPseudoIDs {
+			continue
+		}
+		if ev.Type() != spec.MRoomPowerLevels || !ev.StateKeyEquals("") {
+			continue
+		}
+		pls, err := gomatrixserverlib.NewPowerLevelContentFromEvent(ev)
+		if err != nil {
+			return r.From, err
+		}
+		newPls := make(map[string]int64)
+		for user, level := range pls.Users {
+			validRoomID, _ := spec.NewRoomID(ev.RoomID())
+			userID, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
+			if err != nil {
+				return r.From, err
+			}
+			newPls[userID.String()] = level
+		}
+		newPlBytes, err := json.Marshal(newPls)
+		if err != nil {
+			return r.From, err
+		}
+		newEv, err := sjson.SetRawBytes(ev.JSON(), "content.users", newPlBytes)
+		if err != nil {
+			return r.From, err
+		}
+		evNew, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON(newEv, false)
+		if err != nil {
+			return r.From, err
+		}
+		events[i] = &rstypes.HeaderedEvent{PDU: evNew}
+	}
+
 	sEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
 		gomatrixserverlib.ToPDUs(removeDuplicates(delta.StateEvents, events)),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
@@ -561,6 +599,41 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			PDUPosition: backwardStreamPos,
 		}
 		prevBatch.Decrement()
+	}
+
+	for i, ev := range events {
+		if ev.Version() != gomatrixserverlib.RoomVersionPseudoIDs {
+			continue
+		}
+		if ev.Type() != spec.MRoomPowerLevels || !ev.StateKeyEquals("") {
+			continue
+		}
+		pls, err := gomatrixserverlib.NewPowerLevelContentFromEvent(ev)
+		if err != nil {
+			return nil, err
+		}
+		newPls := make(map[string]int64)
+		for user, level := range pls.Users {
+			validRoomID, _ := spec.NewRoomID(ev.RoomID())
+			userID, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
+			if err != nil {
+				return nil, err
+			}
+			newPls[userID.String()] = level
+		}
+		newPlBytes, err := json.Marshal(newPls)
+		if err != nil {
+			return nil, err
+		}
+		newEv, err := sjson.SetRawBytes(ev.JSON(), "content.users", newPlBytes)
+		if err != nil {
+			return nil, err
+		}
+		evNew, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON(newEv, false)
+		if err != nil {
+			return nil, err
+		}
+		events[i] = &rstypes.HeaderedEvent{PDU: evNew}
 	}
 
 	jr.Timeline.PrevBatch = prevBatch

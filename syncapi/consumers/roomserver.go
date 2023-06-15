@@ -426,6 +426,8 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		return
 	}
 
+	msg.Event.UserID = *userID
+
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		sentry.CaptureException(err)

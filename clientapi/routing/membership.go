@@ -22,10 +22,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -36,6 +32,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"
 )
@@ -453,6 +452,23 @@ func buildMembershipEvent(
 	targetSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *targetID)
 	if err != nil {
 		return nil, err
+	}
+
+	// If we're inviting a local user, we can generate the needed key here.
+	if targetSenderID == "" && cfg.Matrix.IsLocalServerName(targetID.Domain()) { // todo: remove
+		roomVersion, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+		if err != nil {
+			return nil, err
+		}
+		switch roomVersion {
+		case gomatrixserverlib.RoomVersionPseudoIDs:
+			key, err := rsAPI.GetOrCreateUserRoomPrivateKey(ctx, *targetID, *validRoomID)
+			if err != nil {
+				return nil, err
+			}
+			targetSenderID = spec.SenderIDFromPseudoIDKey(key)
+		}
+
 	}
 
 	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *userID)

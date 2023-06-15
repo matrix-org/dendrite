@@ -185,6 +185,7 @@ type ClientRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	QueryEventsAPI
 	QuerySenderIDAPI
+	UserRoomPrivateKeyCreator
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
