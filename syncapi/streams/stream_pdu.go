@@ -356,28 +356,32 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		if ev.Type() != spec.MRoomPowerLevels || !ev.StateKeyEquals("") {
 			continue
 		}
-		pls, err := gomatrixserverlib.NewPowerLevelContentFromEvent(ev)
+		var pls gomatrixserverlib.PowerLevelContent
+		pls, err = gomatrixserverlib.NewPowerLevelContentFromEvent(ev)
 		if err != nil {
 			return r.From, err
 		}
 		newPls := make(map[string]int64)
+		var userID *spec.UserID
 		for user, level := range pls.Users {
 			validRoomID, _ := spec.NewRoomID(ev.RoomID())
-			userID, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
+			userID, err = p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
 			if err != nil {
 				return r.From, err
 			}
 			newPls[userID.String()] = level
 		}
-		newPlBytes, err := json.Marshal(newPls)
+		var newPlBytes, newEv []byte
+		newPlBytes, err = json.Marshal(newPls)
 		if err != nil {
 			return r.From, err
 		}
-		newEv, err := sjson.SetRawBytes(ev.JSON(), "content.users", newPlBytes)
+		newEv, err = sjson.SetRawBytes(ev.JSON(), "content.users", newPlBytes)
 		if err != nil {
 			return r.From, err
 		}
-		evNew, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON(newEv, false)
+		var evNew gomatrixserverlib.PDU
+		evNew, err = gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON(newEv, false)
 		if err != nil {
 			return r.From, err
 		}
@@ -508,6 +512,7 @@ func applyHistoryVisibilityFilter(
 	return events, nil
 }
 
+// nolint: gocyclo
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
 	snapshot storage.DatabaseTransaction,
@@ -613,9 +618,10 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			return nil, err
 		}
 		newPls := make(map[string]int64)
+		var userID *spec.UserID
 		for user, level := range pls.Users {
 			validRoomID, _ := spec.NewRoomID(ev.RoomID())
-			userID, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
+			userID, err = p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
 			if err != nil {
 				return nil, err
 			}
