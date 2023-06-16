@@ -23,12 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -36,6 +30,11 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -68,6 +67,8 @@ var sendEventDuration = prometheus.NewHistogramVec(
 //	/rooms/{roomID}/send/{eventType}
 //	/rooms/{roomID}/send/{eventType}/{txnID}
 //	/rooms/{roomID}/state/{eventType}/{stateKey}
+//
+// nolint: gocyclo
 func SendEvent(
 	req *http.Request,
 	device *userapi.Device,
@@ -119,6 +120,17 @@ func SendEvent(
 	// the event if the room is set to the "restricted" join rule.
 	if eventType == spec.MRoomMember {
 		delete(r, "join_authorised_via_users_server")
+	}
+
+	// for power level events we need to replace the userID with the pseudoID
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && eventType == spec.MRoomPowerLevels {
+		err = updatePowerLevels(req, r, roomID, rsAPI)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{Err: err.Error()},
+			}
+		}
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -223,6 +235,28 @@ func SendEvent(
 	sendEventDuration.With(prometheus.Labels{"action": "submit"}).Observe(float64(timeToSubmitEvent.Milliseconds()))
 
 	return res
+}
+
+func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID string, rsAPI api.ClientRoomserverAPI) error {
+	userMap := r["users"].(map[string]interface{})
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	for user, level := range userMap {
+		uID, err := spec.NewUserID(user, true)
+		if err != nil {
+			continue // we're modifying the map in place, so we're going to have invalid userIDs after the first iteration
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *uID)
+		if err != nil {
+			return err
+		}
+		userMap[string(senderID)] = level
+		delete(userMap, user)
+	}
+	r["users"] = userMap
+	return nil
 }
 
 // stateEqual compares the new and the existing state event content. If they are equal, returns a *util.JSONResponse
