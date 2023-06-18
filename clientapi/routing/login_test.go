@@ -116,7 +116,7 @@ func TestLogin(t *testing.T) {
 		t.Run("Supported log-in flows are returned", func(t *testing.T) {
 			req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/login")
 			rec := httptest.NewRecorder()
-			base.PublicClientAPIMux.ServeHTTP(rec, req)
+			routers.Client.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to get log-in flows: %s", rec.Body.String())
 			}

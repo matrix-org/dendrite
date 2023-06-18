@@ -74,7 +74,7 @@ func LoginFromJSONReader(
 		if err != nil {
 			err := &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.MissingToken(err.Error()),
+				JSON: spec.MissingToken(err.Error()),
 			}
 			return nil, nil, err
 		}

@@ -20,10 +20,10 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -102,7 +102,7 @@ func UsernameResponse(err error) *util.JSONResponse {
 }
 
 // ValidateApplicationServiceUsername returns an error if the username is invalid for an application service
-func ValidateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) error {
+func ValidateApplicationServiceUsername(localpart string, domain spec.ServerName) error {
 	userID := userutil.MakeUserID(localpart, domain)
 	return ValidateApplicationServiceUserID(userID)
 }
@@ -190,7 +190,7 @@ func ValidateApplicationServiceRequest(
 	if err != nil {
 		return "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 
@@ -208,7 +208,7 @@ func ValidateApplicationServiceRequest(
 	if matchedApplicationService == nil {
 		return "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.UnknownToken("Supplied access_token does not match any known application service"),
+			JSON: spec.UnknownToken("Supplied access_token does not match any known application service"),
 		}
 	}
 
@@ -217,7 +217,7 @@ func ValidateApplicationServiceRequest(
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+			JSON: spec.ASExclusive(fmt.Sprintf(
 				"Supplied username %s did not match any namespaces for application service ID: %s", userIDOrLocalpart, matchedApplicationService.ID)),
 		}
 	}
@@ -226,7 +226,7 @@ func ValidateApplicationServiceRequest(
 	if userIDMatchesMultipleExclusiveNamespaces(cfg, userID) {
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+			JSON: spec.ASExclusive(fmt.Sprintf(
 				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", userIDOrLocalpart)),
 		}
 	}
