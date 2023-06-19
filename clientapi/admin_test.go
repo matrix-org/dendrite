@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -54,10 +55,10 @@ func TestAdminResetPassword(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]userDevice{
-			aliceAdmin: {},
-			bob:        {},
-			vhUser:     {},
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
+			bob:        "",
+			vhUser:     "",
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -103,7 +104,7 @@ func TestAdminResetPassword(t *testing.T) {
 				}
 
 				if tc.withHeader {
-					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser])
 				}
 
 				rec := httptest.NewRecorder()
@@ -154,8 +155,8 @@ func TestPurgeRoom(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]userDevice{
-			aliceAdmin: {},
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -174,7 +175,7 @@ func TestPurgeRoom(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/purgeRoom/"+tc.roomID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -224,8 +225,8 @@ func TestAdminEvacuateRoom(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]userDevice{
-			aliceAdmin: {},
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -243,7 +244,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/evacuateRoom/"+tc.roomID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -327,8 +328,8 @@ func TestAdminEvacuateUser(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]userDevice{
-			aliceAdmin: {},
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -348,7 +349,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/evacuateUser/"+tc.userID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -409,8 +410,8 @@ func TestAdminMarkAsStale(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]userDevice{
-			aliceAdmin: {},
+		accessTokens := map[*test.User]string{
+			aliceAdmin: "",
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -428,7 +429,7 @@ func TestAdminMarkAsStale(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/refreshDevices/"+tc.userID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -439,4 +440,36 @@ func TestAdminMarkAsStale(t *testing.T) {
 			})
 		}
 	})
+}
+
+func createAccessTokens(t *testing.T, accessTokens map[*test.User]string, userAPI uapi.UserInternalAPI, ctx context.Context, routers httputil.Routers) {
+	t.Helper()
+	for u := range accessTokens {
+		localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
+		userRes := &uapi.PerformAccountCreationResponse{}
+		password := util.RandomString(8)
+		if err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
+			AccountType: u.AccountType,
+			Localpart:   localpart,
+			ServerName:  serverName,
+			Password:    password,
+		}, userRes); err != nil {
+			t.Errorf("failed to create account: %s", err)
+		}
+
+		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
+			"type": authtypes.LoginTypePassword,
+			"identifier": map[string]interface{}{
+				"type": "m.id.user",
+				"user": u.ID,
+			},
+			"password": password,
+		}))
+		rec := httptest.NewRecorder()
+		routers.Client.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("failed to login: %s", rec.Body.String())
+		}
+		accessTokens[u] = gjson.GetBytes(rec.Body.Bytes(), "access_token").String()
+	}
 }
