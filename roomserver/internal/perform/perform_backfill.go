@@ -114,7 +114,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
-	requester := newBackfillRequester(r.DB, r.FSAPI, r.Querier, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers, info.RoomVersion, info.RoomNID)
+	requester := newBackfillRequester(r.DB, r.FSAPI, r.Querier, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers, info.RoomVersion)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
@@ -266,7 +266,6 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.PDU
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
 	roomVersion             gomatrixserverlib.RoomVersion
-	roomNID                 types.RoomNID
 }
 
 func newBackfillRequester(
@@ -276,7 +275,6 @@ func newBackfillRequester(
 	isLocalServerName func(spec.ServerName) bool,
 	bwExtrems map[string][]string, preferServers []spec.ServerName,
 	roomVersion gomatrixserverlib.RoomVersion,
-	roomNID types.RoomNID,
 ) *backfillRequester {
 	preferServer := make(map[spec.ServerName]bool)
 	for _, p := range preferServers {
@@ -293,7 +291,6 @@ func newBackfillRequester(
 		bwExtrems:               bwExtrems,
 		preferServer:            preferServer,
 		historyVisiblity:        gomatrixserverlib.HistoryVisibilityShared,
-		roomNID:                 roomNID,
 		roomVersion:             roomVersion,
 	}
 }
