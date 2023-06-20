@@ -295,11 +295,12 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []synctypes.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
+	emptyToken := types.TopologyToken{}
 	// Retrieve the events from the local database.
 	streamEvents, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
-		return
+		return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
 	}
 
 	var events []*gomatrixserverlib.HeaderedEvent
@@ -314,11 +315,11 @@ func (r *messagesReq) retrieveEvents() (
 	// on the ordering), or we've reached a backward extremity.
 	if len(streamEvents) == 0 {
 		if events, err = r.handleEmptyEventsSlice(); err != nil {
-			return
+			return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
 		}
 	} else {
 		if events, err = r.handleNonEmptyEventsSlice(streamEvents); err != nil {
-			return
+			return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
 		}
 	}
 
