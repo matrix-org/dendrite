@@ -74,6 +74,7 @@ type RoomserverInternalAPI interface {
 type UserRoomPrivateKeyCreator interface {
 	// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
 	GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error)
+	StoreUserRoomPublicKey(ctx context.Context, senderID spec.SenderID, userID spec.UserID, roomID spec.RoomID) error
 }
 
 type InputRoomEventsAPI interface {
@@ -235,7 +236,7 @@ type FederationRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
-
+	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error

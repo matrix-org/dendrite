@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -111,6 +112,10 @@ func MakeJoin(
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
+	}
+
+	if senderID == "" {
+		senderID = spec.SenderID(userID.String())
 	}
 
 	input := gomatrixserverlib.HandleMakeJoinInput{
@@ -223,6 +228,13 @@ func SendJoin(
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			userID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return rsAPI.StoreUserRoomPublicKey(ctx, senderID, *userID, roomID)
 		},
 	}
 	response, joinErr := gomatrixserverlib.HandleSendJoin(input)

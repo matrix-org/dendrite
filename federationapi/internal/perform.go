@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -170,13 +171,24 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
-		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (spec.SenderID, error) {
+		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			// assign a roomNID, otherwise we can't create a private key for the user
+			_, nidErr := r.rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
+			if nidErr != nil {
+				return "", nil, nidErr
+			}
 			key, keyErr := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
 			if keyErr != nil {
-				return "", keyErr
+				return "", nil, keyErr
 			}
-
-			return spec.SenderIDFromPseudoIDKey(key), nil
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.rsAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
 		},
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
