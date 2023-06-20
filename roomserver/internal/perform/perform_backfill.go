@@ -114,7 +114,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
-	requester := newBackfillRequester(r.DB, r.FSAPI, r.Querier, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers)
+	requester := newBackfillRequester(r.DB, r.FSAPI, r.Querier, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers, info.RoomVersion, info.RoomNID)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
@@ -265,7 +265,8 @@ type backfillRequester struct {
 	eventIDToBeforeStateIDs map[string][]string
 	eventIDMap              map[string]gomatrixserverlib.PDU
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
-	roomInfo                types.RoomInfo
+	roomVersion             gomatrixserverlib.RoomVersion
+	roomNID                 types.RoomNID
 }
 
 func newBackfillRequester(
@@ -274,6 +275,8 @@ func newBackfillRequester(
 	virtualHost spec.ServerName,
 	isLocalServerName func(spec.ServerName) bool,
 	bwExtrems map[string][]string, preferServers []spec.ServerName,
+	roomVersion gomatrixserverlib.RoomVersion,
+	roomNID types.RoomNID,
 ) *backfillRequester {
 	preferServer := make(map[spec.ServerName]bool)
 	for _, p := range preferServers {
@@ -290,6 +293,8 @@ func newBackfillRequester(
 		bwExtrems:               bwExtrems,
 		preferServer:            preferServer,
 		historyVisiblity:        gomatrixserverlib.HistoryVisibilityShared,
+		roomNID:                 roomNID,
+		roomVersion:             roomVersion,
 	}
 }
 
@@ -537,15 +542,11 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 	}
 	eventNIDs := make([]types.EventNID, len(nidMap))
 	i := 0
-	roomNID := b.roomInfo.RoomNID
 	for _, nid := range nidMap {
 		eventNIDs[i] = nid.EventNID
 		i++
-		if roomNID == 0 {
-			roomNID = nid.RoomNID
-		}
 	}
-	eventsWithNids, err := b.db.Events(ctx, b.roomInfo.RoomVersion, eventNIDs)
+	eventsWithNids, err := b.db.Events(ctx, b.roomVersion, eventNIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_nids", eventNIDs).Error("Failed to load events")
 		return nil, err
