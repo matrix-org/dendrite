@@ -350,6 +350,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
 
+	// update the powerlevel event for timeline events
 	for i, ev := range events {
 		if ev.Version() != gomatrixserverlib.RoomVersionPseudoIDs {
 			continue
@@ -371,7 +372,17 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	)
 	delta.StateEvents = make([]*rstypes.HeaderedEvent, len(sEvents))
 	for i := range sEvents {
-		delta.StateEvents[i] = sEvents[i].(*rstypes.HeaderedEvent)
+		ev := sEvents[i]
+		delta.StateEvents[i] = ev.(*rstypes.HeaderedEvent)
+		// update the powerlevel event for state events
+		if ev.Version() == gomatrixserverlib.RoomVersionPseudoIDs && ev.Type() == spec.MRoomPowerLevels && ev.StateKeyEquals("") {
+			var newEvent gomatrixserverlib.PDU
+			newEvent, err = p.updatePowerLevelEvent(ctx, ev.(*rstypes.HeaderedEvent))
+			if err != nil {
+				return r.From, err
+			}
+			delta.StateEvents[i] = newEvent.(*rstypes.HeaderedEvent)
+		}
 	}
 
 	if len(delta.StateEvents) > 0 {
@@ -652,6 +663,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		prevBatch.Decrement()
 	}
 
+	// Update powerlevel events for timeline events
 	for i, ev := range events {
 		if ev.Version() != gomatrixserverlib.RoomVersionPseudoIDs {
 			continue
@@ -664,6 +676,20 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			return nil, err
 		}
 		events[i] = &rstypes.HeaderedEvent{PDU: newEvent}
+	}
+	// Update powerlevel events for state events
+	for i, ev := range stateEvents {
+		if ev.Version() != gomatrixserverlib.RoomVersionPseudoIDs {
+			continue
+		}
+		if ev.Type() != spec.MRoomPowerLevels || !ev.StateKeyEquals("") {
+			continue
+		}
+		newEvent, err := p.updatePowerLevelEvent(ctx, ev)
+		if err != nil {
+			return nil, err
+		}
+		stateEvents[i] = &rstypes.HeaderedEvent{PDU: newEvent}
 	}
 
 	jr.Timeline.PrevBatch = prevBatch
