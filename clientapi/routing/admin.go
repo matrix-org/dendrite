@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -64,13 +62,13 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 			length = 16
 		}
 		// token not present in request body. Hence, generate a random token.
-		if !(length > 0 && length <= 64) {
+		if length <= 0 || length > 64 {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("length must be greater than zero and not greater than 64"),
 			}
 		}
-		token = generateRandomToken(int(length))
+		token = util.RandomString(int(length))
 	}
 
 	if len(token) > 64 {
@@ -114,16 +112,18 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 		ExpiryTime:  &expiryTime,
 	}
 	created, err := userAPI.PerformAdminCreateRegistrationToken(req.Context(), registrationToken)
+	if !created {
+		return util.JSONResponse{
+			Code: http.StatusConflict,
+			JSON: map[string]string{
+				"error": fmt.Sprintf("token: %s already exists", token),
+			},
+		}
+	}
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
-		}
-	}
-	if !created {
-		return util.JSONResponse{
-			Code: http.StatusConflict,
-			JSON: fmt.Sprintf("Token already exists: %s", token),
 		}
 	}
 	return util.JSONResponse{
@@ -136,17 +136,6 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 			"expiry_time":  getReturnValueExpiryTime(expiryTime),
 		},
 	}
-}
-
-func generateRandomToken(length int) string {
-	allowedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-	rand.Seed(time.Now().UnixNano())
-	var sb strings.Builder
-	for i := 0; i < length; i++ {
-		randomIndex := rand.Intn(len(allowedChars))
-		sb.WriteByte(allowedChars[randomIndex])
-	}
-	return sb.String()
 }
 
 func getReturnValueForUsesAllowed(usesAllowed int32) interface{} {
@@ -222,8 +211,8 @@ func AdminDeleteRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	err = userAPI.PerformAdminDeleteRegistrationToken(req.Context(), tokenText)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.NotFound(fmt.Sprintf("token: %s not found", tokenText)),
+			Code: http.StatusInternalServerError,
+			JSON: err,
 		}
 	}
 	return util.JSONResponse{
