@@ -1032,7 +1032,8 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return nil
 		}
 
-		validRoomID, err := spec.NewRoomID(redactedEvent.RoomID())
+		var validRoomID *spec.RoomID
+		validRoomID, err = spec.NewRoomID(redactedEvent.RoomID())
 		if err != nil {
 			return err
 		}
