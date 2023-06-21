@@ -381,7 +381,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			if err != nil {
 				return r.From, err
 			}
-			delta.StateEvents[i] = newEvent.(*rstypes.HeaderedEvent)
+			delta.StateEvents[i] = &rstypes.HeaderedEvent{PDU: newEvent}
 		}
 	}
 
