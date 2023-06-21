@@ -106,8 +106,8 @@ func (s *registrationTokenStatements) InsertRegistrationToken(ctx context.Contex
 	_, err := stmt.ExecContext(
 		ctx,
 		*registrationToken.Token,
-		nullIfZero(*registrationToken.UsesAllowed),
-		nullIfZero(*registrationToken.ExpiryTime),
+		getInsertValue(registrationToken.UsesAllowed),
+		getInsertValue(registrationToken.ExpiryTime),
 		*registrationToken.Pending,
 		*registrationToken.Completed)
 	if err != nil {
@@ -116,11 +116,11 @@ func (s *registrationTokenStatements) InsertRegistrationToken(ctx context.Contex
 	return true, nil
 }
 
-func nullIfZero[t constraints.Integer](in t) any {
-	if in == 0 {
+func getInsertValue[t constraints.Integer](in *t) any {
+	if in == nil {
 		return nil
 	}
-	return in
+	return *in
 }
 
 func (s *registrationTokenStatements) ListRegistrationTokens(ctx context.Context, tx *sql.Tx, returnAll bool, valid bool) ([]api.RegistrationToken, error) {
