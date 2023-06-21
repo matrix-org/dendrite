@@ -227,7 +227,7 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 		return util.ErrorResponse(err)
 	}
 	tokenText := vars["token"]
-	request := make(map[string]interface{})
+	request := make(map[string]*int64)
 	if err = json.NewDecoder(req.Body).Decode(&request); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -238,9 +238,7 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	usesAllowed, ok := request["uses_allowed"]
 	if ok {
 		// Only add usesAllowed to newAtrributes if it is present and valid
-		// Non numeric values in payload will cause panic during type conversion. But this is the best way to mimic
-		// Synapse's behaviour of updating the field if and only if it is present in request body.
-		if !(usesAllowed == nil || int32(usesAllowed.(float64)) >= 0) {
+		if !(usesAllowed == nil || *usesAllowed >= 0) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("uses_allowed must be a non-negative integer or null"),
@@ -251,9 +249,7 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	expiryTime, ok := request["expiry_time"]
 	if ok {
 		// Only add expiryTime to newAtrributes if it is present and valid
-		// Non numeric values in payload will cause panic during type conversion. But this is the best way to mimic
-		// Synapse's behaviour of updating the field if and only if it is present in request body.
-		if !(expiryTime == nil || int64(expiryTime.(float64)) > time.Now().UnixNano()/int64(time.Millisecond)) {
+		if !(expiryTime == nil || *expiryTime > time.Now().UnixNano()/int64(time.Millisecond)) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("expiry_time must not be in the past"),
