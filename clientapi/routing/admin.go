@@ -230,7 +230,7 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	usesAllowed, ok := request["uses_allowed"]
 	if ok {
 		// Only add usesAllowed to newAtrributes if it is present and valid
-		if !(usesAllowed == nil || *usesAllowed >= 0) {
+		if usesAllowed != nil && *usesAllowed < 0 {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("uses_allowed must be a non-negative integer or null"),
@@ -241,7 +241,7 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 	expiryTime, ok := request["expiry_time"]
 	if ok {
 		// Only add expiryTime to newAtrributes if it is present and valid
-		if !(expiryTime == nil || *expiryTime > time.Now().UnixNano()/int64(time.Millisecond)) {
+		if expiryTime != nil && spec.Timestamp(*expiryTime).Time().Before(time.Now()) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("expiry_time must not be in the past"),

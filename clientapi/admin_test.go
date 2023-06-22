@@ -281,7 +281,7 @@ func TestAdminListRegistrationTokens(t *testing.T) {
 				if tc.isValidSpecified {
 					path = fmt.Sprintf("/_dendrite/admin/registrationTokens?valid=%v", tc.valid)
 				} else {
-					path = fmt.Sprintf("/_dendrite/admin/registrationTokens")
+					path = "/_dendrite/admin/registrationTokens"
 				}
 				req := test.NewRequest(t, http.MethodGet, path)
 				if tc.withHeader {
