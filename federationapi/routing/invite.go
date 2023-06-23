@@ -246,3 +246,29 @@ func handleInvite(ctx context.Context, input gomatrixserverlib.HandleInviteInput
 	}
 	return inviteEvent, nil
 }
+
+// MakeInvite implements /_matrix/federation/v2/make_invite/{roomID}/{userID}
+func MakeInvite(
+	httpReq *http.Request,
+	request *fclient.FederationRequest,
+	roomID spec.RoomID,
+	userID spec.UserID,
+	cfg *config.FederationAPI,
+	rsAPI api.FederationRoomserverAPI,
+	keys gomatrixserverlib.JSONVerifier,
+) util.JSONResponse {
+	return util.JSONResponse{}
+}
+
+// SendInvite implements /_matrix/federation/v2/send_invite/{roomID}/{eventID}
+func SendInvite(
+	httpReq *http.Request,
+	request *fclient.FederationRequest,
+	roomID spec.RoomID,
+	eventID string,
+	cfg *config.FederationAPI,
+	rsAPI api.FederationRoomserverAPI,
+	keys gomatrixserverlib.JSONVerifier,
+) util.JSONResponse {
+	return util.JSONResponse{}
+}

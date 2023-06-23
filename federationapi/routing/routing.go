@@ -191,6 +191,61 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
+	v2fedmux.Handle("/make_invite/{roomID}/{userID}", MakeFedAPI(
+		"federation_make_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
+		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
+			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
+				}
+			}
+
+			userID, err := spec.NewUserID(vars["userID"], true)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid UserID"),
+				}
+			}
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
+			return MakeInvite(
+				httpReq, request, *roomID, *userID,
+				cfg, rsAPI, keys,
+			)
+		},
+	)).Methods(http.MethodGet, http.MethodOptions)
+
+	v2fedmux.Handle("/send_invite/{roomID}/{eventID}", MakeFedAPI(
+		"federation_send_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
+		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
+			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: spec.Forbidden("Forbidden by server ACLs"),
+				}
+			}
+
+			roomID, err := spec.NewRoomID(vars["roomID"])
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: spec.InvalidParam("Invalid RoomID"),
+				}
+			}
+			return SendInvite(
+				httpReq, request, *roomID, vars["eventID"],
+				cfg, rsAPI, keys,
+			)
+		},
+	)).Methods(http.MethodPut, http.MethodOptions)
+
 	v1fedmux.Handle("/3pid/onbind", httputil.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
 			return CreateInvitesFrom3PIDInvites(req, rsAPI, cfg, federation, userAPI)
