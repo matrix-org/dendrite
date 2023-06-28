@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -169,13 +170,22 @@ func truncateAuthAndPrevEvents(auth, prev []string) (
 
 // RedactEvent redacts the given event and sets the unsigned field appropriately. This should be used by
 // downstream components to the roomserver when an OutputTypeRedactedEvent occurs.
-func RedactEvent(redactionEvent, redactedEvent gomatrixserverlib.PDU) error {
+func RedactEvent(ctx context.Context, redactionEvent, redactedEvent gomatrixserverlib.PDU, querier api.QuerySenderIDAPI) error {
 	// sanity check
 	if redactionEvent.Type() != spec.MRoomRedaction {
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
 	redactedEvent.Redact()
-	if err := redactedEvent.SetUnsignedField("redacted_because", redactionEvent); err != nil {
+	validRoomID, err := spec.NewRoomID(redactionEvent.RoomID())
+	if err != nil {
+		return err
+	}
+	senderID, err := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
+	if err != nil {
+		return err
+	}
+	redactedBecause := synctypes.ToClientEvent(redactionEvent, synctypes.FormatSync, *senderID, redactionEvent.StateKey())
+	if err := redactedEvent.SetUnsignedField("redacted_because", redactedBecause); err != nil {
 		return err
 	}
 	// NOTSPEC: sytest relies on this unspecced field existing :(

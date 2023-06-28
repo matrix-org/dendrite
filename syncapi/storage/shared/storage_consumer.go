@@ -364,7 +364,7 @@ func (d *Database) PutFilter(
 	return filterID, err
 }
 
-func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent) error {
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error {
 	redactedEvents, err := d.Events(ctx, []string{redactedEventID})
 	if err != nil {
 		return err
@@ -375,7 +375,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 	eventToRedact := redactedEvents[0].PDU
 	redactionEvent := redactedBecause.PDU
-	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
+	if err = eventutil.RedactEvent(ctx, redactionEvent, eventToRedact, querier); err != nil {
 		return err
 	}
 
