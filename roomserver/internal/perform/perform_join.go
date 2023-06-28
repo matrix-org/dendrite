@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -202,14 +204,15 @@ func (r *Joiner) performJoinRoomByID(
 			senderID, err = r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
 			if err == nil {
 				checkInvitePending = true
-			} else {
+			}
+			if senderID == "" {
 				// create user room key if needed
 				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 				if keyErr != nil {
 					util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
 					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
-				senderID = spec.SenderID(spec.Base64Bytes(key).Encode())
+				senderID = spec.SenderIDFromPseudoIDKey(key)
 			}
 		default:
 			checkInvitePending = true
@@ -283,9 +286,37 @@ func (r *Joiner) performJoinRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(userDomain)
+	identity, err := r.RSAPI.SigningIdentityFor(ctx, *roomID, *userID)
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
+	}
+
+	// at this point we know we have an existing room
+	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		var pseudoIDKey ed25519.PrivateKey
+		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			return "", "", err
+		}
+
+		mapping := &gomatrixserverlib.MXIDMapping{
+			UserRoomKey: spec.SenderIDFromPseudoIDKey(pseudoIDKey),
+			UserID:      userID.String(),
+		}
+
+		// Sign the mapping with the server identity
+		if err = mapping.Sign(identity.ServerName, identity.KeyID, identity.PrivateKey); err != nil {
+			return "", "", err
+		}
+		req.Content["mxid_mapping"] = mapping
+
+		// sign the event with the pseudo ID key
+		identity = fclient.SigningIdentity{
+			ServerName: "self",
+			KeyID:      "ed25519:1",
+			PrivateKey: pseudoIDKey,
+		}
 	}
 
 	senderIDString := string(senderID)
@@ -317,7 +348,7 @@ func (r *Joiner) performJoinRoomByID(
 	if err = proto.SetContent(req.Content); err != nil {
 		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, time.Now(), r.RSAPI, &buildRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, time.Now(), r.RSAPI, &buildRes)
 
 	switch err.(type) {
 	case nil:

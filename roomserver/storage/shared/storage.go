@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -991,6 +992,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 // Returns the redaction event and the redacted event if this call resulted in a redaction.
 func (d *EventDatabase) MaybeRedactEvent(
 	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+	querier api.QuerySenderIDAPI,
 ) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error) {
 	var (
 		redactionEvent, redactedEvent *types.Event
@@ -1030,15 +1032,18 @@ func (d *EventDatabase) MaybeRedactEvent(
 			return nil
 		}
 
-		// TODO: Don't hack senderID into userID here (pseudoIDs)
+		var validRoomID *spec.RoomID
+		validRoomID, err = spec.NewRoomID(redactedEvent.RoomID())
+		if err != nil {
+			return err
+		}
 		sender1Domain := ""
-		sender1, err1 := spec.NewUserID(string(redactedEvent.SenderID()), true)
+		sender1, err1 := querier.QueryUserIDForSender(ctx, *validRoomID, redactedEvent.SenderID())
 		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
-		// TODO: Don't hack senderID into userID here (pseudoIDs)
 		sender2Domain := ""
-		sender2, err2 := spec.NewUserID(string(redactionEvent.SenderID()), true)
+		sender2, err2 := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
 		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
@@ -1698,6 +1703,7 @@ func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userID spec.User
 // SelectUserRoomPrivateKey queries the users room private key.
 // If no key exists, returns no key and no error. Otherwise returns
 // the key and a database error, if any.
+// TODO: Cache this?
 func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error) {
 	uID := userID.String()
 	stateKeyNIDMap, sErr := d.eventStateKeyNIDs(ctx, nil, []string{uID})
@@ -1756,58 +1762,54 @@ func (d *Database) SelectUserRoomPublicKey(ctx context.Context, userID spec.User
 // SelectUserIDsForPublicKeys returns a map from roomID -> map from senderKey -> userID
 func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys map[spec.RoomID][]ed25519.PublicKey) (result map[spec.RoomID]map[string]string, err error) {
 	result = make(map[spec.RoomID]map[string]string, len(publicKeys))
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 
-		// map all roomIDs to roomNIDs
-		query := make(map[types.RoomNID][]ed25519.PublicKey)
-		rooms := make(map[types.RoomNID]spec.RoomID)
-		for roomID, keys := range publicKeys {
-			roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID.String())
-			if !ok {
-				roomInfo, rErr := d.roomInfo(ctx, txn, roomID.String())
-				if rErr != nil {
-					return rErr
-				}
-				if roomInfo == nil {
-					logrus.Warnf("missing room info for %s, there will be missing users in the response", roomID.String())
-					continue
-				}
-				roomNID = roomInfo.RoomNID
+	// map all roomIDs to roomNIDs
+	query := make(map[types.RoomNID][]ed25519.PublicKey)
+	rooms := make(map[types.RoomNID]spec.RoomID)
+	for roomID, keys := range publicKeys {
+		roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID.String())
+		if !ok {
+			roomInfo, rErr := d.roomInfo(ctx, nil, roomID.String())
+			if rErr != nil {
+				return nil, rErr
 			}
-
-			query[roomNID] = keys
-			rooms[roomNID] = roomID
-		}
-
-		// get the user room key pars
-		userRoomKeyPairMap, sErr := d.UserRoomKeyTable.BulkSelectUserNIDs(ctx, txn, query)
-		if sErr != nil {
-			return sErr
-		}
-		nids := make([]types.EventStateKeyNID, 0, len(userRoomKeyPairMap))
-		for _, nid := range userRoomKeyPairMap {
-			nids = append(nids, nid.EventStateKeyNID)
-		}
-		// get the userIDs
-		nidMap, seErr := d.EventStateKeys(ctx, nids)
-		if seErr != nil {
-			return seErr
-		}
-
-		// build the result map (roomID -> map publicKey -> userID)
-		for publicKey, userRoomKeyPair := range userRoomKeyPairMap {
-			userID := nidMap[userRoomKeyPair.EventStateKeyNID]
-			roomID := rooms[userRoomKeyPair.RoomNID]
-			resMap, exists := result[roomID]
-			if !exists {
-				resMap = map[string]string{}
+			if roomInfo == nil {
+				logrus.Warnf("missing room info for %s, there will be missing users in the response", roomID.String())
+				continue
 			}
-			resMap[publicKey] = userID
-			result[roomID] = resMap
+			roomNID = roomInfo.RoomNID
 		}
 
-		return nil
-	})
+		query[roomNID] = keys
+		rooms[roomNID] = roomID
+	}
+
+	// get the user room key pars
+	userRoomKeyPairMap, sErr := d.UserRoomKeyTable.BulkSelectUserNIDs(ctx, nil, query)
+	if sErr != nil {
+		return nil, sErr
+	}
+	nids := make([]types.EventStateKeyNID, 0, len(userRoomKeyPairMap))
+	for _, nid := range userRoomKeyPairMap {
+		nids = append(nids, nid.EventStateKeyNID)
+	}
+	// get the userIDs
+	nidMap, seErr := d.EventStateKeys(ctx, nids)
+	if seErr != nil {
+		return nil, seErr
+	}
+
+	// build the result map (roomID -> map publicKey -> userID)
+	for publicKey, userRoomKeyPair := range userRoomKeyPairMap {
+		userID := nidMap[userRoomKeyPair.EventStateKeyNID]
+		roomID := rooms[userRoomKeyPair.RoomNID]
+		resMap, exists := result[roomID]
+		if !exists {
+			resMap = map[string]string{}
+		}
+		resMap[publicKey] = userID
+		result[roomID] = resMap
+	}
 	return result, err
 }
 

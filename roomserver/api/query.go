@@ -174,6 +174,8 @@ type QueryServerJoinedToRoomResponse struct {
 	RoomExists bool `json:"room_exists"`
 	// True if we still believe that the server is participating in the room
 	IsInRoom bool `json:"is_in_room"`
+	// The roomversion if joined to room
+	RoomVersion gomatrixserverlib.RoomVersion
 }
 
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent

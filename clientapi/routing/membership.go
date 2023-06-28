@@ -22,10 +22,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -36,6 +32,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"
 )
@@ -433,11 +432,6 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
-	if err != nil {
-		return nil, err
-	}
-
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
 		return nil, err
@@ -459,6 +453,12 @@ func buildMembershipEvent(
 	if err != nil {
 		return nil, err
 	}
+
+	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *userID)
+	if err != nil {
+		return nil, err
+	}
+
 	return buildMembershipEventDirect(ctx, targetSenderID, reason, profile.DisplayName, profile.AvatarURL,
 		senderID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
 }

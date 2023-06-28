@@ -478,6 +478,9 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
+	if info != nil {
+		response.RoomVersion = info.RoomVersion
+	}
 	if info == nil || info.IsStub() {
 		return nil
 	}

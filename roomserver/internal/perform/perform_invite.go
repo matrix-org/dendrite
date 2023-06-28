@@ -153,6 +153,23 @@ func (r *Inviter) PerformInvite(
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
 
+	// If we're inviting a local user, we can generate the needed pseudoID key here. (if needed)
+	if isTargetLocal {
+		var roomVersion gomatrixserverlib.RoomVersion
+		roomVersion, err = r.DB.GetRoomVersion(ctx, event.RoomID())
+		if err != nil {
+			return err
+		}
+
+		switch roomVersion {
+		case gomatrixserverlib.RoomVersionPseudoIDs:
+			_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, *validRoomID, *invitedUser)
 	if err != nil {
 		return fmt.Errorf("failed looking up senderID for invited user")
