@@ -454,25 +454,6 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	// If we're inviting a local user, we can generate the needed key here.
-	if targetSenderID == "" && cfg.Matrix.IsLocalServerName(targetID.Domain()) { // todo: remove
-		var roomVersion gomatrixserverlib.RoomVersion
-		roomVersion, err = rsAPI.QueryRoomVersionForRoom(ctx, roomID)
-		if err != nil {
-			return nil, err
-		}
-		switch roomVersion {
-		case gomatrixserverlib.RoomVersionPseudoIDs:
-			var key ed25519.PrivateKey
-			key, err = rsAPI.GetOrCreateUserRoomPrivateKey(ctx, *targetID, *validRoomID)
-			if err != nil {
-				return nil, err
-			}
-			targetSenderID = spec.SenderIDFromPseudoIDKey(key)
-		}
-
-	}
-
 	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *userID)
 	if err != nil {
 		return nil, err
