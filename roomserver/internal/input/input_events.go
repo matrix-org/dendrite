@@ -406,7 +406,7 @@ func (r *Inputer) processRoomEvent(
 	)
 	if !isRejected && !isCreateEvent {
 		resolver := state.NewStateResolution(r.DB, roomInfo, r.Queryer)
-		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver)
+		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver, r.Queryer)
 		if err != nil {
 			return err
 		}

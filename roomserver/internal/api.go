@@ -289,6 +289,15 @@ func (r *RoomserverInternalAPI) GetOrCreateUserRoomPrivateKey(ctx context.Contex
 	return key, nil
 }
 
+func (r *RoomserverInternalAPI) StoreUserRoomPublicKey(ctx context.Context, senderID spec.SenderID, userID spec.UserID, roomID spec.RoomID) error {
+	pubKeyBytes, err := senderID.RawBytes()
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.InsertUserRoomPublicKey(ctx, userID, roomID, ed25519.PublicKey(pubKeyBytes))
+	return err
+}
+
 func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error) {
 	roomVersion, ok := r.Cache.GetRoomVersion(roomID.String())
 	if !ok {
@@ -307,7 +316,7 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 		}
 		return fclient.SigningIdentity{
 			PrivateKey: privKey,
-			KeyID:      "ed25519",
+			KeyID:      "ed25519:1",
 			ServerName: "self",
 		}, nil
 	}
@@ -316,4 +325,8 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 		return fclient.SigningIdentity{}, err
 	}
 	return *identity, err
+}
+
+func (r *RoomserverInternalAPI) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error) {
+	return r.DB.AssignRoomNID(ctx, roomID, roomVersion)
 }

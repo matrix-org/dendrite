@@ -35,6 +35,14 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 )
 
+type FakeQuerier struct {
+	api.QuerySenderIDAPI
+}
+
+func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
@@ -566,7 +574,7 @@ func TestRedaction(t *testing.T) {
 					err = updater.Commit()
 					assert.NoError(t, err)
 
-					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.PDU, &plResolver)
+					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.PDU, &plResolver, &FakeQuerier{})
 					assert.NoError(t, err)
 					if redactedEvent != nil {
 						assert.Equal(t, ev.Redacts(), redactedEvent.EventID())

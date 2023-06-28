@@ -57,6 +57,7 @@ const selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_use
 const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid IN ($1) AND pseudo_id_pub_key IN ($2)`
 
 type userRoomKeysStatements struct {
+	db                           *sql.DB
 	insertUserRoomPrivateKeyStmt *sql.Stmt
 	insertUserRoomPublicKeyStmt  *sql.Stmt
 	selectUserRoomKeyStmt        *sql.Stmt
@@ -70,7 +71,7 @@ func CreateUserRoomKeysTable(db *sql.DB) error {
 }
 
 func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
-	s := &userRoomKeysStatements{}
+	s := &userRoomKeysStatements{db: db}
 	return s, sqlutil.StatementList{
 		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomKeySQL},
 		{&s.insertUserRoomPublicKeyStmt, insertUserRoomPublicKeySQL},
@@ -137,7 +138,7 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 	selectSQL := strings.Replace(selectUserNIDsSQL, "($2)", sqlutil.QueryVariadicOffset(len(senders), len(senderKeys)), 1)
 	selectSQL = strings.Replace(selectSQL, "($1)", sqlutil.QueryVariadic(len(senderKeys)), 1) // replace $1 with the roomNIDs
 
-	selectStmt, err := txn.Prepare(selectSQL)
+	selectStmt, err := s.db.Prepare(selectSQL)
 	if err != nil {
 		return nil, err
 	}

@@ -314,7 +314,7 @@ func (r *Joiner) performJoinRoomByID(
 		// sign the event with the pseudo ID key
 		identity = fclient.SigningIdentity{
 			ServerName: "self",
-			KeyID:      "ed25519",
+			KeyID:      "ed25519:1",
 			PrivateKey: pseudoIDKey,
 		}
 	}
