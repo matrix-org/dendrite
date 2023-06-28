@@ -171,7 +171,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
-		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+		GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
 			// assign a roomNID, otherwise we can't create a private key for the user
 			_, nidErr := r.rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
 			if nidErr != nil {
