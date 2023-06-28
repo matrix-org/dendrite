@@ -53,6 +53,10 @@ func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *
 		return nil, err
 	}
 
+	registationTokensTable, err := NewPostgresRegistrationTokensTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresRegistrationsTokenTable: %w", err)
+	}
 	accountsTable, err := NewPostgresAccountsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresAccountsTable: %w", err)
@@ -125,6 +129,7 @@ func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *
 		ThreePIDs:             threePIDTable,
 		Pushers:               pusherTable,
 		Notifications:         notificationsTable,
+		RegistrationTokens:    registationTokensTable,
 		Stats:                 statsTable,
 		ServerName:            serverName,
 		DB:                    db,

@@ -174,7 +174,7 @@ type Database interface {
 	// goes wrong.
 	PutFilter(ctx context.Context, localpart string, filter *synctypes.Filter) (string, error)
 	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
-	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent) error
+	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error
 	// StoreReceipt stores new receipt events
 	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error

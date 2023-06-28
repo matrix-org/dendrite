@@ -2,7 +2,7 @@
 title: Configuring Dendrite
 parent: Manual
 grand_parent: Installation
-nav_order: 3
+nav_order: 4
 permalink: /installation/manual/configuration
 ---
 
@@ -21,7 +21,7 @@ sections:
 
 First of all, you will need to configure the server name of your Matrix homeserver.
 This must match the domain name that you have selected whilst [configuring the domain
-name delegation](domainname#delegation).
+name delegation](../domainname#delegation).
 
 In the `global` section, set the `server_name` to your delegated domain name:
 

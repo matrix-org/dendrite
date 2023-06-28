@@ -162,6 +162,36 @@ func Setup(
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
+	dendriteAdminRouter.Handle("/admin/registrationTokens/new",
+		httputil.MakeAdminAPI("admin_registration_tokens_new", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminCreateNewRegistrationToken(req, cfg, userAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/registrationTokens",
+		httputil.MakeAdminAPI("admin_list_registration_tokens", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminListRegistrationTokens(req, cfg, userAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/registrationTokens/{token}",
+		httputil.MakeAdminAPI("admin_get_registration_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			switch req.Method {
+			case http.MethodGet:
+				return AdminGetRegistrationToken(req, cfg, userAPI)
+			case http.MethodPut:
+				return AdminUpdateRegistrationToken(req, cfg, userAPI)
+			case http.MethodDelete:
+				return AdminDeleteRegistrationToken(req, cfg, userAPI)
+			default:
+				return util.MatrixErrorResponse(
+					404,
+					string(spec.ErrorNotFound),
+					"unknown method",
+				)
+			}
+		}),
+	).Methods(http.MethodGet, http.MethodPut, http.MethodDelete, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

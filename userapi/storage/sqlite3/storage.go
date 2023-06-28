@@ -50,7 +50,10 @@ func NewUserDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperti
 	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
-
+	registationTokensTable, err := NewSQLiteRegistrationTokensTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteRegistrationsTokenTable: %w", err)
+	}
 	accountsTable, err := NewSQLiteAccountsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
@@ -130,6 +133,7 @@ func NewUserDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperti
 		LoginTokenLifetime:    loginTokenLifetime,
 		BcryptCost:            bcryptCost,
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
+		RegistrationTokens:    registationTokensTable,
 	}, nil
 }
 
