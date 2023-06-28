@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -441,7 +440,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 
 		// Process the invites.
-		var inviteEvent *types.HeaderedEvent
 		for _, invitee := range createRequest.InvitedUsers {
 			inviteeUserID, userIDErr := spec.NewUserID(invitee, true)
 			if userIDErr != nil {
@@ -451,59 +449,20 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 					JSON: spec.InternalServerError{},
 				}
 			}
-			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID, *inviteeUserID)
-			if queryErr != nil {
-				util.GetLogger(ctx).WithError(queryErr).Error("rsapi.QuerySenderIDForUser failed")
-				return "", &util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-			inviteeString := string(inviteeSenderID)
-			proto := gomatrixserverlib.ProtoEvent{
-				SenderID: string(senderID),
-				RoomID:   roomID.String(),
-				Type:     "m.room.member",
-				StateKey: &inviteeString,
-			}
 
-			content := gomatrixserverlib.MemberContent{
-				Membership:  spec.Invite,
-				DisplayName: createRequest.UserDisplayName,
-				AvatarURL:   createRequest.UserAvatarURL,
-				Reason:      "",
-				IsDirect:    createRequest.IsDirect,
-			}
-
-			if err = proto.SetContent(content); err != nil {
-				return "", &util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-
-			// Build the invite event.
-			identity := &fclient.SigningIdentity{
-				ServerName: userID.Domain(),
-				KeyID:      createRequest.KeyID,
-				PrivateKey: createRequest.PrivateKey,
-			}
-			inviteEvent, err = eventutil.QueryAndBuildEvent(ctx, &proto, identity, createRequest.EventTime, c.RSAPI, nil)
-
-			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
-				continue
-			}
-			inviteStrippedState := append(
-				globalStrippedState,
-				gomatrixserverlib.NewInviteStrippedState(inviteEvent.PDU),
-			)
-			// Send the invite event to the roomserver.
-			event := inviteEvent
 			err = c.RSAPI.PerformInvite(ctx, &api.PerformInviteRequest{
-				Event:           event,
-				InviteRoomState: inviteStrippedState,
-				RoomVersion:     event.Version(),
+				InviteInput: api.InviteInput{
+					RoomID:      roomID,
+					Inviter:     userID,
+					Invitee:     *inviteeUserID,
+					DisplayName: createRequest.UserDisplayName,
+					AvatarURL:   createRequest.UserAvatarURL,
+					Reason:      "",
+					IsDirect:    createRequest.IsDirect,
+					KeyID:       createRequest.KeyID,
+					PrivateKey:  createRequest.PrivateKey,
+				},
+				InviteRoomState: globalStrippedState,
 				SendAsServer:    string(userID.Domain()),
 			})
 			switch e := err.(type) {

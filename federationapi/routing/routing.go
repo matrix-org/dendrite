@@ -78,6 +78,7 @@ func Setup(
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
 	v2fedmux := fedMux.PathPrefix("/v2").Subrouter()
+	v3fedmux := fedMux.PathPrefix("/v3").Subrouter()
 
 	wakeup := &FederationWakeups{
 		FsAPI: fsAPI,
@@ -191,8 +192,8 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
-	v2fedmux.Handle("/make_invite/{roomID}/{userID}", MakeFedAPI(
-		"federation_make_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
+	v3fedmux.Handle("/invite/{roomID}/{userID}", MakeFedAPI(
+		"federation_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
 			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
 				return util.JSONResponse{
@@ -215,32 +216,8 @@ func Setup(
 					JSON: spec.InvalidParam("Invalid RoomID"),
 				}
 			}
-			return MakeInvite(
+			return InviteV3(
 				httpReq, request, *roomID, *userID,
-				cfg, rsAPI, keys,
-			)
-		},
-	)).Methods(http.MethodGet, http.MethodOptions)
-
-	v2fedmux.Handle("/send_invite/{roomID}/{eventID}", MakeFedAPI(
-		"federation_send_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
-		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
-			if roomserverAPI.IsServerBannedFromRoom(httpReq.Context(), rsAPI, vars["roomID"], request.Origin()) {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: spec.Forbidden("Forbidden by server ACLs"),
-				}
-			}
-
-			roomID, err := spec.NewRoomID(vars["roomID"])
-			if err != nil {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: spec.InvalidParam("Invalid RoomID"),
-				}
-			}
-			return SendInvite(
-				httpReq, request, *roomID, vars["eventID"],
 				cfg, rsAPI, keys,
 			)
 		},
