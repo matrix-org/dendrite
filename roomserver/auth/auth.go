@@ -30,10 +30,6 @@ func IsServerAllowed(
 	serverCurrentlyInRoom bool,
 	authEvents []gomatrixserverlib.PDU,
 ) bool {
-	// In practice should not happen, but avoids unneeded CPU cycles
-	if serverName == "" || len(authEvents) == 0 {
-		return false
-	}
 	historyVisibility := HistoryVisibilityForRoom(authEvents)
 
 	// 1. If the history_visibility was set to world_readable, allow.
