@@ -115,6 +115,7 @@ func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 
 // nolint:gocyclo
 // RemoveRoomAlias implements alias.RoomserverInternalAPI
+// nolint: gocyclo
 func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
 	request *api.RemoveRoomAliasRequest,
@@ -188,9 +189,11 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			senderDomain := sender.Domain()
-
-			identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
+			validRoomID, err := spec.NewRoomID(roomID)
+			if err != nil {
+				return err
+			}
+			identity, err := r.SigningIdentityFor(ctx, *validRoomID, *sender)
 			if err != nil {
 				return err
 			}
@@ -216,7 +219,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			newEvent, err := eventutil.BuildEvent(ctx, proto, identity, time.Now(), &eventsNeeded, stateRes)
+			newEvent, err := eventutil.BuildEvent(ctx, proto, &identity, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -19,6 +20,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 )
 
 var ctx = context.Background()
@@ -41,6 +43,7 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.Header
 		var addStateEventIDs []string
 		var removeStateEventIDs []string
 		if ev.StateKey() != nil {
+			ev.StateKeyResolved = ev.StateKey()
 			addStateEvents = append(addStateEvents, ev)
 			addStateEventIDs = append(addStateEventIDs, ev.EventID())
 		}
@@ -975,6 +978,55 @@ func TestRecentEvents(t *testing.T) {
 			assert.Equal(t, true, recentEvents.Limited, "expected events to be limited")
 			assert.Equal(t, 1, len(recentEvents.Events), "unexpected recent events for room")
 			assert.Equal(t, origEvents[len(origEvents)-1].EventID(), recentEvents.Events[0].EventID())
+		}
+	})
+}
+
+type FakeQuerier struct {
+	api.QuerySenderIDAPI
+}
+
+func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func TestRedaction(t *testing.T) {
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
+	redactionEvent := room.CreateEvent(t, alice, spec.MRoomRedaction, map[string]string{"redacts": redactedEvent.EventID()})
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := MustCreateDatabase(t, dbType)
+		t.Cleanup(close)
+		MustWriteEvents(t, db, room.Events())
+
+		err := db.RedactEvent(context.Background(), redactedEvent.EventID(), redactionEvent, &FakeQuerier{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		evs, err := db.Events(context.Background(), []string{redactedEvent.EventID()})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(evs) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(evs))
+		}
+
+		// check a few fields which shouldn't be there in unsigned
+		authEvs := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.auth_events")
+		if authEvs.Exists() {
+			t.Error("unexpected auth_events in redacted event")
+		}
+		prevEvs := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.prev_events")
+		if prevEvs.Exists() {
+			t.Error("unexpected auth_events in redacted event")
+		}
+		depth := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.depth")
+		if depth.Exists() {
+			t.Error("unexpected auth_events in redacted event")
 		}
 	})
 }

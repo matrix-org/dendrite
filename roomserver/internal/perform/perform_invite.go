@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
@@ -152,7 +153,7 @@ func (r *Inviter) PerformInvite(
 		IsDirect:    req.InviteInput.IsDirect,
 	}
 
-	if err := proto.SetContent(content); err != nil {
+	if err = proto.SetContent(content); err != nil {
 		return err
 	}
 
@@ -172,6 +173,7 @@ func (r *Inviter) PerformInvite(
 		StrippedState:     req.InviteRoomState,
 		KeyID:             req.InviteInput.KeyID,
 		SigningKey:        req.InviteInput.PrivateKey,
+		EventTime:         req.InviteInput.EventTime,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB, r.RSAPI},
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -180,18 +182,18 @@ func (r *Inviter) PerformInvite(
 		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
 			return r.RSAPI.QuerySenderIDForUser(ctx, roomID, userID)
 		},
-		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (spec.SenderID, error) {
+		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
 			key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
 			if keyErr != nil {
-				return "", keyErr
+				return "", nil, keyErr
 			}
 
-			return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
 		},
 		EventQuerier: func(ctx context.Context, roomID spec.RoomID, eventsNeeded []gomatrixserverlib.StateKeyTuple) (gomatrixserverlib.LatestEvents, error) {
 			req := api.QueryLatestEventsAndStateRequest{RoomID: roomID.String(), StateToFetch: eventsNeeded}
 			res := api.QueryLatestEventsAndStateResponse{}
-			err := r.RSAPI.QueryLatestEventsAndState(ctx, &req, &res)
+			err = r.RSAPI.QueryLatestEventsAndState(ctx, &req, &res)
 			if err != nil {
 				return gomatrixserverlib.LatestEvents{}, nil
 			}

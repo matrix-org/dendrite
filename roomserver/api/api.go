@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
@@ -73,6 +74,7 @@ type RoomserverInternalAPI interface {
 type UserRoomPrivateKeyCreator interface {
 	// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
 	GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error)
+	StoreUserRoomPublicKey(ctx context.Context, senderID spec.SenderID, userID spec.UserID, roomID spec.RoomID) error
 }
 
 type InputRoomEventsAPI interface {
@@ -184,6 +186,7 @@ type ClientRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	QueryEventsAPI
 	QuerySenderIDAPI
+	UserRoomPrivateKeyCreator
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
@@ -213,6 +216,7 @@ type ClientRoomserverAPI interface {
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 	SetRoomAlias(ctx context.Context, req *SetRoomAliasRequest, res *SetRoomAliasResponse) error
 	RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
+	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 }
 
 type UserRoomserverAPI interface {
@@ -232,7 +236,8 @@ type FederationRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
-
+	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
+	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error

@@ -60,6 +60,7 @@ type InviteInput struct {
 	IsDirect    bool
 	KeyID       gomatrixserverlib.KeyID
 	PrivateKey  ed25519.PrivateKey
+	EventTime   time.Time
 }
 
 type PerformInviteRequest struct {
