@@ -65,13 +65,7 @@ func MakeJoin(
 	}
 
 	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		// TODO: remove this once the join dance understands pseudo IDs
-		var dummyUserID *spec.UserID
-		dummyUserID, err = spec.NewUserID(fmt.Sprintf("@dummy:%s", request.Destination()), true)
-		if err != nil {
-			return nil, nil, err
-		}
-		identity, signErr := rsAPI.SigningIdentityFor(httpReq.Context(), roomID, *dummyUserID)
+		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
 		if signErr != nil {
 			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
@@ -80,7 +74,7 @@ func MakeJoin(
 		queryRes := api.QueryLatestEventsAndStateResponse{
 			RoomVersion: roomVersion,
 		}
-		event, signErr := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, &identity, time.Now(), rsAPI, &queryRes)
+		event, signErr := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
 		switch e := signErr.(type) {
 		case nil:
 		case eventutil.ErrRoomNoExists:
