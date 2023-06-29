@@ -1,2 +1,3 @@
 release-name-template: "helm-{{ .Name }}-{{ .Version }}"
 pages-index-path: docs/index.yaml
+make-release-latest: false
