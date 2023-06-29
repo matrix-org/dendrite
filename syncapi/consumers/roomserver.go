@@ -558,13 +558,6 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
-	prevEvent, err := snapshot.GetStateEvent(
-		s.ctx, event.RoomID(), event.Type(), stateKey,
-	)
-	if err != nil {
-		return event, err
-	}
-
 	validRoomID, err := spec.NewRoomID(event.RoomID())
 	if err != nil {
 		return event, err
@@ -577,8 +570,16 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 			if err == nil && sku != nil {
 				sKey := sku.String()
 				event.StateKeyResolved = &sKey
+				stateKey = sKey
 			}
 		}
+	}
+
+	prevEvent, err := snapshot.GetStateEvent(
+		s.ctx, event.RoomID(), event.Type(), stateKey,
+	)
+	if err != nil {
+		return event, err
 	}
 
 	userID, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, event.SenderID())
