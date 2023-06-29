@@ -28,7 +28,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -96,7 +95,7 @@ func federatedSpacesHandler(
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidParam("bad request uri"),
+			JSON: spec.InvalidParam("bad request uri"),
 		}
 	}
 
@@ -214,13 +213,13 @@ func (w *walker) walk() util.JSONResponse {
 			// CS API format
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden("room is unknown/forbidden"),
+				JSON: spec.Forbidden("room is unknown/forbidden"),
 			}
 		} else {
 			// SS API format
 			return util.JSONResponse{
 				Code: 404,
-				JSON: jsonerror.NotFound("room is unknown/forbidden"),
+				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		}
 	}
@@ -233,7 +232,7 @@ func (w *walker) walk() util.JSONResponse {
 		if cache == nil {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("invalid from"),
+				JSON: spec.InvalidParam("invalid from"),
 			}
 		}
 	} else {
@@ -377,7 +376,7 @@ func (w *walker) walk() util.JSONResponse {
 	if len(discoveredRooms) == 0 {
 		return util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("room is unknown/forbidden"),
+			JSON: spec.NotFound("room is unknown/forbidden"),
 		}
 	}
 	return util.JSONResponse{
@@ -731,7 +730,7 @@ func stripped(ev gomatrixserverlib.PDU) *fclient.MSC2946StrippedEvent {
 		Type:           ev.Type(),
 		StateKey:       *ev.StateKey(),
 		Content:        ev.Content(),
-		Sender:         ev.Sender(),
+		Sender:         string(ev.SenderID()),
 		OriginServerTS: ev.OriginServerTS(),
 	}
 }

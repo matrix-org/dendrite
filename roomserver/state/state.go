@@ -24,10 +24,12 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -41,7 +43,7 @@ type StateResolutionStorage interface {
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	Events(ctx context.Context, roomInfo *types.RoomInfo, eventNIDs []types.EventNID) ([]types.Event, error)
+	Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error)
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 }
 
@@ -49,13 +51,15 @@ type StateResolution struct {
 	db       StateResolutionStorage
 	roomInfo *types.RoomInfo
 	events   map[types.EventNID]gomatrixserverlib.PDU
+	Querier  api.QuerySenderIDAPI
 }
 
-func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) StateResolution {
+func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo, querier api.QuerySenderIDAPI) StateResolution {
 	return StateResolution{
 		db:       db,
 		roomInfo: roomInfo,
 		events:   make(map[types.EventNID]gomatrixserverlib.PDU),
+		Querier:  querier,
 	}
 }
 
@@ -85,7 +89,10 @@ func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatri
 		return nil, fmt.Errorf("unable to find power level event")
 	}
 
-	events, err := p.db.Events(ctx, p.roomInfo, []types.EventNID{plNID})
+	if p.roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	events, err := p.db.Events(ctx, p.roomInfo.RoomVersion, []types.EventNID{plNID})
 	if err != nil {
 		return nil, err
 	}
@@ -942,7 +949,9 @@ func (v *StateResolution) resolveConflictsV1(
 	}
 
 	// Resolve the conflicts.
-	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents)
+	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+	})
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
@@ -1054,6 +1063,9 @@ func (v *StateResolution) resolveConflictsV2(
 			conflictedEvents,
 			nonConflictedEvents,
 			authEvents,
+			func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+			},
 		)
 	}()
 
@@ -1134,7 +1146,11 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	events, err := v.db.Events(ctx, v.roomInfo, eventNIDs)
+
+	if v.roomInfo == nil {
+		return nil, nil, types.ErrorInvalidRoomInfo
+	}
+	events, err := v.db.Events(ctx, v.roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}

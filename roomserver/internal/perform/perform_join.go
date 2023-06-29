@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -24,7 +25,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -145,7 +148,7 @@ func (r *Joiner) performJoinRoomByAlias(
 	return r.performJoinRoomByID(ctx, req)
 }
 
-// TODO: Break this function up a bit
+// TODO: Break this function up a bit & move to GMSL
 // nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
@@ -162,7 +165,7 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// Get the domain part of the room ID.
-	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
+	roomID, err := spec.NewRoomID(req.RoomIDOrAlias)
 	if err != nil {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", req.RoomIDOrAlias, err)}
 	}
@@ -170,41 +173,8 @@ func (r *Joiner) performJoinRoomByID(
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
 	// it to the list of servers to try.
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		req.ServerNames = append(req.ServerNames, domain)
-	}
-
-	// Prepare the template for the join event.
-	userID := req.UserID
-	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
-	if err != nil {
-		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", userID, err)}
-	}
-	proto := gomatrixserverlib.ProtoEvent{
-		Type:     spec.MRoomMember,
-		Sender:   userID,
-		StateKey: &userID,
-		RoomID:   req.RoomIDOrAlias,
-		Redacts:  "",
-	}
-	if err = proto.SetUnsigned(struct{}{}); err != nil {
-		return "", "", fmt.Errorf("eb.SetUnsigned: %w", err)
-	}
-
-	// It is possible for the request to include some "content" for the
-	// event. We'll always overwrite the "membership" key, but the rest,
-	// like "display_name" or "avatar_url", will be kept if supplied.
-	if req.Content == nil {
-		req.Content = map[string]interface{}{}
-	}
-	req.Content["membership"] = spec.Join
-	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req); aerr != nil {
-		return "", "", aerr
-	} else if authorisedVia != "" {
-		req.Content["join_authorised_via_users_server"] = authorisedVia
-	}
-	if err = proto.SetContent(req.Content); err != nil {
-		return "", "", fmt.Errorf("eb.SetContent: %w", err)
+	if !r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
+		req.ServerNames = append(req.ServerNames, roomID.Domain())
 	}
 
 	// Force a federated join if we aren't in the room and we've been
@@ -219,29 +189,64 @@ func (r *Joiner) performJoinRoomByID(
 	serverInRoom := inRoomRes.IsInRoom
 	forceFederatedJoin := len(req.ServerNames) > 0 && !serverInRoom
 
+	userID, err := spec.NewUserID(req.UserID, true)
+	if err != nil {
+		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
+	}
+
+	// Look up the room NID for the supplied room ID.
+	var senderID spec.SenderID
+	checkInvitePending := false
+	info, err := r.DB.RoomInfo(ctx, req.RoomIDOrAlias)
+	if err == nil && info != nil {
+		switch info.RoomVersion {
+		case gomatrixserverlib.RoomVersionPseudoIDs:
+			senderID, err = r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
+			if err == nil {
+				checkInvitePending = true
+			}
+			if senderID == "" {
+				// create user room key if needed
+				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
+				if keyErr != nil {
+					util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
+				}
+				senderID = spec.SenderIDFromPseudoIDKey(key)
+			}
+		default:
+			checkInvitePending = true
+			senderID = spec.SenderID(userID.String())
+		}
+	}
+
+	userDomain := userID.Domain()
+
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
-	isInvitePending, inviteSender, _, inviteEvent, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
-	if err == nil && !serverInRoom && isInvitePending {
-		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
-		if ierr != nil {
-			return "", "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-		}
+	if checkInvitePending {
+		isInvitePending, inviteSender, _, inviteEvent, inviteErr := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, senderID)
+		if inviteErr == nil && !serverInRoom && isInvitePending {
+			inviter, queryErr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, inviteSender)
+			if queryErr != nil {
+				return "", "", fmt.Errorf("r.RSAPI.QueryUserIDForSender: %w", queryErr)
+			}
 
-		// If we were invited by someone from another server then we can
-		// assume they are in the room so we can join via them.
-		if !r.Cfg.Matrix.IsLocalServerName(inviterDomain) {
-			req.ServerNames = append(req.ServerNames, inviterDomain)
-			forceFederatedJoin = true
-			memberEvent := gjson.Parse(string(inviteEvent.JSON()))
-			// only set unsigned if we've got a content.membership, which we _should_
-			if memberEvent.Get("content.membership").Exists() {
-				req.Unsigned = map[string]interface{}{
-					"prev_sender": memberEvent.Get("sender").Str,
-					"prev_content": map[string]interface{}{
-						"is_direct":  memberEvent.Get("content.is_direct").Bool(),
-						"membership": memberEvent.Get("content.membership").Str,
-					},
+			// If we were invited by someone from another server then we can
+			// assume they are in the room so we can join via them.
+			if inviter != nil && !r.Cfg.Matrix.IsLocalServerName(inviter.Domain()) {
+				req.ServerNames = append(req.ServerNames, inviter.Domain())
+				forceFederatedJoin = true
+				memberEvent := gjson.Parse(string(inviteEvent.JSON()))
+				// only set unsigned if we've got a content.membership, which we _should_
+				if memberEvent.Get("content.membership").Exists() {
+					req.Unsigned = map[string]interface{}{
+						"prev_sender": memberEvent.Get("sender").Str,
+						"prev_content": map[string]interface{}{
+							"is_direct":  memberEvent.Get("content.is_direct").Bool(),
+							"membership": memberEvent.Get("content.membership").Str,
+						},
+					}
 				}
 			}
 		}
@@ -269,6 +274,7 @@ func (r *Joiner) performJoinRoomByID(
 	// If we should do a forced federated join then do that.
 	var joinedVia spec.ServerName
 	if forceFederatedJoin {
+		// TODO : pseudoIDs - pass through userID here since we don't know what the senderID should be yet
 		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
 		return req.RoomIDOrAlias, joinedVia, err
 	}
@@ -280,25 +286,79 @@ func (r *Joiner) performJoinRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(userDomain)
+	identity, err := r.RSAPI.SigningIdentityFor(ctx, *roomID, *userID)
 	if err != nil {
 		return "", "", fmt.Errorf("error joining local room: %q", err)
 	}
-	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, r.Cfg.Matrix, identity, time.Now(), r.RSAPI, &buildRes)
 
-	switch err {
+	// at this point we know we have an existing room
+	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		var pseudoIDKey ed25519.PrivateKey
+		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			return "", "", err
+		}
+
+		mapping := &gomatrixserverlib.MXIDMapping{
+			UserRoomKey: spec.SenderIDFromPseudoIDKey(pseudoIDKey),
+			UserID:      userID.String(),
+		}
+
+		// Sign the mapping with the server identity
+		if err = mapping.Sign(identity.ServerName, identity.KeyID, identity.PrivateKey); err != nil {
+			return "", "", err
+		}
+		req.Content["mxid_mapping"] = mapping
+
+		// sign the event with the pseudo ID key
+		identity = fclient.SigningIdentity{
+			ServerName: "self",
+			KeyID:      "ed25519:1",
+			PrivateKey: pseudoIDKey,
+		}
+	}
+
+	senderIDString := string(senderID)
+
+	// Prepare the template for the join event.
+	proto := gomatrixserverlib.ProtoEvent{
+		Type:     spec.MRoomMember,
+		SenderID: senderIDString,
+		StateKey: &senderIDString,
+		RoomID:   req.RoomIDOrAlias,
+		Redacts:  "",
+	}
+	if err = proto.SetUnsigned(struct{}{}); err != nil {
+		return "", "", fmt.Errorf("eb.SetUnsigned: %w", err)
+	}
+
+	// It is possible for the request to include some "content" for the
+	// event. We'll always overwrite the "membership" key, but the rest,
+	// like "display_name" or "avatar_url", will be kept if supplied.
+	if req.Content == nil {
+		req.Content = map[string]interface{}{}
+	}
+	req.Content["membership"] = spec.Join
+	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req, senderID); aerr != nil {
+		return "", "", aerr
+	} else if authorisedVia != "" {
+		req.Content["join_authorised_via_users_server"] = authorisedVia
+	}
+	if err = proto.SetContent(req.Content); err != nil {
+		return "", "", fmt.Errorf("eb.SetContent: %w", err)
+	}
+	event, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, time.Now(), r.RSAPI, &buildRes)
+
+	switch err.(type) {
 	case nil:
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
 		// a member of the room. This is best-effort (as in we won't
 		// fail if we can't find the existing membership) because there
 		// is really no harm in just sending another membership event.
-		membershipReq := &api.QueryMembershipForUserRequest{
-			RoomID: req.RoomIDOrAlias,
-			UserID: userID,
-		}
 		membershipRes := &api.QueryMembershipForUserResponse{}
-		_ = r.Queryer.QueryMembershipForUser(ctx, membershipReq, membershipRes)
+		_ = r.Queryer.QueryMembershipForSenderID(ctx, *roomID, senderID, membershipRes)
 
 		// If we haven't already joined the room then send an event
 		// into the room changing our membership status.
@@ -313,9 +373,7 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := rsAPI.InputRoomEventsResponse{}
-			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
-				return "", "", rsAPI.ErrNotAllowed{Err: err}
-			}
+			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
 			if err = inputRes.Err(); err != nil {
 				return "", "", rsAPI.ErrNotAllowed{Err: err}
 			}
@@ -325,12 +383,12 @@ func (r *Joiner) performJoinRoomByID(
 		// The room doesn't exist locally. If the room ID looks like it should
 		// be ours then this probably means that we've nuked our database at
 		// some point.
-		if r.Cfg.Matrix.IsLocalServerName(domain) {
+		if r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
 			// If there are no more server names to try then give up here.
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.
 			if len(req.ServerNames) == 0 {
-				return "", "", eventutil.ErrRoomNoExists
+				return "", "", eventutil.ErrRoomNoExists{}
 			}
 		}
 
@@ -373,23 +431,12 @@ func (r *Joiner) performFederatedJoinRoomByID(
 func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 	ctx context.Context,
 	joinReq *rsAPI.PerformJoinRequest,
+	senderID spec.SenderID,
 ) (string, error) {
-	req := &api.QueryRestrictedJoinAllowedRequest{
-		UserID: joinReq.UserID,
-		RoomID: joinReq.RoomIDOrAlias,
+	roomID, err := spec.NewRoomID(joinReq.RoomIDOrAlias)
+	if err != nil {
+		return "", err
 	}
-	res := &api.QueryRestrictedJoinAllowedResponse{}
-	if err := r.Queryer.QueryRestrictedJoinAllowed(ctx, req, res); err != nil {
-		return "", fmt.Errorf("r.Queryer.QueryRestrictedJoinAllowed: %w", err)
-	}
-	if !res.Restricted {
-		return "", nil
-	}
-	if !res.Resident {
-		return "", nil
-	}
-	if !res.Allowed {
-		return "", rsAPI.ErrNotAllowed{Err: fmt.Errorf("the join to room %s was not allowed", joinReq.RoomIDOrAlias)}
-	}
-	return res.AuthorisedVia, nil
+
+	return r.Queryer.QueryRestrictedJoinAllowed(ctx, *roomID, senderID)
 }

@@ -151,7 +151,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause)
+	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause, s.rsAPI)
 	if err != nil {
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
@@ -256,16 +256,19 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	pduPos, err := s.db.WriteEvent(
-		ctx,
-		ev,
-		addsStateEvents,
-		msg.AddsStateEventIDs,
-		msg.RemovesStateEventIDs,
-		msg.TransactionID,
-		false,
-		msg.HistoryVisibility,
-	)
+	validRoomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return err
+	}
+
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, ev.SenderID())
+	if err != nil {
+		return err
+	}
+
+	ev.UserID = *userID
+
+	pduPos, err := s.db.WriteEvent(ctx, ev, addsStateEvents, msg.AddsStateEventIDs, msg.RemovesStateEventIDs, msg.TransactionID, false, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -315,16 +318,19 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	// hack but until we have some better strategy for dealing with
 	// old events in the sync API, this should at least prevent us
 	// from confusing clients into thinking they've joined/left rooms.
-	pduPos, err := s.db.WriteEvent(
-		ctx,
-		ev,
-		[]*rstypes.HeaderedEvent{},
-		[]string{},           // adds no state
-		[]string{},           // removes no state
-		nil,                  // no transaction
-		ev.StateKey() != nil, // exclude from sync?,
-		msg.HistoryVisibility,
-	)
+
+	validRoomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return err
+	}
+
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, ev.SenderID())
+	if err != nil {
+		return err
+	}
+	ev.UserID = *userID
+
+	pduPos, err := s.db.WriteEvent(ctx, ev, []*rstypes.HeaderedEvent{}, []string{}, []string{}, nil, ev.StateKey() != nil, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -373,7 +379,19 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rst
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == spec.Join {
 		// check it's a local join
-		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
+		if ev.StateKey() == nil {
+			return sp, fmt.Errorf("unexpected nil state_key")
+		}
+
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			return sp, err
+		}
+		userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*ev.StateKey()))
+		if err != nil || userID == nil {
+			return sp, fmt.Errorf("failed getting userID for sender: %w", err)
+		}
+		if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
 			return sp, nil
 		}
 
@@ -395,9 +413,21 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if msg.Event.StateKey() == nil {
 		return
 	}
-	if _, _, err := s.cfg.Matrix.SplitLocalID('@', *msg.Event.StateKey()); err != nil {
+
+	validRoomID, err := spec.NewRoomID(msg.Event.RoomID())
+	if err != nil {
 		return
 	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*msg.Event.StateKey()))
+	if err != nil || userID == nil {
+		return
+	}
+	if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		return
+	}
+
+	msg.Event.UserID = *userID
+
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		sentry.CaptureException(err)
@@ -440,7 +470,25 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 
 	// Notify any active sync requests that the invite has been retired.
 	s.inviteStream.Advance(pduPos)
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	validRoomID, err := spec.NewRoomID(msg.RoomID)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"room_id":    msg.RoomID,
+			log.ErrorKey: err,
+		}).Errorf("roomID is invalid")
+		return
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
+	if err != nil || userID == nil {
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"sender_id":  msg.TargetSenderID,
+			log.ErrorKey: err,
+		}).Errorf("failed to find userID for sender")
+		return
+	}
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, userID.String())
 }
 
 func (s *OutputRoomEventConsumer) onNewPeek(
@@ -497,6 +545,7 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent) (*rstypes.HeaderedEvent, error) {
+	event.StateKeyResolved = event.StateKey()
 	if event.StateKey() == nil {
 		return event, nil
 	}
@@ -516,6 +565,29 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		return event, err
 	}
 
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return event, err
+	}
+
+	if event.StateKey() != nil {
+		if *event.StateKey() != "" {
+			var sku *spec.UserID
+			sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
+			if err == nil && sku != nil {
+				sKey := sku.String()
+				event.StateKeyResolved = &sKey
+			}
+		}
+	}
+
+	userID, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, event.SenderID())
+	if err != nil {
+		return event, err
+	}
+
+	event.UserID = *userID
+
 	if prevEvent == nil || prevEvent.EventID() == event.EventID() {
 		return event, nil
 	}
@@ -523,7 +595,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	prev := types.PrevEventRef{
 		PrevContent:   prevEvent.Content(),
 		ReplacesState: prevEvent.EventID(),
-		PrevSender:    prevEvent.Sender(),
+		PrevSenderID:  string(prevEvent.SenderID()),
 	}
 
 	event.PDU, err = event.SetUnsigned(prev)

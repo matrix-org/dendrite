@@ -81,7 +81,7 @@ type Inputer struct {
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
 	ServerName          spec.ServerName
-	SigningIdentity     *fclient.SigningIdentity
+	SigningIdentity     func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
@@ -389,18 +389,18 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) error {
+) {
 	// Queue up the event into the roomserver.
 	replySub, err := r.queueInputRoomEvents(ctx, request)
 	if err != nil {
 		response.ErrMsg = err.Error()
-		return nil
+		return
 	}
 
 	// If we aren't waiting for synchronous responses then we can
 	// give up here, there is nothing further to do.
 	if replySub == nil {
-		return nil
+		return
 	}
 
 	// Otherwise, we'll want to sit and wait for the responses
@@ -412,14 +412,12 @@ func (r *Inputer) InputRoomEvents(
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()
-			return nil
+			return
 		}
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
 	}
-
-	return nil
 }
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(

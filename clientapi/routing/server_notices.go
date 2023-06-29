@@ -32,12 +32,12 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Unspecced server notice request
@@ -52,6 +52,7 @@ type sendServerNoticeRequest struct {
 	StateKey string `json:"state_key,omitempty"`
 }
 
+// nolint:gocyclo
 // SendServerNotice sends a message to a specific user. It can only be invoked by an admin.
 func SendServerNotice(
 	req *http.Request,
@@ -68,7 +69,7 @@ func SendServerNotice(
 	if device.AccountType != userapi.AccountTypeAdmin {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("This API can only be used by admin users."),
+			JSON: spec.Forbidden("This API can only be used by admin users."),
 		}
 	}
 
@@ -90,7 +91,7 @@ func SendServerNotice(
 	if !r.valid() {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Invalid request"),
+			JSON: spec.BadJSON("Invalid request"),
 		}
 	}
 
@@ -155,7 +156,7 @@ func SendServerNotice(
 			Invite:                    []string{r.UserID},
 			Name:                      cfgNotices.RoomName,
 			Visibility:                "private",
-			Preset:                    presetPrivateChat,
+			Preset:                    spec.PresetPrivateChat,
 			CreationContent:           cc,
 			RoomVersion:               roomVersion,
 			PowerLevelContentOverride: pl,
@@ -175,7 +176,10 @@ func SendServerNotice(
 			}}
 			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 		default:
@@ -184,12 +188,23 @@ func SendServerNotice(
 		}
 	} else {
 		// we've found a room in common, check the membership
+		deviceUserID, err := spec.NewUserID(r.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			}
+		}
+
 		roomID = commonRooms[0]
 		membershipRes := api.QueryMembershipForUserResponse{}
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: r.UserID, RoomID: roomID}, &membershipRes)
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if !membershipRes.IsInRoom {
 			// re-invite the user
@@ -206,7 +221,7 @@ func SendServerNotice(
 		"body":    r.Content.Body,
 		"msgtype": r.Content.MsgType,
 	}
-	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
+	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
 		return *resErr
@@ -228,7 +243,7 @@ func SendServerNotice(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{PDU: e},
+			{PDU: e},
 		},
 		device.UserDomain(),
 		cfgClient.Matrix.ServerName,
@@ -237,7 +252,10 @@ func SendServerNotice(
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
@@ -332,7 +350,7 @@ func getSenderDevice(
 	if len(deviceRes.Devices) > 0 {
 		// If there were changes to the profile, create a new membership event
 		if displayNameChanged || avatarChanged {
-			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, cfg, time.Now())
+			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, time.Now())
 			if err != nil {
 				return nil, err
 			}

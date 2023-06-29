@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -158,18 +157,21 @@ func Setup(
 			if !cfg.Fulltext.Enabled {
 				return util.JSONResponse{
 					Code: http.StatusNotImplemented,
-					JSON: jsonerror.Unknown("Search has been disabled by the server administrator."),
+					JSON: spec.Unknown("Search has been disabled by the server administrator."),
 				}
 			}
 			var nextBatch *string
 			if err := req.ParseForm(); err != nil {
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if req.Form.Has("next_batch") {
 				nb := req.FormValue("next_batch")
 				nextBatch = &nb
 			}
-			return Search(req, device, syncDB, fts, nextBatch)
+			return Search(req, device, syncDB, fts, nextBatch, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

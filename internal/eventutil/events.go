@@ -22,7 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -31,7 +31,17 @@ import (
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
 // doesn't exist
-var ErrRoomNoExists = errors.New("room does not exist")
+var errRoomNoExists = fmt.Errorf("room does not exist")
+
+type ErrRoomNoExists struct{}
+
+func (e ErrRoomNoExists) Error() string {
+	return errRoomNoExists.Error()
+}
+
+func (e ErrRoomNoExists) Unwrap() error {
+	return errRoomNoExists
+}
 
 // QueryAndBuildEvent builds a Matrix event using the event builder and roomserver query
 // API client provided. If also fills roomserver query API response (if provided)
@@ -41,7 +51,7 @@ var ErrRoomNoExists = errors.New("room does not exist")
 // Returns an error if something else went wrong
 func QueryAndBuildEvent(
 	ctx context.Context,
-	proto *gomatrixserverlib.ProtoEvent, cfg *config.Global,
+	proto *gomatrixserverlib.ProtoEvent,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*types.HeaderedEvent, error) {
@@ -54,14 +64,14 @@ func QueryAndBuildEvent(
 		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
 	}
-	return BuildEvent(ctx, proto, cfg, identity, evTime, eventsNeeded, queryRes)
+	return BuildEvent(ctx, proto, identity, evTime, eventsNeeded, queryRes)
 }
 
 // BuildEvent builds a Matrix event from the builder and QueryLatestEventsAndStateResponse
 // provided.
 func BuildEvent(
 	ctx context.Context,
-	proto *gomatrixserverlib.ProtoEvent, cfg *config.Global,
+	proto *gomatrixserverlib.ProtoEvent,
 	identity *fclient.SigningIdentity, evTime time.Time,
 	eventsNeeded *gomatrixserverlib.StateNeeded, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*types.HeaderedEvent, error) {
@@ -116,21 +126,15 @@ func addPrevEventsToEvent(
 	queryRes *api.QueryLatestEventsAndStateResponse,
 ) error {
 	if !queryRes.RoomExists {
-		return ErrRoomNoExists
+		return ErrRoomNoExists{}
 	}
-
-	verImpl, err := gomatrixserverlib.GetRoomVersion(queryRes.RoomVersion)
-	if err != nil {
-		return fmt.Errorf("GetRoomVersion: %w", err)
-	}
-	eventFormat := verImpl.EventFormat()
 
 	builder.Depth = queryRes.Depth
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(queryRes.StateEvents[i].PDU)
+		err := authEvents.AddEvent(queryRes.StateEvents[i].PDU)
 		if err != nil {
 			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
@@ -141,22 +145,7 @@ func addPrevEventsToEvent(
 		return fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
 	}
 
-	truncAuth, truncPrev := truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
-	switch eventFormat {
-	case gomatrixserverlib.EventFormatV1:
-		builder.AuthEvents = truncAuth
-		builder.PrevEvents = truncPrev
-	case gomatrixserverlib.EventFormatV2:
-		v2AuthRefs, v2PrevRefs := []string{}, []string{}
-		for _, ref := range truncAuth {
-			v2AuthRefs = append(v2AuthRefs, ref.EventID)
-		}
-		for _, ref := range truncPrev {
-			v2PrevRefs = append(v2PrevRefs, ref.EventID)
-		}
-		builder.AuthEvents = v2AuthRefs
-		builder.PrevEvents = v2PrevRefs
-	}
+	builder.AuthEvents, builder.PrevEvents = truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
 
 	return nil
 }
@@ -166,8 +155,8 @@ func addPrevEventsToEvent(
 // NOTSPEC: The limits here feel a bit arbitrary but they are currently
 // here because of https://github.com/matrix-org/matrix-doc/issues/2307
 // and because Synapse will just drop events that don't comply.
-func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
-	truncAuth, truncPrev []gomatrixserverlib.EventReference,
+func truncateAuthAndPrevEvents(auth, prev []string) (
+	truncAuth, truncPrev []string,
 ) {
 	truncAuth, truncPrev = auth, prev
 	if len(truncAuth) > 10 {
@@ -181,13 +170,22 @@ func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
 
 // RedactEvent redacts the given event and sets the unsigned field appropriately. This should be used by
 // downstream components to the roomserver when an OutputTypeRedactedEvent occurs.
-func RedactEvent(redactionEvent, redactedEvent gomatrixserverlib.PDU) error {
+func RedactEvent(ctx context.Context, redactionEvent, redactedEvent gomatrixserverlib.PDU, querier api.QuerySenderIDAPI) error {
 	// sanity check
 	if redactionEvent.Type() != spec.MRoomRedaction {
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
 	redactedEvent.Redact()
-	if err := redactedEvent.SetUnsignedField("redacted_because", redactionEvent); err != nil {
+	validRoomID, err := spec.NewRoomID(redactionEvent.RoomID())
+	if err != nil {
+		return err
+	}
+	senderID, err := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
+	if err != nil {
+		return err
+	}
+	redactedBecause := synctypes.ToClientEvent(redactionEvent, synctypes.FormatSync, *senderID, redactionEvent.StateKey())
+	if err := redactedEvent.SetUnsignedField("redacted_because", redactedBecause); err != nil {
 		return err
 	}
 	// NOTSPEC: sytest relies on this unspecced field existing :(

@@ -20,20 +20,21 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/setup/base"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
+
+	"github.com/matrix-org/dendrite/setup/base"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -84,6 +85,14 @@ func Setup(
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
 	}
+
+	// singleflight protects /join endpoints from being invoked
+	// multiple times from the same user and room, otherwise
+	// a state reset can occur. This also avoids unneeded
+	// state calculations.
+	// TODO: actually fix this in the roomserver, as there are
+	// 		 possibly other ways that can result in a stat reset.
+	sf := singleflight.Group{}
 
 	if cfg.Matrix.WellKnownClientName != "" {
 		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
@@ -148,11 +157,41 @@ func Setup(
 				}
 				return util.JSONResponse{
 					Code: http.StatusMethodNotAllowed,
-					JSON: jsonerror.NotFound("unknown method"),
+					JSON: spec.NotFound("unknown method"),
 				}
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
+	dendriteAdminRouter.Handle("/admin/registrationTokens/new",
+		httputil.MakeAdminAPI("admin_registration_tokens_new", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminCreateNewRegistrationToken(req, cfg, userAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/registrationTokens",
+		httputil.MakeAdminAPI("admin_list_registration_tokens", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminListRegistrationTokens(req, cfg, userAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/registrationTokens/{token}",
+		httputil.MakeAdminAPI("admin_get_registration_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			switch req.Method {
+			case http.MethodGet:
+				return AdminGetRegistrationToken(req, cfg, userAPI)
+			case http.MethodPut:
+				return AdminUpdateRegistrationToken(req, cfg, userAPI)
+			case http.MethodDelete:
+				return AdminDeleteRegistrationToken(req, cfg, userAPI)
+			default:
+				return util.MatrixErrorResponse(
+					404,
+					string(spec.ErrorNotFound),
+					"unknown method",
+				)
+			}
+		}),
+	).Methods(http.MethodGet, http.MethodPut, http.MethodDelete, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -265,9 +304,17 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return JoinRoomByIDOrAlias(
-				req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
-			)
+			// Only execute a join for roomIDOrAlias and UserID once. If there is a join in progress
+			// it waits for it to complete and returns that result for subsequent requests.
+			resp, _, _ := sf.Do(vars["roomIDOrAlias"]+device.UserID, func() (any, error) {
+				return JoinRoomByIDOrAlias(
+					req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
+				), nil
+			})
+			// once all joins are processed, drop them from the cache. Further requests
+			// will be processed as usual.
+			sf.Forget(vars["roomIDOrAlias"] + device.UserID)
+			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -301,9 +348,17 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return JoinRoomByIDOrAlias(
-				req, device, rsAPI, userAPI, vars["roomID"],
-			)
+			// Only execute a join for roomID and UserID once. If there is a join in progress
+			// it waits for it to complete and returns that result for subsequent requests.
+			resp, _, _ := sf.Do(vars["roomID"]+device.UserID, func() (any, error) {
+				return JoinRoomByIDOrAlias(
+					req, device, rsAPI, userAPI, vars["roomID"],
+				), nil
+			})
+			// once all joins are processed, drop them from the cache. Further requests
+			// will be processed as usual.
+			sf.Forget(vars["roomID"] + device.UserID)
+			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/leave",
@@ -659,7 +714,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash"),
+				JSON: spec.InvalidParam("missing trailing slash"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -674,7 +729,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("scope, kind and rule ID must be specified"),
+				JSON: spec.InvalidParam("scope, kind and rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -693,7 +748,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after scope"),
+				JSON: spec.InvalidParam("missing trailing slash after scope"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -702,7 +757,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("kind and rule ID must be specified"),
+				JSON: spec.InvalidParam("kind and rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -721,7 +776,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after kind"),
+				JSON: spec.InvalidParam("missing trailing slash after kind"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -730,7 +785,7 @@ func Setup(
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("rule ID must be specified"),
+				JSON: spec.InvalidParam("rule ID must be specified"),
 			}
 		}),
 	).Methods(http.MethodPut)
@@ -939,7 +994,7 @@ func Setup(
 			// TODO: Allow people to peek into rooms.
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.GuestAccessForbidden("Guest access not implemented"),
+				JSON: spec.GuestAccessForbidden("Guest access not implemented"),
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -1244,7 +1299,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: spec.InvalidParam("version must be specified"),
 			}
 		}
 		var reqBody keyBackupSessionRequest
@@ -1265,7 +1320,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: spec.InvalidParam("version must be specified"),
 			}
 		}
 		roomID := vars["roomID"]
@@ -1297,7 +1352,7 @@ func Setup(
 		if version == "" {
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				JSON: spec.InvalidParam("version must be specified"),
 			}
 		}
 		var reqBody userapi.KeyBackupSession

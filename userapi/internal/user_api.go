@@ -25,7 +25,6 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
@@ -62,6 +62,37 @@ type UserInternalAPI struct {
 	PgClient    pushgateway.Client
 	FedClient   fedsenderapi.KeyserverFederationAPI
 	Updater     *DeviceListUpdater
+}
+
+func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error) {
+	exists, err := a.DB.RegistrationTokenExists(ctx, *registrationToken.Token)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		return false, fmt.Errorf("token: %s already exists", *registrationToken.Token)
+	}
+	_, err = a.DB.InsertRegistrationToken(ctx, registrationToken)
+	if err != nil {
+		return false, fmt.Errorf("Error creating token: %s"+err.Error(), *registrationToken.Token)
+	}
+	return true, nil
+}
+
+func (a *UserInternalAPI) PerformAdminListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error) {
+	return a.DB.ListRegistrationTokens(ctx, returnAll, valid)
+}
+
+func (a *UserInternalAPI) PerformAdminGetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error) {
+	return a.DB.GetRegistrationToken(ctx, tokenString)
+}
+
+func (a *UserInternalAPI) PerformAdminDeleteRegistrationToken(ctx context.Context, tokenString string) error {
+	return a.DB.DeleteRegistrationToken(ctx, tokenString)
+}
+
+func (a *UserInternalAPI) PerformAdminUpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*clientapi.RegistrationToken, error) {
+	return a.DB.UpdateRegistrationToken(ctx, tokenString, newAttributes)
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -715,7 +746,7 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 		return res, fmt.Errorf("backup was deleted")
 	}
 	if version != req.Version {
-		return res, jsonerror.WrongBackupVersionError(version)
+		return res, spec.WrongBackupVersionError(version)
 	}
 	res.Exists = true
 	res.Version = version

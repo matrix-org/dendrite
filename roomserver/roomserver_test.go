@@ -35,6 +35,14 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 )
 
+type FakeQuerier struct {
+	api.QuerySenderIDAPI
+}
+
+func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
@@ -392,7 +400,7 @@ func TestPurgeRoom(t *testing.T) {
 type fledglingEvent struct {
 	Type       string
 	StateKey   *string
-	Sender     string
+	SenderID   string
 	RoomID     string
 	Redacts    string
 	Depth      int64
@@ -405,7 +413,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:     ev.Sender,
+		SenderID:   ev.SenderID,
 		Type:       ev.Type,
 		StateKey:   ev.StateKey,
 		RoomID:     ev.RoomID,
@@ -444,7 +452,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     alice.ID,
+					SenderID:   alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -461,7 +469,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     alice.ID,
+					SenderID:   alice.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -478,7 +486,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     bob.ID,
+					SenderID:   bob.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -494,7 +502,7 @@ func TestRedaction(t *testing.T) {
 
 				builderEv := mustCreateEvent(t, fledglingEvent{
 					Type:       spec.MRoomRedaction,
-					Sender:     charlie.ID,
+					SenderID:   charlie.ID,
 					RoomID:     room.ID,
 					Redacts:    redactedEvent.EventID(),
 					Depth:      redactedEvent.Depth() + 1,
@@ -515,6 +523,9 @@ func TestRedaction(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		natsInstance := &jetstream.NATSInstance{}
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -551,7 +562,7 @@ func TestRedaction(t *testing.T) {
 					}
 
 					// Calculate the snapshotNID etc.
-					plResolver := state.NewStateResolution(db, roomInfo)
+					plResolver := state.NewStateResolution(db, roomInfo, rsAPI)
 					stateAtEvent.BeforeStateSnapshotNID, err = plResolver.CalculateAndStoreStateBeforeEvent(ctx, ev.PDU, false)
 					assert.NoError(t, err)
 
@@ -563,7 +574,7 @@ func TestRedaction(t *testing.T) {
 					err = updater.Commit()
 					assert.NoError(t, err)
 
-					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.PDU, &plResolver)
+					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.PDU, &plResolver, &FakeQuerier{})
 					assert.NoError(t, err)
 					if redactedEvent != nil {
 						assert.Equal(t, ev.Redacts(), redactedEvent.EventID())
@@ -571,7 +582,7 @@ func TestRedaction(t *testing.T) {
 					if ev.Type() == spec.MRoomRedaction {
 						nids, err := db.EventNIDs(ctx, []string{ev.Redacts()})
 						assert.NoError(t, err)
-						evs, err := db.Events(ctx, roomInfo, []types.EventNID{nids[ev.Redacts()].EventNID})
+						evs, err := db.Events(ctx, roomInfo.RoomVersion, []types.EventNID{nids[ev.Redacts()].EventNID})
 						assert.NoError(t, err)
 						assert.Equal(t, 1, len(evs))
 						assert.Equal(t, tc.wantRedacted, evs[0].Redacted())
@@ -598,16 +609,15 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 	testCases := []struct {
 		name            string
 		prepareRoomFunc func(t *testing.T) *test.Room
-		wantResponse    api.QueryRestrictedJoinAllowedResponse
+		wantResponse    string
+		wantError       bool
 	}{
 		{
 			name: "public room unrestricted",
 			prepareRoomFunc: func(t *testing.T) *test.Room {
 				return test.NewRoom(t, alice)
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident: true,
-			},
+			wantResponse: "",
 		},
 		{
 			name: "room version without restrictions",
@@ -624,10 +634,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(""))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:   true,
-				Restricted: true,
-			},
+			wantError: true,
 		},
 		{
 			name: "knock_restricted",
@@ -638,10 +645,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(""))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:   true,
-				Restricted: true,
-			},
+			wantError: true,
 		},
 		{
 			name: "restricted with pending invite", // bob should be allowed to join
@@ -655,11 +659,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(bob.ID))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:   true,
-				Restricted: true,
-				Allowed:    true,
-			},
+			wantResponse: "",
 		},
 		{
 			name: "restricted with allowed room_id, but missing room", // bob should not be allowed to join, as we don't know about the room
@@ -680,9 +680,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(bob.ID))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Restricted: true,
-			},
+			wantError: true,
 		},
 		{
 			name: "restricted with allowed room_id", // bob should be allowed to join, as we know about the room
@@ -703,12 +701,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}, test.WithStateKey(bob.ID))
 				return r
 			},
-			wantResponse: api.QueryRestrictedJoinAllowedResponse{
-				Resident:      true,
-				Restricted:    true,
-				Allowed:       true,
-				AuthorisedVia: alice.ID,
-			},
+			wantResponse: alice.ID,
 		},
 	}
 
@@ -738,16 +731,17 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 					t.Errorf("failed to send events: %v", err)
 				}
 
-				req := api.QueryRestrictedJoinAllowedRequest{
-					UserID: bob.ID,
-					RoomID: testRoom.ID,
+				roomID, _ := spec.NewRoomID(testRoom.ID)
+				userID, _ := spec.NewUserID(bob.ID, true)
+				got, err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), *roomID, spec.SenderID(userID.String()))
+				if tc.wantError && err == nil {
+					t.Fatal("expected error, got none")
 				}
-				res := api.QueryRestrictedJoinAllowedResponse{}
-				if err := rsAPI.QueryRestrictedJoinAllowed(processCtx.Context(), &req, &res); err != nil {
+				if !tc.wantError && err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(tc.wantResponse, res) {
-					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, res)
+				if !reflect.DeepEqual(tc.wantResponse, got) {
+					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, got)
 				}
 			})
 		}
@@ -838,17 +832,6 @@ func TestUpgrade(t *testing.T) {
 		validateFunc func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI)
 		wantNewRoom  bool
 	}{
-		{
-			name:        "invalid userID",
-			upgradeUser: "!notvalid:test",
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
-				room := test.NewRoom(t, alice)
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
-				}
-				return room.ID
-			},
-		},
 		{
 			name:        "invalid roomID",
 			upgradeUser: alice.ID,
@@ -1066,7 +1049,11 @@ func TestUpgrade(t *testing.T) {
 				}
 				roomID := tc.roomFunc(rsAPI)
 
-				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, tc.upgradeUser, version.DefaultRoomVersion())
+				userID, err := spec.NewUserID(tc.upgradeUser, true)
+				if err != nil {
+					t.Fatalf("upgrade userID is invalid")
+				}
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, version.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}

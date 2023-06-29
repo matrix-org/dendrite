@@ -21,14 +21,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -139,6 +138,9 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateRedactionsTable(db); err != nil {
 		return err
 	}
+	if err := CreateUserRoomKeysTable(db); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -200,6 +202,10 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
+	userRoomKeys, err := PrepareUserRoomKeysTable(db)
+	if err != nil {
+		return err
+	}
 
 	d.Database = shared.Database{
 		DB: db,
@@ -225,6 +231,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 		PublishedTable:     published,
 		GetRoomUpdaterFn:   d.GetRoomUpdater,
 		Purge:              purge,
+		UserRoomKeyTable:   userRoomKeys,
 	}
 	return nil
 }

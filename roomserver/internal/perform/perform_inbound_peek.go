@@ -64,7 +64,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	latestEvents, err := r.DB.EventsFromIDs(ctx, info, []string{latestEventRefs[0].EventID})
+	latestEvents, err := r.DB.EventsFromIDs(ctx, info, []string{latestEventRefs[0]})
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	response.LatestEvent = &types.HeaderedEvent{PDU: sortedLatestEvents[0]}
 
 	// XXX: do we actually need to do a state resolution here?
-	roomState := state.NewStateResolution(r.DB, info)
+	roomState := state.NewStateResolution(r.DB, info, r.Inputer.Queryer)
 
 	var stateEntries []types.StateEntry
 	stateEntries, err = roomState.LoadStateAtSnapshot(

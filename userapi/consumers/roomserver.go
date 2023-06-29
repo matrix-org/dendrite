@@ -108,7 +108,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	}
 
 	if s.cfg.Matrix.ReportStats.Enabled {
-		go s.storeMessageStats(ctx, event.Type(), event.Sender(), event.RoomID())
+		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID())
 	}
 
 	log.WithFields(log.Fields{
@@ -301,7 +301,25 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 	switch {
 	case event.Type() == spec.MRoomMember:
-		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll)
+		sender := spec.UserID{}
+		validRoomID, roomErr := spec.NewRoomID(event.RoomID())
+		if roomErr != nil {
+			return roomErr
+		}
+		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+		if queryErr == nil && userID != nil {
+			sender = *userID
+		}
+
+		sk := event.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
+			if queryErr == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
+		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk)
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
@@ -529,12 +547,30 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 		return fmt.Errorf("s.localPushDevices: %w", err)
 	}
 
+	sender := spec.UserID{}
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return err
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	if err == nil && userID != nil {
+		sender = *userID
+	}
+
+	sk := event.StateKey()
+	if sk != nil && *sk != "" {
+		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
+		if queryErr == nil && skUserID != nil {
+			skString := skUserID.String()
+			sk = &skString
+		}
+	}
 	n := &api.Notification{
 		Actions: actions,
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.ToClientEvent(event, synctypes.FormatSync),
+		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender, sk),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it
@@ -615,7 +651,16 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
-	if event.Sender() == mem.UserID {
+	user := ""
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return nil, err
+	}
+	sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	if err == nil {
+		user = sender.String()
+	}
+	if user == mem.UserID {
 		// SPEC: Homeservers MUST NOT notify the Push Gateway for
 		// events that the user has sent themselves.
 		return nil, nil
@@ -632,9 +677,8 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		if err != nil {
 			return nil, err
 		}
-		sender := event.Sender()
-		if _, ok := ignored.List[sender]; ok {
-			return nil, fmt.Errorf("user %s is ignored", sender)
+		if _, ok := ignored.List[sender.String()]; ok {
+			return nil, fmt.Errorf("user %s is ignored", sender.String())
 		}
 	}
 	ruleSets, err := s.db.QueryPushRules(ctx, mem.Localpart, mem.Domain)
@@ -650,7 +694,9 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
-	rule, err := eval.MatchEvent(event.PDU)
+	rule, err := eval.MatchEvent(event.PDU, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -682,7 +728,7 @@ func (rse *ruleSetEvalContext) UserDisplayName() string { return rse.mem.Display
 
 func (rse *ruleSetEvalContext) RoomMemberCount() (int, error) { return rse.roomSize, nil }
 
-func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, error) {
+func (rse *ruleSetEvalContext) HasPowerLevel(senderID spec.SenderID, levelKey string) (bool, error) {
 	req := &rsapi.QueryLatestEventsAndStateRequest{
 		RoomID: rse.roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
@@ -702,7 +748,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 		if err != nil {
 			return false, err
 		}
-		return plc.UserLevel(userID) >= plc.NotificationLevel(levelKey), nil
+		return plc.UserLevel(senderID) >= plc.NotificationLevel(levelKey), nil
 	}
 	return true, nil
 }
@@ -756,6 +802,15 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		}
 
 	default:
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return nil, err
+		}
+		sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to get userID for sender %s", event.SenderID())
+			return nil, err
+		}
 		req = pushgateway.NotifyRequest{
 			Notification: pushgateway.Notification{
 				Content: event.Content(),
@@ -767,14 +822,30 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				ID:       event.EventID(),
 				RoomID:   event.RoomID(),
 				RoomName: roomName,
-				Sender:   event.Sender(),
+				Sender:   sender.String(),
 				Type:     event.Type(),
 			},
 		}
-		if mem, err := event.Membership(); err == nil {
+		if mem, memberErr := event.Membership(); memberErr == nil {
 			req.Notification.Membership = mem
 		}
-		if event.StateKey() != nil && *event.StateKey() == fmt.Sprintf("@%s:%s", localpart, s.cfg.Matrix.ServerName) {
+		userID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", localpart, s.cfg.Matrix.ServerName), true)
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
+			return nil, err
+		}
+		roomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			logger.WithError(err).Errorf("event roomID is invalid %s", event.RoomID())
+			return nil, err
+		}
+
+		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
+			return nil, err
+		}
+		if event.StateKey() != nil && *event.StateKey() == string(localSender) {
 			req.Notification.UserIsTarget = true
 		}
 	}

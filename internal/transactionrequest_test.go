@@ -66,9 +66,12 @@ var (
 
 type FakeRsAPI struct {
 	rsAPI.RoomserverInternalAPI
-	shouldFailQuery  bool
-	bannedFromRoom   bool
-	shouldEventsFail bool
+	shouldFailQuery bool
+	bannedFromRoom  bool
+}
+
+func (r *FakeRsAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 func (r *FakeRsAPI) QueryRoomVersionForRoom(
@@ -98,11 +101,7 @@ func (r *FakeRsAPI) InputRoomEvents(
 	ctx context.Context,
 	req *rsAPI.InputRoomEventsRequest,
 	res *rsAPI.InputRoomEventsResponse,
-) error {
-	if r.shouldEventsFail {
-		return fmt.Errorf("Failure")
-	}
-	return nil
+) {
 }
 
 func TestEmptyTransactionRequest(t *testing.T) {
@@ -175,18 +174,6 @@ func TestProcessTransactionRequestPDUBannedFromRoom(t *testing.T) {
 func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{invalidSignatures}, []gomatrixserverlib.EDU{}, "", "", "")
-	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
-
-	assert.Nil(t, jsonRes)
-	assert.Equal(t, 1, len(txnRes.PDUs))
-	for _, result := range txnRes.PDUs {
-		assert.NotEmpty(t, result.Error)
-	}
-}
-
-func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
-	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{shouldEventsFail: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -655,16 +642,19 @@ type testRoomserverAPI struct {
 	queryLatestEventsAndState func(*rsAPI.QueryLatestEventsAndStateRequest) rsAPI.QueryLatestEventsAndStateResponse
 }
 
+func (t *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 func (t *testRoomserverAPI) InputRoomEvents(
 	ctx context.Context,
 	request *rsAPI.InputRoomEventsRequest,
 	response *rsAPI.InputRoomEventsResponse,
-) error {
+) {
 	t.inputRoomEvents = append(t.inputRoomEvents, request.InputRoomEvents...)
 	for _, ire := range request.InputRoomEvents {
 		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
 	}
-	return nil
 }
 
 // Query the latest events and state for a room from the room server.

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,15 +157,39 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 
 	joinInput := gomatrixserverlib.PerformJoinInput{
-		UserID:        user,
-		RoomID:        room,
-		ServerName:    serverName,
-		Content:       content,
-		Unsigned:      unsigned,
-		PrivateKey:    r.cfg.Matrix.PrivateKey,
-		KeyID:         r.cfg.Matrix.KeyID,
-		KeyRing:       r.keyRing,
-		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName),
+		UserID:     user,
+		RoomID:     room,
+		ServerName: serverName,
+		Content:    content,
+		Unsigned:   unsigned,
+		PrivateKey: r.cfg.Matrix.PrivateKey,
+		KeyID:      r.cfg.Matrix.KeyID,
+		KeyRing:    r.keyRing,
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}),
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			// assign a roomNID, otherwise we can't create a private key for the user
+			_, nidErr := r.rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
+			if nidErr != nil {
+				return "", nil, nidErr
+			}
+			key, keyErr := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", nil, keyErr
+			}
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.rsAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
+		},
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
 
@@ -187,7 +212,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
 	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
 	// The events are trusted now as we performed auth checks above.
-	joinedHosts, err := consumers.JoinedHostsFromEvents(response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false))
+	joinedHosts, err := consumers.JoinedHostsFromEvents(ctx, response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false), r.rsAPI)
 	if err != nil {
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
@@ -358,8 +383,11 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
+	userIDProvider := func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
-		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName),
+		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName, userIDProvider), userIDProvider,
 	)
 	if err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
@@ -406,7 +434,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) (err error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.UserID)
+	userID, err := spec.NewUserID(request.UserID, true)
 	if err != nil {
 		return err
 	}
@@ -425,7 +453,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// request.
 		respMakeLeave, err := r.federation.MakeLeave(
 			ctx,
-			origin,
+			userID.Domain(),
 			serverName,
 			request.RoomID,
 			request.UserID,
@@ -446,9 +474,18 @@ func (r *FederationInternalAPI) PerformLeave(
 
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
+		roomID, err := spec.NewRoomID(request.RoomID)
+		if err != nil {
+			return err
+		}
+		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
+		if err != nil {
+			return err
+		}
+		senderIDString := string(senderID)
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
-		respMakeLeave.LeaveEvent.Sender = request.UserID
-		respMakeLeave.LeaveEvent.StateKey = &request.UserID
+		respMakeLeave.LeaveEvent.SenderID = senderIDString
+		respMakeLeave.LeaveEvent.StateKey = &senderIDString
 		respMakeLeave.LeaveEvent.RoomID = request.RoomID
 		respMakeLeave.LeaveEvent.Redacts = ""
 		leaveEB := verImpl.NewEventBuilderFromProtoEvent(&respMakeLeave.LeaveEvent)
@@ -470,7 +507,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Build the leave event.
 		event, err := leaveEB.Build(
 			time.Now(),
-			origin,
+			userID.Domain(),
 			r.cfg.Matrix.KeyID,
 			r.cfg.Matrix.PrivateKey,
 		)
@@ -482,7 +519,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Try to perform a send_leave using the newly built event.
 		err = r.federation.SendLeave(
 			ctx,
-			origin,
+			userID.Domain(),
 			serverName,
 			event,
 		)
@@ -503,60 +540,63 @@ func (r *FederationInternalAPI) PerformLeave(
 	)
 }
 
-// PerformLeaveRequest implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformInvite(
+// SendInvite implements api.FederationInternalAPI
+func (r *FederationInternalAPI) SendInvite(
 	ctx context.Context,
-	request *api.PerformInviteRequest,
-	response *api.PerformInviteResponse,
-) (err error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.Event.Sender())
+	event gomatrixserverlib.PDU,
+	strippedState []gomatrixserverlib.InviteStrippedState,
+) (gomatrixserverlib.PDU, error) {
+	validRoomID, err := spec.NewRoomID(event.RoomID())
 	if err != nil {
-		return err
+		return nil, err
+	}
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	if err != nil {
+		return nil, err
 	}
 
-	if request.Event.StateKey() == nil {
-		return errors.New("invite must be a state event")
+	if event.StateKey() == nil {
+		return nil, errors.New("invite must be a state event")
 	}
 
-	_, destination, err := gomatrixserverlib.SplitID('@', *request.Event.StateKey())
+	_, destination, err := gomatrixserverlib.SplitID('@', *event.StateKey())
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
 
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
 	if !r.shouldAttemptDirectFederation(destination) {
-		return fmt.Errorf("relay servers have no meaningful response for invite.")
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"event_id":     request.Event.EventID(),
-		"user_id":      *request.Event.StateKey(),
-		"room_id":      request.Event.RoomID(),
-		"room_version": request.RoomVersion,
+		"event_id":     event.EventID(),
+		"user_id":      *event.StateKey(),
+		"room_id":      event.RoomID(),
+		"room_version": event.Version(),
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := fclient.NewInviteV2Request(request.Event.PDU, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(event, strippedState)
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
-	inviteRes, err := r.federation.SendInviteV2(ctx, origin, destination, inviteReq)
+	inviteRes, err := r.federation.SendInviteV2(ctx, inviter.Domain(), destination, inviteReq)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
+		return nil, fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
-	verImpl, err := gomatrixserverlib.GetRoomVersion(request.RoomVersion)
+	verImpl, err := gomatrixserverlib.GetRoomVersion(event.Version())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
+		return nil, fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
-	response.Event = &types.HeaderedEvent{PDU: inviteEvent}
-	return nil
+	return inviteEvent, nil
 }
 
 // PerformServersAlive implements api.FederationInternalAPI
@@ -636,6 +676,7 @@ func checkEventsContainCreateEvent(events []gomatrixserverlib.PDU) error {
 func federatedEventProvider(
 	ctx context.Context, federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
+	userIDForSender spec.UserIDForSender,
 ) gomatrixserverlib.EventProvider {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
@@ -685,7 +726,7 @@ func federatedEventProvider(
 				}
 
 				// Check the signatures of the event.
-				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing); err != nil {
+				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing, userIDForSender); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
 				}
 

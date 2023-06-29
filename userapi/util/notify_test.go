@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/bcrypt"
 
@@ -87,7 +88,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Prepare pusher with our test server URL
-		if err := db.UpsertPusher(ctx, api.Pusher{
+		if err = db.UpsertPusher(ctx, api.Pusher{
 			Kind:    api.HTTPKind,
 			AppID:   appID,
 			PushKey: pushKey,
@@ -99,8 +100,13 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Insert a dummy event
+		sender, err := spec.NewUserID(alice.ID, true)
+		if err != nil {
+			t.Error(err)
+		}
+		sk := ""
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
-			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll),
+			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, *sender, &sk),
 		}); err != nil {
 			t.Error(err)
 		}

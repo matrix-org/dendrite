@@ -2,6 +2,7 @@ package tables
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"errors"
 
@@ -42,7 +43,7 @@ type Events interface {
 	InsertEvent(
 		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventTypeNID types.EventTypeNID,
 		eventStateKeyNID types.EventStateKeyNID, eventID string,
-		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
+		authEventNIDs []types.EventNID, depth int64, isRejected bool,
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
 	BulkSelectSnapshotsFromEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
@@ -59,7 +60,6 @@ type Events interface {
 	UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error
 	SelectEventID(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) (eventID string, err error)
 	BulkSelectStateAtEventAndReference(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error)
-	BulkSelectEventReference(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) ([]gomatrixserverlib.EventReference, error)
 	// BulkSelectEventID returns a map from numeric event ID to string event ID.
 	BulkSelectEventID(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
 	// BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
@@ -113,10 +113,10 @@ type RoomAliases interface {
 }
 
 type PreviousEvents interface {
-	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, previousEventReferenceSHA256 []byte, eventNID types.EventNID) error
+	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, eventNID types.EventNID) error
 	// Check if the event reference exists
 	// Returns sql.ErrNoRows if the event reference doesn't exist.
-	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
+	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string) error
 }
 
 type Invites interface {
@@ -183,6 +183,21 @@ type Purge interface {
 	PurgeRoom(
 		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, roomID string,
 	) error
+}
+
+type UserRoomKeys interface {
+	// InsertUserRoomPrivatePublicKey inserts the given private key as well as the public key for it. This should be used
+	// when creating keys locally.
+	InsertUserRoomPrivatePublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (ed25519.PrivateKey, error)
+	// InsertUserRoomPublicKey inserts the given public key, this should be used for users NOT local to this server
+	InsertUserRoomPublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (ed25519.PublicKey, error)
+	// SelectUserRoomPrivateKey selects the private key for the given user and room combination
+	SelectUserRoomPrivateKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID) (ed25519.PrivateKey, error)
+	// SelectUserRoomPublicKey selects the public key for the given user and room combination
+	SelectUserRoomPublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID) (ed25519.PublicKey, error)
+	// BulkSelectUserNIDs selects all userIDs for the requested senderKeys. Returns a map from publicKey -> types.UserRoomKeyPair.
+	// If a senderKey can't be found, it is omitted in the result.
+	BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error)
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

@@ -39,6 +39,10 @@ var (
 	roomIDCounter = int64(0)
 )
 
+func UserIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 type Room struct {
 	ID           string
 	Version      gomatrixserverlib.RoomVersion
@@ -75,7 +79,7 @@ func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 	return r
 }
 
-func (r *Room) MustGetAuthEventRefsForEvent(t *testing.T, needed gomatrixserverlib.StateNeeded) []gomatrixserverlib.EventReference {
+func (r *Room) MustGetAuthEventRefsForEvent(t *testing.T, needed gomatrixserverlib.StateNeeded) []string {
 	t.Helper()
 	a, err := needed.AuthEventReferences(&r.authEvents)
 	if err != nil {
@@ -164,7 +168,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	}
 
 	builder := gomatrixserverlib.MustGetRoomVersion(r.Version).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:   creator.ID,
+		SenderID: creator.ID,
 		RoomID:   r.ID,
 		Type:     eventType,
 		StateKey: mod.stateKey,
@@ -176,7 +180,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 		t.Fatalf("CreateEvent[%s]: failed to SetContent: %s", eventType, err)
 	}
 	if depth > 1 {
-		builder.PrevEvents = []gomatrixserverlib.EventReference{r.events[len(r.events)-1].EventReference()}
+		builder.PrevEvents = []string{r.events[len(r.events)-1].EventID()}
 	}
 
 	err = builder.AddAuthEvents(&r.authEvents)
@@ -195,7 +199,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to build event: %s", eventType, err)
 	}
-	if err = gomatrixserverlib.Allowed(ev, &r.authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(ev, &r.authEvents, UserIDForSender); err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
 	headeredEvent := &rstypes.HeaderedEvent{PDU: ev}

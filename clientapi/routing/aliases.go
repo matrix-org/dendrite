@@ -19,12 +19,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-
 	"github.com/matrix-org/util"
 )
 
@@ -57,19 +55,29 @@ func GetAliases(
 		visibility = content.HistoryVisibility
 	}
 	if visibility != spec.WorldReadable {
+		deviceUserID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			}
+		}
 		queryReq := api.QueryMembershipForUserRequest{
 			RoomID: roomID,
-			UserID: device.UserID,
+			UserID: *deviceUserID,
 		}
 		var queryRes api.QueryMembershipForUserResponse
 		if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if !queryRes.IsInRoom {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("You aren't a member of this room."),
+				JSON: spec.Forbidden("You aren't a member of this room."),
 			}
 		}
 	}

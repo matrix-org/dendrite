@@ -99,7 +99,48 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*rstypes.He
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
+}
+
+func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Device, in []types.StreamEvent, rsAPI api.SyncRoomserverAPI) []*rstypes.HeaderedEvent {
+	out := make([]*rstypes.HeaderedEvent, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i].HeaderedEvent
+		if device != nil && in[i].TransactionID != nil {
+			userID, err := spec.NewUserID(device.UserID, true)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			roomID, err := spec.NewRoomID(in[i].RoomID())
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Room ID is invalid")
+				continue
+			}
+			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			if deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
+				err := out[i].SetUnsignedField(
+					"transaction_id", in[i].TransactionID.TransactionID,
+				)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"event_id": out[i].EventID(),
+					}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}
+			}
+		}
+	}
+	return out
 }
 
 // AddInviteEvent stores a new invite event for a user.
@@ -188,26 +229,6 @@ func (d *Database) UpsertAccountData(
 		return err
 	})
 	return
-}
-
-func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*rstypes.HeaderedEvent {
-	out := make([]*rstypes.HeaderedEvent, len(in))
-	for i := 0; i < len(in); i++ {
-		out[i] = in[i].HeaderedEvent
-		if device != nil && in[i].TransactionID != nil {
-			if device.UserID == in[i].Sender() && device.SessionID == in[i].TransactionID.SessionID {
-				err := out[i].SetUnsignedField(
-					"transaction_id", in[i].TransactionID.TransactionID,
-				)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						"event_id": out[i].EventID(),
-					}).WithError(err).Warnf("Failed to add transaction ID to event")
-				}
-			}
-		}
-	}
-	return out
 }
 
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
@@ -343,7 +364,7 @@ func (d *Database) PutFilter(
 	return filterID, err
 }
 
-func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent) error {
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error {
 	redactedEvents, err := d.Events(ctx, []string{redactedEventID})
 	if err != nil {
 		return err
@@ -354,7 +375,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 	eventToRedact := redactedEvents[0].PDU
 	redactionEvent := redactedBecause.PDU
-	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
+	if err = eventutil.RedactEvent(ctx, redactionEvent, eventToRedact, querier); err != nil {
 		return err
 	}
 
@@ -493,8 +514,24 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev gomatrixserverlib.PDU, userID string) (string, string) {
-	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
+func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userID string, rsAPI api.SyncRoomserverAPI) (string, string) {
+	if ev.StateKey() == nil || *ev.StateKey() == "" {
+		return "", ""
+	}
+	fullUser, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return "", ""
+	}
+	roomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return "", ""
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *fullUser)
+	if err != nil {
+		return "", ""
+	}
+
+	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(string(senderID)) {
 		return "", ""
 	}
 	membership, err := ev.Membership()

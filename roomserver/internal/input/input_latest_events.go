@@ -154,8 +154,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	extremitiesChanged, err := u.calculateLatest(
 		u.oldLatest, u.event,
 		types.StateAtEventAndReference{
-			EventReference: u.event.EventReference(),
-			StateAtEvent:   u.stateAtEvent,
+			EventID:      u.event.EventID(),
+			StateAtEvent: u.stateAtEvent,
 		},
 	)
 	if err != nil {
@@ -213,7 +213,7 @@ func (u *latestEventsUpdater) latestState() error {
 	defer trace.EndRegion()
 
 	var err error
-	roomState := state.NewStateResolution(u.updater, u.roomInfo)
+	roomState := state.NewStateResolution(u.updater, u.roomInfo, u.api.Queryer)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
@@ -349,7 +349,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// If the "new" event is already referenced by an existing event
 	// then do nothing - it's not a candidate to be a new extremity if
 	// it has been referenced.
-	if referenced, err := u.updater.IsReferenced(newEvent.EventReference()); err != nil {
+	if referenced, err := u.updater.IsReferenced(newEvent.EventID()); err != nil {
 		return false, fmt.Errorf("u.updater.IsReferenced(new): %w", err)
 	} else if referenced {
 		u.latest = oldLatest
@@ -360,7 +360,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// have entries in the previous events table. If they do then we
 	// will no longer include them as forward extremities.
 	for k, l := range existingRefs {
-		referenced, err := u.updater.IsReferenced(l.EventReference)
+		referenced, err := u.updater.IsReferenced(l.EventID)
 		if err != nil {
 			return false, fmt.Errorf("u.updater.IsReferenced: %w", err)
 		} else if referenced {

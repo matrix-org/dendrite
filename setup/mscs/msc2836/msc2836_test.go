@@ -525,6 +525,14 @@ type testRoomserverAPI struct {
 	events            map[string]*types.HeaderedEvent
 }
 
+func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+	return spec.SenderID(userID.String()), nil
+}
+
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
 	for _, eventID := range req.EventIDs {
 		ev := r.events[eventID]
@@ -536,7 +544,7 @@ func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver
 }
 
 func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roomserver.QueryMembershipForUserRequest, res *roomserver.QueryMembershipForUserResponse) error {
-	rooms := r.userToJoinedRooms[req.UserID]
+	rooms := r.userToJoinedRooms[req.UserID.String()]
 	for _, roomID := range rooms {
 		if roomID == req.RoomID {
 			res.IsInRoom = true
@@ -586,7 +594,7 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
-		Sender:   ev.Sender,
+		SenderID: ev.Sender,
 		Depth:    999,
 		Type:     ev.Type,
 		StateKey: ev.StateKey,

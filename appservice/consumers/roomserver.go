@@ -181,7 +181,9 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	// Create the transaction body.
 	transaction, err := json.Marshal(
 		ApplicationServiceTransaction{
-			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll),
+			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			}),
 		},
 	)
 	if err != nil {
@@ -233,10 +235,20 @@ func (s *appserviceState) backoffAndPause(err error) error {
 //
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
+	user := ""
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return false
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	if err == nil {
+		user = userID.String()
+	}
+
 	switch {
 	case appservice.URL == "":
 		return false
-	case appservice.IsInterestedInUserID(event.Sender()):
+	case appservice.IsInterestedInUserID(user):
 		return true
 	case appservice.IsInterestedInRoomID(event.RoomID()):
 		return true

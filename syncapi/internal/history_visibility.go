@@ -134,9 +134,21 @@ func ApplyHistoryVisibilityFilter(
 			}
 		}
 		// NOTSPEC: Always allow user to see their own membership events (spec contains more "rules")
-		if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(userID) {
-			eventsFiltered = append(eventsFiltered, ev)
-			continue
+
+		user, err := spec.NewUserID(userID, true)
+		if err != nil {
+			return nil, err
+		}
+		roomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			return nil, err
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *user)
+		if err == nil {
+			if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(string(senderID)) {
+				eventsFiltered = append(eventsFiltered, ev)
+				continue
+			}
 		}
 		// Always allow history evVis events on boundaries. This is done
 		// by setting the effective evVis to the least restrictive

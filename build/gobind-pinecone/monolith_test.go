@@ -22,7 +22,10 @@ import (
 )
 
 func TestMonolithStarts(t *testing.T) {
-	monolith := DendriteMonolith{}
+	monolith := DendriteMonolith{
+		StorageDirectory: t.TempDir(),
+		CacheDirectory:   t.TempDir(),
+	}
 	monolith.Start()
 	monolith.PublicKey()
 	monolith.Stop()
@@ -60,7 +63,10 @@ func TestMonolithSetRelayServers(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		monolith := DendriteMonolith{}
+		monolith := DendriteMonolith{
+			StorageDirectory: t.TempDir(),
+			CacheDirectory:   t.TempDir(),
+		}
 		monolith.Start()
 
 		inputRelays := tc.relays

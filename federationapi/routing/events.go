@@ -20,13 +20,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
-
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/roomserver/api"
 )
 
 // GetEvent returns the requested event
@@ -37,13 +35,14 @@ func GetEvent(
 	eventID string,
 	origin spec.ServerName,
 ) util.JSONResponse {
-	err := allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
-	if err != nil {
-		return *err
-	}
 	// /_matrix/federation/v1/event/{eventId} doesn't have a roomID, we use an empty string,
 	// which results in `QueryEventsByID` to first get the event and use that to determine the roomID.
 	event, err := fetchEvent(ctx, rsAPI, "", eventID)
+	if err != nil {
+		return *err
+	}
+
+	err = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID())
 	if err != nil {
 		return *err
 	}
@@ -64,8 +63,9 @@ func allowedToSeeEvent(
 	origin spec.ServerName,
 	rsAPI api.FederationRoomserverAPI,
 	eventID string,
+	roomID string,
 ) *util.JSONResponse {
-	allowed, err := rsAPI.QueryServerAllowedToSeeEvent(ctx, origin, eventID)
+	allowed, err := rsAPI.QueryServerAllowedToSeeEvent(ctx, origin, eventID, roomID)
 	if err != nil {
 		resErr := util.ErrorResponse(err)
 		return &resErr
@@ -95,7 +95,7 @@ func fetchEvent(ctx context.Context, rsAPI api.FederationRoomserverAPI, roomID, 
 	if len(eventsResponse.Events) == 0 {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Event not found"),
+			JSON: spec.NotFound("Event not found"),
 		}
 	}
 

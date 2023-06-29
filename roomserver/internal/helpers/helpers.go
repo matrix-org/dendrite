@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -55,9 +54,10 @@ func UpdateToInviteMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
+				RoomID:           add.RoomID(),
 				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
+				TargetSenderID:   spec.SenderID(*add.StateKey()),
 			},
 		})
 	}
@@ -68,7 +68,7 @@ func UpdateToInviteMembership(
 // memberships. If the servername is not supplied then the local server will be
 // checked instead using a faster code path.
 // TODO: This should probably be replaced by an API call.
-func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverName spec.ServerName, roomID string) (bool, error) {
+func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, querier api.QuerySenderIDAPI, serverName spec.ServerName, roomID string) (bool, error) {
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
 		return false, err
@@ -86,7 +86,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 		return false, err
 	}
 
-	events, err := db.Events(ctx, info, eventNIDs)
+	events, err := db.Events(ctx, info.RoomVersion, eventNIDs)
 	if err != nil {
 		return false, err
 	}
@@ -94,13 +94,13 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	for i := range events {
 		gmslEvents[i] = events[i].PDU
 	}
-	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, spec.Join), nil
+	return auth.IsAnyUserOnServerWithMembership(ctx, querier, serverName, gmslEvents, spec.Join), nil
 }
 
 func IsInvitePending(
 	ctx context.Context, db storage.Database,
-	roomID, userID string,
-) (bool, string, string, gomatrixserverlib.PDU, error) {
+	roomID string, senderID spec.SenderID,
+) (bool, spec.SenderID, string, gomatrixserverlib.PDU, error) {
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -111,13 +111,13 @@ func IsInvitePending(
 	}
 
 	// Look up the state key NID for the supplied user ID.
-	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{userID})
+	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{string(senderID)})
 	if err != nil {
 		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
-	targetUserNID, targetUserFound := targetUserNIDs[userID]
+	targetUserNID, targetUserFound := targetUserNIDs[string(senderID)]
 	if !targetUserFound {
-		return false, "", "", nil, fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
+		return false, "", "", nil, fmt.Errorf("missing NID for user %q (%+v)", senderID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
@@ -156,7 +156,7 @@ func IsInvitePending(
 
 	event, err := verImpl.NewEventFromTrustedJSON(eventJSON, false)
 
-	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
+	return true, spec.SenderID(senderUser), userNIDToEventID[senderUserNIDs[0]], event, err
 }
 
 // GetMembershipsAtState filters the state events to
@@ -183,7 +183,10 @@ func GetMembershipsAtState(
 	util.Unique(eventNIDs)
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
+	if roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +211,8 @@ func GetMembershipsAtState(
 	return events, nil
 }
 
-func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventNID types.EventNID) ([]types.StateEntry, error) {
-	roomState := state.NewStateResolution(db, info)
+func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventNID types.EventNID, querier api.QuerySenderIDAPI) ([]types.StateEntry, error) {
+	roomState := state.NewStateResolution(db, info, querier)
 	// Lookup the event NID
 	eIDs, err := db.EventIDs(ctx, []types.EventNID{eventNID})
 	if err != nil {
@@ -226,8 +229,8 @@ func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.Room
 	return roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 }
 
-func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID) (map[string][]types.StateEntry, error) {
-	roomState := state.NewStateResolution(db, info)
+func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID, querier api.QuerySenderIDAPI) (map[string][]types.StateEntry, error) {
+	roomState := state.NewStateResolution(db, info, querier)
 	// Fetch the state as it was when this event was fired
 	return roomState.LoadMembershipAtEvent(ctx, eventIDs, stateKeyNID)
 }
@@ -235,7 +238,10 @@ func MembershipAtEvent(ctx context.Context, db storage.RoomDatabase, info *types
 func LoadEvents(
 	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, eventNIDs []types.EventNID,
 ) ([]gomatrixserverlib.PDU, error) {
-	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
+	if roomInfo == nil {
+		return nil, types.ErrorInvalidRoomInfo
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +264,7 @@ func LoadStateEvents(
 }
 
 func CheckServerAllowedToSeeEvent(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName, isServerInRoom bool,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, roomID string, eventID string, serverName spec.ServerName, isServerInRoom bool, querier api.QuerySenderIDAPI,
 ) (bool, error) {
 	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
 	switch err {
@@ -267,7 +273,7 @@ func CheckServerAllowedToSeeEvent(
 	case tables.OptimisationNotSupportedError:
 		// The database engine didn't support this optimisation, so fall back to using
 		// the old and slow method
-		stateAtEvent, err = slowGetHistoryVisibilityState(ctx, db, info, eventID, serverName)
+		stateAtEvent, err = slowGetHistoryVisibilityState(ctx, db, info, roomID, eventID, serverName, querier)
 		if err != nil {
 			return false, err
 		}
@@ -282,13 +288,13 @@ func CheckServerAllowedToSeeEvent(
 			return false, err
 		}
 	}
-	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
+	return auth.IsServerAllowed(ctx, querier, serverName, isServerInRoom, stateAtEvent), nil
 }
 
 func slowGetHistoryVisibilityState(
-	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName spec.ServerName,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, roomID, eventID string, serverName spec.ServerName, querier api.QuerySenderIDAPI,
 ) ([]gomatrixserverlib.PDU, error) {
-	roomState := state.NewStateResolution(db, info)
+	roomState := state.NewStateResolution(db, info, querier)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -312,9 +318,18 @@ func slowGetHistoryVisibilityState(
 	// If the event state key doesn't match the given servername
 	// then we'll filter it out. This does preserve state keys that
 	// are "" since these will contain history visibility etc.
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
 	for nid, key := range stateKeys {
-		if key != "" && !strings.HasSuffix(key, ":"+string(serverName)) {
-			delete(stateKeys, nid)
+		if key != "" {
+			userID, err := querier.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(key))
+			if err == nil && userID != nil {
+				if userID.Domain() != serverName {
+					delete(stateKeys, nid)
+				}
+			}
 		}
 	}
 
@@ -338,7 +353,7 @@ func slowGetHistoryVisibilityState(
 // TODO: Remove this when we have tests to assert correctness of this function
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, front []string, visited map[string]bool, limit int,
-	serverName spec.ServerName,
+	serverName spec.ServerName, querier api.QuerySenderIDAPI,
 ) ([]types.EventNID, map[string]struct{}, error) {
 	var resultNIDs []types.EventNID
 	var err error
@@ -381,7 +396,7 @@ BFSLoop:
 			// It's nasty that we have to extract the room ID from an event, but many federation requests
 			// only talk in event IDs, no room IDs at all (!!!)
 			ev := events[0]
-			isServerInRoom, err = IsServerCurrentlyInRoom(ctx, db, serverName, ev.RoomID())
+			isServerInRoom, err = IsServerCurrentlyInRoom(ctx, db, querier, serverName, ev.RoomID())
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to check if server is currently in room, assuming not.")
 			}
@@ -404,7 +419,7 @@ BFSLoop:
 				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, pre, serverName, isServerInRoom)
+					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, ev.RoomID(), pre, serverName, isServerInRoom, querier)
 					if err != nil {
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",
@@ -433,7 +448,7 @@ BFSLoop:
 }
 
 func QueryLatestEventsAndState(
-	ctx context.Context, db storage.Database,
+	ctx context.Context, db storage.Database, querier api.QuerySenderIDAPI,
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
@@ -446,7 +461,7 @@ func QueryLatestEventsAndState(
 		return nil
 	}
 
-	roomState := state.NewStateResolution(db, roomInfo)
+	roomState := state.NewStateResolution(db, roomInfo, querier)
 	response.RoomExists = true
 	response.RoomVersion = roomInfo.RoomVersion
 

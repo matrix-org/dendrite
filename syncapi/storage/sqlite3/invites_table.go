@@ -108,7 +108,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 		streamPos,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
-		*inviteEvent.StateKey(),
+		inviteEvent.UserID.String(),
 		headeredJSON,
 	)
 	return

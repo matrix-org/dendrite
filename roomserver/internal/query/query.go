@@ -16,11 +16,13 @@ package query
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
+	//"github.com/matrix-org/dendrite/roomserver/internal"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -44,6 +46,42 @@ type Queryer struct {
 	Cache             caching.RoomServerCaches
 	IsLocalServerName func(spec.ServerName) bool
 	ServerACLs        *acls.ServerACLs
+	Cfg               *config.Dendrite
+}
+
+func (r *Queryer) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
+	roomInfo, err := r.QueryRoomInfo(ctx, roomID)
+	if err != nil || roomInfo == nil || roomInfo.IsStub() {
+		return nil, err
+	}
+
+	req := api.QueryServerJoinedToRoomRequest{
+		ServerName: localServerName,
+		RoomID:     roomID.String(),
+	}
+	res := api.QueryServerJoinedToRoomResponse{}
+	if err = r.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
+	}
+
+	userJoinedToRoom, err := r.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	locallyJoinedUsers, err := r.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	return &gomatrixserverlib.RestrictedRoomJoinInfo{
+		LocalServerInRoom: res.RoomExists && res.IsInRoom,
+		UserJoinedToRoom:  userJoinedToRoom,
+		JoinedUsers:       locallyJoinedUsers,
+	}, nil
 }
 
 // QueryLatestEventsAndState implements api.RoomserverInternalAPI
@@ -52,7 +90,7 @@ func (r *Queryer) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
-	return helpers.QueryLatestEventsAndState(ctx, r.DB, request, response)
+	return helpers.QueryLatestEventsAndState(ctx, r.DB, r, request, response)
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
@@ -69,7 +107,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		return nil
 	}
 
-	roomState := state.NewStateResolution(r.DB, info)
+	roomState := state.NewStateResolution(r.DB, info, r)
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
@@ -122,7 +160,9 @@ func (r *Queryer) QueryStateAfterEvents(
 		}
 
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return r.QueryUserIDForSender(ctx, roomID, senderID)
+			},
 		)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
@@ -181,13 +221,14 @@ func (r *Queryer) QueryEventsByID(
 	return nil
 }
 
-// QueryMembershipForUser implements api.RoomserverInternalAPI
-func (r *Queryer) QueryMembershipForUser(
+// QueryMembershipForSenderID implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMembershipForSenderID(
 	ctx context.Context,
-	request *api.QueryMembershipForUserRequest,
+	roomID spec.RoomID,
+	senderID spec.SenderID,
 	response *api.QueryMembershipForUserResponse,
 ) error {
-	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
 		return err
 	}
@@ -197,7 +238,7 @@ func (r *Queryer) QueryMembershipForUser(
 	}
 	response.RoomExists = true
 
-	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.UserID)
+	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, senderID)
 	if err != nil {
 		return err
 	}
@@ -212,7 +253,7 @@ func (r *Queryer) QueryMembershipForUser(
 	response.IsInRoom = stillInRoom
 	response.HasBeenInRoom = true
 
-	evs, err := r.DB.Events(ctx, info, []types.EventNID{membershipEventNID})
+	evs, err := r.DB.Events(ctx, info.RoomVersion, []types.EventNID{membershipEventNID})
 	if err != nil {
 		return err
 	}
@@ -223,6 +264,24 @@ func (r *Queryer) QueryMembershipForUser(
 	response.EventID = evs[0].EventID()
 	response.Membership, err = evs[0].Membership()
 	return err
+}
+
+// QueryMembershipForUser implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMembershipForUser(
+	ctx context.Context,
+	request *api.QueryMembershipForUserRequest,
+	response *api.QueryMembershipForUserResponse,
+) error {
+	roomID, err := spec.NewRoomID(request.RoomID)
+	if err != nil {
+		return err
+	}
+	senderID, err := r.QuerySenderIDForUser(ctx, *roomID, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	return r.QueryMembershipForSenderID(ctx, *roomID, senderID, response)
 }
 
 // QueryMembershipAtEvent returns the known memberships at a given event.
@@ -262,7 +321,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 	}
 
 	response.Membership = make(map[string]*types.HeaderedEvent)
-	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, nil, request.EventIDs, stateKeyNIDs[request.UserID])
+	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, nil, request.EventIDs, stateKeyNIDs[request.UserID], r)
 	if err != nil {
 		return fmt.Errorf("unable to get state before event: %w", err)
 	}
@@ -334,7 +393,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	// If no sender is specified then we will just return the entire
 	// set of memberships for the room, regardless of whether a specific
 	// user is allowed to see them or not.
-	if request.Sender == "" {
+	if request.SenderID == "" {
 		var events []types.Event
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.LocalOnly)
@@ -344,18 +403,20 @@ func (r *Queryer) QueryMembershipsForRoom(
 			}
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}
-		events, err = r.DB.Events(ctx, info, eventNIDs)
+		events, err = r.DB.Events(ctx, info.RoomVersion, eventNIDs)
 		if err != nil {
 			return fmt.Errorf("r.DB.Events: %w", err)
 		}
 		for _, event := range events {
-			clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll)
+			clientEvent := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return r.QueryUserIDForSender(ctx, roomID, senderID)
+			}, event)
 			response.JoinEvents = append(response.JoinEvents, clientEvent)
 		}
 		return nil
 	}
 
-	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
+	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.SenderID)
 	if err != nil {
 		return err
 	}
@@ -383,9 +444,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 			return err
 		}
 
-		events, err = r.DB.Events(ctx, info, eventNIDs)
+		events, err = r.DB.Events(ctx, info.RoomVersion, eventNIDs)
 	} else {
-		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID)
+		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID, r)
 		if err != nil {
 			logrus.WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err
@@ -398,7 +459,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 	}
 
 	for _, event := range events {
-		clientEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll)
+		clientEvent := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.QueryUserIDForSender(ctx, roomID, senderID)
+		}, event)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
 
@@ -414,6 +477,9 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	if info != nil {
+		response.RoomVersion = info.RoomVersion
 	}
 	if info == nil || info.IsStub() {
 		return nil
@@ -440,6 +506,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
 	serverName spec.ServerName,
 	eventID string,
+	roomID string,
 ) (allowed bool, err error) {
 	events, err := r.DB.EventNIDs(ctx, []string{eventID})
 	if err != nil {
@@ -469,7 +536,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	}
 
 	return helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, info, eventID, serverName, isInRoom,
+		ctx, r.DB, info, roomID, eventID, serverName, isInRoom, r,
 	)
 }
 
@@ -510,7 +577,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %d", events[front[0]].RoomNID)
 	}
 
-	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName, r)
 	if err != nil {
 		return err
 	}
@@ -588,7 +655,9 @@ func (r *Queryer) QueryStateAndAuthChain(
 
 	if request.ResolveState {
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
-			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents),
+			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return r.QueryUserIDForSender(ctx, roomID, senderID)
+			},
 		)
 		if err != nil {
 			return err
@@ -608,7 +677,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 
 // first bool: is rejected, second bool: state missing
 func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]gomatrixserverlib.PDU, bool, bool, error) {
-	roomState := state.NewStateResolution(r.DB, roomInfo)
+	roomState := state.NewStateResolution(r.DB, roomInfo, r)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
 		switch err.(type) {
@@ -858,132 +927,112 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	return nil
 }
 
+func (r *Queryer) InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error) {
+	pending, _, _, _, err := helpers.IsInvitePending(ctx, r.DB, roomID.String(), senderID)
+	return pending, err
+}
+
+func (r *Queryer) QueryRoomInfo(ctx context.Context, roomID spec.RoomID) (*types.RoomInfo, error) {
+	return r.DB.RoomInfo(ctx, roomID.String())
+}
+
+func (r *Queryer) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
+	res, err := r.DB.GetStateEvent(ctx, roomID.String(), eventType, stateKey)
+	if res == nil {
+		return nil, err
+	}
+	return res, err
+}
+
+func (r *Queryer) UserJoinedToRoom(ctx context.Context, roomNID types.RoomNID, senderID spec.SenderID) (bool, error) {
+	_, isIn, _, err := r.DB.GetMembership(ctx, roomNID, senderID)
+	return isIn, err
+}
+
+func (r *Queryer) LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error) {
+	joinNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true)
+	if err != nil {
+		return nil, err
+	}
+
+	events, err := r.DB.Events(ctx, roomVersion, joinNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// For each of the joined users, let's see if we can get a valid
+	// membership event.
+	joinedUsers := []gomatrixserverlib.PDU{}
+	for _, event := range events {
+		if event.Type() != spec.MRoomMember || event.StateKey() == nil {
+			continue // shouldn't happen
+		}
+
+		joinedUsers = append(joinedUsers, event)
+	}
+
+	return joinedUsers, nil
+}
+
 // nolint:gocyclo
-func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse) error {
+func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
 	// Look up if we know anything about the room. If it doesn't exist
 	// or is a stub entry then we can't do anything.
-	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
-		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return "", fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
 	if roomInfo == nil || roomInfo.IsStub() {
-		return nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
+		return "", nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
 	if err != nil {
-		return err
+		return "", err
 	}
-	// If the room version doesn't allow restricted joins then don't
-	// try to process any further.
-	allowRestrictedJoins := verImpl.MayAllowRestrictedJoinsInEventAuth()
-	if !allowRestrictedJoins {
-		return nil
-	}
-	// Start off by populating the "resident" flag in the response. If we
-	// come across any rooms in the request that are missing, we will unset
-	// the flag.
-	res.Resident = true
-	// Get the join rules to work out if the join rule is "restricted".
-	joinRulesEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, spec.MRoomJoinRules, "")
+
+	return verImpl.CheckRestrictedJoin(ctx, r.Cfg.Global.ServerName, &api.JoinRoomQuerier{Roomserver: r}, roomID, senderID)
+}
+
+func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+	version, err := r.DB.GetRoomVersion(ctx, roomID.String())
 	if err != nil {
-		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+		return "", err
 	}
-	if joinRulesEvent == nil {
-		return nil
-	}
-	var joinRules gomatrixserverlib.JoinRuleContent
-	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
-		return fmt.Errorf("json.Unmarshal: %w", err)
-	}
-	// If the join rule isn't "restricted" or "knock_restricted" then there's nothing more to do.
-	res.Restricted = joinRules.JoinRule == spec.Restricted || joinRules.JoinRule == spec.KnockRestricted
-	if !res.Restricted {
-		return nil
-	}
-	// If the user is already invited to the room then the join is allowed
-	// but we don't specify an authorised via user, since the event auth
-	// will allow the join anyway.
-	var pending bool
-	if pending, _, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
-		return fmt.Errorf("helpers.IsInvitePending: %w", err)
-	} else if pending {
-		res.Allowed = true
-		return nil
-	}
-	// We need to get the power levels content so that we can determine which
-	// users in the room are entitled to issue invites. We need to use one of
-	// these users as the authorising user.
-	powerLevelsEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, spec.MRoomPowerLevels, "")
-	if err != nil {
-		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
-	}
-	powerLevels, err := powerLevelsEvent.PowerLevels()
-	if err != nil {
-		return fmt.Errorf("unable to get powerlevels: %w", err)
-	}
-	// Step through the join rules and see if the user matches any of them.
-	for _, rule := range joinRules.Allow {
-		// We only understand "m.room_membership" rules at this point in
-		// time, so skip any rule that doesn't match those.
-		if rule.Type != spec.MRoomMembership {
-			continue
-		}
-		// See if the room exists. If it doesn't exist or if it's a stub
-		// room entry then we can't check memberships.
-		targetRoomInfo, err := r.DB.RoomInfo(ctx, rule.RoomID)
-		if err != nil || targetRoomInfo == nil || targetRoomInfo.IsStub() {
-			res.Resident = false
-			continue
-		}
-		// First of all work out if *we* are still in the room, otherwise
-		// it's possible that the memberships will be out of date.
-		isIn, err := r.DB.GetLocalServerInRoom(ctx, targetRoomInfo.RoomNID)
-		if err != nil || !isIn {
-			// If we aren't in the room, we can no longer tell if the room
-			// memberships are up-to-date.
-			res.Resident = false
-			continue
-		}
-		// At this point we're happy that we are in the room, so now let's
-		// see if the target user is in the room.
-		_, isIn, _, err = r.DB.GetMembership(ctx, targetRoomInfo.RoomNID, req.UserID)
+
+	switch version {
+	case gomatrixserverlib.RoomVersionPseudoIDs:
+		key, err := r.DB.SelectUserRoomPublicKey(ctx, userID, roomID)
 		if err != nil {
-			continue
+			return "", err
 		}
-		// If the user is not in the room then we will skip them.
-		if !isIn {
-			continue
-		}
-		// The user is in the room, so now we will need to authorise the
-		// join using the user ID of one of our own users in the room. Pick
-		// one.
-		joinNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, targetRoomInfo.RoomNID, true, true)
-		if err != nil || len(joinNIDs) == 0 {
-			// There should always be more than one join NID at this point
-			// because we are gated behind GetLocalServerInRoom, but y'know,
-			// sometimes strange things happen.
-			continue
-		}
-		// For each of the joined users, let's see if we can get a valid
-		// membership event.
-		for _, joinNID := range joinNIDs {
-			events, err := r.DB.Events(ctx, roomInfo, []types.EventNID{joinNID})
-			if err != nil || len(events) != 1 {
-				continue
-			}
-			event := events[0]
-			if event.Type() != spec.MRoomMember || event.StateKey() == nil {
-				continue // shouldn't happen
-			}
-			// Only users that have the power to invite should be chosen.
-			if powerLevels.UserLevel(*event.StateKey()) < powerLevels.Invite {
-				continue
-			}
-			res.Resident = true
-			res.Allowed = true
-			res.AuthorisedVia = *event.StateKey()
-			return nil
+		return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
+	default:
+		return spec.SenderID(userID.String()), nil
+	}
+}
+
+func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	userID, err := spec.NewUserID(string(senderID), true)
+	if err == nil {
+		return userID, nil
+	}
+
+	bytes := spec.Base64Bytes{}
+	err = bytes.Decode(string(senderID))
+	if err != nil {
+		return nil, err
+	}
+	queryMap := map[spec.RoomID][]ed25519.PublicKey{roomID: {ed25519.PublicKey(bytes)}}
+	result, err := r.DB.SelectUserIDsForPublicKeys(ctx, queryMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if userKeys, ok := result[roomID]; ok {
+		if userID, ok := userKeys[string(senderID)]; ok {
+			return spec.NewUserID(userID, true)
 		}
 	}
-	return nil
+
+	return nil, nil
 }

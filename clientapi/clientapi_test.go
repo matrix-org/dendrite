@@ -33,6 +33,7 @@ import (
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -1105,7 +1106,7 @@ func Test3PID(t *testing.T) {
 				resp := threepid.GetValidatedResponse{}
 				switch r.URL.Query().Get("client_secret") {
 				case "fail":
-					resp.ErrCode = "M_SESSION_NOT_VALIDATED"
+					resp.ErrCode = string(spec.ErrorSessionNotValidated)
 				case "fail2":
 					resp.ErrCode = "some other error"
 				case "fail3":

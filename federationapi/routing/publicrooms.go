@@ -12,7 +12,6 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 )
 
@@ -40,7 +39,10 @@ func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.FederationRoomser
 	}
 	response, err := publicRooms(req.Context(), request, rsAPI)
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -107,8 +109,10 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
-			reqErr := jsonerror.InternalServerError()
-			return &reqErr
+			return &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		request.Limit = int16(limit)
 		request.Since = httpReq.FormValue("since")
@@ -119,7 +123,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 
 	return &util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
-		JSON: jsonerror.NotFound("Bad method"),
+		JSON: spec.NotFound("Bad method"),
 	}
 }
 

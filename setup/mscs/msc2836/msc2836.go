@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -93,9 +92,11 @@ type MSC2836EventRelationshipsResponse struct {
 	ParsedAuthChain []gomatrixserverlib.PDU
 }
 
-func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
+func toClientResponse(ctx context.Context, res *MSC2836EventRelationshipsResponse, rsAPI roomserver.RoomserverInternalAPI) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events:    synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(res.ParsedEvents), synctypes.FormatAll),
+		Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(res.ParsedEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,
 	}
@@ -153,7 +154,7 @@ type reqCtx struct {
 	rsAPI       roomserver.RoomserverInternalAPI
 	db          Database
 	req         *EventRelationshipRequest
-	userID      string
+	userID      spec.UserID
 	roomVersion gomatrixserverlib.RoomVersion
 
 	// federated request args
@@ -169,13 +170,20 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 			util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 			return util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+			}
+		}
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 			}
 		}
 		rc := reqCtx{
 			ctx:                req.Context(),
 			req:                relation,
-			userID:             device.UserID,
+			userID:             *userID,
 			rsAPI:              rsAPI,
 			fsAPI:              fsAPI,
 			isFederatedRequest: false,
@@ -188,7 +196,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 
 		return util.JSONResponse{
 			Code: 200,
-			JSON: toClientResponse(res),
+			JSON: toClientResponse(req.Context(), res, rsAPI),
 		}
 	}
 }
@@ -201,7 +209,7 @@ func federatedEventRelationship(
 		util.GetLogger(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+			JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 		}
 	}
 	rc := reqCtx{
@@ -268,7 +276,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 	if event == nil || !rc.authorisedToSeeEvent(event) {
 		return nil, &util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("Event does not exist or you are not authorised to see it"),
+			JSON: spec.Forbidden("Event does not exist or you are not authorised to see it"),
 		}
 	}
 	rc.roomVersion = event.Version()
@@ -428,8 +436,10 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	children, err := db.ChildrenForParent(rc.ctx, parentID, constRelType, recentFirst)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to get ChildrenForParent")
-		resErr := jsonerror.InternalServerError()
-		return nil, &resErr
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var childEvents []*types.HeaderedEvent
 	for _, child := range children {
