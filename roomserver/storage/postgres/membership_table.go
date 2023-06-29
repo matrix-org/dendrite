@@ -128,7 +128,7 @@ const deleteMembershipSQL = "" +
 	"DELETE FROM roomserver_membership WHERE room_nid = $1 AND target_nid = $2"
 
 const selectRoomsWithMembershipSQL = "" +
-	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
+	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = ANY($2) and forgotten = false"
 
 // selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
 // joined to. Since this information is used to populate the user directory, we will
@@ -347,10 +347,10 @@ func (s *membershipStatements) UpdateMembership(
 
 func (s *membershipStatements) SelectRoomsWithMembership(
 	ctx context.Context, txn *sql.Tx,
-	userID types.EventStateKeyNID, membershipState tables.MembershipState,
+	userIDs []types.EventStateKeyNID, membershipState tables.MembershipState,
 ) ([]types.RoomNID, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, membershipState, userID)
+	rows, err := stmt.QueryContext(ctx, membershipState, pq.Array(userIDs))
 	if err != nil {
 		return nil, err
 	}

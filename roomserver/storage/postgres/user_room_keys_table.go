@@ -56,12 +56,15 @@ const selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_use
 
 const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
 
+const selectUserRoomKeysSQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND pseudo_id_key IS NOT NULL`
+
 type userRoomKeysStatements struct {
 	insertUserRoomPrivateKeyStmt *sql.Stmt
 	insertUserRoomPublicKeyStmt  *sql.Stmt
 	selectUserRoomKeyStmt        *sql.Stmt
 	selectUserRoomPublicKeyStmt  *sql.Stmt
 	selectUserNIDsStmt           *sql.Stmt
+	selectUserRoomKeysStmt       *sql.Stmt
 }
 
 func CreateUserRoomKeysTable(db *sql.DB) error {
@@ -77,6 +80,7 @@ func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
 		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
 		{&s.selectUserRoomPublicKeyStmt, selectUserRoomPublicKeySQL},
 		{&s.selectUserNIDsStmt, selectUserNIDsSQL},
+		{&s.selectUserRoomKeysStmt, selectUserRoomKeysSQL},
 	}.Prepare(db)
 }
 
@@ -148,5 +152,27 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 		}
 		result[spec.Base64Bytes(publicKey).Encode()] = userRoomKeyPair
 	}
+	return result, rows.Err()
+}
+
+func (s *userRoomKeysStatements) SelectPrivateKeysForUserNID(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID) ([]ed25519.PrivateKey, error) {
+	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomKeysStmt)
+
+	rows, err := stmt.QueryContext(ctx, userNID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
+
+	var result []ed25519.PrivateKey
+	var pk ed25519.PrivateKey
+
+	for rows.Next() {
+		if err = rows.Scan(&pk); err != nil {
+			return nil, err
+		}
+		result = append(result, pk)
+	}
+
 	return result, rows.Err()
 }

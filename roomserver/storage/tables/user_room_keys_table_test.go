@@ -115,6 +115,11 @@ func TestUserRoomKeysTable(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, key4, gotPublicKey)
 
+			// query rooms for a specific user
+			var pks []ed25519.PrivateKey
+			pks, err = tab.SelectPrivateKeysForUserNID(context.Background(), txn, userNID)
+			assert.NoError(t, err)
+			assert.Equal(t, []ed25519.PrivateKey{key}, pks)
 			return nil
 		})
 		assert.NoError(t, err)

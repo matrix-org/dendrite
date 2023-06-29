@@ -1361,14 +1361,38 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 	default:
 		return nil, fmt.Errorf("GetRoomsByMembership: invalid membership %s", membership)
 	}
-	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+	stateKeyNID, err := d.EventStateKeyNIDs(ctx, []string{userID})
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("GetRoomsByMembership: cannot map user ID to state key NID: %w", err)
 	}
-	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, nil, stateKeyNID, membershipState)
+
+	// get the pseudo IDs, if any, as otherwise we don't get the correct room list
+	pseudoIDKeys, err := d.UserRoomKeyTable.SelectPrivateKeysForUserNID(ctx, nil, stateKeyNID[userID])
+	if err != nil {
+		return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectPrivateKeysForUserNID: %w", err)
+	}
+	senderIDs := make([]string, len(pseudoIDKeys))
+	var senderID spec.SenderID
+	for _, key := range pseudoIDKeys {
+		senderID = spec.SenderIDFromPseudoIDKey(key)
+		senderIDs = append(senderIDs, string(senderID))
+	}
+
+	stateKeyNIDMap, err := d.EventStateKeyNIDs(ctx, senderIDs)
+	if err != nil {
+		return nil, fmt.Errorf("GetRoomsByMembership: failed to EventStateKeyNIDs: %w", err)
+	}
+
+	stateKeyNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDMap)+1)
+	stateKeyNIDs = append(stateKeyNIDs, stateKeyNID[userID])
+	for _, stateKeyNID := range stateKeyNIDMap {
+		stateKeyNIDs = append(stateKeyNIDs, stateKeyNID)
+	}
+
+	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, nil, stateKeyNIDs, membershipState)
 	if err != nil {
 		return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectRoomsWithMembership: %w", err)
 	}

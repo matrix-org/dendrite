@@ -100,7 +100,7 @@ const updateMembershipForgetRoom = "" +
 	" WHERE room_nid = $2 AND target_nid = $3"
 
 const selectRoomsWithMembershipSQL = "" +
-	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
+	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid IN ($2) and forgotten = false"
 
 // selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
 // joined to. Since this information is used to populate the user directory, we will
@@ -297,10 +297,27 @@ func (s *membershipStatements) UpdateMembership(
 }
 
 func (s *membershipStatements) SelectRoomsWithMembership(
-	ctx context.Context, txn *sql.Tx, userID types.EventStateKeyNID, membershipState tables.MembershipState,
+	ctx context.Context, txn *sql.Tx, userIDs []types.EventStateKeyNID, membershipState tables.MembershipState,
 ) ([]types.RoomNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, membershipState, userID)
+
+	query := strings.Replace(selectRoomsWithMembershipSQL, "($2)", sqlutil.QueryVariadicOffset(len(userIDs), 1), 1)
+
+	var stmt *sql.Stmt
+	var err error
+	if txn != nil {
+		stmt, err = txn.PrepareContext(ctx, query)
+	} else {
+		stmt, err = s.db.Prepare(query)
+	}
+	if err != nil {
+		return nil, err
+	}
+	params := make([]any, len(userIDs)+1)
+	params[0] = membershipState
+	for i, userID := range userIDs {
+		params[i+1] = userID
+	}
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}

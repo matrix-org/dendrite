@@ -99,12 +99,13 @@ func TestMembershipTable(t *testing.T) {
 		assert.Equal(t, 10, len(members))
 
 		// Get correct user
-		roomNIDs, err := tab.SelectRoomsWithMembership(ctx, nil, userNIDs[1], tables.MembershipStateLeaveOrBan)
+		roomNIDs, err := tab.SelectRoomsWithMembership(ctx, nil, []types.EventStateKeyNID{userNIDs[1]}, tables.MembershipStateLeaveOrBan)
+		t.Logf("XXX: %v", userNIDs[1:1])
 		assert.NoError(t, err)
 		assert.Equal(t, []types.RoomNID{1}, roomNIDs)
 
 		// User is not joined to room
-		roomNIDs, err = tab.SelectRoomsWithMembership(ctx, nil, userNIDs[5], tables.MembershipStateJoin)
+		roomNIDs, err = tab.SelectRoomsWithMembership(ctx, nil, []types.EventStateKeyNID{userNIDs[5]}, tables.MembershipStateJoin)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(roomNIDs))
 
