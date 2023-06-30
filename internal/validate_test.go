@@ -215,7 +215,6 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 	fakeConfig := &config.Dendrite{}
 	fakeConfig.Defaults(config.DefaultOpts{
 		Generate:   true,
-		Monolithic: true,
 	})
 	fakeConfig.Global.ServerName = "localhost"
 	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}
