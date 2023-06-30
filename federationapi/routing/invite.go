@@ -80,11 +80,7 @@ func InviteV3(
 					return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
 				},
 			},
-			Origin:           request.Origin(),
 			InviteProtoEvent: inviteReq.Event(),
-			SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
-				return rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
-			},
 			GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
 				// assign a roomNID, otherwise we can't create a private key for the user
 				_, nidErr := rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
