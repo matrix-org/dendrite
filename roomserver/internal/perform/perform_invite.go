@@ -163,6 +163,14 @@ func (r *Inviter) PerformInvite(
 
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Invitee.Domain())
 
+	signingKey := req.InviteInput.PrivateKey
+	if info.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		signingKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, req.InviteInput.Inviter, req.InviteInput.RoomID)
+		if err != nil {
+			return err
+		}
+	}
+
 	input := gomatrixserverlib.PerformInviteInput{
 		RoomID:            req.InviteInput.RoomID,
 		RoomVersion:       info.RoomVersion,
@@ -172,7 +180,7 @@ func (r *Inviter) PerformInvite(
 		EventTemplate:     proto,
 		StrippedState:     req.InviteRoomState,
 		KeyID:             req.InviteInput.KeyID,
-		SigningKey:        req.InviteInput.PrivateKey,
+		SigningKey:        signingKey,
 		EventTime:         req.InviteInput.EventTime,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB, r.RSAPI},
@@ -208,6 +216,13 @@ func (r *Inviter) PerformInvite(
 				PrevEventIDs: res.LatestEvents,
 				Depth:        res.Depth,
 			}, nil
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.RSAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
 		},
 	}
 

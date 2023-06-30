@@ -616,10 +616,6 @@ func (r *FederationInternalAPI) SendInviteV3(
 		return nil, err
 	}
 
-	if event.StateKey == nil {
-		return nil, errors.New("invite must be a state event")
-	}
-
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
 	if !r.shouldAttemptDirectFederation(invitee.Domain()) {
@@ -627,7 +623,7 @@ func (r *FederationInternalAPI) SendInviteV3(
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"user_id":      *event.StateKey,
+		"user_id":      invitee.String(),
 		"room_id":      event.RoomID,
 		"room_version": version,
 		"destination":  invitee.Domain(),
