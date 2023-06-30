@@ -994,7 +994,7 @@ func TestRedaction(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
-	redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
+	redactedEvent := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "join", "displayname": "alice"}, test.WithStateKey(alice.ID))
 	redactionEvent := room.CreateEvent(t, alice, spec.MRoomRedaction, map[string]string{"redacts": redactedEvent.EventID()})
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := MustCreateDatabase(t, dbType)
@@ -1027,6 +1027,26 @@ func TestRedaction(t *testing.T) {
 		depth := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.depth")
 		if depth.Exists() {
 			t.Error("unexpected auth_events in redacted event")
+		}
+
+		dbTxn, err := db.NewDatabaseTransaction(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		filter := synctypes.DefaultStateFilter()
+		wantTypes := []string{spec.MRoomMember}
+		filter.Types = &wantTypes
+		evs, err = dbTxn.CurrentRoomState.SelectCurrentState(context.Background(), nil, redactedEvent.RoomID(), &filter, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count := len(evs); count != 1 {
+			t.Fatalf("expected 1 event, got %d", count)
+		}
+		// we expect that the displayname does not exist anymore
+		displayname := gjson.GetBytes(evs[0].Content(), "displayname")
+		if displayname.Exists() {
+			t.Fatal("expected displayname to be redacted, but wasn't")
 		}
 	})
 }
