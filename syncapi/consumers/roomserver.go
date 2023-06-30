@@ -21,11 +21,13 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -593,8 +595,17 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		return event, nil
 	}
 
+	prevContent := prevEvent.Content()
+	// if we're storing a pseudoID event, make sure to delete the mxid_mapping
+	if event.Type() == spec.MRoomMember && event.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		prevContent, err = sjson.DeleteBytes(prevEvent.Content(), "mxid_mapping")
+		if err != nil {
+			return event, err
+		}
+	}
+
 	prev := types.PrevEventRef{
-		PrevContent:   prevEvent.Content(),
+		PrevContent:   prevContent,
 		ReplacesState: prevEvent.EventID(),
 		PrevSenderID:  string(prevEvent.SenderID()),
 	}
