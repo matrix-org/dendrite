@@ -25,10 +25,10 @@ import (
 )
 
 const (
-	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
+	maxUsernameLength = 254 // https://spec.matrix.org/v1.7/appendices/#user-identifiers TODO account for domain
 
-	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
-	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	minPasswordLength = 8   // https://spec.matrix.org/v1.7/client-server-api/#password-based
+	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v1.86.0/synapse/rest/client/register.py#L533
 )
 
 var (
@@ -42,7 +42,7 @@ var (
 
 // ValidatePassword returns an error if the password is invalid
 func ValidatePassword(password string) error {
-	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	// https://github.com/matrix-org/synapse/blob/v1.86.0/synapse/rest/client/register.py#L533
 	if len(password) > maxPasswordLength {
 		return ErrPasswordTooLong
 	} else if len(password) > 0 && len(password) < minPasswordLength {
@@ -70,7 +70,7 @@ func PasswordResponse(err error) *util.JSONResponse {
 
 // ValidateUsername returns an error if the username is invalid
 func ValidateUsername(localpart string, domain spec.ServerName) error {
-	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	// https://github.com/matrix-org/synapse/blob/v1.86.0/synapse/rest/client/register.py#L533
 	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return ErrUsernameTooLong
 	} else if !validUsernameRegex.MatchString(localpart) {
