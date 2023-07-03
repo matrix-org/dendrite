@@ -100,7 +100,6 @@ func TestMembershipTable(t *testing.T) {
 
 		// Get correct user
 		roomNIDs, err := tab.SelectRoomsWithMembership(ctx, nil, []types.EventStateKeyNID{userNIDs[1]}, tables.MembershipStateLeaveOrBan)
-		t.Logf("XXX: %v", userNIDs[1:1])
 		assert.NoError(t, err)
 		assert.Equal(t, []types.RoomNID{1}, roomNIDs)
 
