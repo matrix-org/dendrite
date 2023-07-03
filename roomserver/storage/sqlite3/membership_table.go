@@ -312,6 +312,7 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectRoomsWithMembership: stmt.close() failed")
 	params := make([]any, len(userIDs)+1)
 	params[0] = membershipState
 	for i, userID := range userIDs {
