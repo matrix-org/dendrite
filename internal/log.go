@@ -27,7 +27,6 @@ import (
 	"sync"
 
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/rs/zerolog"
 	log "github.com/rs/zerolog/log"
@@ -93,9 +92,9 @@ func callerPrettyfier(f *runtime.Frame) (string, string) {
 // simplest, and it gives us the freedom to run pprof on a separate port.
 func SetupPprof() {
 	if hostPort := os.Getenv("PPROFLISTEN"); hostPort != "" {
-		logrus.Warn("Starting pprof on ", hostPort)
+		log.Warn().Msgf("Starting pprof on %s", hostPort)
 		go func() {
-			logrus.WithError(http.ListenAndServe(hostPort, nil)).Error("Failed to setup pprof listener")
+			log.Error().Err(http.ListenAndServe(hostPort, nil)).Msg("Failed to setup pprof listener")
 		}()
 	}
 }

@@ -54,6 +54,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
+	log "github.com/rs/zerolog/log"
+
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -115,6 +117,8 @@ func GenerateDefaultConfig(sk ed25519.PrivateKey, storageDir string, cacheDir st
 
 func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 	p.EventChannel = make(chan pineconeEvents.Event)
+	// log.Logger.With().Str("pinecone", "router").Logger()
+	// not compatible with pinecone types.logger => Printf missing
 	p.Router = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
 	p.Router.EnableHopLimiting()
 	p.Router.EnableWakeupBroadcasts()
@@ -166,7 +170,7 @@ func (p *P2PMonolith) SetupDendrite(
 		UserAPI:                userAPI,
 	}
 	relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, federation, rsAPI, keyRing, producer, enableRelaying, caches)
-	logrus.Infof("Relaying enabled: %v", relayAPI.RelayingEnabled())
+	log.Info().Msgf("Relaying enabled: %v", relayAPI.RelayingEnabled())
 
 	p.dendrite = setup.Monolith{
 		Config:    cfg,
@@ -206,10 +210,10 @@ func (p *P2PMonolith) StartMonolith() {
 }
 
 func (p *P2PMonolith) Stop() {
-	logrus.Info("Stopping monolith")
+	log.Info().Msg("Stopping monolith")
 	p.ProcessCtx.ShutdownDendrite()
 	p.WaitForShutdown()
-	logrus.Info("Stopped monolith")
+	log.Info().Msg("Stopped monolith")
 }
 
 func (p *P2PMonolith) WaitForShutdown() {
@@ -218,7 +222,7 @@ func (p *P2PMonolith) WaitForShutdown() {
 }
 
 func (p *P2PMonolith) closeAllResources() {
-	logrus.Info("Closing monolith resources")
+	log.Info().Msg("Closing monolith resources")
 	p.httpServerMu.Lock()
 	if p.httpServer != nil {
 		_ = p.httpServer.Shutdown(context.Background())
@@ -245,7 +249,7 @@ func (p *P2PMonolith) closeAllResources() {
 	if p.Router != nil {
 		_ = p.Router.Close()
 	}
-	logrus.Info("Monolith resources closed")
+	log.Info().Msg("Monolith resources closed")
 }
 
 func (p *P2PMonolith) Addr() string {
@@ -268,7 +272,7 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 		p.httpMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 			c, err := wsUpgrader.Upgrade(w, r, nil)
 			if err != nil {
-				logrus.WithError(err).Error("Failed to upgrade WebSocket connection")
+				log.Error().Err(err).Msg("Failed to upgrade WebSocket connection")
 				return
 			}
 			conn := conn.WrapWebSocketConn(c)
@@ -277,7 +281,7 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 				pineconeRouter.ConnectionZone("websocket"),
 				pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
 			); err != nil {
-				logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
+				log.Error().Err(err).Msg("Failed to connect WebSocket peer to Pinecone switch")
 			}
 		})
 	}
@@ -317,34 +321,35 @@ func (p *P2PMonolith) startHTTPServers() {
 		p.httpServerMu.Unlock()
 		pubkey := p.Router.PublicKey()
 		pubkeyString := hex.EncodeToString(pubkey[:])
-		logrus.Info("Listening on ", pubkeyString)
+		log.Info().Msgf("Listening on %s", pubkeyString)
 
 		switch p.httpServer.Serve(p.Sessions.Protocol(SessionProtocol)) {
 		case net.ErrClosed, http.ErrServerClosed:
-			logrus.Info("Stopped listening on ", pubkeyString)
+			log.Info().Msgf("Stopped listening on %s", pubkeyString)
 		default:
-			logrus.Error("Stopped listening on ", pubkeyString)
+			log.Error().Msgf("Stopped listening on %s", pubkeyString)
 		}
-		logrus.Info("Stopped goroutine listening on ", pubkeyString)
+		log.Info().Msgf("Stopped goroutine listening on %s", pubkeyString)
 	}()
 
 	p.httpListenAddr = fmt.Sprintf(":%d", p.port)
 	go func() {
-		logrus.Info("Listening on ", p.httpListenAddr)
+		log.Info().Msgf("Listening on %s", p.httpListenAddr)
 		switch http.ListenAndServe(p.httpListenAddr, p.httpMux) {
 		case net.ErrClosed, http.ErrServerClosed:
-			logrus.Info("Stopped listening on ", p.httpListenAddr)
+			log.Info().Msgf("Stopped listening on %s", p.httpListenAddr)
 		default:
-			logrus.Error("Stopped listening on ", p.httpListenAddr)
+			log.Error().Msgf("Stopped listening on %s", p.httpListenAddr)
 		}
-		logrus.Info("Stopped goroutine listening on ", p.httpListenAddr)
+		log.Info().Msgf("Stopped goroutine listening on %s", p.httpListenAddr)
 	}()
 }
 
 func (p *P2PMonolith) startEventHandler() {
 	p.stopHandlingEvents = make(chan bool)
 	stopRelayServerSync := make(chan bool)
-	eLog := logrus.WithField("pinecone", "events")
+	logger := log.Logger.With().Str("pinecone", "events").Logger()
+	//eLog := logrus.WithField("pinecone", "events")
 	p.RelayRetriever = relay.NewRelayServerRetriever(
 		context.Background(),
 		spec.ServerName(p.Router.PublicKey().String()),
@@ -352,7 +357,7 @@ func (p *P2PMonolith) startEventHandler() {
 		p.dendrite.RelayAPI,
 		stopRelayServerSync,
 	)
-	p.RelayRetriever.InitializeRelayServers(eLog)
+	p.RelayRetriever.InitializeRelayServers(&logger)
 
 	go func(ch <-chan pineconeEvents.Event) {
 		for {
@@ -377,17 +382,17 @@ func (p *P2PMonolith) startEventHandler() {
 					}
 					res := &federationAPI.PerformWakeupServersResponse{}
 					if err := p.dendrite.FederationAPI.PerformWakeupServers(p.ProcessCtx.Context(), req, res); err != nil {
-						eLog.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+						log.Error().Err(err).Msgf("Failed to wakeup destination %s", e.PeerID)
 					}
 				}
 			case <-p.stopHandlingEvents:
-				logrus.Info("Stopping processing pinecone events")
+				log.Info().Msg("Stopping processing pinecone events")
 				// NOTE: Don't block on channel
 				select {
 				case stopRelayServerSync <- true:
 				default:
 				}
-				logrus.Info("Stopped processing pinecone events")
+				log.Info().Msg("Stopped processing pinecone events")
 				return
 			}
 		}

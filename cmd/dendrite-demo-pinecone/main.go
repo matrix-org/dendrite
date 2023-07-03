@@ -34,7 +34,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 )
@@ -112,7 +113,7 @@ func main() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				logrus.WithError(err).Error("listener.Accept failed")
+				log.Error().Err(err).Msg("listener.Accept failed")
 				continue
 			}
 
@@ -121,7 +122,7 @@ func main() {
 				pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
 			)
 			if err != nil {
-				logrus.WithError(err).Error("pSwitch.Connect failed")
+				log.Error().Err(err).Msg("pSwitch.Connect failed")
 				continue
 			}
 

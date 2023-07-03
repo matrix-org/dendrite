@@ -22,7 +22,8 @@ import (
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	log "github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 )
 
@@ -59,12 +60,12 @@ func NewRelayServerRetriever(
 	}
 }
 
-func (r *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
+func (r *RelayServerRetriever) InitializeRelayServers(eLog *zerolog.Logger) {
 	request := federationAPI.P2PQueryRelayServersRequest{Server: spec.ServerName(r.serverName)}
 	response := federationAPI.P2PQueryRelayServersResponse{}
 	err := r.federationAPI.P2PQueryRelayServers(r.ctx, &request, &response)
 	if err != nil {
-		eLog.Warnf("Failed obtaining list of this node's relay servers: %s", err.Error())
+		eLog.Warn().Msgf("Failed obtaining list of this node's relay servers: %s", err.Error())
 	}
 
 	r.queriedServersMutex.Lock()
@@ -73,7 +74,7 @@ func (r *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
 		r.relayServersQueried[server] = false
 	}
 
-	eLog.Infof("Registered relay servers: %v", response.RelayServers)
+	eLog.Info().Msgf("Registered relay servers: %v", response.RelayServers)
 }
 
 func (r *RelayServerRetriever) SetRelayServers(servers []spec.ServerName) {
@@ -114,7 +115,7 @@ func (r *RelayServerRetriever) GetQueriedServerStatus() map[spec.ServerName]bool
 
 func (r *RelayServerRetriever) StartSync() {
 	if !r.running.Load() {
-		logrus.Info("Starting relay server sync")
+		log.Info().Msg("Starting relay server sync")
 		go r.SyncRelayServers(r.quit)
 	}
 }
@@ -140,7 +141,7 @@ func (r *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
 		}()
 		if len(relayServersToQuery) == 0 {
 			// All relay servers have been synced.
-			logrus.Info("Finished syncing with all known relays")
+			log.Info().Msg("Finished syncing with all known relays")
 			return
 		}
 		r.queryRelayServers(relayServersToQuery)
@@ -151,7 +152,7 @@ func (r *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
 			if !t.Stop() {
 				<-t.C
 			}
-			logrus.Info("Stopped relay server retriever")
+			log.Info().Msg("Stopped relay server retriever")
 			return
 		case <-t.C:
 		}
@@ -159,14 +160,14 @@ func (r *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
 }
 
 func (r *RelayServerRetriever) queryRelayServers(relayServers []spec.ServerName) {
-	logrus.Info("Querying relay servers for any available transactions")
+	log.Info().Msg("Querying relay servers for any available transactions")
 	for _, server := range relayServers {
 		userID, err := spec.NewUserID("@user:"+string(r.serverName), false)
 		if err != nil {
 			return
 		}
 
-		logrus.Infof("Syncing with relay: %s", string(server))
+		log.Info().Msgf("Syncing with relay: %s", string(server))
 		err = r.relayAPI.PerformRelayServerSync(context.Background(), *userID, server)
 		if err == nil {
 			func() {
@@ -181,7 +182,7 @@ func (r *RelayServerRetriever) queryRelayServers(relayServers []spec.ServerName)
 			// What if you miss this message?
 			// Maybe you should try querying them again after a certain period of time as a backup?
 		} else {
-			logrus.Errorf("Failed querying relay server: %s", err.Error())
+			log.Error().Msgf("Failed querying relay server: %s", err.Error())
 		}
 	}
 }
@@ -197,7 +198,7 @@ func UpdateNodeRelayServers(
 	response := federationAPI.P2PQueryRelayServersResponse{}
 	err := fedAPI.P2PQueryRelayServers(ctx, &request, &response)
 	if err != nil {
-		logrus.Warnf("Failed obtaining list of relay servers for %s: %s", node, err.Error())
+		log.Warn().Msgf("Failed obtaining list of relay servers for %s: %s", node, err.Error())
 	}
 
 	// Remove old, non-matching relays
@@ -222,7 +223,7 @@ func UpdateNodeRelayServers(
 	removeResponse := federationAPI.P2PRemoveRelayServersResponse{}
 	err = fedAPI.P2PRemoveRelayServers(ctx, &removeRequest, &removeResponse)
 	if err != nil {
-		logrus.Warnf("Failed removing old relay servers for %s: %s", node, err.Error())
+		log.Warn().Msgf("Failed removing old relay servers for %s: %s", node, err.Error())
 	}
 
 	// Add new relays
@@ -233,6 +234,6 @@ func UpdateNodeRelayServers(
 	addResponse := federationAPI.P2PAddRelayServersResponse{}
 	err = fedAPI.P2PAddRelayServers(ctx, &addRequest, &addResponse)
 	if err != nil {
-		logrus.Warnf("Failed adding relay servers for %s: %s", node, err.Error())
+		log.Warn().Msgf("Failed adding relay servers for %s: %s", node, err.Error())
 	}
 }

@@ -22,7 +22,8 @@ import (
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"gotest.tools/v3/poll"
 )
@@ -63,7 +64,8 @@ func TestRelayRetrieverInitialization(t *testing.T) {
 		make(chan bool),
 	)
 
-	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
+	logger := log.Logger.With().Str("test", "relay").Logger()
+	retriever.InitializeRelayServers(&logger)
 	relayServers := retriever.GetQueriedServerStatus()
 	assert.Equal(t, 2, len(relayServers))
 }
@@ -77,7 +79,8 @@ func TestRelayRetrieverSync(t *testing.T) {
 		make(chan bool),
 	)
 
-	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
+	logger := log.Logger.With().Str("test", "relay").Logger()
+	retriever.InitializeRelayServers(&logger)
 	relayServers := retriever.GetQueriedServerStatus()
 	assert.Equal(t, 2, len(relayServers))
 

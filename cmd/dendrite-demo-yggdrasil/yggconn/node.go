@@ -25,15 +25,13 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/neilalexander/utp"
-	"github.com/sirupsen/logrus"
 
 	ironwoodtypes "github.com/Arceliar/ironwood/types"
-	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	yggdrasilcore "github.com/yggdrasil-network/yggdrasil-go/src/core"
-	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 
 	gologme "github.com/gologme/log"
+	log "github.com/rs/zerolog/log"
 )
 
 type Node struct {
@@ -56,8 +54,9 @@ func (n *Node) DialerContext(ctx context.Context, _, address string) (net.Conn, 
 }
 
 func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, listenURI string) (*Node, error) {
+	// TODO: gologme v.s. zerolog
 	n := &Node{
-		log:      gologme.New(logrus.StandardLogger().Writer(), "", 0),
+		log:      gologme.New(log.Logger, "", 0),
 		incoming: make(chan net.Conn),
 	}
 
@@ -78,7 +77,7 @@ func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, liste
 				})
 			}
 		}
-		if n.core, err = core.New(sk[:], n.log, options...); err != nil {
+		if n.core, err = yggdrasilcore.New(sk[:], n.log, options...); err != nil {
 			panic(err)
 		}
 		n.core.SetLogger(n.log)
@@ -91,8 +90,8 @@ func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, liste
 	// Setup the multicast module.
 	{
 		var err error
-		options := []multicast.SetupOption{
-			multicast.MulticastInterface{
+		options := []yggdrasilmulticast.SetupOption{
+			yggdrasilmulticast.MulticastInterface{
 				Regex:    regexp.MustCompile(".*"),
 				Beacon:   true,
 				Listen:   true,
@@ -100,7 +99,7 @@ func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, liste
 				Priority: 0,
 			},
 		}
-		if n.multicast, err = multicast.New(n.core, n.log, options...); err != nil {
+		if n.multicast, err = yggdrasilmulticast.New(n.core, n.log, options...); err != nil {
 			panic(err)
 		}
 	}

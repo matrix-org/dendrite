@@ -52,7 +52,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 )
 
 var (
@@ -153,29 +154,29 @@ func main() {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			logrus.Errorf("Configuration error: %s", err)
+			log.Error().Msgf("Configuration error: %s", err)
 		}
-		logrus.Fatalf("Failed to start due to configuration errors")
+		log.Fatal().Msg("Failed to start due to configuration errors")
 	}
 
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging)
 	internal.SetupPprof()
 
-	logrus.Infof("Dendrite version %s", internal.VersionString())
+	log.Info().Msgf("Dendrite version %s", internal.VersionString())
 
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
-		logrus.Warn("Open registration is enabled")
+		log.Warn().Msg("Open registration is enabled")
 	}
 
 	closer, err := cfg.SetupTracing()
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start opentracing")
+		log.Panic().Err(err).Msgf("failed to start opentracing")
 	}
 	defer closer.Close() // nolint: errcheck
 
 	if cfg.Global.Sentry.Enabled {
-		logrus.Info("Setting up Sentry for debugging...")
+		log.Info().Msg("Setting up Sentry for debugging...")
 		err = sentry.Init(sentry.ClientOptions{
 			Dsn:              cfg.Global.Sentry.DSN,
 			Environment:      cfg.Global.Sentry.Environment,
@@ -185,7 +186,7 @@ func main() {
 			AttachStacktrace: true,
 		})
 		if err != nil {
-			logrus.WithError(err).Panic("failed to start Sentry")
+			log.Panic().Err(err).Msg("failed to start Sentry")
 		}
 	}
 
@@ -239,7 +240,7 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 	if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
-		logrus.WithError(err).Fatalf("Failed to enable MSCs")
+		log.Fatal().Err(err).Msgf("Failed to enable MSCs")
 	}
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
@@ -267,20 +268,20 @@ func main() {
 	}
 
 	go func() {
-		logrus.Info("Listening on ", ygg.DerivedServerName())
-		logrus.Fatal(httpServer.Serve(ygg))
+		log.Info().Msgf("Listening on %s", ygg.DerivedServerName())
+		log.Fatal().Err(httpServer.Serve(ygg))
 	}()
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
-		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
+		log.Info().Msgf("Listening on %s", httpBindAddr)
+		log.Fatal().Err(http.ListenAndServe(httpBindAddr, httpRouter))
 	}()
 	go func() {
-		logrus.Info("Sending wake-up message to known nodes")
+		log.Info().Msg("Sending wake-up message to known nodes")
 		req := &api.PerformBroadcastEDURequest{}
 		res := &api.PerformBroadcastEDUResponse{}
 		if err := fsAPI.PerformBroadcastEDU(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
+			log.Error().Err(err).Msg("Failed to send wake-up message to known nodes")
 		}
 	}()
 
