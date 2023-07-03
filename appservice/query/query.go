@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -77,15 +77,12 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				defer func() {
 					err = resp.Body.Close()
 					if err != nil {
-						log.WithFields(log.Fields{
-							"appservice_id": appservice.ID,
-							"status_code":   resp.StatusCode,
-						}).WithError(err).Error("Unable to close application service response body")
+						log.Error().Err(err).Str("appservice_id", appservice.ID).Int("status_code", resp.StatusCode).Msg("Unable to close application service response body")
 					}
 				}()
 			}
 			if err != nil {
-				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
+				log.Error().Err(err).Msgf("Issue querying room alias on application service %s", appservice.ID)
 				return err
 			}
 			switch resp.StatusCode {
@@ -97,10 +94,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				// Room does not exist
 			default:
 				// Application service reported an error. Warn
-				log.WithFields(log.Fields{
-					"appservice_id": appservice.ID,
-					"status_code":   resp.StatusCode,
-				}).Warn("Application service responded with non-OK status code")
+				log.Warn().Str("appservice_id", appservice.ID).Int("status_code", resp.StatusCode).Msg("Application service responded with non-OK status code")
 			}
 		}
 	}
@@ -141,17 +135,12 @@ func (a *AppServiceQueryAPI) UserIDExists(
 				defer func() {
 					err = resp.Body.Close()
 					if err != nil {
-						log.WithFields(log.Fields{
-							"appservice_id": appservice.ID,
-							"status_code":   resp.StatusCode,
-						}).Error("Unable to close application service response body")
+						log.Error().Str("appservice_id", appservice.ID).Int("status_code", resp.StatusCode).Msg("Unable to close application service response body")
 					}
 				}()
 			}
 			if err != nil {
-				log.WithFields(log.Fields{
-					"appservice_id": appservice.ID,
-				}).WithError(err).Error("issue querying user ID on application service")
+				log.Error().Err(err).Str("appservice_id", appservice.ID).Msg("issue querying user ID on application service")
 				return err
 			}
 			if resp.StatusCode == http.StatusOK {
@@ -161,10 +150,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			}
 
 			// Log non OK
-			log.WithFields(log.Fields{
-				"appservice_id": appservice.ID,
-				"status_code":   resp.StatusCode,
-			}).Warn("application service responded with non-OK status code")
+			log.Warn().Str("appservice_id", appservice.ID).Int("status_code", resp.StatusCode).Msg("application service responded with non-OK status code")
 		}
 	}
 
@@ -217,7 +203,7 @@ func (a *AppServiceQueryAPI) Locations(
 		}
 
 		if err := requestDo[[]api.ASLocationResponse](as.HTTPClient, url+"?"+params.Encode(), &asLocations); err != nil {
-			log.WithError(err).Error("unable to get 'locations' from application service")
+			log.Error().Err(err).Msg("unable to get 'locations' from application service")
 			continue
 		}
 
@@ -252,7 +238,7 @@ func (a *AppServiceQueryAPI) User(
 		}
 
 		if err := requestDo[[]api.ASUserResponse](as.HTTPClient, url+"?"+params.Encode(), &asUsers); err != nil {
-			log.WithError(err).Error("unable to get 'user' from application service")
+			log.Error().Err(err).Msg("unable to get 'user' from application service")
 			continue
 		}
 
@@ -290,7 +276,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, as := range a.Cfg.Derived.ApplicationServices {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](as.HTTPClient, as.RequestUrl()+api.ASProtocolPath+req.Protocol, &proto); err != nil {
-				log.WithError(err).Error("unable to get 'protocol' from application service")
+				log.Error().Err(err).Msg("unable to get 'protocol' from application service")
 				continue
 			}
 
@@ -320,7 +306,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, p := range as.Protocols {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](as.HTTPClient, as.RequestUrl()+api.ASProtocolPath+p, &proto); err != nil {
-				log.WithError(err).Error("unable to get 'protocol' from application service")
+				log.Error().Err(err).Msg("unable to get 'protocol' from application service")
 				continue
 			}
 			existing, ok := response[p]

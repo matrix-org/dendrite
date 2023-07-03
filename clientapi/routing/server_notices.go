@@ -21,14 +21,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/rs/zerolog/log"
 	"github.com/sirupsen/logrus"
-
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -208,7 +208,7 @@ func SendServerNotice(
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
 	if resErr != nil {
-		logrus.Errorf("failed to send message: %+v", resErr)
+		log.Error().Msgf("failed to send message: %+v", resErr)
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)

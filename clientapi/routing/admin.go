@@ -15,7 +15,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -40,7 +41,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	default:
-		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
+		log.Error().Err(err).Str("roomID", vars["roomID"]).Msg("Failed to evacuate room")
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
@@ -59,7 +60,7 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 
 	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
-		logrus.WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
+		log.Error().Err(err).Str("userID", vars["userID"]).Msg("Failed to evacuate user")
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
 
@@ -169,7 +170,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *api.Device, natsClient *nats.Conn) util.JSONResponse {
 	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
 	if err != nil {
-		logrus.WithError(err).Error("failed to publish nats message")
+		log.Error().Err(err).Msg("failed to publish nats message")
 		return jsonerror.InternalServerError()
 	}
 	return util.JSONResponse{
@@ -238,11 +239,7 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 				JSON: jsonerror.NotFound(eventutil.ErrRoomNoExists.Error()),
 			}
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"userID":     device.UserID,
-			"serverName": serverName,
-			"roomID":     roomID,
-		}).Error("failed to download state")
+		log.Error().Err(err).Str("userID", device.UserID).Str("serverName", serverName).Str("roomID", roomID).Msg("failed to download state")
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{

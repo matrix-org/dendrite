@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -56,7 +56,7 @@ func (p *SyncAPIProducer) SendReceipt(
 	m.Header.Set("type", receiptType)
 	m.Header.Set("timestamp", fmt.Sprintf("%d", timestamp))
 
-	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
+	log.Trace().Msgf("Producing to topic '%s'", p.TopicReceiptEvent)
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }
@@ -91,11 +91,7 @@ func (p *SyncAPIProducer) SendToDevice(
 		devices = append(devices, deviceID)
 	}
 
-	log.WithFields(log.Fields{
-		"user_id":     userID,
-		"num_devices": len(devices),
-		"type":        eventType,
-	}).Tracef("Producing to topic '%s'", p.TopicSendToDeviceEvent)
+	log.Trace().Str("user_id", userID).Int("num_devices", len(devices)).Str("type", eventType).Msgf("Producing to topic '%s'", p.TopicSendToDeviceEvent)
 	for i, device := range devices {
 		ote := &types.OutputSendToDeviceEvent{
 			UserID:   userID,
@@ -109,7 +105,7 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		eventJSON, err := json.Marshal(ote)
 		if err != nil {
-			log.WithError(err).Error("sendToDevice failed json.Marshal")
+			log.Error().Err(err).Msg("sendToDevice failed json.Marshal")
 			return err
 		}
 		m := nats.NewMsg(p.TopicSendToDeviceEvent)
@@ -119,10 +115,10 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
 			if i < len(devices)-1 {
-				log.WithError(err).Warn("sendToDevice failed to PublishMsg, trying further devices")
+				log.Warn().Err(err).Msg("sendToDevice failed to PublishMsg, trying further devices")
 				continue
 			}
-			log.WithError(err).Error("sendToDevice failed to PublishMsg for all devices")
+			log.Error().Err(err).Msg("sendToDevice failed to PublishMsg for all devices")
 			return err
 		}
 	}

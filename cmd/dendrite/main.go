@@ -19,23 +19,23 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/dendrite/appservice"
+	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/sirupsen/logrus"
-
-	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/mscs"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+
+	log "github.com/rs/zerolog/log"
 )
 
 var (
@@ -58,18 +58,18 @@ func main() {
 	if *unixSocket == "" {
 		http, err := config.HTTPAddress("http://" + *httpBindAddr)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse http address")
+			log.Fatal().Err(err).Msg("Failed to parse http address")
 		}
 		httpAddr = http
 		https, err := config.HTTPAddress("https://" + *httpsBindAddr)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse https address")
+			log.Fatal().Err(err).Msg("Failed to parse https address")
 		}
 		httpsAddr = https
 	} else {
 		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse unix socket")
+			log.Fatal().Err(err).Msg("Failed to parse unix socket")
 		}
 		httpAddr = socket
 	}
@@ -78,9 +78,9 @@ func main() {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			logrus.Errorf("Configuration error: %s", err)
+			log.Error().Msgf("Configuration error: %s", err)
 		}
-		logrus.Fatalf("Failed to start due to configuration errors")
+		log.Fatal().Msgf("Failed to start due to configuration errors")
 	}
 	processCtx := process.NewProcessContext()
 
@@ -90,9 +90,9 @@ func main() {
 
 	basepkg.PlatformSanityChecks()
 
-	logrus.Infof("Dendrite version %s", internal.VersionString())
+	log.Info().Msgf("Dendrite version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
-		logrus.Warn("Open registration is enabled")
+		log.Warn().Msg("Open registration is enabled")
 	}
 
 	// create DNS cache
@@ -102,7 +102,7 @@ func main() {
 			cfg.Global.DNSCache.CacheSize,
 			cfg.Global.DNSCache.CacheLifetime,
 		)
-		logrus.Infof(
+		log.Info().Msgf(
 			"DNS cache enabled (size %d, lifetime %s)",
 			cfg.Global.DNSCache.CacheSize,
 			cfg.Global.DNSCache.CacheLifetime,
@@ -112,13 +112,13 @@ func main() {
 	// setup tracing
 	closer, err := cfg.SetupTracing()
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start opentracing")
+		log.Panic().Err(err).Msg("failed to start opentracing")
 	}
 	defer closer.Close() // nolint: errcheck
 
 	// setup sentry
 	if cfg.Global.Sentry.Enabled {
-		logrus.Info("Setting up Sentry for debugging...")
+		log.Info().Msg("Setting up Sentry for debugging...")
 		err = sentry.Init(sentry.ClientOptions{
 			Dsn:              cfg.Global.Sentry.DSN,
 			Environment:      cfg.Global.Sentry.Environment,
@@ -128,13 +128,13 @@ func main() {
 			AttachStacktrace: true,
 		})
 		if err != nil {
-			logrus.WithError(err).Panic("failed to start Sentry")
+			log.Panic().Err(err).Msg("failed to start Sentry")
 		}
 		go func() {
 			processCtx.ComponentStarted()
 			<-processCtx.WaitForShutdown()
 			if !sentry.Flush(time.Second * 5) {
-				logrus.Warnf("failed to flush all Sentry events!")
+				log.Warn().Msg("failed to flush all Sentry events!")
 			}
 			processCtx.ComponentFinished()
 		}()
@@ -183,7 +183,7 @@ func main() {
 
 	if len(cfg.MSCs.MSCs) > 0 {
 		if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
-			logrus.WithError(err).Fatalf("Failed to enable MSCs")
+			log.Fatal().Err(err).Msg("Failed to enable MSCs")
 		}
 	}
 

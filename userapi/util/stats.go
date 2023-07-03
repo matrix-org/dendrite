@@ -21,14 +21,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 func getMemoryStats(p *phoneHomeStats) error {
 	oldUsage := p.prevData
 	newUsage := syscall.Rusage{}
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &newUsage); err != nil {
-		logrus.WithError(err).Error("unable to get usage")
+		log.Error().Err(err).Msg("unable to get usage")
 		return err
 	}
 	newData := timestampToRUUsage{timestamp: time.Now().Unix(), usage: newUsage}

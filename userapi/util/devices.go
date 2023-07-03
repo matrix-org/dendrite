@@ -8,7 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 type PusherDevice struct {
@@ -40,30 +40,20 @@ func GetPushDevices(ctx context.Context, localpart string, serverName spec.Serve
 			var ok bool
 			format, ok = fmtIface.(string)
 			if ok && format != "event_id_only" {
-				log.WithFields(log.Fields{
-					"localpart": localpart,
-					"app_id":    pusher.AppID,
-				}).Errorf("Only data.format event_id_only or empty is supported")
+				log.Error().Str("localpart", localpart).Str("app_id", pusher.AppID).Msg("Only data.format event_id_only or empty is supported")
 				continue
 			}
 
 			urlIface := pusher.Data["url"]
 			url, ok = urlIface.(string)
 			if !ok {
-				log.WithFields(log.Fields{
-					"localpart": localpart,
-					"app_id":    pusher.AppID,
-				}).Errorf("No data.url configured for HTTP Pusher")
+				log.Error().Str("localpart", localpart).Str("app_id", pusher.AppID).Msg("No data.url configured for HTTP Pusher")
 				continue
 			}
 			data = mapWithout(data, "url")
 
 		default:
-			log.WithFields(log.Fields{
-				"localpart": localpart,
-				"app_id":    pusher.AppID,
-				"kind":      pusher.Kind,
-			}).Errorf("Unhandled pusher kind")
+			log.Error().Str("localpart", localpart).Str("app_id", pusher.AppID).Any("kind", pusher.Kind).Msg("Unhandled pusher kind")
 			continue
 		}
 

@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 type presenceReq struct {
@@ -72,7 +72,7 @@ func SetPresence(
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
-		log.WithError(err).Errorf("failed to update presence")
+		log.Error().Err(err).Msgf("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -97,7 +97,7 @@ func GetPresence(
 
 	presence, err := natsClient.RequestMsg(msg, time.Second*10)
 	if err != nil {
-		log.WithError(err).Errorf("unable to get presence")
+		log.Error().Err(err).Msg("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -107,7 +107,7 @@ func GetPresence(
 	statusMsg := presence.Header.Get("status_msg")
 	e := presence.Header.Get("error")
 	if e != "" {
-		log.Errorf("received error msg from nats: %s", e)
+		log.Error().Msgf("received error msg from nats: %s", e)
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: types.PresenceClientResponse{

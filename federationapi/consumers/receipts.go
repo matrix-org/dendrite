@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
@@ -93,7 +93,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 	// only send receipt events which originated from us
 	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")
+		log.Error().Err(err).Str("user_id", receipt.UserID).Msg("failed to extract domain from receipt sender")
 		return true
 	}
 	if !t.isLocalServerName(receiptServerName) {
@@ -103,7 +103,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 	timestamp, err := strconv.ParseUint(msg.Header.Get("timestamp"), 10, 64)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU output log: message parse failure")
+		log.Error().Err(err).Msgf("EDU output log: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -112,7 +112,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 
 	joined, err := t.db.GetJoinedHosts(ctx, receipt.RoomID)
 	if err != nil {
-		log.WithError(err).WithField("room_id", receipt.RoomID).Error("failed to get joined hosts for room")
+		log.Error().Err(err).Str("room_id", receipt.RoomID).Msg("failed to get joined hosts for room")
 		return false
 	}
 
@@ -138,12 +138,12 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 		Origin: string(receiptServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		log.Error().Err(err).Msg("failed to marshal EDU JSON")
 		return true
 	}
 
 	if err := t.queues.SendEDU(edu, receiptServerName, names); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		log.Error().Err(err).Msg("failed to send EDU")
 		return false
 	}
 

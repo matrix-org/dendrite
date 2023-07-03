@@ -28,7 +28,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 type stateEventInStateResp struct {

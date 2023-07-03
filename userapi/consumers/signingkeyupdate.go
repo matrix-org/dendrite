@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -73,18 +73,18 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var updatePayload api.CrossSigningKeyUpdate
 	if err := json.Unmarshal(msg.Data, &updatePayload); err != nil {
-		logrus.WithError(err).Errorf("Failed to read from signing key update input topic")
+		log.Error().Err(err).Msg("Failed to read from signing key update input topic")
 		return true
 	}
 	origin := spec.ServerName(msg.Header.Get("origin"))
 	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
-		logrus.WithError(err).Error("failed to split user id")
+		log.Error().Err(err).Msgf("failed to split user id")
 		return true
 	} else if t.isLocalServerName(serverName) {
-		logrus.Warn("dropping device key update from ourself")
+		log.Warn().Msg("dropping device key update from ourself")
 		return true
 	} else if serverName != origin {
-		logrus.Warnf("dropping device key update, %s != %s", serverName, origin)
+		log.Warn().Msgf("dropping device key update, %s != %s", serverName, origin)
 		return true
 	}
 
@@ -101,11 +101,11 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
 	if err := t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes); err != nil {
-		logrus.WithError(err).Error("failed to upload device keys")
+		log.Error().Err(err).Msg("failed to upload device keys")
 		return false
 	}
 	if uploadRes.Error != nil {
-		logrus.WithError(uploadRes.Error).Error("failed to upload device keys")
+		log.Error().Err(uploadRes.Error).Msg("failed to upload device keys")
 		return true
 	}
 

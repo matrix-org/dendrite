@@ -24,8 +24,9 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+
+	log "github.com/rs/zerolog/log"
 )
 
 // Type represents an auth type
@@ -177,7 +178,7 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 func (u *UserInteractive) NewSession() *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
-		logrus.WithError(err).Error("failed to generate session ID")
+		log.Error().Err(err).Msg("failed to generate session ID")
 		res := jsonerror.InternalServerError()
 		return &res
 	}

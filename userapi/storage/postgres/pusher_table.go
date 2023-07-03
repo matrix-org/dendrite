@@ -19,7 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -140,7 +140,7 @@ func (s *pushersStatements) SelectPushers(
 		pushers = append(pushers, pusher)
 	}
 
-	logrus.Tracef("Database returned %d pushers", len(pushers))
+	log.Trace().Msgf("Database returned %d pushers", len(pushers))
 	return pushers, rows.Err()
 }
 

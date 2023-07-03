@@ -20,15 +20,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/setup/base"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
-	"github.com/nats-io/nats.go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -39,8 +30,16 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/rs/zerolog/log"
 )
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
@@ -86,7 +85,7 @@ func Setup(
 	}
 
 	if cfg.Matrix.WellKnownClientName != "" {
-		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
+		log.Info().Msgf("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -129,7 +128,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	if cfg.RegistrationSharedSecret != "" {
-		logrus.Info("Enabling shared secret registration at /_synapse/admin/v1/register")
+		log.Info().Msg("Enabling shared secret registration at /_synapse/admin/v1/register")
 		sr := NewSharedSecretRegistration(cfg.RegistrationSharedSecret)
 		synapseAdminRouter.Handle("/admin/v1/register",
 			httputil.MakeExternalAPI("shared_secret_registration", func(req *http.Request) util.JSONResponse {
@@ -198,10 +197,10 @@ func Setup(
 
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
-		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
+		log.Info().Msg("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+			log.Fatal().Err(err).Msg("unable to get account for sending sending server notices")
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",

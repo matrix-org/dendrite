@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 // MatrixError represents the "standard error response" in Matrix.
@@ -235,7 +235,7 @@ func NotTrusted(serverName string) *MatrixError {
 
 // InternalAPIError is returned when Dendrite failed to reach an internal API.
 func InternalAPIError(ctx context.Context, err error) util.JSONResponse {
-	logrus.WithContext(ctx).WithError(err).Error("Error reaching an internal API")
+	log.Error().Any("context", ctx).Err(err).Msg("Error reaching an internal API")
 	return util.JSONResponse{
 		Code: http.StatusInternalServerError,
 		JSON: &MatrixError{

@@ -9,7 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 // NotifyUserCountsAsync sends notifications to a local user's
@@ -32,11 +32,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"localpart": localpart,
-		"app_id0":   pusherDevices[0].Device.AppID,
-		"pushkey":   pusherDevices[0].Device.PushKey,
-	}).Tracef("Notifying HTTP push gateway about notification counts")
+	log.Trace().Str("localpart", localpart).Str("app_id0", pusherDevices[0].Device.AppID).Str("pushkey", pusherDevices[0].Device.PushKey).Msgf("Notifying HTTP push gateway about notification counts")
 
 	// TODO: think about bounding this to one per user, and what
 	// ordering guarantees we must provide.
@@ -63,11 +59,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 				},
 			}
 			if err := pgClient.Notify(ctx, pusherDevice.URL, &req, &pushgateway.NotifyResponse{}); err != nil {
-				log.WithFields(log.Fields{
-					"localpart": localpart,
-					"app_id0":   pusherDevice.Device.AppID,
-					"pushkey":   pusherDevice.Device.PushKey,
-				}).WithError(err).Error("HTTP push gateway request failed")
+				log.Error().Err(err).Str("localpart", localpart).Str("app_id0", pusherDevice.Device.AppID).Str("pushkey", pusherDevice.Device.PushKey).Msg("HTTP push gateway request failed")
 				return
 			}
 		}

@@ -8,7 +8,8 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 )
 
 var serverNamesTables = []string{
@@ -57,7 +58,7 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName spec.ServerName) 
 			pq.QuoteIdentifier(table),
 		)
 		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 1 {
-			logrus.Infof("Table %s already has column, skipping", table)
+			log.Info().Msgf("Table %s already has column, skipping", table)
 			continue
 		}
 		if c == 0 {

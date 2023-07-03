@@ -6,7 +6,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -48,11 +48,7 @@ func (p *SyncAPI) SendAccountData(userID string, data eventutil.AccountData) err
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   data.RoomID,
-		"data_type": data.Type,
-	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
+	log.Trace().Str("user_id", userID).Str("room_id", data.RoomID).Str("data_type", data.Type).Msgf("Producing to topic '%s'", p.clientDataTopic)
 
 	_, err = p.producer.PublishMsg(m)
 	return err
@@ -92,10 +88,7 @@ func (p *SyncAPI) sendNotificationData(userID string, data *eventutil.Notificati
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"user_id": userID,
-		"room_id": data.RoomID,
-	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
+	log.Trace().Str("user_id", userID).Str("room_id", data.RoomID).Msgf("Producing to topic '%s'", p.clientDataTopic)
 
 	_, err = p.producer.PublishMsg(m)
 	return err

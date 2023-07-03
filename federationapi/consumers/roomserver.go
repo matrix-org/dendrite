@@ -26,8 +26,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -103,7 +102,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		log.Error().Err(err).Msg("roomserver output log: message parse failure")
 		return true
 	}
 
@@ -112,36 +111,31 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		ev := output.NewRoomEvent.Event
 		if err := s.processMessage(*output.NewRoomEvent, output.NewRoomEvent.RewritesState); err != nil {
 			// panic rather than continue with an inconsistent database
-			log.WithFields(log.Fields{
-				"event_id":   ev.EventID(),
-				"event":      string(ev.JSON()),
-				"add":        output.NewRoomEvent.AddsStateEventIDs,
-				"del":        output.NewRoomEvent.RemovesStateEventIDs,
-				log.ErrorKey: err,
-			}).Panicf("roomserver output log: write room event failure")
+			log.Panic().
+				Str("event_id", ev.EventID()).
+				Str("event", string(ev.JSON())).
+				Any("add", output.NewRoomEvent.AddsStateEventIDs).
+				Any("del", output.NewRoomEvent.RemovesStateEventIDs).
+				Err(err).Msg("roomserver output log: write room event failure")
 		}
 
 	case api.OutputTypeNewInboundPeek:
 		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
-			log.WithFields(log.Fields{
-				"event":      output.NewInboundPeek,
-				log.ErrorKey: err,
-			}).Panicf("roomserver output log: remote peek event failure")
+			//log.ErrorKey == ?
+			log.Panic().Any("event", output.NewInboundPeek).Err(err).Msg("roomserver output log: remote peek event failure")
 			return false
 		}
 
 	case api.OutputTypePurgeRoom:
-		log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Purging room from federation API")
+		log.Warn().Str("room_id", output.PurgeRoom.RoomID).Msg("Purging room from federation API")
 		if err := s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID); err != nil {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from federation API")
+			log.Error().Str("room_id", output.PurgeRoom.RoomID).Err(err).Msg("Failed to purge room from federation API")
 		} else {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).Warn("Room purged from federation API")
+			log.Warn().Str("room_id", output.PurgeRoom.RoomID).Msg("Room purged from federation API")
 		}
 
 	default:
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
+		log.Debug().Any("type", output.Type).Msg("roomserver output log: ignoring unknown output type")
 	}
 
 	return true
@@ -263,7 +257,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		RoomID:     roomID,
 	}, &queryRes)
 	if err != nil {
-		log.WithError(err).Error("failed to calculate joined rooms for user")
+		log.Error().Err(err).Msg("failed to calculate joined rooms for user")
 		return
 	}
 
@@ -276,7 +270,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		var presence *nats.Msg
 		presence, err = s.natsClient.RequestMsg(msg, time.Second*10)
 		if err != nil {
-			log.WithError(err).Errorf("unable to get presence")
+			log.Error().Err(err).Msg("unable to get presence")
 			continue
 		}
 
@@ -311,11 +305,11 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		Origin: string(s.cfg.Matrix.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		log.Error().Err(err).Msg("failed to marshal EDU JSON")
 		return
 	}
 	if err := s.queues.SendEDU(edu, s.cfg.Matrix.ServerName, joined); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		log.Error().Err(err).Msg("failed to send EDU")
 	}
 }
 

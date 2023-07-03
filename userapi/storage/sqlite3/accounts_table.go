@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 const accountsSchema = `
@@ -178,7 +178,7 @@ func (s *accountsStatements) SelectAccountByLocalpart(
 	err := stmt.QueryRowContext(ctx, localpart, serverName).Scan(&acc.Localpart, &acc.ServerName, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			log.WithError(err).Error("Unable to retrieve user from the db")
+			log.Error().Err(err).Msg("Unable to retrieve user from the db")
 		}
 		return nil, err
 	}

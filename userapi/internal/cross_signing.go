@@ -27,7 +27,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
+
 	"golang.org/x/crypto/curve25519"
 )
 
@@ -469,7 +470,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 	for targetUserID := range req.UserToDevices {
 		keys, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to get cross-signing keys for user %q", targetUserID)
+			log.Error().Err(err).Msgf("Failed to get cross-signing keys for user %q", targetUserID)
 			continue
 		}
 
@@ -482,7 +483,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, keyID)
 			if err != nil && err != sql.ErrNoRows {
-				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
+				log.Error().Err(err).Msgf("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
 				continue
 			}
 

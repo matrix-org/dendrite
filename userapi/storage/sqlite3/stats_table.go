@@ -21,7 +21,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -241,9 +242,9 @@ func NewSQLiteStatsTable(db *sql.DB, serverName spec.ServerName) (tables.StatsTa
 func (s *statsStatements) startTimers() {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
-		logrus.Infof("Executing UpdateUserDailyVisits")
+		log.Info().Msg("Executing UpdateUserDailyVisits")
 		if err := s.UpdateUserDailyVisits(context.Background(), nil, time.Now(), s.lastUpdate); err != nil {
-			logrus.WithError(err).Error("failed to update daily user visits")
+			log.Error().Err(err).Msg("failed to update daily user visits")
 		}
 		time.AfterFunc(time.Hour*3, updateStatsFunc)
 	}

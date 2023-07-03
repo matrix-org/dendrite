@@ -36,19 +36,18 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/gomatrixserverlib/tokens"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/gomatrixserverlib/tokens"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/rs/zerolog/log"
 )
 
 var (

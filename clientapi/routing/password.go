@@ -12,7 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 type newPasswordRequest struct {
@@ -37,10 +37,7 @@ func Password(
 	var r newPasswordRequest
 	r.LogoutDevices = true
 
-	logrus.WithFields(logrus.Fields{
-		"sessionId": device.SessionID,
-		"userId":    device.UserID,
-	}).Debug("Changing password")
+	log.Debug().Int64("sessionId", device.SessionID).Str("userId", device.UserID).Msg("Changing password")
 
 	// Unmarshal the request.
 	resErr := httputil.UnmarshalJSONRequest(req, &r)

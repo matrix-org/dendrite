@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -137,7 +137,7 @@ func (s *notificationsStatements) DeleteUpTo(ctx context.Context, txn *sql.Tx, l
 	if err != nil {
 		return true, err
 	}
-	log.WithFields(log.Fields{"localpart": localpart, "room_id": roomID, "stream_pos": pos}).Tracef("DeleteUpTo: %d rows affected", nrows)
+	log.Trace().Str("localpart", localpart).Str("room_id", roomID).Uint64("stream_pos", pos).Msgf("DeleteUpTo: %d rows affected", nrows)
 	return nrows > 0, nil
 }
 
@@ -151,7 +151,7 @@ func (s *notificationsStatements) UpdateRead(ctx context.Context, txn *sql.Tx, l
 	if err != nil {
 		return true, err
 	}
-	log.WithFields(log.Fields{"localpart": localpart, "room_id": roomID, "stream_pos": pos}).Tracef("UpdateRead: %d rows affected", nrows)
+	log.Trace().Str("localpart", localpart).Str("room_id", roomID).Uint64("stream_pos", pos).Msgf("UpdateRead: %d rows affected", nrows)
 	return nrows > 0, nil
 }
 

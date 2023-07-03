@@ -27,19 +27,14 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 )
 
 func SetReceipt(req *http.Request, userAPI api.ClientUserAPI, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
 	timestamp := spec.AsTimestamp(time.Now())
-	logrus.WithFields(logrus.Fields{
-		"roomID":      roomID,
-		"receiptType": receiptType,
-		"eventID":     eventID,
-		"userId":      device.UserID,
-		"timestamp":   timestamp,
-	}).Debug("Setting receipt")
-
+	/// TODO: Check timestamp => timestamp.Time().Unix() for compat issues
+	log.Debug().Str("roomID", roomID).Str("receiptType", receiptType).Str("eventID", eventID).Str("userId", device.UserID).Int64("timestamp", timestamp.Time().Unix()).Msg("Setting receipt")
 	switch receiptType {
 	case "m.read", "m.read.private":
 		if err := syncProducer.SendReceipt(req.Context(), device.UserID, roomID, eventID, receiptType, timestamp); err != nil {

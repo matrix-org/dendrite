@@ -17,13 +17,6 @@ package federationapi
 import (
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
@@ -33,9 +26,15 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -107,7 +106,7 @@ func NewInternalAPI(
 
 	federationDB, err := storage.NewDatabase(processContext.Context(), cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to federation sender db")
+		log.Panic().Err(err).Msg("failed to connect to federation sender db")
 	}
 
 	if resetBlacklist {
@@ -135,45 +134,45 @@ func NewInternalAPI(
 		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start room server consumer")
+		log.Panic().Err(err).Msg("failed to start room server consumer")
 	}
 	tsConsumer := consumers.NewOutputSendToDeviceConsumer(
 		processContext, cfg, js, queues, federationDB,
 	)
 	if err = tsConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start send-to-device consumer")
+		log.Panic().Err(err).Msg("failed to start send-to-device consumer")
 	}
 	receiptConsumer := consumers.NewOutputReceiptConsumer(
 		processContext, cfg, js, queues, federationDB,
 	)
 	if err = receiptConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start receipt consumer")
+		log.Panic().Err(err).Msg("failed to start receipt consumer")
 	}
 	typingConsumer := consumers.NewOutputTypingConsumer(
 		processContext, cfg, js, queues, federationDB,
 	)
 	if err = typingConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start typing consumer")
+		log.Panic().Err(err).Msg("failed to start typing consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
 		processContext, &dendriteCfg.KeyServer, js, queues, federationDB, rsAPI,
 	)
 	if err = keyConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start key server consumer")
+		log.Panic().Err(err).Msg("failed to start key server consumer")
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceConsumer(
 		processContext, cfg, js, queues, federationDB, rsAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start presence consumer")
+		log.Panic().Err(err).Msg("failed to start presence consumer")
 	}
 
 	var cleanExpiredEDUs func()
 	cleanExpiredEDUs = func() {
-		logrus.Infof("Cleaning expired EDUs")
+		log.Info().Msg("Cleaning expired EDUs")
 		if err := federationDB.DeleteExpiredEDUs(processContext.Context()); err != nil {
-			logrus.WithError(err).Error("Failed to clean expired EDUs")
+			log.Error().Err(err).Msg("Failed to clean expired EDUs")
 		}
 		time.AfterFunc(time.Hour, cleanExpiredEDUs)
 	}

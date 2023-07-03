@@ -22,7 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/rs/zerolog/log"
 )
 
 // KeyChange produces key change events for the sync API and federation sender to consume
@@ -61,10 +62,7 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 		userToDeviceCount[key.UserID]++
 	}
 	for userID, count := range userToDeviceCount {
-		logrus.WithFields(logrus.Fields{
-			"user_id":         userID,
-			"num_key_changes": count,
-		}).Tracef("Produced to key change topic '%s'", p.Topic)
+		log.Trace().Str("user_id", userID).Int("num_key_changes", count).Msgf("Produced to key change topic '%s'", p.Topic)
 	}
 	return nil
 }
@@ -100,8 +98,6 @@ func (p *KeyChange) ProduceSigningKeyUpdate(key api.CrossSigningKeyUpdate) error
 		return err
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"user_id": key.UserID,
-	}).Tracef("Produced to cross-signing update topic '%s'", p.Topic)
+	log.Trace().Str("user_id", key.UserID).Msgf("Produced to cross-signing update topic '%s'", p.Topic)
 	return nil
 }

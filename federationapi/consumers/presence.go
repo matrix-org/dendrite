@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
@@ -87,7 +87,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	userID := msg.Header.Get(jetstream.UserID)
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
+		log.Error().Err(err).Str("user_id", userID).Msg("failed to extract domain from receipt sender")
 		return true
 	}
 	if !t.isLocalServerName(serverName) {
@@ -100,7 +100,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		WantMembership: "join",
 	}, &queryRes)
 	if err != nil {
-		log.WithError(err).Error("failed to calculate joined rooms for user")
+		log.Error().Err(err).Msg("failed to calculate joined rooms for user")
 		return true
 	}
 
@@ -114,7 +114,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	// send this presence to all servers who share rooms with this user.
 	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
 	if err != nil {
-		log.WithError(err).Error("failed to get joined hosts")
+		log.Error().Err(err).Msg("failed to get joined hosts")
 		return true
 	}
 
@@ -147,13 +147,13 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		log.Error().Err(err).Msg("failed to marshal EDU JSON")
 		return true
 	}
 
-	log.Tracef("sending presence EDU to %d servers", len(joined))
+	log.Trace().Msgf("sending presence EDU to %d servers", len(joined))
 	if err = t.queues.SendEDU(edu, serverName, joined); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		log.Error().Err(err).Msg("failed to send EDU")
 		return false
 	}
 

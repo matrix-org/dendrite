@@ -37,7 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom

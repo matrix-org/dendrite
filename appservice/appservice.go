@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
@@ -29,6 +28,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	log "github.com/rs/zerolog/log"
 )
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
@@ -59,9 +59,7 @@ func NewInternalAPI(
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
 		if err := generateAppServiceAccount(userAPI, appservice, cfg.Global.ServerName); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"appservice": appservice.ID,
-			}).WithError(err).Panicf("failed to generate bot account for appservice")
+			log.Logger.Panic().Str("appservice", appservice.ID).Err(err).Msg("failed to generate bot account for appservice")
 		}
 	}
 
@@ -73,7 +71,7 @@ func NewInternalAPI(
 		js, rsAPI,
 	)
 	if err := consumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+		log.Panic().Err(err).Msg("failed to start appservice roomserver consumer")
 	}
 
 	return appserviceQueryAPI

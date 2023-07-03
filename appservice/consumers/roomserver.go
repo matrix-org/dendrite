@@ -36,7 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/rs/zerolog/log"
 )
 
 // ApplicationServiceTransaction is the transaction that is sent off to an
@@ -104,7 +104,7 @@ func (s *OutputRoomEventConsumer) Start() error {
 func (s *OutputRoomEventConsumer) onMessage(
 	ctx context.Context, state *appserviceState, msgs []*nats.Msg,
 ) bool {
-	log.WithField("appservice", state.ID).Tracef("Appservice worker received %d message(s) from roomserver", len(msgs))
+	log.Trace().Str("appservice", state.ID).Msgf("Appservice worker received %d message(s) from roomserver", len(msgs))
 	events := make([]*types.HeaderedEvent, 0, len(msgs))
 	for _, msg := range msgs {
 		// Only handle events we care about
@@ -116,7 +116,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 		var output api.OutputEvent
 		if err := json.Unmarshal(msg.Data, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithField("appservice", state.ID).WithError(err).Errorf("Appservice failed to parse message, ignoring")
+			log.Error().Str("appservice", state.ID).Err(err).Msg("Appservice failed to parse message, ignoring")
 			continue
 		}
 		switch output.Type {
@@ -139,7 +139,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 				}
 				if len(eventsReq.EventIDs) > 0 {
 					if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
-						log.WithError(err).Errorf("s.rsAPI.QueryEventsByID failed")
+						log.Error().Err(err).Msg("s.rsAPI.QueryEventsByID failed")
 						return false
 					}
 					events = append(events, eventsRes.Events...)
@@ -167,7 +167,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 
 	// Send event to any relevant application services. If we hit
 	// an error here, return false, so that we negatively ack.
-	log.WithField("appservice", state.ID).Debugf("Appservice worker sending %d events(s) from roomserver", len(events))
+	log.Debug().Str("appservice", state.ID).Msgf("Appservice worker sending %d events(s) from roomserver", len(events))
 	return s.sendEvents(ctx, state, events, txnID) == nil
 }
 
@@ -223,7 +223,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 		s.backoff++
 	}
 	duration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
-	log.WithField("appservice", s.ID).WithError(err).Errorf("Unable to send transaction to appservice, backing off for %s", duration.String())
+	log.Error().Str("appservice", s.ID).Err(err).Msgf("Unable to send transaction to appservice, backing off for %s", duration.String())
 	time.Sleep(duration)
 	return err
 }
@@ -258,10 +258,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 			}
 		}
 	} else {
-		log.WithFields(log.Fields{
-			"appservice": appservice.ID,
-			"room_id":    event.RoomID(),
-		}).WithError(err).Errorf("Unable to get aliases for room")
+		log.Error().Str("appservice", appservice.ID).Str("room_id", event.RoomID()).Err(err).Msg("Unable to get aliases for room")
 	}
 
 	// Check if any of the members in the room match the appservice
@@ -303,10 +300,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			}
 		}
 	} else {
-		log.WithFields(log.Fields{
-			"appservice": appservice.ID,
-			"room_id":    event.RoomID(),
-		}).WithError(err).Errorf("Unable to get membership for room")
+		log.Error().Str("appservice", appservice.ID).Str("room_id", event.RoomID()).Err(err).Msg("Unable to get membership for room")
 	}
 	return false
 }
