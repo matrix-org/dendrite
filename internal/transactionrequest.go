@@ -167,6 +167,22 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			}
 			continue
 		}
+
+		// If the user is already joined and we receive a new "join" event, we're adding the previous
+		// content to unsigned, this way VerifyEventSignatures skips the mxid_mapping check
+		// FIXME: this is not great..
+		origEvent := event
+		unsignedUpdated := false
+		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && event.Type() == spec.MRoomMember && event.StateKey() != nil {
+			unsignedUpdated, err = t.updateUnsignedIfNeeded(ctx, event)
+			if err != nil {
+				results[event.EventID()] = fclient.PDUResult{
+					Error: err.Error(),
+				}
+				continue
+			}
+		}
+
 		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
@@ -175,6 +191,11 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 				Error: err.Error(),
 			}
 			continue
+		}
+
+		// switch the event again, so we don't store a wrong value in the DB
+		if unsignedUpdated {
+			event = origEvent
 		}
 
 		// pass the event to the roomserver which will do auth checks
@@ -206,6 +227,47 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 
 	wg.Wait()
 	return &fclient.RespSend{PDUs: results}, nil
+}
+
+// updateUnsignedIfNeeded sets unsigned.prev_content to the previous membership event. This is
+// to avoid checking the mxid_mapping on join -> join (e.g. displayname changes) events, which
+// wouldn't be present.
+func (t *TxnReq) updateUnsignedIfNeeded(ctx context.Context, event gomatrixserverlib.PDU) (updated bool, err error) {
+	var membership string
+	membership, err = event.Membership()
+	if err != nil {
+		return false, err
+	}
+	var validRoomID *spec.RoomID
+	validRoomID, err = spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return false, err
+	}
+
+	// get the current membership event
+	var currentStateEv gomatrixserverlib.PDU
+	currentStateEv, err = t.rsAPI.CurrentStateEvent(ctx, *validRoomID, event.Type(), string(event.SenderID()))
+	if err != nil {
+		return false, err
+	}
+	if currentStateEv != nil {
+		var currentMembership string
+		currentMembership, err = currentStateEv.Membership()
+		if err != nil {
+			return false, err
+		}
+
+		// if the currentMembership is join and the new membership as well (e.g. displayname change),
+		// update unsigned so VerifyEventSignatures does not try to validate the mxid_mapping
+		if currentMembership == spec.Join && currentMembership == membership {
+			err = event.SetUnsignedField("prev_content", currentStateEv.Content())
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // nolint:gocyclo
