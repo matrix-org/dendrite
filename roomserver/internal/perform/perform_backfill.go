@@ -647,7 +647,7 @@ func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySe
 
 		resolver := state.NewStateResolution(db, roomInfo, querier)
 
-		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev, &resolver, querier)
+		_, redactedEvent, _, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev, &resolver, querier)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue

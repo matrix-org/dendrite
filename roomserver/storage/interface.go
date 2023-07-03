@@ -190,9 +190,7 @@ type Database interface {
 	GetRoomVersion(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
-	MaybeRedactEvent(
-		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
-	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
+	MaybeRedactEvent(ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 }
 
 type UserRoomKeys interface {
@@ -249,10 +247,8 @@ type EventDatabase interface {
 	EventIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
 	Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error)
-	// MaybeRedactEvent returns the redaction event and the redacted event if this call resulted in a redaction, else an error
+	// MaybeRedactEvent returns the redaction event, the redacted event and the event before redaction if this call resulted in a redaction, else an error
 	// (nil if there was nothing to do)
-	MaybeRedactEvent(
-		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
-	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
+	MaybeRedactEvent(ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI) (redactionEvent, redactedEvent, originalRedactedEvent gomatrixserverlib.PDU, err error)
 	StoreEvent(ctx context.Context, event gomatrixserverlib.PDU, roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.StateAtEvent, error)
 }

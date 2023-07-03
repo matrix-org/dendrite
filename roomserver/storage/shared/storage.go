@@ -990,15 +990,15 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
 // to cross-reference with other tables when loading.
 //
 // Returns the redaction event and the redacted event if this call resulted in a redaction.
+// nolint: gocylo
 func (d *EventDatabase) MaybeRedactEvent(
 	ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
 	querier api.QuerySenderIDAPI,
-) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error) {
+) (redactionEvent, redactedEvent, originalRedactedEvent gomatrixserverlib.PDU, err error) {
 	var (
-		redactionEvent, redactedEvent *types.Event
-		err                           error
-		validated                     bool
-		ignoreRedaction               bool
+		redactionEv, redactedEv *types.Event
+		validated               bool
+		ignoreRedaction         bool
 	)
 
 	wErr := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -1019,42 +1019,42 @@ func (d *EventDatabase) MaybeRedactEvent(
 			}
 		}
 
-		redactionEvent, redactedEvent, validated, err = d.loadRedactionPair(ctx, txn, roomInfo, eventNID, event)
+		redactionEv, redactedEv, validated, err = d.loadRedactionPair(ctx, txn, roomInfo, eventNID, event)
 		switch {
 		case err != nil:
 			return fmt.Errorf("d.loadRedactionPair: %w", err)
-		case validated || redactedEvent == nil || redactionEvent == nil:
+		case validated || redactedEv == nil || redactionEv == nil:
 			// we've seen this redaction before or there is nothing to redact
 			return nil
-		case redactedEvent.RoomID() != redactionEvent.RoomID():
+		case redactedEv.RoomID() != redactionEv.RoomID():
 			// redactions across rooms aren't allowed
 			ignoreRedaction = true
 			return nil
 		}
 
 		var validRoomID *spec.RoomID
-		validRoomID, err = spec.NewRoomID(redactedEvent.RoomID())
+		validRoomID, err = spec.NewRoomID(redactedEv.RoomID())
 		if err != nil {
 			return err
 		}
 		sender1Domain := ""
-		sender1, err1 := querier.QueryUserIDForSender(ctx, *validRoomID, redactedEvent.SenderID())
+		sender1, err1 := querier.QueryUserIDForSender(ctx, *validRoomID, redactedEv.SenderID())
 		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
 		sender2Domain := ""
-		sender2, err2 := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
+		sender2, err2 := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEv.SenderID())
 		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
 		var powerlevels *gomatrixserverlib.PowerLevelContent
-		powerlevels, err = plResolver.Resolve(ctx, redactionEvent.EventID())
+		powerlevels, err = plResolver.Resolve(ctx, redactionEv.EventID())
 		if err != nil {
 			return err
 		}
 
 		switch {
-		case powerlevels.UserLevel(redactionEvent.SenderID()) >= powerlevels.Redact:
+		case powerlevels.UserLevel(redactionEv.SenderID()) >= powerlevels.Redact:
 			// 1. The power level of the redaction event’s sender is greater than or equal to the redact level.
 		case sender1Domain != "" && sender2Domain != "" && sender1Domain == sender2Domain:
 			// 2. The domain of the redaction event’s sender matches that of the original event’s sender.
@@ -1065,42 +1065,47 @@ func (d *EventDatabase) MaybeRedactEvent(
 
 		// mark the event as redacted
 		if redactionsArePermanent {
-			redactedEvent.Redact()
+			originalRedactedEvent, err = gomatrixserverlib.MustGetRoomVersion(redactedEv.Version()).
+				NewEventFromTrustedJSON(redactedEv.JSON(), false)
+			if err != nil {
+				return err
+			}
+			redactedEv.Redact()
 		}
 
-		err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
+		err = redactedEv.SetUnsignedField("redacted_because", redactionEv)
 		if err != nil {
 			return fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 		}
 		// NOTSPEC: sytest relies on this unspecced field existing :(
-		err = redactedEvent.SetUnsignedField("redacted_by", redactionEvent.EventID())
+		err = redactedEv.SetUnsignedField("redacted_by", redactionEv.EventID())
 		if err != nil {
 			return fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 		}
 		// overwrite the eventJSON table
-		err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
+		err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEv.EventNID, redactedEv.JSON())
 		if err != nil {
 			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
 
-		err = d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEvent.EventID(), true)
+		err = d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEv.EventID(), true)
 		if err != nil {
 			return fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 		}
 
 		// We remove the entry from the cache, as if we just "StoreRoomServerEvent", we can't be
 		// certain that the cached entry actually is updated, since ristretto is eventual-persistent.
-		d.Cache.InvalidateRoomServerEvent(redactedEvent.EventNID)
+		d.Cache.InvalidateRoomServerEvent(redactedEv.EventNID)
 
 		return nil
 	})
 	if wErr != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	if ignoreRedaction || redactionEvent == nil || redactedEvent == nil {
-		return nil, nil, nil
+	if ignoreRedaction || redactionEv == nil || redactedEv == nil {
+		return nil, nil, nil, nil
 	}
-	return redactionEvent.PDU, redactedEvent.PDU, nil
+	return redactionEv.PDU, redactedEv.PDU, originalRedactedEvent, nil
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.

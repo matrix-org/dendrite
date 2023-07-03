@@ -400,13 +400,14 @@ func (r *Inputer) processRoomEvent(
 	// if storing this event results in it being redacted then do so.
 	// we do this after calculating state for this event as we may need to get power levels
 	var (
-		redactedEventID string
-		redactionEvent  gomatrixserverlib.PDU
-		redactedEvent   gomatrixserverlib.PDU
+		redactedEventID       string
+		redactionEvent        gomatrixserverlib.PDU
+		redactedEvent         gomatrixserverlib.PDU
+		originalRedactedEvent gomatrixserverlib.PDU
 	)
 	if !isRejected && !isCreateEvent {
 		resolver := state.NewStateResolution(r.DB, roomInfo, r.Queryer)
-		redactionEvent, redactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver, r.Queryer)
+		redactionEvent, redactedEvent, originalRedactedEvent, err = r.DB.MaybeRedactEvent(ctx, roomInfo, eventNID, event, &resolver, r.Queryer)
 		if err != nil {
 			return err
 		}
@@ -486,6 +487,12 @@ func (r *Inputer) processRoomEvent(
 		if err != nil {
 			return fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
 		}
+		// if we're in a pseudoID room, and we redacted a m.room.member event, also leave/kick the user
+		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && redactedEvent.Type() == spec.MRoomMember {
+			if err = r.leavePseudoIDRoom(ctx, *validRoomID, originalRedactedEvent, redactionEvent); err != nil {
+				logrus.WithError(err).Error("failed to leave user after membership event redaction")
+			}
+		}
 	}
 
 	// If guest_access changed and is not can_join, kick all guest users.
@@ -498,6 +505,73 @@ func (r *Inputer) processRoomEvent(
 	// Everything was OK — the latest events updater didn't error and
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
+	return nil
+}
+
+// leavePseudoIDRoom leaves/kicks a user in the event of a membership event redaction.
+// TODO: This doesn't play well with users re-joining rooms, as in this case we have multiple join events with a mxid_mapping.
+func (r *Inputer) leavePseudoIDRoom(ctx context.Context, roomID spec.RoomID, originalRedactedEvent, redactionEvent gomatrixserverlib.PDU) error {
+	var memberContent gomatrixserverlib.MemberContent
+	if err := json.Unmarshal(originalRedactedEvent.Content(), &memberContent); err != nil {
+		return err
+	}
+	if memberContent.Membership != spec.Join {
+		return nil
+	}
+	// no mxid_mapping, nothing to do
+	if memberContent.MXIDMapping == nil {
+		return nil
+	}
+
+	userID, err := r.Queryer.QueryUserIDForSender(ctx, roomID, redactionEvent.SenderID())
+	if err != nil {
+		return err
+	}
+
+	// We can only create the leave event on servers the redaction originated on.
+	// We are going to receive the leave event anyway.
+	if !r.Cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		return nil
+	}
+
+	// check that the redacted event is the _current_ membership event
+	stateKey := originalRedactedEvent.StateKey()
+
+	signingIdentity, err := r.SigningIdentity(ctx, roomID, *userID)
+	if err != nil {
+		return err
+	}
+
+	fledglingEvent := &gomatrixserverlib.ProtoEvent{
+		RoomID:   originalRedactedEvent.RoomID(),
+		Type:     spec.MRoomMember,
+		StateKey: stateKey,
+		SenderID: string(redactionEvent.SenderID()),
+	}
+
+	if fledglingEvent.Content, err = json.Marshal(gomatrixserverlib.MemberContent{
+		Membership: spec.Leave,
+	}); err != nil {
+		return err
+	}
+
+	event, err := eventutil.QueryAndBuildEvent(ctx, fledglingEvent, &signingIdentity, time.Now(), r.Queryer, nil)
+	if err != nil {
+		return err
+	}
+
+	inputReq := &api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{{
+			Kind:         api.KindNew,
+			Event:        event,
+			Origin:       userID.Domain(),
+			SendAsServer: string(userID.Domain()),
+		}},
+		Asynchronous: true, // Needs to be async, as we otherwise create a deadlock
+	}
+	inputRes := &api.InputRoomEventsResponse{}
+	r.InputRoomEvents(ctx, inputReq, inputRes)
+
 	return nil
 }
 
