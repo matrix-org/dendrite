@@ -27,9 +27,10 @@ import (
 	"sync"
 
 	"github.com/matrix-org/util"
-
-	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rs/zerolog"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -37,34 +38,34 @@ import (
 // logrus is using a global variable when we're using `logrus.AddHook`
 // this unfortunately results in us adding the same hook multiple times.
 // This map ensures we only ever add one level hook.
-var stdLevelLogAdded = make(map[logrus.Level]bool)
+var stdLevelLogAdded = make(map[zerolog.Level]bool)
 var levelLogAddedMu = &sync.Mutex{}
 
 type utcFormatter struct {
-	logrus.Formatter
+	zerolog.Formatter
 }
 
-func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	entry.Time = entry.Time.UTC()
-	return f.Formatter.Format(entry)
+func (f utcFormatter) Format(entry *zerolog.Event) ([]byte, error) {
+	return f.Format(entry)
 }
 
 // Logrus hook which wraps another hook and filters log entries according to their level.
 // (Note that we cannot use solely logrus.SetLevel, because Dendrite supports multiple
 // levels of logging at the same time.)
 type logLevelHook struct {
-	level logrus.Level
-	logrus.Hook
+	level zerolog.Level
+	zerolog.Hook
 }
 
 // Levels returns all the levels supported by this hook.
-func (h *logLevelHook) Levels() []logrus.Level {
-	levels := make([]logrus.Level, 0)
-
-	for _, level := range logrus.AllLevels {
+func (h *logLevelHook) Levels() []zerolog.Level {
+	levels := make([]zerolog.Level, 0)
+	var level zerolog.Level = -1
+	for level <= 5 {
 		if level <= h.level {
 			levels = append(levels, level)
 		}
+		level = level + 1
 	}
 
 	return levels
@@ -103,9 +104,14 @@ func SetupPprof() {
 func SetupStdLogging() {
 	levelLogAddedMu.Lock()
 	defer levelLogAddedMu.Unlock()
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&utcFormatter{
-		&logrus.TextFormatter{
+	//zerolog.SetReportCaller(true)
+	//TimeFieldFormat => dont need
+	//DisableColors => dont need
+	//DisableTimestamp => dont need
+	//Quo0teEmptyFields => dont need
+	//callprettyfier => what?
+	/*zerolog.Formatter(&utcFormatter{
+		&zerolog.TextFormatter{
 			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
 			FullTimestamp:    true,
 			DisableColors:    false,
@@ -113,46 +119,39 @@ func SetupStdLogging() {
 			QuoteEmptyFields: true,
 			CallerPrettyfier: callerPrettyfier,
 		},
-	})
+	})*/
 }
 
 // File type hooks should be provided a path to a directory to store log files
 func checkFileHookParams(params map[string]interface{}) {
 	path, ok := params["path"]
 	if !ok {
-		logrus.Fatalf("Expecting a parameter \"path\" for logging hook of type \"file\"")
+		log.Fatal().Msg("Expecting a parameter \"path\" for logging hook of type \"file\"")
 	}
 
 	if _, ok := path.(string); !ok {
-		logrus.Fatalf("Parameter \"path\" for logging hook of type \"file\" should be a string")
+		log.Fatal().Msg("Parameter \"path\" for logging hook of type \"file\" should be a string")
 	}
 }
 
 // Add a new FSHook to the logger. Each component will log in its own file
-func setupFileHook(hook config.LogrusHook, level logrus.Level) {
+func setupFileHook(hook config.LogHook, level zerolog.Level) {
 	dirPath := (hook.Params["path"]).(string)
 	fullPath := filepath.Join(dirPath, "dendrite.log")
 
 	if err := os.MkdirAll(path.Dir(fullPath), os.ModePerm); err != nil {
-		logrus.Fatalf("Couldn't create directory %s: %q", path.Dir(fullPath), err)
+		log.Fatal().Msgf("Couldn't create directory %s: %q", path.Dir(fullPath), err)
 	}
-
-	logrus.AddHook(&logLevelHook{
-		level,
-		dugong.NewFSHook(
-			fullPath,
-			&utcFormatter{
-				&logrus.TextFormatter{
-					TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
-					DisableColors:    true,
-					DisableTimestamp: false,
-					DisableSorting:   false,
-					QuoteEmptyFields: true,
-				},
-			},
-			&dugong.DailyRotationSchedule{GZip: true},
-		),
-	})
+	/*
+		log.Hook(&logLevelHook{
+			level,
+			dugong.NewFSHook(
+				fullPath,
+				&utcFormatter{log.Logger},
+				&dugong.DailyRotationSchedule{GZip: true},
+			),
+		})*/
+	/// TODO: Dugong FSHook!
 }
 
 // CloseAndLogIfError Closes io.Closer and logs the error if any

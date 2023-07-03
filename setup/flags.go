@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -29,6 +29,8 @@ var (
 	version                               = flag.Bool("version", false, "Shows the current version and exits immediately.")
 	enableRegistrationWithoutVerification = flag.Bool("really-enable-open-registration", false, "This allows open registration without secondary verification (reCAPTCHA). This is NOT RECOMMENDED and will SIGNIFICANTLY increase the risk that your server will be used to send spam or conduct attacks, which may result in your server being banned from rooms.")
 )
+
+var logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 // ParseFlags parses the commandline flags and uses them to create a config.
 func ParseFlags(monolith bool) *config.Dendrite {
@@ -40,13 +42,13 @@ func ParseFlags(monolith bool) *config.Dendrite {
 	}
 
 	if *configPath == "" {
-		logrus.Fatal("--config must be supplied")
+		logger.Fatal().Msg("--config must be supplied")
 	}
 
 	cfg, err := config.Load(*configPath)
 
 	if err != nil {
-		logrus.Fatalf("Invalid config file: %s", err)
+		logger.Fatal().Msgf("Invalid config file: %s", err)
 	}
 
 	if *enableRegistrationWithoutVerification {

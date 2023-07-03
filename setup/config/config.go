@@ -27,13 +27,17 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
 
+	"github.com/uber/jaeger-client-go"
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
 )
+
+var logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 // keyIDRegexp defines allowable characters in Key IDs.
 var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
@@ -74,8 +78,8 @@ type Dendrite struct {
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	} `yaml:"tracing"`
 
-	// The config for logging informations. Each hook will be added to logrus.
-	Logging []LogrusHook `yaml:"logging"`
+	// The config for logging informations. Each hook will be added.
+	Logging []LogHook `yaml:"logging"`
 
 	// Any information derived from the configuration options for later use.
 	Derived Derived `yaml:"-"`
@@ -146,10 +150,10 @@ type ThumbnailSize struct {
 	ResizeMethod string `yaml:"method,omitempty"`
 }
 
-// LogrusHook represents a single logrus hook. At this point, only parsing and
+// LogHook represents a single log hook. At this point, only parsing and
 // verification of the proper values for type and level are done.
-// Validity/integrity checks on the parameters are done when configuring logrus.
-type LogrusHook struct {
+// Validity/integrity checks on the parameters are done when configuring log.
+type LogHook struct {
 	// The type of hook, currently only "file" is supported.
 	Type string `yaml:"type"`
 
@@ -398,9 +402,9 @@ func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 
 // checkLogging verifies the parameters logging.* are valid.
 func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
-	for _, logrusHook := range config.Logging {
-		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
-		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
+	for _, logHook := range config.Logging {
+		checkNotEmpty(configErrs, "logging.type", string(logHook.Type))
+		checkNotEmpty(configErrs, "logging.level", string(logHook.Level))
 	}
 }
 
@@ -480,20 +484,31 @@ func (config *Dendrite) SetupTracing() (closer io.Closer, err error) {
 	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
 		"Dendrite",
-		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
+		jaegerconfig.Logger(NewJaegerLogger(&logger)),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)
 }
 
-// logrusLogger is a small wrapper that implements jaeger.Logger using logrus.
-type logrusLogger struct {
-	l *logrus.Logger
+type jaegerLogger struct {
+	logger *zerolog.Logger
 }
 
-func (l logrusLogger) Error(msg string) {
-	l.l.Error(msg)
+func NewJaegerLogger(logger *zerolog.Logger) jaeger.Logger {
+	return &jaegerLogger{logger}
 }
 
-func (l logrusLogger) Infof(msg string, args ...interface{}) {
-	l.l.Infof(msg, args...)
+type Logger interface {
+	// Error logs a message at error priority
+	Error(msg string)
+
+	// Infof logs a message at info priority
+	Infof(msg string, args ...interface{})
+}
+
+func (jl *jaegerLogger) Error(msg string) {
+	jl.logger.Error().Msg(msg)
+}
+
+func (jl *jaegerLogger) Infof(msg string, args ...interface{}) {
+	jl.logger.Info().Msgf(msg, args...)
 }

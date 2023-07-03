@@ -17,7 +17,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/matrix-org/dendrite/test"
@@ -56,7 +55,7 @@ func main() {
 
 	if *tlsCertFile != "" || *tlsKeyFile != "" {
 		if *tlsCertFile == "" || *tlsKeyFile == "" {
-			log.Fatal("Zero or both of --tls-key and --tls-cert must be supplied")
+			panic("Zero or both of --tls-key and --tls-cert must be supplied")
 		}
 		if *authorityCertFile == "" && *authorityKeyFile == "" {
 			if err := test.NewTLSKey(*tlsKeyFile, *tlsCertFile, *keySize); err != nil {

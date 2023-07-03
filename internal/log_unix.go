@@ -19,11 +19,10 @@ package internal
 
 import (
 	"io"
-	"log/syslog"
+	"os"
 
-	"github.com/MFAshby/stdemuxerhook"
-	"github.com/sirupsen/logrus"
-	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
+	"github.com/rs/zerolog"
+	log "github.com/rs/zerolog/log"
 
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -31,20 +30,20 @@ import (
 // SetupHookLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupHookLogging(hooks []config.LogrusHook) {
+func SetupHookLogging(hooks []config.LogHook) {
 	levelLogAddedMu.Lock()
 	defer levelLogAddedMu.Unlock()
 	for _, hook := range hooks {
 		// Check we received a proper logging level
-		level, err := logrus.ParseLevel(hook.Level)
+		level, err := zerolog.ParseLevel(hook.Level)
 		if err != nil {
-			logrus.Fatalf("Unrecognised logging level %s: %q", hook.Level, err)
+			log.Fatal().Msgf("Unrecognised logging level %s: %q", hook.Level, err)
 		}
 
 		// Perform a first filter on the logs according to the lowest level of all
 		// (Eg: If we have hook for info and above, prevent logrus from processing debug logs)
-		if logrus.GetLevel() < level {
-			logrus.SetLevel(level)
+		if log.Logger.GetLevel() < level {
+			log.Logger = log.Logger.Level(level)
 		}
 
 		switch hook.Type {
@@ -57,46 +56,50 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 		case "std":
 			setupStdLogHook(level)
 		default:
-			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
+			log.Fatal().Msgf("Unrecognised logging hook type: %s", hook.Type)
 		}
 	}
-	setupStdLogHook(logrus.InfoLevel)
+	setupStdLogHook(zerolog.InfoLevel)
 	// Hooks are now configured for stdout/err, so throw away the default logger output
-	logrus.SetOutput(io.Discard)
+	log.Logger = log.Logger.Output(io.Discard)
 }
 
 func checkSyslogHookParams(params map[string]interface{}) {
 	addr, ok := params["address"]
 	if !ok {
-		logrus.Fatalf("Expecting a parameter \"address\" for logging hook of type \"syslog\"")
+		log.Fatal().Msg("Expecting a parameter \"address\" for logging hook of type \"syslog\"")
 	}
 
 	if _, ok := addr.(string); !ok {
-		logrus.Fatalf("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
+		log.Fatal().Msg("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
 	}
 
 	proto, ok2 := params["protocol"]
 	if !ok2 {
-		logrus.Fatalf("Expecting a parameter \"protocol\" for logging hook of type \"syslog\"")
+		log.Fatal().Msg("Expecting a parameter \"protocol\" for logging hook of type \"syslog\"")
 	}
 
 	if _, ok2 := proto.(string); !ok2 {
-		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
+		log.Fatal().Msg("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
 	}
 
 }
 
-func setupStdLogHook(level logrus.Level) {
+func setupStdLogHook(level zerolog.Level) {
 	if stdLevelLogAdded[level] {
 		return
 	}
-	logrus.AddHook(&logLevelHook{level, stdemuxerhook.New(logrus.StandardLogger())})
+	//log.Logger.Hook(&logLevelHook{level, stdemuxerhook.New(log.Logger)})
+	//log.Logger.Hook(&logLevelHook{level, zerolog.New(os.Stdout)})
+	log.Logger = zerolog.New(os.Stdout)
 	stdLevelLogAdded[level] = true
 }
 
-func setupSyslogHook(hook config.LogrusHook, level logrus.Level) {
-	syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, "dendrite")
+func setupSyslogHook(hook config.LogHook, level zerolog.Level) {
+	// rewrite to:
+	// https://stackoverflow.com/questions/73064915/logging-to-syslog-file-with-zerolog-golang
+	/*syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, "dendrite")
 	if err == nil {
-		logrus.AddHook(&logLevelHook{level, syslogHook})
-	}
+		log.Logger.Hook(&logLevelHook{level, syslogHook})
+	}*/
 }

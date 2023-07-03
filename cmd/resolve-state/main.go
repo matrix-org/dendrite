@@ -36,7 +36,7 @@ var difference = flag.Bool("difference", false, "whether to calculate the differ
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
-	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
+	cfg.Logging = append(cfg.Logging[:0], config.LogHook{
 		Type:  "std",
 		Level: "error",
 	})
