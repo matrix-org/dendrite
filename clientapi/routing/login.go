@@ -47,9 +47,8 @@ func Login(
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
-		var loginFlows []flow
-		loginFlows = []flow{{Type: authtypes.LoginTypePassword}}
-		if len(cfg.Derived.ApplicationServices) == 0 {
+		loginFlows := []flow{{Type: authtypes.LoginTypePassword}}
+		if len(cfg.Derived.ApplicationServices) > 0 {
 			loginFlows = append(loginFlows, flow{Type: authtypes.LoginTypeApplicationService})
 		}
 		// TODO: support other forms of login, depending on config options
