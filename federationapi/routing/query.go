@@ -20,6 +20,7 @@ import (
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -114,5 +115,51 @@ func RoomAliasToID(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: resp,
+	}
+}
+
+func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationRequest, roomIDStr string, rsAPI roomserverAPI.FederationRoomserverAPI) util.JSONResponse {
+	parsedRoomID, err := spec.NewRoomID(roomIDStr)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.InvalidParam("room is unknown/forbidden"),
+		}
+	}
+	roomID := *parsedRoomID
+
+	suggestedOnly := false // Defaults to false (spec-defined)
+	switch httpReq.URL.Query().Get("suggested_only") {
+	case "true":
+		suggestedOnly = true
+	case "false":
+	case "": // Empty string is returned when query param is not set
+	default:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("query parameter 'suggested_only', if set, must be 'true' or 'false'"),
+		}
+	}
+
+	walker := rsAPI.QueryRoomHierarchy(httpReq.Context(), types.NewServerNameNotDevice(request.Origin()), roomID, suggestedOnly, 1)
+
+	discoveredRooms, err := walker.NextPage(-1)
+
+	if err != nil {
+		// TODO
+	}
+
+	if len(discoveredRooms) == 0 {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: spec.NotFound("room is unknown/forbidden"),
+		}
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: fclient.MSC2946SpacesResponse{
+			Room:     discoveredRooms[0],
+			Children: discoveredRooms[1:],
+		},
 	}
 }
