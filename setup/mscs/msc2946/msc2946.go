@@ -57,7 +57,7 @@ type MSC2946ClientResponse struct {
 // Enable this MSC
 func Enable(
 	cfg *config.Dendrite, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
-	fsAPI fs.FederationInternalAPI, keyRing gomatrixserverlib.JSONVerifier, cache caching.SpaceSummaryRoomsCache,
+	fsAPI fs.FederationInternalAPI, keyRing gomatrixserverlib.JSONVerifier, cache caching.RoomHierarchyCache,
 ) error {
 	clientAPI := httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(rsAPI, fsAPI, cache, cfg.Global.ServerName), httputil.WithAllowGuests())
 	routers.Client.Handle("/v1/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
@@ -87,7 +87,7 @@ func Enable(
 
 func federatedSpacesHandler(
 	ctx context.Context, fedReq *fclient.FederationRequest, roomID string,
-	cache caching.SpaceSummaryRoomsCache,
+	cache caching.RoomHierarchyCache,
 	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	thisServer spec.ServerName,
 ) util.JSONResponse {
@@ -122,7 +122,7 @@ func federatedSpacesHandler(
 func spacesHandler(
 	rsAPI roomserver.RoomserverInternalAPI,
 	fsAPI fs.FederationInternalAPI,
-	cache caching.SpaceSummaryRoomsCache,
+	cache caching.RoomHierarchyCache,
 	thisServer spec.ServerName,
 ) func(*http.Request, *userapi.Device) util.JSONResponse {
 	// declared outside the returned handler so it persists between calls
@@ -168,7 +168,7 @@ type walker struct {
 	rsAPI           roomserver.RoomserverInternalAPI
 	fsAPI           fs.FederationInternalAPI
 	ctx             context.Context
-	cache           caching.SpaceSummaryRoomsCache
+	cache           caching.RoomHierarchyCache
 	suggestedOnly   bool
 	limit           int
 	maxDepth        int
@@ -423,7 +423,7 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) *fclient.MSC294
 	if w.caller == nil {
 		return nil
 	}
-	resp, ok := w.cache.GetSpaceSummary(roomID)
+	resp, ok := w.cache.GetRoomHierarchy(roomID)
 	if ok {
 		util.GetLogger(w.ctx).Debugf("Returning cached response for %s", roomID)
 		return &resp
@@ -451,7 +451,7 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) *fclient.MSC294
 			}
 			res.Children[i] = child
 		}
-		w.cache.StoreSpaceSummary(roomID, res)
+		w.cache.StoreRoomHierarchy(roomID, res)
 
 		return &res
 	}

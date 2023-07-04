@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
@@ -502,4 +503,25 @@ func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.
 		membership = res.Membership
 	}
 	return membership, err
+}
+
+type QueryRoomHierarchyRequest struct {
+	SuggestedOnly bool `json:"suggested_only"`
+	Limit         int  `json:"limit"`
+	MaxDepth      int  `json:"max_depth"`
+	From          int  `json:"json"`
+}
+
+type RoomHierarchyWalker interface {
+	NextPage(limit int) ([]fclient.MSC2946Room, error)
+	Done() bool
+	GetCached() CachedRoomHierarchyWalker
+}
+
+// Stripped down version of RoomHierarchyWalker suitable for caching (for pagination)
+type CachedRoomHierarchyWalker interface {
+	// Converts this cached walker back into an actual walker, to resume walking from.
+	GetWalker() RoomHierarchyWalker
+	// Validates that the given parameters match those stored in the cache
+	ValidateParams(suggestedOnly bool, maxDepth int) bool
 }

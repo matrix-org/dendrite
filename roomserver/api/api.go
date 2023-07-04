@@ -113,6 +113,10 @@ type QueryEventsAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 }
 
+type QueryRoomHierarchyAPI interface {
+	QueryRoomHierarchy(ctx context.Context, caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker
+}
+
 // API functions required by the syncapi
 type SyncRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
@@ -187,6 +191,7 @@ type ClientRoomserverAPI interface {
 	QueryEventsAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
+	QueryRoomHierarchyAPI
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
@@ -236,6 +241,7 @@ type FederationRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
+	QueryRoomHierarchyAPI
 	UserRoomPrivateKeyCreator
 	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
