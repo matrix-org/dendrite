@@ -540,34 +540,31 @@ func Test_register(t *testing.T) {
 
 				resp = Register(req, userAPI, &cfg.ClientAPI)
 
-				switch resp.JSON.(type) {
+				switch rr := resp.JSON.(type) {
 				case spec.InternalServerError, spec.MatrixError, util.JSONResponse:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
 					}
 					return
-				}
-
-				rr, ok := resp.JSON.(registerResponse)
-				if !ok {
-					t.Fatalf("expected a registerresponse, got %T", resp.JSON)
-				}
-
-				// validate the response
-				if tc.forceEmpty {
-					// when not supplying a username, one will be generated. Given this _SHOULD_ be
-					// the second user, set the username accordingly
-					reg.Username = "2"
-				}
-				wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
-				if wantUserID != rr.UserID {
-					t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
-				}
-				if rr.DeviceID != *reg.DeviceID {
-					t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
-				}
-				if rr.AccessToken == "" {
-					t.Fatalf("missing accessToken in response")
+				case registerResponse:
+					// validate the response
+					if tc.forceEmpty {
+						// when not supplying a username, one will be generated. Given this _SHOULD_ be
+						// the second user, set the username accordingly
+						reg.Username = "2"
+					}
+					wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
+					if wantUserID != rr.UserID {
+						t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+					}
+					if rr.DeviceID != *reg.DeviceID {
+						t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
+					}
+					if rr.AccessToken == "" {
+						t.Fatalf("missing accessToken in response")
+					}
+				default:
+					t.Fatalf("expected one of internalservererror, matrixerror, jsonresponse, registerresponse, got %T", resp.JSON)
 				}
 			})
 		}
