@@ -313,8 +313,9 @@ func Test_register(t *testing.T) {
 			},
 		},
 		{
-			name: "allow guests",
-			kind: "guest",
+			name:         "allow guests",
+			kind:         "guest",
+			wantUsername: "1",
 		},
 		{
 			name:      "unknown login type",
@@ -508,6 +509,13 @@ func Test_register(t *testing.T) {
 					if r.DeviceID == "" {
 						t.Fatalf("missing deviceID in response")
 					}
+					// if an expected username is provided, assert that it is a match
+					if tc.wantUsername != "" {
+						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
+						if wantUserID != r.UserID {
+							t.Fatalf("unexpected userID: %s, want %s", r.UserID, wantUserID)
+						}
+					}
 					return
 				default:
 					t.Logf("Got response: %T", resp.JSON)
@@ -553,7 +561,7 @@ func Test_register(t *testing.T) {
 				case registerResponse:
 					// validate the response
 					if tc.wantUsername != "" {
-						// if an expected username is provided, validate it
+						// if an expected username is provided, assert that it is a match
 						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
 						if wantUserID != rr.UserID {
 							t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
