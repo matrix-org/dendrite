@@ -611,6 +611,11 @@ func (r *FederationInternalAPI) SendInviteV3(
 	if err != nil {
 		return nil, err
 	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
 	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(event.SenderID))
 	if err != nil {
 		return nil, err
@@ -637,10 +642,6 @@ func (r *FederationInternalAPI) SendInviteV3(
 	inviteRes, err := r.federation.SendInviteV3(ctx, inviter.Domain(), invitee.Domain(), inviteReq, invitee)
 	if err != nil {
 		return nil, fmt.Errorf("r.federation.SendInviteV3: failed to send invite: %w", err)
-	}
-	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
-	if err != nil {
-		return nil, err
 	}
 
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
