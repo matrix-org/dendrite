@@ -42,72 +42,58 @@ func InviteV3(
 ) util.JSONResponse {
 	inviteReq := fclient.InviteV3Request{}
 	err := json.Unmarshal(request.Content(), &inviteReq)
-	switch e := err.(type) {
-	case gomatrixserverlib.UnsupportedRoomVersionError:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.UnsupportedRoomVersion(
-				fmt.Sprintf("Room version %q is not supported by this server.", e.Version),
-			),
-		}
-	case gomatrixserverlib.BadJSONError:
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(err.Error()),
 		}
-	case nil:
-		if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
-			}
-		}
-
-		input := gomatrixserverlib.HandleInviteV3Input{
-			HandleInviteInput: gomatrixserverlib.HandleInviteInput{
-				RoomVersion:       inviteReq.RoomVersion(),
-				RoomID:            roomID,
-				InvitedUser:       invitedUser,
-				KeyID:             cfg.Matrix.KeyID,
-				PrivateKey:        cfg.Matrix.PrivateKey,
-				Verifier:          keys,
-				RoomQuerier:       rsAPI,
-				MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
-				StateQuerier:      rsAPI.StateQuerier(),
-				InviteEvent:       nil,
-				StrippedState:     inviteReq.InviteRoomState(),
-				UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-					return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
-				},
-			},
-			InviteProtoEvent: inviteReq.Event(),
-			GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
-				// assign a roomNID, otherwise we can't create a private key for the user
-				_, nidErr := rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
-				if nidErr != nil {
-					return "", nil, nidErr
-				}
-				key, keyErr := rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
-				if keyErr != nil {
-					return "", nil, keyErr
-				}
-
-				return spec.SenderIDFromPseudoIDKey(key), key, nil
-			},
-		}
-		event, jsonErr := handleInviteV3(httpReq.Context(), input, rsAPI)
-		if jsonErr != nil {
-			return *jsonErr
-		}
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: fclient.RespInviteV2{Event: event.JSON()},
-		}
-	default:
+	}
+	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
+			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
 		}
+	}
+
+	input := gomatrixserverlib.HandleInviteV3Input{
+		HandleInviteInput: gomatrixserverlib.HandleInviteInput{
+			RoomVersion:       inviteReq.RoomVersion(),
+			RoomID:            roomID,
+			InvitedUser:       invitedUser,
+			KeyID:             cfg.Matrix.KeyID,
+			PrivateKey:        cfg.Matrix.PrivateKey,
+			Verifier:          keys,
+			RoomQuerier:       rsAPI,
+			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+			StateQuerier:      rsAPI.StateQuerier(),
+			InviteEvent:       nil,
+			StrippedState:     inviteReq.InviteRoomState(),
+			UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+			},
+		},
+		InviteProtoEvent: inviteReq.Event(),
+		GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			// assign a roomNID, otherwise we can't create a private key for the user
+			_, nidErr := rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
+			if nidErr != nil {
+				return "", nil, nidErr
+			}
+			key, keyErr := rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", nil, keyErr
+			}
+
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+	}
+	event, jsonErr := handleInviteV3(httpReq.Context(), input, rsAPI)
+	if jsonErr != nil {
+		return *jsonErr
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: fclient.RespInviteV2{Event: event.JSON()},
 	}
 }
 
