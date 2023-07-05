@@ -541,17 +541,7 @@ func Test_register(t *testing.T) {
 				resp = Register(req, userAPI, &cfg.ClientAPI)
 
 				switch resp.JSON.(type) {
-				case spec.InternalServerError:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
-					}
-					return
-				case spec.MatrixError:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
-					}
-					return
-				case util.JSONResponse:
+				case spec.InternalServerError, spec.MatrixError, util.JSONResponse:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
 					}
