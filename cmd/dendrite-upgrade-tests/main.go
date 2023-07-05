@@ -557,8 +557,8 @@ func cleanup(dockerClient *client.Client) {
 	})
 	for _, c := range containers {
 		log.Printf("Removing container: %v %v\n", c.ID, c.Names)
-		s := int(time.Second)
-		_ = dockerClient.ContainerStop(context.Background(), c.ID, container.StopOptions{Timeout: &s})
+		s := time.Second
+		_ = dockerClient.ContainerStop(context.Background(), c.ID, &s)
 		_ = dockerClient.ContainerRemove(context.Background(), c.ID, types.ContainerRemoveOptions{
 			Force: true,
 		})
@@ -592,7 +592,7 @@ func main() {
 	branchToImageID := buildDendriteImages(httpClient, dockerClient, *flagTempDir, *flagBuildConcurrency, versions)
 
 	// make a shared postgres volume
-	volume, err := dockerClient.VolumeCreate(context.Background(), volume.CreateOptions{
+	volume, err := dockerClient.VolumeCreate(context.Background(), volume.VolumeCreateBody{
 		Name: "dendrite_upgrade_test",
 		Labels: map[string]string{
 			dendriteUpgradeTestLabel: "yes",
