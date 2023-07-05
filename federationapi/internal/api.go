@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"fmt"
@@ -181,4 +182,8 @@ func (a *FederationInternalAPI) doRequestIfNotBlacklisted(
 		}
 	}
 	return request()
+}
+
+func (a *FederationInternalAPI) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
+	return a.rsAPI.CurrentMembership(ctx, roomID, senderID)
 }

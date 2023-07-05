@@ -167,7 +167,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		KeyRing:    r.keyRing,
 		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-		}),
+		}, r.rsAPI),
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
@@ -190,6 +190,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 			}
 			return r.rsAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
 		},
+		MembershipQuerier: r.rsAPI,
 	}
 	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
 
@@ -387,7 +388,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
-		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName, userIDProvider), userIDProvider,
+		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName, userIDProvider, r.rsAPI), userIDProvider, r.rsAPI,
 	)
 	if err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
@@ -676,7 +677,7 @@ func checkEventsContainCreateEvent(events []gomatrixserverlib.PDU) error {
 func federatedEventProvider(
 	ctx context.Context, federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
-	userIDForSender spec.UserIDForSender,
+	userIDForSender spec.UserIDForSender, rsAPI gomatrixserverlib.MembershipQuerier,
 ) gomatrixserverlib.EventProvider {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
@@ -726,7 +727,7 @@ func federatedEventProvider(
 				}
 
 				// Check the signatures of the event.
-				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing, userIDForSender); err != nil {
+				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing, userIDForSender, rsAPI); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
 				}
 

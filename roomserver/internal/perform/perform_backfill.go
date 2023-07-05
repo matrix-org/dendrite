@@ -266,6 +266,7 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.PDU
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
 	roomVersion             gomatrixserverlib.RoomVersion
+	membershipQuerier       gomatrixserverlib.MembershipQuerier
 }
 
 func newBackfillRequester(
@@ -292,7 +293,12 @@ func newBackfillRequester(
 		preferServer:            preferServer,
 		historyVisiblity:        gomatrixserverlib.HistoryVisibilityShared,
 		roomVersion:             roomVersion,
+		membershipQuerier:       fsAPI,
 	}
+}
+
+func (b *backfillRequester) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
+	return b.fsAPI.CurrentMembership(ctx, roomID, senderID)
 }
 
 func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent gomatrixserverlib.PDU) ([]string, error) {

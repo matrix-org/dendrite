@@ -780,7 +780,7 @@ nextAuthEvent:
 		// if a critical event is missing anyway.
 		if err := gomatrixserverlib.VerifyEventSignatures(ctx, authEvent, r.FSAPI.KeyRing(), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
-		}); err != nil {
+		}, r.Queryer); err != nil {
 			continue nextAuthEvent
 		}
 

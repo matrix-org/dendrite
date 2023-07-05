@@ -571,7 +571,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
 		if err = gomatrixserverlib.VerifyEventSignatures(ctx, ev, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
-		}); err != nil {
+		}, t.inputer.Queryer); err != nil {
 			continue
 		}
 		missingEvents = append(missingEvents, t.cacheAndReturn(ev))
@@ -662,7 +662,7 @@ func (t *missingStateReq) lookupMissingStateViaState(
 		AuthEvents:  state.GetAuthEvents(),
 	}, roomVersion, t.keys, nil, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
-	})
+	}, t.inputer.Queryer)
 	if err != nil {
 		return nil, err
 	}
@@ -899,7 +899,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 	}
 	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
-	}); err != nil {
+	}, t.inputer.Queryer); err != nil {
 		t.log.WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}

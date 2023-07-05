@@ -168,34 +168,14 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			continue
 		}
 
-		// If the user is already joined and we receive a new "join" event, we're adding the previous
-		// content to unsigned, this way VerifyEventSignatures skips the mxid_mapping check
-		// FIXME: this is not great..
-		origEvent := event
-		unsignedUpdated := false
-		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && event.Type() == spec.MRoomMember && event.StateKey() != nil {
-			unsignedUpdated, err = t.updateUnsignedIfNeeded(ctx, event)
-			if err != nil {
-				results[event.EventID()] = fclient.PDUResult{
-					Error: err.Error(),
-				}
-				continue
-			}
-		}
-
 		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-		}); err != nil {
+		}, t.rsAPI); err != nil {
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
 			continue
-		}
-
-		// switch the event again, so we don't store a wrong value in the DB
-		if unsignedUpdated {
-			event = origEvent
 		}
 
 		// pass the event to the roomserver which will do auth checks
