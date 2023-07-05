@@ -190,6 +190,8 @@ type Database interface {
 	GetRoomVersion(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
+	// MaybeRedactEvent returns the redaction event, the redacted event and the event before redaction if this call resulted in a redaction, else an error
+	// (nil if there was nothing to do)
 	MaybeRedactEvent(ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 }
 
