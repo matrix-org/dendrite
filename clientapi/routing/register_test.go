@@ -345,6 +345,13 @@ func Test_register(t *testing.T) {
 			username: "success",
 		},
 		{
+			name:         "successful registration, sequential numeric ID",
+			username:     "",
+			password:     "someRandomPassword",
+			forceEmpty:   true,
+			wantUsername: "3",
+		},
+		{
 			name:     "failing registration - user already exists",
 			username: "success",
 			wantErrorResponse: util.JSONResponse{
