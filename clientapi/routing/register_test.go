@@ -298,13 +298,16 @@ func Test_register(t *testing.T) {
 		guestsDisabled       bool
 		enableRecaptcha      bool
 		captchaBody          string
-		wantResponse         util.JSONResponse
+		// in case of an error, the expected response
+		wantErrorResponse util.JSONResponse
+		// in case of success, the expected username assigned
+		wantUsername string
 	}{
 		{
 			name:           "disallow guests",
 			kind:           "guest",
 			guestsDisabled: true,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden(`Guest registration is disabled on "test"`),
 			},
@@ -316,7 +319,7 @@ func Test_register(t *testing.T) {
 		{
 			name:      "unknown login type",
 			loginType: "im.not.known",
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusNotImplemented,
 				JSON: spec.Unknown("unknown/unimplemented auth type"),
 			},
@@ -324,16 +327,17 @@ func Test_register(t *testing.T) {
 		{
 			name:                 "disabled registration",
 			registrationDisabled: true,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden(`Registration is disabled on "test"`),
 			},
 		},
 		{
-			name:       "successful registration, numeric ID",
-			username:   "",
-			password:   "someRandomPassword",
-			forceEmpty: true,
+			name:         "successful registration, numeric ID",
+			username:     "",
+			password:     "someRandomPassword",
+			forceEmpty:   true,
+			wantUsername: "2",
 		},
 		{
 			name:     "successful registration",
@@ -342,7 +346,7 @@ func Test_register(t *testing.T) {
 		{
 			name:     "failing registration - user already exists",
 			username: "success",
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.UserInUse("Desired user ID is already taken."),
 			},
@@ -352,14 +356,14 @@ func Test_register(t *testing.T) {
 			username: "LOWERCASED", // this is going to be lower-cased
 		},
 		{
-			name:         "invalid username",
-			username:     "#totalyNotValid",
-			wantResponse: *internal.UsernameResponse(internal.ErrUsernameInvalid),
+			name:              "invalid username",
+			username:          "#totalyNotValid",
+			wantErrorResponse: *internal.UsernameResponse(internal.ErrUsernameInvalid),
 		},
 		{
 			name:     "numeric username is forbidden",
 			username: "1337",
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidUsername("Numeric user IDs are reserved"),
 			},
@@ -367,7 +371,7 @@ func Test_register(t *testing.T) {
 		{
 			name:      "disabled recaptcha login",
 			loginType: authtypes.LoginTypeRecaptcha,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Unknown(ErrCaptchaDisabled.Error()),
 			},
@@ -376,7 +380,7 @@ func Test_register(t *testing.T) {
 			name:            "enabled recaptcha, no response defined",
 			enableRecaptcha: true,
 			loginType:       authtypes.LoginTypeRecaptcha,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON(ErrMissingResponse.Error()),
 			},
@@ -386,7 +390,7 @@ func Test_register(t *testing.T) {
 			enableRecaptcha: true,
 			loginType:       authtypes.LoginTypeRecaptcha,
 			captchaBody:     `notvalid`,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusUnauthorized,
 				JSON: spec.BadJSON(ErrInvalidCaptcha.Error()),
 			},
@@ -398,11 +402,11 @@ func Test_register(t *testing.T) {
 			captchaBody:     `success`,
 		},
 		{
-			name:            "captcha invalid from remote",
-			enableRecaptcha: true,
-			loginType:       authtypes.LoginTypeRecaptcha,
-			captchaBody:     `i should fail for other reasons`,
-			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}},
+			name:              "captcha invalid from remote",
+			enableRecaptcha:   true,
+			loginType:         authtypes.LoginTypeRecaptcha,
+			captchaBody:       `i should fail for other reasons`,
+			wantErrorResponse: util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}},
 		},
 	}
 
@@ -485,8 +489,8 @@ func Test_register(t *testing.T) {
 						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
 					}
 				case spec.MatrixError:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
+					if !reflect.DeepEqual(tc.wantErrorResponse, resp) {
+						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantErrorResponse)
 					}
 					return
 				case registerResponse:
@@ -542,20 +546,18 @@ func Test_register(t *testing.T) {
 
 				switch rr := resp.JSON.(type) {
 				case spec.InternalServerError, spec.MatrixError, util.JSONResponse:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+					if !reflect.DeepEqual(tc.wantErrorResponse, resp) {
+						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantErrorResponse)
 					}
 					return
 				case registerResponse:
 					// validate the response
-					if tc.forceEmpty {
-						// when not supplying a username, one will be generated. Given this _SHOULD_ be
-						// the second user, set the username accordingly
-						reg.Username = "2"
-					}
-					wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
-					if wantUserID != rr.UserID {
-						t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+					if tc.wantUsername != "" {
+						// if an expected username is provided, validate it
+						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
+						if wantUserID != rr.UserID {
+							t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+						}
 					}
 					if rr.DeviceID != *reg.DeviceID {
 						t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
