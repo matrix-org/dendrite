@@ -195,7 +195,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 		// sign all events with the pseudo ID key
 		identity = &fclient.SigningIdentity{
-			ServerName: "self",
+			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(pseudoIDKey)),
 			KeyID:      "ed25519:1",
 			PrivateKey: pseudoIDKey,
 		}

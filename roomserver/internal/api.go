@@ -317,7 +317,7 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 		return fclient.SigningIdentity{
 			PrivateKey: privKey,
 			KeyID:      "ed25519:1",
-			ServerName: "self",
+			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(privKey)),
 		}, nil
 	}
 	identity, err := r.Cfg.Global.SigningIdentityFor(senderID.Domain())
