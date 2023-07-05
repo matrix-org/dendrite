@@ -209,47 +209,6 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 	return &fclient.RespSend{PDUs: results}, nil
 }
 
-// updateUnsignedIfNeeded sets unsigned.prev_content to the previous membership event. This is
-// to avoid checking the mxid_mapping on join -> join (e.g. displayname changes) events, which
-// wouldn't be present.
-func (t *TxnReq) updateUnsignedIfNeeded(ctx context.Context, event gomatrixserverlib.PDU) (updated bool, err error) {
-	var membership string
-	membership, err = event.Membership()
-	if err != nil {
-		return false, err
-	}
-	var validRoomID *spec.RoomID
-	validRoomID, err = spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return false, err
-	}
-
-	// get the current membership event
-	var currentStateEv gomatrixserverlib.PDU
-	currentStateEv, err = t.rsAPI.CurrentStateEvent(ctx, *validRoomID, event.Type(), string(event.SenderID()))
-	if err != nil {
-		return false, err
-	}
-	if currentStateEv != nil {
-		var currentMembership string
-		currentMembership, err = currentStateEv.Membership()
-		if err != nil {
-			return false, err
-		}
-
-		// if the currentMembership is join and the new membership as well (e.g. displayname change),
-		// update unsigned so VerifyEventSignatures does not try to validate the mxid_mapping
-		if currentMembership == spec.Join && currentMembership == membership {
-			err = event.SetUnsignedField("prev_content", currentStateEv.Content())
-			if err != nil {
-				return false, err
-			}
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // nolint:gocyclo
 func (t *TxnReq) processEDUs(ctx context.Context) {
 	for _, e := range t.EDUs {
