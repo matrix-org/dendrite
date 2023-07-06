@@ -602,10 +602,16 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		}
 	}
 
+	prevEventSender := string(prevEvent.SenderID())
+	prevUser, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, prevEvent.SenderID())
+	if err == nil && prevUser != nil {
+		prevEventSender = prevUser.String()
+	}
+
 	prev := types.PrevEventRef{
 		PrevContent:   prevContent,
 		ReplacesState: prevEvent.EventID(),
-		PrevSenderID:  string(prevEvent.SenderID()),
+		PrevSenderID:  prevEventSender,
 	}
 
 	event.PDU, err = event.SetUnsigned(prev)
