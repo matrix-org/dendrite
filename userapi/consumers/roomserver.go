@@ -313,10 +313,12 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 		sk := event.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
+			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*sk))
 			if queryErr == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString
+			} else {
+				return fmt.Errorf("queryUserIDForSender: userID unknown for %s", *sk)
 			}
 		}
 		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk)

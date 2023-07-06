@@ -50,9 +50,21 @@ type PerformLeaveResponse struct {
 	Message interface{} `json:"message,omitempty"`
 }
 
+type InviteInput struct {
+	RoomID      spec.RoomID
+	Inviter     spec.UserID
+	Invitee     spec.UserID
+	DisplayName string
+	AvatarURL   string
+	Reason      string
+	IsDirect    bool
+	KeyID       gomatrixserverlib.KeyID
+	PrivateKey  ed25519.PrivateKey
+	EventTime   time.Time
+}
+
 type PerformInviteRequest struct {
-	RoomVersion     gomatrixserverlib.RoomVersion           `json:"room_version"`
-	Event           *types.HeaderedEvent                    `json:"event"`
+	InviteInput     InviteInput
 	InviteRoomState []gomatrixserverlib.InviteStrippedState `json:"invite_room_state"`
 	SendAsServer    string                                  `json:"send_as_server"`
 	TransactionID   *TransactionID                          `json:"transaction_id"`

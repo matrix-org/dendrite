@@ -337,22 +337,55 @@ func sendInvite(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI, evTime time.Time,
 ) (util.JSONResponse, error) {
-	event, err := buildMembershipEvent(
-		ctx, userID, reason, profileAPI, device, spec.Invite,
-		roomID, false, cfg, evTime, rsAPI, asAPI,
-	)
+	validRoomID, err := spec.NewRoomID(roomID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("RoomID is invalid"),
+		}, err
+	}
+	inviter, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}, err
 	}
-
+	invitee, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("UserID is invalid"),
+		}, err
+	}
+	profile, err := loadProfile(ctx, userID, cfg, profileAPI, asAPI)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
+	}
+	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
+	}
 	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
-		Event:           event,
+		InviteInput: roomserverAPI.InviteInput{
+			RoomID:      *validRoomID,
+			Inviter:     *inviter,
+			Invitee:     *invitee,
+			DisplayName: profile.DisplayName,
+			AvatarURL:   profile.AvatarURL,
+			Reason:      reason,
+			IsDirect:    false,
+			KeyID:       identity.KeyID,
+			PrivateKey:  identity.PrivateKey,
+			EventTime:   evTime,
+		},
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
-		RoomVersion:     event.Version(),
 		SendAsServer:    string(device.UserDomain()),
 	})
 
