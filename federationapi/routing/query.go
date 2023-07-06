@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // RoomAliasToID converts the queried alias into a room ID and returns it
@@ -118,6 +119,9 @@ func RoomAliasToID(
 	}
 }
 
+// Query the immediate children of a room/space
+//
+// Implements /_matrix/federation/v1/hierarchy/{roomID}
 func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationRequest, roomIDStr string, rsAPI roomserverAPI.FederationRoomserverAPI) util.JSONResponse {
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
@@ -146,7 +150,19 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	discoveredRooms, err := walker.NextPage(-1)
 
 	if err != nil {
-		// TODO
+		switch err.(type) {
+		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("room is unknown/forbidden"),
+			}
+		default:
+			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (SS API)")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
 	}
 
 	if len(discoveredRooms) == 0 {

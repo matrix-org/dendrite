@@ -34,6 +34,17 @@ func (e ErrNotAllowed) Error() string {
 	return e.Err.Error()
 }
 
+// ErrRoomUnknownOrNotAllowed is an error return if either the provided
+// room ID does not exist, or points to a room that the requester does
+// not have access to.
+type ErrRoomUnknownOrNotAllowed struct {
+	Err error
+}
+
+func (e ErrRoomUnknownOrNotAllowed) Error() string {
+	return e.Err.Error()
+}
+
 type RestrictedJoinAPI interface {
 	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
 	InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error)

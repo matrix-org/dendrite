@@ -17,6 +17,7 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -92,9 +93,12 @@ const (
 	ConstSpaceParentEventType         = "m.space.parent"
 )
 
+// Walk the room hierarchy to retrieve room information until either
+// no room left, or provided limit reached. If limit provided is -1, then this is
+// treated as no limit.
 func (w *RoomHierarchyWalker) NextPage(limit int) ([]fclient.MSC2946Room, error) {
 	if authorised, _ := w.authorised(w.rootRoomID, ""); !authorised {
-		return nil, spec.Forbidden("room is unknown/forbidden")
+		return nil, roomserver.ErrRoomUnknownOrNotAllowed{Err: fmt.Errorf("room is unknown/forbidden")}
 	}
 
 	var discoveredRooms []fclient.MSC2946Room
@@ -277,7 +281,7 @@ func (w *RoomHierarchyWalker) federatedRoomInfo(roomID string, vias []string) *f
 		}
 		res, err := w.fsAPI.RoomHierarchies(ctx, w.thisServer, spec.ServerName(serverName), roomID, w.suggestedOnly)
 		if err != nil {
-			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call MSC2946Spaces on server %s", serverName)
+			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call RoomHierarchies on server %s", serverName)
 			continue
 		}
 		// ensure nil slices are empty as we send this to the client sometimes

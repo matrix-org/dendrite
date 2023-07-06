@@ -512,9 +512,17 @@ type QueryRoomHierarchyRequest struct {
 	From          int  `json:"json"`
 }
 
+// An iterator-like interface for walking a room/space hierarchy, returning each rooms information.
+//
+// Used for implementing space summaries / room hierarchies
 type RoomHierarchyWalker interface {
+	// Walk the room hierarchy to retrieve room information until either
+	// no room left, or provided limit reached. If limit provided is -1, then this is
+	// treated as no limit.
 	NextPage(limit int) ([]fclient.MSC2946Room, error)
+	// Returns true if there are no more rooms left to walk
 	Done() bool
+	// Returns a stripped down version of the hiearchy walker suitable for pagination caching
 	GetCached() CachedRoomHierarchyWalker
 }
 

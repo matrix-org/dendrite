@@ -508,6 +508,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	// Defined outside of handler to persist between calls
+	// TODO: clear based on some criteria
 	roomHierarchyPaginationCache := new(RoomHierarchyPaginationCache)
 	v1mux.Handle("/rooms/{roomID}/hierarchy",
 		httputil.MakeAuthAPI("spaces", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

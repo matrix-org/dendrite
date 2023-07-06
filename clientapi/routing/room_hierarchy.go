@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 type RoomHierarchyPaginationCache struct {
@@ -54,6 +55,9 @@ func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.CachedRoomHier
 	return token
 }
 
+// Query the hierarchy of a room/space
+//
+// Implements /_matrix/client/v1/rooms/{roomID}/hierarchy
 func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr string, rsAPI roomserverAPI.ClientRoomserverAPI, paginationCache *RoomHierarchyPaginationCache) util.JSONResponse {
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
@@ -127,7 +131,19 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	discoveredRooms, err := walker.NextPage(limit)
 
 	if err != nil {
-		// TODO
+		switch err.(type) {
+		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("room is unknown/forbidden"),
+			}
+		default:
+			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (CS API)")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
 	}
 
 	nextBatch := ""
