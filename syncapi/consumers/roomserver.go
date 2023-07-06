@@ -564,14 +564,12 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	}
 
 	sKeyUser := ""
-	if event.StateKey() != nil {
-		if *event.StateKey() != "" {
-			var sku *spec.UserID
-			sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
-			if err == nil && sku != nil {
-				sKeyUser = sku.String()
-				event.StateKeyResolved = &sKeyUser
-			}
+	if stateKey != "" {
+		var sku *spec.UserID
+		sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
+		if err == nil && sku != nil {
+			sKeyUser = sku.String()
+			event.StateKeyResolved = &sKeyUser
 		}
 	}
 
