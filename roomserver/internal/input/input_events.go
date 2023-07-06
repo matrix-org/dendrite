@@ -250,6 +250,21 @@ func (r *Inputer) processRoomEvent(
 				// really do anything with the event other than reject it at this point.
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+				switch e := err.(type) {
+				case gomatrixserverlib.EventValidationError:
+					if e.Persistable && stateSnapshot != nil {
+						// We retrieved some state and we ended up having to call /state_ids for
+						// the new event in question (probably because closing the gap by using
+						// /get_missing_events didn't do what we hoped) so we'll instead overwrite
+						// the state snapshot with the newly resolved state.
+						missingPrev = false
+						input.HasState = true
+						input.StateEventIDs = make([]string, 0, len(stateSnapshot.StateEvents))
+						for _, se := range stateSnapshot.StateEvents {
+							input.StateEventIDs = append(input.StateEventIDs, se.EventID())
+						}
+					}
+				}
 			} else if stateSnapshot != nil {
 				// We retrieved some state and we ended up having to call /state_ids for
 				// the new event in question (probably because closing the gap by using
