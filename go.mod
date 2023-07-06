@@ -1,7 +1,5 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/matrix-org/gomatrixserverlib => ../../../gomatrixserverlib/s7evink/memberships/
-
 require (
 	github.com/Arceliar/ironwood v0.0.0-20221025225125-45b4281814c2
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
