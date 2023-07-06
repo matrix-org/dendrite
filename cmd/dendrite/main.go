@@ -157,13 +157,14 @@ func main() {
 
 	keyRing := fsAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient)
-	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
+
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient)
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
+
 	rsAPI.SetAppserviceAPI(asAPI)
 	rsAPI.SetUserAPI(userAPI)
 
