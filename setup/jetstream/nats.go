@@ -70,7 +70,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			process.ComponentFinished()
 		}()
 	}
-	if !s.ReadyForConnections(time.Second * 10) {
+	if !s.ReadyForConnections(time.Second * 60) {
 		logrus.Fatalln("NATS did not start in time")
 	}
 	// reuse existing connections
