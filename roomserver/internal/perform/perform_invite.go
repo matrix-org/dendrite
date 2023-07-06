@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
@@ -129,65 +130,102 @@ func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 ) error {
-	event := req.Event
-
-	validRoomID, err := spec.NewRoomID(event.RoomID())
+	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.InviteInput.RoomID, req.InviteInput.Inviter)
+	if err != nil {
+		return err
+	}
+	info, err := r.DB.RoomInfo(ctx, req.InviteInput.RoomID.String())
 	if err != nil {
 		return err
 	}
 
-	sender, err := r.RSAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
-	if err != nil {
-		return spec.InvalidParam("The sender user ID is invalid")
+	proto := gomatrixserverlib.ProtoEvent{
+		SenderID: string(senderID),
+		RoomID:   req.InviteInput.RoomID.String(),
+		Type:     "m.room.member",
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
+
+	content := gomatrixserverlib.MemberContent{
+		Membership:  spec.Invite,
+		DisplayName: req.InviteInput.DisplayName,
+		AvatarURL:   req.InviteInput.AvatarURL,
+		Reason:      req.InviteInput.Reason,
+		IsDirect:    req.InviteInput.IsDirect,
+	}
+
+	if err = proto.SetContent(content); err != nil {
+		return err
+	}
+
+	if !r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Inviter.Domain()) {
 		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
 	}
 
-	if event.StateKey() == nil || *event.StateKey() == "" {
-		return fmt.Errorf("invite must be a state event")
-	}
-	invitedUser, err := r.RSAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
-	if err != nil || invitedUser == nil {
-		return spec.InvalidParam("Could not find the matching senderID for this user")
-	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Invitee.Domain())
 
-	// If we're inviting a local user, we can generate the needed pseudoID key here. (if needed)
-	if isTargetLocal {
-		var roomVersion gomatrixserverlib.RoomVersion
-		roomVersion, err = r.DB.GetRoomVersion(ctx, event.RoomID())
+	signingKey := req.InviteInput.PrivateKey
+	if info.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		signingKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, req.InviteInput.Inviter, req.InviteInput.RoomID)
 		if err != nil {
 			return err
 		}
-
-		switch roomVersion {
-		case gomatrixserverlib.RoomVersionPseudoIDs:
-			_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	invitedSenderID, err := r.RSAPI.QuerySenderIDForUser(ctx, *validRoomID, *invitedUser)
-	if err != nil {
-		return fmt.Errorf("failed looking up senderID for invited user")
 	}
 
 	input := gomatrixserverlib.PerformInviteInput{
-		RoomID:            *validRoomID,
-		InviteEvent:       event.PDU,
-		InvitedUser:       *invitedUser,
-		InvitedSenderID:   invitedSenderID,
+		RoomID:            req.InviteInput.RoomID,
+		RoomVersion:       info.RoomVersion,
+		Inviter:           req.InviteInput.Inviter,
+		Invitee:           req.InviteInput.Invitee,
 		IsTargetLocal:     isTargetLocal,
+		EventTemplate:     proto,
 		StrippedState:     req.InviteRoomState,
+		KeyID:             req.InviteInput.KeyID,
+		SigningKey:        signingKey,
+		EventTime:         req.InviteInput.EventTime,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
 		StateQuerier:      &QueryState{r.DB, r.RSAPI},
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
+		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+			return r.RSAPI.QuerySenderIDForUser(ctx, roomID, userID)
+		},
+		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", nil, keyErr
+			}
+
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+		EventQuerier: func(ctx context.Context, roomID spec.RoomID, eventsNeeded []gomatrixserverlib.StateKeyTuple) (gomatrixserverlib.LatestEvents, error) {
+			req := api.QueryLatestEventsAndStateRequest{RoomID: roomID.String(), StateToFetch: eventsNeeded}
+			res := api.QueryLatestEventsAndStateResponse{}
+			err = r.RSAPI.QueryLatestEventsAndState(ctx, &req, &res)
+			if err != nil {
+				return gomatrixserverlib.LatestEvents{}, nil
+			}
+
+			stateEvents := []gomatrixserverlib.PDU{}
+			for _, event := range res.StateEvents {
+				stateEvents = append(stateEvents, event.PDU)
+			}
+			return gomatrixserverlib.LatestEvents{
+				RoomExists:   res.RoomExists,
+				StateEvents:  stateEvents,
+				PrevEventIDs: res.LatestEvents,
+				Depth:        res.Depth,
+			}, nil
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.RSAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
+		},
 	}
+
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
 	if err != nil {
 		switch e := err.(type) {
@@ -197,20 +235,6 @@ func (r *Inviter) PerformInvite(
 			}
 		}
 		return err
-	}
-
-	// Use the returned event if there was one (due to federation), otherwise
-	// send the original invite event to the roomserver.
-	if inviteEvent == nil {
-		inviteEvent = event
-	}
-
-	// if we invited a local user, we can also create a user room key, if it doesn't exist yet.
-	if isTargetLocal && event.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
-		_, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *invitedUser, *validRoomID)
-		if err != nil {
-			return fmt.Errorf("failed to get user room private key: %w", err)
-		}
 	}
 
 	// Send the invite event to the roomserver input stream. This will
@@ -223,7 +247,7 @@ func (r *Inviter) PerformInvite(
 			{
 				Kind:         api.KindNew,
 				Event:        &types.HeaderedEvent{PDU: inviteEvent},
-				Origin:       sender.Domain(),
+				Origin:       req.InviteInput.Inviter.Domain(),
 				SendAsServer: req.SendAsServer,
 			},
 		},
@@ -231,7 +255,7 @@ func (r *Inviter) PerformInvite(
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 	if err := inputRes.Err(); err != nil {
-		util.GetLogger(ctx).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}
 	}
 

@@ -187,9 +187,6 @@ func MakeJoin(
 }
 
 // SendJoin implements the /send_join API
-// The make-join send-join dance makes much more sense as a single
-// flow so the cyclomatic complexity is high:
-// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *fclient.FederationRequest,

@@ -126,6 +126,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		KeyRing:             keyRing,
 		ACLs:                r.ServerACLs,
 		Queryer:             r.Queryer,
+		EnableMetrics:       r.enableMetrics,
 	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
@@ -317,7 +318,7 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 		return fclient.SigningIdentity{
 			PrivateKey: privKey,
 			KeyID:      "ed25519:1",
-			ServerName: "self",
+			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(privKey)),
 		}, nil
 	}
 	identity, err := r.Cfg.Global.SigningIdentityFor(senderID.Domain())

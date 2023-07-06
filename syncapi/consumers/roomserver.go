@@ -565,20 +565,18 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		return event, err
 	}
 
-	if event.StateKey() != nil {
-		if *event.StateKey() != "" {
-			var sku *spec.UserID
-			sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
-			if err == nil && sku != nil {
-				sKey := sku.String()
-				event.StateKeyResolved = &sKey
-				stateKey = sKey
-			}
+	sKeyUser := ""
+	if stateKey != "" {
+		var sku *spec.UserID
+		sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
+		if err == nil && sku != nil {
+			sKeyUser = sku.String()
+			event.StateKeyResolved = &sKeyUser
 		}
 	}
 
 	prevEvent, err := snapshot.GetStateEvent(
-		s.ctx, event.RoomID(), event.Type(), stateKey,
+		s.ctx, event.RoomID(), event.Type(), sKeyUser,
 	)
 	if err != nil {
 		return event, err

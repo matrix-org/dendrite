@@ -1,5 +1,27 @@
 # Changelog
 
+## Dendrite 0.13.1 (2023-07-06)
+
+This releases fixes a long-standing "off-by-one" error which could result in state resets. Upgrading to this version is **highly** recommended.
+
+When deduplicating state events, we were checking if the event in question was already in a state snapshot. If it was in a previous state snapshot, we would 
+then remove it from the list of events to store. If this happened, we were, unfortunately, skipping the next event to check. This resulted in 
+events getting stored in state snapshots where they may not be needed. When we now compared two of those state snapshots, one of them
+contained the skipped event, while the other didn't. This difference possibly shouldn't exist, resulting in unexpected state resets and explains
+reports of missing state events as well.
+
+Rooms where a state reset occurred earlier should, hopefully, reconcile over time.
+
+### Fixes:
+
+- A long-standing "off-by-one" error has been fixed, which could result in state resets
+- Roomserver Prometheus Metrics are available again
+
+### Features
+
+- Updated dependencies
+  - Internal NATS Server has been updated from v2.9.15 to v2.9.19
+
 ## Dendrite 0.13.0 (2023-06-30)
 
 ### Features
