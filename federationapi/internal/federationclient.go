@@ -194,7 +194,7 @@ func (a *FederationInternalAPI) MSC2836EventRelationships(
 	return ires.(fclient.MSC2836EventRelationshipsResponse), nil
 }
 
-func (a *FederationInternalAPI) MSC2946Spaces(
+func (a *FederationInternalAPI) RoomHierarchies(
 	ctx context.Context, origin, s spec.ServerName, roomID string, suggestedOnly bool,
 ) (res fclient.MSC2946SpacesResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)

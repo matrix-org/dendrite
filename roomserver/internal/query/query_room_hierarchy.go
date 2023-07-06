@@ -260,7 +260,7 @@ func (w *RoomHierarchyWalker) federatedRoomInfo(roomID string, vias []string) *f
 		if serverName == string(w.thisServer) {
 			continue
 		}
-		res, err := w.fsAPI.MSC2946Spaces(ctx, w.thisServer, spec.ServerName(serverName), roomID, w.suggestedOnly)
+		res, err := w.fsAPI.RoomHierarchies(ctx, w.thisServer, spec.ServerName(serverName), roomID, w.suggestedOnly)
 		if err != nil {
 			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call MSC2946Spaces on server %s", serverName)
 			continue

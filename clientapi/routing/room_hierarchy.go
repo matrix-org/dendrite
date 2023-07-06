@@ -136,7 +136,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: MSC2946ClientResponse{
+		JSON: RoomHierarchyClientResponse{
 			Rooms:     discoveredRooms,
 			NextBatch: nextBatch,
 		},
@@ -144,7 +144,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 
 }
 
-type MSC2946ClientResponse struct {
+type RoomHierarchyClientResponse struct {
 	Rooms     []fclient.MSC2946Room `json:"rooms"`
 	NextBatch string                `json:"next_batch,omitempty"`
 }
