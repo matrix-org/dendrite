@@ -37,6 +37,7 @@ func (r *Queryer) QueryRoomHierarchy(ctx context.Context, caller types.DeviceOrS
 			parentRoomID: "",
 			depth:        0,
 		}},
+		processed: stringSet{},
 	}
 
 	return &walker

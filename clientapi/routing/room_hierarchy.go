@@ -34,7 +34,9 @@ type RoomHierarchyPaginationCache struct {
 }
 
 func NewRoomHierarchyPaginationCache() RoomHierarchyPaginationCache {
-	return RoomHierarchyPaginationCache{}
+	return RoomHierarchyPaginationCache{
+		cache: map[string]roomserverAPI.CachedRoomHierarchyWalker{},
+	}
 }
 
 func (c *RoomHierarchyPaginationCache) Get(token string) roomserverAPI.CachedRoomHierarchyWalker {
