@@ -370,7 +370,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		gomatrixserverlib.ToPDUs(removeDuplicates(delta.StateEvents, events)),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	)
-	delta.StateEvents = make([]*rstypes.HeaderedEvent, 0, len(sEvents))
+	delta.StateEvents = make([]*rstypes.HeaderedEvent, len(sEvents))
 	var skipped int
 	for i := range sEvents {
 		ev := sEvents[i]
@@ -390,6 +390,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			delta.StateEvents[i-skipped] = &rstypes.HeaderedEvent{PDU: newEvent}
 		}
 	}
+	delta.StateEvents = delta.StateEvents[:len(sEvents)-skipped]
 
 	if len(delta.StateEvents) > 0 {
 		if last := delta.StateEvents[len(delta.StateEvents)-1]; last != nil {
