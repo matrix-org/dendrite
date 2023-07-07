@@ -743,7 +743,7 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 		return res, fmt.Errorf("failed to query version: %w", err)
 	}
 	if deleted {
-		return res, fmt.Errorf("backup was deleted")
+		return res, nil
 	}
 	if version != req.Version {
 		return res, spec.WrongBackupVersionError(version)
