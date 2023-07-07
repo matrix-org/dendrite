@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
 	"testing"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
@@ -53,10 +54,14 @@ func TestPerformWakeupServers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, offline)
 
+	_, key, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
+				KeyID:      "ed25519:1",
+				PrivateKey: key,
 			},
 		},
 	}
@@ -95,10 +100,14 @@ func TestQueryRelayServers(t *testing.T) {
 	err := testDB.P2PAddRelayServersForServer(context.Background(), server, relayServers)
 	assert.NoError(t, err)
 
+	_, key, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
+				KeyID:      "ed25519:1",
+				PrivateKey: key,
 			},
 		},
 	}
@@ -132,10 +141,14 @@ func TestRemoveRelayServers(t *testing.T) {
 	err := testDB.P2PAddRelayServersForServer(context.Background(), server, relayServers)
 	assert.NoError(t, err)
 
+	_, key, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
+				KeyID:      "ed25519:1",
+				PrivateKey: key,
 			},
 		},
 	}
@@ -168,10 +181,14 @@ func TestRemoveRelayServers(t *testing.T) {
 func TestPerformDirectoryLookup(t *testing.T) {
 	testDB := test.NewInMemoryFederationDatabase()
 
+	_, key, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
+				KeyID:      "ed25519:1",
+				PrivateKey: key,
 			},
 		},
 	}
@@ -192,7 +209,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 		ServerName: "server",
 	}
 	res := api.PerformDirectoryLookupResponse{}
-	err := fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
+	err = fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
 	assert.NoError(t, err)
 }
 
@@ -203,10 +220,14 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 	testDB.SetServerAssumedOffline(context.Background(), server)
 	testDB.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{"relay"})
 
+	_, key, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
-				ServerName: server,
+				ServerName: "relay",
+				KeyID:      "ed25519:1",
+				PrivateKey: key,
 			},
 		},
 	}
@@ -227,6 +248,6 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 		ServerName: server,
 	}
 	res := api.PerformDirectoryLookupResponse{}
-	err := fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
+	err = fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
 	assert.Error(t, err)
 }
