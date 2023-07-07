@@ -371,19 +371,26 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	)
 	delta.StateEvents = make([]*rstypes.HeaderedEvent, len(sEvents))
+	var skipped int
 	for i := range sEvents {
 		ev := sEvents[i]
-		delta.StateEvents[i] = ev.(*rstypes.HeaderedEvent)
+		he, ok := ev.(*rstypes.HeaderedEvent)
+		if !ok {
+			skipped++
+			continue
+		}
+		delta.StateEvents[i-skipped] = he
 		// update the powerlevel event for state events
 		if ev.Version() == gomatrixserverlib.RoomVersionPseudoIDs && ev.Type() == spec.MRoomPowerLevels && ev.StateKeyEquals("") {
 			var newEvent gomatrixserverlib.PDU
-			newEvent, err = p.updatePowerLevelEvent(ctx, ev.(*rstypes.HeaderedEvent))
+			newEvent, err = p.updatePowerLevelEvent(ctx, he)
 			if err != nil {
 				return r.From, err
 			}
-			delta.StateEvents[i] = &rstypes.HeaderedEvent{PDU: newEvent}
+			delta.StateEvents[i-skipped] = &rstypes.HeaderedEvent{PDU: newEvent}
 		}
 	}
+	delta.StateEvents = delta.StateEvents[:len(sEvents)-skipped]
 
 	if len(delta.StateEvents) > 0 {
 		if last := delta.StateEvents[len(delta.StateEvents)-1]; last != nil {
