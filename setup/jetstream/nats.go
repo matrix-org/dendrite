@@ -125,15 +125,16 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 			// with the subject "Foo", "Foo.Bar" or "Foo.Bar.Baz" etc.
 			subjects = []string{name, name + ".>"}
 		}
-		if info != nil {
-			switch {
-			case !reflect.DeepEqual(info.Config.Subjects, subjects):
-				fallthrough
-			case info.Config.Retention != stream.Retention:
-				fallthrough
-			case info.Config.Storage != stream.Storage:
+		if info != nil && !reflect.DeepEqual(info.Config, stream) {
+			// If the stream config doesn't match what we expect, try to update
+			// it. If that doesn't work then try to blow it away and we'll then
+			// recreate it in the next section.
+			if info, err = s.UpdateStream(stream); err != nil {
+				logrus.WithError(err).Warnf("Unable to update stream %q, recreating...", name)
+				// We failed to update the stream, this is a last attempt to get
+				// things working but may result in data loss.
 				if err = s.DeleteStream(name); err != nil {
-					logrus.WithError(err).Fatal("Unable to delete stream")
+					logrus.WithError(err).Fatalf("Unable to delete stream %q", name)
 				}
 				info = nil
 			}
