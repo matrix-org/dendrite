@@ -112,7 +112,13 @@ func (m *Migrator) Up(ctx context.Context) error {
 
 func (m *Migrator) insertMigration(ctx context.Context, txn *sql.Tx, migrationName string) error {
 	if m.insertStmt == nil {
-		stmt, err := m.db.Prepare(insertVersionSQL)
+		var stmt *sql.Stmt
+		var err error
+		if txn == nil {
+			stmt, err = m.db.PrepareContext(ctx, insertVersionSQL)
+		} else {
+			stmt, err = txn.PrepareContext(ctx, insertVersionSQL)
+		}
 		if err != nil {
 			return fmt.Errorf("unable to prepare insert statement: %w", err)
 		}
