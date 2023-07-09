@@ -825,7 +825,21 @@ func (d *DatabaseTransaction) SelectMultiRoomData(ctx context.Context, r *types.
 
 }
 
-func (d *DatabaseTransaction) SelectMaxMultiRoomDataEventId(ctx context.Context) (types.StreamPosition, error) {
-	id, err := d.MultiRoom.SelectMaxMultiRoomDataEventId(ctx, d.txn)
-	return types.StreamPosition(id), err
+func (d *DatabaseTransaction) SelectAllMultiRoomDataInRoom(ctx context.Context, roomId string) (types.MultiRoom, error) {
+	rows, err := d.MultiRoom.SelectAllMultiRoomDataInRoom(ctx, roomId, d.txn)
+	if err != nil {
+		return nil, fmt.Errorf("select all multi room data in room: %w", err)
+	}
+	mr := make(types.MultiRoom, 3)
+	for _, row := range rows {
+		if mr[row.UserId] == nil {
+			mr[row.UserId] = make(map[string]types.MultiRoomData)
+		}
+		mr[row.UserId][row.Type] = types.MultiRoomData{
+			Content:        row.Data,
+			OriginServerTs: row.Timestamp,
+		}
+	}
+	return mr, nil
+
 }

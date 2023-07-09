@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"database/sql"
 	"net/http"
 
@@ -45,15 +44,10 @@ func GetLocationSync(
 		logrus.WithError(err).Error("Failed to get snapshot for locations sync")
 		return jsonerror.InternalServerError()
 	}
-	id, err := snapshot.SelectMaxMultiRoomDataEventId(context.Background())
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("failed to get max multiroom data event id")
-		return jsonerror.InternalServerError()
-	}
-	mr, err := snapshot.SelectMultiRoomData(req.Context(), &types.Range{From: 0, To: id}, []string{roomID})
+	mr, err := snapshot.SelectAllMultiRoomDataInRoom(req.Context(), roomID)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to select multiroom data for room")
+			util.GetLogger(req.Context()).WithError(err).Error("failed to select all most recent multiroom data for room")
 			return jsonerror.InternalServerError()
 		}
 	}
