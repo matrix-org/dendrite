@@ -25,8 +25,12 @@ WHERE v.room_id = ANY($1)
 AND id > $2
 AND id <= $3`
 
+const selectMaxMultiCastIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_multiroom_data"
+
 type multiRoomStatements struct {
-	selectMultiRoomCast *sql.Stmt
+	selectMultiRoomCast  *sql.Stmt
+	selectMaxMultiCastID *sql.Stmt
 }
 
 func NewPostgresMultiRoomCastTable(db *sql.DB) (tables.MultiRoom, error) {
@@ -37,6 +41,7 @@ func NewPostgresMultiRoomCastTable(db *sql.DB) (tables.MultiRoom, error) {
 	}
 	return r, sqlutil.StatementList{
 		{&r.selectMultiRoomCast, selectMultiRoomCastSQL},
+		{&r.selectMaxMultiCastID, selectMaxMultiCastIDSQL},
 	}.Prepare(db)
 }
 
@@ -58,4 +63,12 @@ func (s *multiRoomStatements) SelectMultiRoomData(ctx context.Context, r *types.
 		data = append(data, &r)
 	}
 	return data, rows.Err()
+}
+
+func (s *multiRoomStatements) SelectMaxMultiRoomDataEventId(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMaxMultiCastID)
+	err = stmt.QueryRowContext(ctx).Scan(&id)
+	return
 }

@@ -824,3 +824,8 @@ func (d *DatabaseTransaction) SelectMultiRoomData(ctx context.Context, r *types.
 	return mr, nil
 
 }
+
+func (d *DatabaseTransaction) SelectMaxMultiRoomDataEventId(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.MultiRoom.SelectMaxMultiRoomDataEventId(ctx, d.txn)
+	return types.StreamPosition(id), err
+}

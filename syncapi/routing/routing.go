@@ -205,4 +205,14 @@ func Setup(
 			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, true, &membership, nil, at)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/location_sync",
+		httputil.MakeAuthAPI("location_sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetLocationSync(req, device, vars["roomID"], syncDB, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
