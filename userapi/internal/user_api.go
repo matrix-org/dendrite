@@ -422,6 +422,11 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	}
 	res.DeviceExists = true
 
+	if dev.UserID != req.RequestingUserID {
+		res.Forbidden = true
+		return nil
+	}
+
 	err = a.DB.UpdateDevice(ctx, localpart, domain, req.DeviceID, req.DisplayName)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
@@ -668,6 +673,17 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	deviceRes := &api.PerformDeviceDeletionResponse{}
 	if err = a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
 		return err
+	}
+
+	threepids, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart, serverName)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(threepids); i++ {
+		err = a.DB.RemoveThreePIDAssociation(ctx, threepids[i].Address, threepids[i].Medium)
+		if err != nil {
+			return err
+		}
 	}
 
 	pusherReq := &api.PerformPusherDeletionRequest{

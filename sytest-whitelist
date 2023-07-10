@@ -204,7 +204,6 @@ Deleted tags appear in an incremental v2 /sync
 /event/ on non world readable room does not work
 Outbound federation can query profile data
 /event/ on joined room works
-/event/ does not allow access to events before the user joined
 Federation key API allows unsigned requests for keys
 GET /publicRooms lists rooms
 GET /publicRooms includes avatar URLs
@@ -759,6 +758,7 @@ Can filter rooms/{roomId}/members
 Current state appears in timeline in private history with many messages after
 AS can publish rooms in their own list
 AS and main public room lists are separate
+AS can deactivate a user
 /upgrade preserves direct room state
 local user has tags copied to the new room
 remote user has tags copied to the new room

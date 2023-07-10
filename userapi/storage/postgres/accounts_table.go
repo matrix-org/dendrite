@@ -101,6 +101,11 @@ func NewPostgresAccountsTable(db *sql.DB, serverName spec.ServerName) (tables.Ac
 			Up:      deltas.UpAddAccountType,
 			Down:    deltas.DownAddAccountType,
 		},
+		{
+			Version: "userapi: no guests",
+			Up:      deltas.UpNoGuests,
+			Down:    deltas.DownNoGuests,
+		},
 	}...)
 	err = m.Up(context.Background())
 	if err != nil {

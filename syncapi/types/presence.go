@@ -21,6 +21,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
+const (
+	PresenceNoOpMs         = 60_000
+	PresenceExpire         = "'4 minutes'"
+	PresenceExpireInterval = time.Second * 30
+)
+
 type Presence uint8
 
 const (
@@ -64,6 +70,11 @@ type PresenceInternal struct {
 	UserID       string         `json:"-"`
 	LastActiveTS spec.Timestamp `json:"-"`
 	Presence     Presence       `json:"-"`
+}
+
+type PresenceNotify struct {
+	StreamPos StreamPosition
+	UserID    string
 }
 
 // Equals compares p1 with p2.

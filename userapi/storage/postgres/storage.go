@@ -42,6 +42,10 @@ func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *
 		Version: "userapi: rename tables",
 		Up:      deltas.UpRenameTables,
 		Down:    deltas.DownRenameTables,
+	}, sqlutil.Migration{
+		Version: "userapi: unique pushers",
+		Up:      deltas.UpUniquePusher,
+		Down:    deltas.DownUniquePusher,
 	})
 	m.AddMigrations(sqlutil.Migration{
 		Version: "userapi: server names",

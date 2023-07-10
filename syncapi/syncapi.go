@@ -16,6 +16,7 @@ package syncapi
 
 import (
 	"context"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -37,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
@@ -54,14 +56,26 @@ func AddPublicRoutes(
 ) {
 	js, natsClient := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(processContext.Context(), cm, &dendriteCfg.SyncAPI.Database)
+	syncDB, mrq, err := storage.NewSyncServerDatasource(processContext.Context(), cm, &dendriteCfg.SyncAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
+	go func() {
+		var affected int64
+		for {
+			affected, err = mrq.DeleteMultiRoomVisibilityByExpireTS(context.Background(), time.Now().UnixMilli())
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire multiroom visibility")
+			}
+			logrus.WithField("rows", affected).Info("expired multiroom visibility")
+			time.Sleep(time.Minute)
+		}
+	}()
+
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier(rsAPI)
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier, mrq)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -144,8 +158,35 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
+	multiRoomConsumer := consumers.NewOutputMultiRoomDataConsumer(
+		processContext, &dendriteCfg.SyncAPI, js, mrq, notifier, streams.MultiRoomStreamProvider,
+	)
+	if err = multiRoomConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start multiroom consumer")
+	}
+
 	routing.Setup(
 		routers.Client, requestPool, syncDB, userAPI,
 		rsAPI, &dendriteCfg.SyncAPI, caches, fts,
 	)
+
+	go func() {
+		ctx := context.Background()
+		for {
+			notify, err := syncDB.ExpirePresence(ctx)
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire presence")
+			}
+			for i := range notify {
+				requestPool.Presence.Store(notify[i].UserID, types.PresenceInternal{
+					Presence: types.PresenceOffline,
+				})
+				notifier.OnNewPresence(types.StreamingToken{
+					PresencePosition: notify[i].StreamPos,
+				}, notify[i].UserID)
+
+			}
+			time.Sleep(types.PresenceExpireInterval)
+		}
+	}()
 }

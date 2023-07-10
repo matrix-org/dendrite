@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -32,7 +33,7 @@ import (
 // called after authorization has completed, with the result of the authorization.
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
-func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.UserLoginAPI, userAPI UserInternalAPIForLogin, cfg *config.ClientAPI) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.ClientUserAPI, cfg *config.ClientAPI, rt *ratelimit.RtFailedLogin) (*Login, LoginCleanupFunc, *util.JSONResponse) {
 	reqBytes, err := io.ReadAll(r)
 	if err != nil {
 		err := &util.JSONResponse{
@@ -43,7 +44,8 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 	}
 
 	var header struct {
-		Type string `json:"type"`
+		Type          string `json:"type"`
+		InhibitDevice bool   `json:"inhibit_device"`
 	}
 	if err := json.Unmarshal(reqBytes, &header); err != nil {
 		err := &util.JSONResponse{
@@ -57,13 +59,20 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 	switch header.Type {
 	case authtypes.LoginTypePassword:
 		typ = &LoginTypePassword{
-			GetAccountByPassword: useraccountAPI.QueryAccountByPassword,
-			Config:               cfg,
+			UserApi:       useraccountAPI,
+			Config:        cfg,
+			Rt:            rt,
+			InhibitDevice: header.InhibitDevice,
+			UserLoginAPI:  useraccountAPI,
 		}
 	case authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{
-			UserAPI: userAPI,
+			UserAPI: useraccountAPI,
 			Config:  cfg,
+		}
+	case authtypes.LoginTypeJwt:
+		typ = &LoginTypeTokenJwt{
+			Config: cfg,
 		}
 	default:
 		err := util.JSONResponse{

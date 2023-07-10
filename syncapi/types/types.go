@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -122,6 +123,7 @@ type StreamingToken struct {
 	DeviceListPosition       StreamPosition
 	NotificationDataPosition StreamPosition
 	PresencePosition         StreamPosition
+	MultiRoomDataPosition    StreamPosition
 }
 
 // This will be used as a fallback by json.Marshal.
@@ -137,12 +139,12 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
 		t.InvitePosition, t.AccountDataPosition,
 		t.DeviceListPosition, t.NotificationDataPosition,
-		t.PresencePosition,
+		t.PresencePosition, t.MultiRoomDataPosition,
 	)
 	return posStr
 }
@@ -168,12 +170,14 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.PresencePosition > other.PresencePosition:
 		return true
+	case t.MultiRoomDataPosition > other.MultiRoomDataPosition:
+		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition+t.PresencePosition == 0
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition+t.PresencePosition+t.MultiRoomDataPosition == 0
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -216,6 +220,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.PresencePosition > t.PresencePosition {
 		t.PresencePosition = other.PresencePosition
+	}
+	if other.MultiRoomDataPosition > t.MultiRoomDataPosition {
+		t.MultiRoomDataPosition = other.MultiRoomDataPosition
 	}
 }
 
@@ -302,9 +309,11 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	if len(tok) < 1 {
 		err = ErrMalformedSyncToken
+		logrus.WithField("token", tok).Info("invalid stream token: bad length")
 		return
 	}
 	if tok[0] != SyncTokenTypeStream[0] {
+		logrus.WithField("token", tok).Info("invalid stream token: not starting from s")
 		err = ErrMalformedSyncToken
 		return
 	}
@@ -312,7 +321,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	// s478_0_0_0_0_13.dl-0-2 but we have now removed partitioned stream positions
 	tok = strings.Split(tok, ".")[0]
 	parts := strings.Split(tok[1:], "_")
-	var positions [9]StreamPosition
+	var positions [10]StreamPosition
 	for i, p := range parts {
 		if i >= len(positions) {
 			break
@@ -320,6 +329,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		var pos int
 		pos, err = strconv.Atoi(p)
 		if err != nil {
+			logrus.WithField("token", tok).Info("invalid stream token: strconv")
 			err = ErrMalformedSyncToken
 			return
 		}
@@ -335,6 +345,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		DeviceListPosition:       positions[6],
 		NotificationDataPosition: positions[7],
 		PresencePosition:         positions[8],
+		MultiRoomDataPosition:    positions[9],
 	}
 	return token, nil
 }
@@ -371,6 +382,7 @@ type Response struct {
 	ToDevice            *ToDeviceResponse `json:"to_device,omitempty"`
 	DeviceLists         *DeviceLists      `json:"device_lists,omitempty"`
 	DeviceListsOTKCount map[string]int    `json:"device_one_time_keys_count,omitempty"`
+	MultiRoom           MultiRoom         `json:"multiroom,omitempty"`
 }
 
 func (r Response) MarshalJSON() ([]byte, error) {
@@ -409,7 +421,8 @@ func (r *Response) HasUpdates() bool {
 		len(r.Rooms.Peek) > 0 ||
 		len(r.ToDevice.Events) > 0 ||
 		len(r.DeviceLists.Changed) > 0 ||
-		len(r.DeviceLists.Left) > 0)
+		len(r.DeviceLists.Left) > 0) ||
+		len(r.MultiRoom) > 0
 }
 
 // NewResponse creates an empty response with initialised maps.

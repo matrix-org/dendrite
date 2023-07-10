@@ -54,6 +54,7 @@ func AddPublicRoutes(
 		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicMultiRoomCast:     cfg.Global.JetStream.Prefixed(jetstream.OutputMultiRoomCast),
 		UserAPI:                userAPI,
 		ServerName:             cfg.Global.ServerName,
 	}

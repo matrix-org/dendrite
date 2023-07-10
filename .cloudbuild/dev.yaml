@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '--build-arg', 'BUILDPLATFORM=${_BUILD_PLATFORM}', '-t', 'gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA', '-f', 'Dockerfile', '.']
+  - name: gcr.io/cloud-builders/kubectl
+    args: ['-n', 'dendrite', 'set', 'image', 'deployment/dendrite', 'dendrite=gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA']
+    env:
+      - CLOUDSDK_CORE_PROJECT=globekeeper-development
+      - CLOUDSDK_COMPUTE_ZONE=europe-west2-a
+      - CLOUDSDK_CONTAINER_CLUSTER=synapse
+substitutions:
+  _BUILD_PLATFORM: linux/amd64 # default
+images:
+  - gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA
+timeout: 480s

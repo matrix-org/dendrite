@@ -18,7 +18,7 @@ func newSyncDB(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 
 	cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	syncDB, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
+	syncDB, _, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
 	if err != nil {
 		t.Fatalf("failed to create sync DB: %s", err)
 	}

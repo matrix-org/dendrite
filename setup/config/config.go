@@ -16,6 +16,7 @@ package config
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -62,7 +63,6 @@ type Dendrite struct {
 	RoomServer    RoomServer    `yaml:"room_server"`
 	SyncAPI       SyncAPI       `yaml:"sync_api"`
 	UserAPI       UserAPI       `yaml:"user_api"`
-	RelayAPI      RelayAPI      `yaml:"relay_api"`
 
 	MSCs MSCs `yaml:"mscs"`
 
@@ -255,6 +255,15 @@ func loadConfig(
 			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
 		}
 	}
+	if c.ClientAPI.JwtConfig.Enabled {
+		pubPki, _ := pem.Decode([]byte(c.ClientAPI.JwtConfig.Secret))
+		var pub interface{}
+		pub, err = x509.ParsePKIXPublicKey(pubPki.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		c.ClientAPI.JwtConfig.SecretKey = pub.(ed25519.PublicKey)
+	}
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
 
@@ -296,7 +305,10 @@ func (config *Dendrite) Derive() error {
 			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
 		}
 	}
-
+	if config.ClientAPI.ThreePidDelegate != "" {
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
+			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeEmail}})
+	}
 	// Load application service configuration files
 	if err := loadAppServices(&config.AppServiceAPI, &config.Derived); err != nil {
 		return err
@@ -323,7 +335,6 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.SyncAPI.Defaults(opts)
 	c.UserAPI.Defaults(opts)
 	c.AppServiceAPI.Defaults(opts)
-	c.RelayAPI.Defaults(opts)
 	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
@@ -336,7 +347,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors) {
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
+		&c.AppServiceAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs)
 	}
@@ -352,7 +363,6 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
-	c.RelayAPI.Matrix = &c.Global
 	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived

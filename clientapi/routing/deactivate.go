@@ -27,13 +27,18 @@ func Deactivate(
 			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
-
-	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, deviceAPI)
-	if errRes != nil {
-		return *errRes
+	var userId string
+	if deviceAPI.AccountType != api.AccountTypeAppService {
+		login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, deviceAPI)
+		if errRes != nil {
+			return *errRes
+		}
+		userId = login.Username()
+	} else {
+		userId = deviceAPI.UserID
 	}
 
-	localpart, serverName, err := gomatrixserverlib.SplitID('@', login.Username())
+	localpart, _, err := gomatrixserverlib.SplitID('@', userId)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
@@ -44,8 +49,7 @@ func Deactivate(
 
 	var res api.PerformAccountDeactivationResponse
 	err = accountAPI.PerformAccountDeactivation(ctx, &api.PerformAccountDeactivationRequest{
-		Localpart:  localpart,
-		ServerName: serverName,
+		Localpart: localpart,
 	}, &res)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")

@@ -156,6 +156,12 @@ func UpdateDeviceByID(
 			JSON: spec.Forbidden("device does not exist"),
 		}
 	}
+	if performRes.Forbidden {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("device not owned by current user"),
+		}
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -286,6 +292,8 @@ func DeleteDevices(
 			JSON: spec.InternalServerError{},
 		}
 	}
+
+	defer req.Body.Close() // nolint: errcheck
 
 	var res api.PerformDeviceDeletionResponse
 	if err := userAPI.PerformDeviceDeletion(ctx, &api.PerformDeviceDeletionRequest{

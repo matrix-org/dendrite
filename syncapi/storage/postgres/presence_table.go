@@ -65,6 +65,10 @@ const upsertPresenceFromSyncSQL = "" +
 	" presence = $2, last_active_ts = $3" +
 	" RETURNING id"
 
+const updateLastActiveSQL = `UPDATE syncapi_presence
+SET last_active_ts = $1
+WHERE user_id = $2`
+
 const selectPresenceForUserSQL = "" +
 	"SELECT user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
@@ -79,12 +83,24 @@ const selectPresenceAfter = "" +
 	" WHERE id > $1 AND last_active_ts >= $2" +
 	" ORDER BY id ASC LIMIT $3"
 
+const expirePresenceSQL = `UPDATE syncapi_presence SET 
+	id = nextval('syncapi_presence_id'), 
+	presence = 3
+WHERE
+	to_timestamp(last_active_ts / 1000) < NOW() - INTERVAL` + types.PresenceExpire + `
+AND 
+	presence != 3
+RETURNING id, user_id
+`
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	upsertPresenceFromSyncStmt *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
 	selectMaxPresenceStmt      *sql.Stmt
 	selectPresenceAfterStmt    *sql.Stmt
+	expirePresenceStmt         *sql.Stmt
+	updateLastActiveStmt       *sql.Stmt
 }
 
 func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
@@ -99,6 +115,8 @@ func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
 		{&s.selectPresenceForUsersStmt, selectPresenceForUserSQL},
 		{&s.selectMaxPresenceStmt, selectMaxPresenceSQL},
 		{&s.selectPresenceAfterStmt, selectPresenceAfter},
+		{&s.expirePresenceStmt, expirePresenceSQL},
+		{&s.updateLastActiveStmt, updateLastActiveSQL},
 	}.Prepare(db)
 }
 
@@ -176,4 +194,29 @@ func (p *presenceStatements) GetPresenceAfter(
 		presences[qryRes.UserID] = qryRes
 	}
 	return presences, rows.Err()
+}
+
+func (p *presenceStatements) ExpirePresence(
+	ctx context.Context,
+) ([]types.PresenceNotify, error) {
+	rows, err := p.expirePresenceStmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	presences := make([]types.PresenceNotify, 0)
+	i := 0
+	for rows.Next() {
+		presences = append(presences, types.PresenceNotify{})
+		err = rows.Scan(&presences[i].StreamPos, &presences[i].UserID)
+		if err != nil {
+			return nil, err
+		}
+		i++
+	}
+	return presences, err
+}
+
+func (p *presenceStatements) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	_, err := p.updateLastActiveStmt.Exec(&lastActiveTs, &userId)
+	return err
 }

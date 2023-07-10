@@ -2,6 +2,8 @@
 
 # Hidden files
 .*
+!.vscode
+!.cloudbuild
 
 # Allow GitHub config
 !.github
@@ -74,7 +76,11 @@ complement/
 docs/_site
 
 media_store/
-build
 
 # golang workspaces
 go.work*
+
+__debug_bin
+
+cmd/dendrite-monolith-server/dendrite-monolith-server
+build

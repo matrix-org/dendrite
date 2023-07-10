@@ -1175,7 +1175,7 @@ func TestUpdateRelations(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		t.Cleanup(close)
-		db, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
+		db, _, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
 		if err != nil {
 			t.Fatal(err)
 		}

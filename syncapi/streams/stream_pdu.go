@@ -80,6 +80,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
 		return from
 	}
+	req.JoinedRooms = joinedRoomIDs
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
@@ -192,6 +193,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	for _, roomID := range syncJoinedRooms {
 		req.Rooms[roomID] = spec.Join
 	}
+	req.JoinedRooms = syncJoinedRooms
 
 	if len(stateDeltas) == 0 {
 		return to

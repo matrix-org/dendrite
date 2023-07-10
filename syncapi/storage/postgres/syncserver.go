@@ -23,6 +23,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/storage/mrd"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
@@ -102,6 +103,11 @@ func NewDatabase(ctx context.Context, cm sqlutil.Connections, dbProperties *conf
 	if err != nil {
 		return nil, err
 	}
+	mr, err := NewPostgresMultiRoomCastTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	mrq := mrd.New(d.db)
 
 	// apply migrations which need multiple tables
 	m := sqlutil.NewMigrator(d.db)
@@ -134,6 +140,8 @@ func NewDatabase(ctx context.Context, cm sqlutil.Connections, dbProperties *conf
 		Ignores:             ignores,
 		Presence:            presence,
 		Relations:           relations,
+		MultiRoom:           mr,
+		MultiRoomQ:          mrq,
 	}
 	return &d, nil
 }

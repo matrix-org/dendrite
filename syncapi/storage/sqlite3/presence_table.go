@@ -201,3 +201,15 @@ func (p *presenceStatements) GetPresenceAfter(
 	}
 	return presences, rows.Err()
 }
+
+func (p *presenceStatements) ExpirePresence(
+	ctx context.Context,
+) ([]types.PresenceNotify, error) {
+	// TODO implement
+	return nil, nil
+}
+
+func (p *presenceStatements) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	// TODO implement
+	return nil
+}

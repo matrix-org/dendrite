@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -24,7 +25,9 @@ func (d *dummyPublisher) SendPresence(userID string, presence types.Presence, st
 	return nil
 }
 
-type dummyDB struct{}
+type dummyDB struct {
+	storage.Database
+}
 
 func (d dummyDB) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS spec.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	return 0, nil
@@ -110,7 +113,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		},
 	}
 	rp := &RequestPool{
-		presence: &syncMap,
+		Presence: &syncMap,
 		producer: publisher,
 		consumer: consumer,
 		cfg: &config.SyncAPI{

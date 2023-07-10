@@ -25,8 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/relayapi"
-	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -49,7 +47,6 @@ type Monolith struct {
 	FederationAPI federationAPI.FederationInternalAPI
 	RoomserverAPI roomserverAPI.RoomserverInternalAPI
 	UserAPI       userapi.UserInternalAPI
-	RelayAPI      relayAPI.RelayInternalAPI
 
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
@@ -81,7 +78,4 @@ func (m *Monolith) AddAllPublicRoutes(
 	mediaapi.AddPublicRoutes(routers.Media, cm, cfg, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
-	if m.RelayAPI != nil {
-		relayapi.AddPublicRoutes(routers, cfg, m.KeyRing, m.RelayAPI)
-	}
 }

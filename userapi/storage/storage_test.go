@@ -133,6 +133,11 @@ func Test_Accounts(t *testing.T) {
 		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.Error(t, err, "expected an error, got none")
 
+		// This should return an empty slice, as the account is deactivated and the 3pid is unbound
+		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart, aliceDomain)
+		assert.NoError(t, err, "failed to get 3pid for account")
+		assert.Equal(t, len(threepids), 0)
+
 		_, err = db.GetAccountByLocalpart(ctx, "unusename", aliceDomain)
 		assert.Error(t, err, "expected an error for non existent localpart")
 
@@ -542,7 +547,7 @@ func Test_Notification(t *testing.T) {
 		// get notifications
 		count, err := db.GetNotificationCount(ctx, aliceLocalpart, aliceDomain, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notification count")
-		assert.Equal(t, int64(10), count)
+		assert.Equal(t, int64(2), count)
 		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, aliceDomain, 0, 15, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notifications")
 		assert.Equal(t, int64(10), count)
