@@ -8,10 +8,13 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -33,13 +36,19 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 	}
 }
 
-func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {
+func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 	t.Helper()
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(content), false, gomatrixserverlib.RoomVersionV10)
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
-	return ev.Headered(gomatrixserverlib.RoomVersionV10)
+	return &types.HeaderedEvent{PDU: ev}
+}
+
+type FakeUserRoomserverAPI struct{ rsapi.UserRoomserverAPI }
+
+func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 func Test_evaluatePushRules(t *testing.T) {
@@ -48,7 +57,7 @@ func Test_evaluatePushRules(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
-		consumer := OutputRoomEventConsumer{db: db}
+		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
 		testCases := []struct {
 			name         string
@@ -59,13 +68,13 @@ func Test_evaluatePushRules(t *testing.T) {
 		}{
 			{
 				name:         "m.receipt doesn't notify",
-				eventContent: `{"type":"m.receipt"}`,
+				eventContent: `{"type":"m.receipt","room_id":"!room:example.com"}`,
 				wantAction:   pushrules.UnknownAction,
 				wantActions:  nil,
 			},
 			{
 				name:         "m.reaction doesn't notify",
-				eventContent: `{"type":"m.reaction"}`,
+				eventContent: `{"type":"m.reaction","room_id":"!room:example.com"}`,
 				wantAction:   pushrules.DontNotifyAction,
 				wantActions: []*pushrules.Action{
 					{
@@ -75,7 +84,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			},
 			{
 				name:         "m.room.message notifies",
-				eventContent: `{"type":"m.room.message"}`,
+				eventContent: `{"type":"m.room.message","room_id":"!room:example.com"}`,
 				wantNotify:   true,
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{
@@ -84,7 +93,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			},
 			{
 				name:         "m.room.message highlights",
-				eventContent: `{"type":"m.room.message", "content": {"body": "test"} }`,
+				eventContent: `{"type":"m.room.message", "content": {"body": "test"},"room_id":"!room:example.com"}`,
 				wantNotify:   true,
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{
@@ -139,9 +148,9 @@ func TestMessageStats(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           args
-		ourServer      gomatrixserverlib.ServerName
+		ourServer      spec.ServerName
 		lastUpdate     time.Time
-		initRoomCounts map[gomatrixserverlib.ServerName]map[string]bool
+		initRoomCounts map[spec.ServerName]map[string]bool
 		wantStats      userAPITypes.MessageStats
 	}{
 		{
@@ -197,7 +206,7 @@ func TestMessageStats(t *testing.T) {
 			name:       "day change creates a new room map",
 			ourServer:  "localhost",
 			lastUpdate: time.Now().Add(-time.Hour * 24),
-			initRoomCounts: map[gomatrixserverlib.ServerName]map[string]bool{
+			initRoomCounts: map[spec.ServerName]map[string]bool{
 				"localhost": {"encryptedRoom": true},
 			},
 			args: args{
@@ -219,11 +228,11 @@ func TestMessageStats(t *testing.T) {
 					tt.lastUpdate = time.Now()
 				}
 				if tt.initRoomCounts == nil {
-					tt.initRoomCounts = map[gomatrixserverlib.ServerName]map[string]bool{}
+					tt.initRoomCounts = map[spec.ServerName]map[string]bool{}
 				}
 				s := &OutputRoomEventConsumer{
 					db:         db,
-					msgCounts:  map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+					msgCounts:  map[spec.ServerName]userAPITypes.MessageStats{},
 					roomCounts: tt.initRoomCounts,
 					countsLock: sync.Mutex{},
 					lastUpdate: tt.lastUpdate,

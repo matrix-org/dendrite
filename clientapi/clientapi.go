@@ -37,7 +37,7 @@ func AddPublicRoutes(
 	routers httputil.Routers,
 	cfg *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	transactionsCache *transactions.Cache,

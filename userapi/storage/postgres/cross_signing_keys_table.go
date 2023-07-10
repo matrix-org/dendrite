@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var crossSigningKeysSchema = `
@@ -76,7 +76,7 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	r = types.CrossSigningKeyMap{}
 	for rows.Next() {
 		var keyTypeInt int16
-		var keyData gomatrixserverlib.Base64Bytes
+		var keyData spec.Base64Bytes
 		if err := rows.Scan(&keyTypeInt, &keyData); err != nil {
 			return nil, err
 		}
@@ -90,7 +90,7 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 }
 
 func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
-	ctx context.Context, txn *sql.Tx, userID string, keyType fclient.CrossSigningKeyPurpose, keyData gomatrixserverlib.Base64Bytes,
+	ctx context.Context, txn *sql.Tx, userID string, keyType fclient.CrossSigningKeyPurpose, keyData spec.Base64Bytes,
 ) error {
 	keyTypeInt, ok := types.KeyTypePurposeToInt[keyType]
 	if !ok {

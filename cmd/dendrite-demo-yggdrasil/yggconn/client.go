@@ -38,7 +38,7 @@ func (n *Node) CreateClient() *fclient.Client {
 
 func (n *Node) CreateFederationClient(
 	cfg *config.Dendrite,
-) *fclient.FederationClient {
+) fclient.FederationClient {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{

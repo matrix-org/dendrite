@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -127,7 +127,7 @@ func (p *presenceStatements) UpsertPresence(
 	userID string,
 	statusMsg *string,
 	presence types.Presence,
-	lastActiveTS gomatrixserverlib.Timestamp,
+	lastActiveTS spec.Timestamp,
 	fromSync bool,
 ) (pos types.StreamPosition, err error) {
 	if fromSync {
@@ -179,7 +179,7 @@ func (p *presenceStatements) GetPresenceAfter(
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
-	afterTS := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute * -5))
+	afterTS := spec.AsTimestamp(time.Now().Add(time.Minute * -5))
 	rows, err := stmt.QueryContext(ctx, after, afterTS, filter.Limit)
 	if err != nil {
 		return nil, err

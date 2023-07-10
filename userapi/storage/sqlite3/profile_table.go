@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const profilesSchema = `
@@ -88,7 +88,7 @@ func NewSQLiteProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables.P
 
 func (s *profilesStatements) InsertProfile(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, serverName, "", "")
 	return err
@@ -96,7 +96,7 @@ func (s *profilesStatements) InsertProfile(
 
 func (s *profilesStatements) SelectProfileByLocalpart(
 	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) (*authtypes.Profile, error) {
 	var profile authtypes.Profile
 	err := s.selectProfileByLocalpartStmt.QueryRowContext(ctx, localpart, serverName).Scan(
@@ -110,7 +110,7 @@ func (s *profilesStatements) SelectProfileByLocalpart(
 
 func (s *profilesStatements) SetAvatarURL(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	avatarURL string,
 ) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{
@@ -132,7 +132,7 @@ func (s *profilesStatements) SetAvatarURL(
 
 func (s *profilesStatements) SetDisplayName(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	displayName string,
 ) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{

@@ -20,12 +20,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type eventMods struct {
 	originServerTS time.Time
-	origin         gomatrixserverlib.ServerName
+	origin         spec.ServerName
 	stateKey       *string
 	unsigned       interface{}
 	keyID          gomatrixserverlib.KeyID
@@ -71,22 +73,22 @@ func WithPrivateKey(pkey ed25519.PrivateKey) eventModifier {
 	}
 }
 
-func WithOrigin(origin gomatrixserverlib.ServerName) eventModifier {
+func WithOrigin(origin spec.ServerName) eventModifier {
 	return func(e *eventMods) {
 		e.origin = origin
 	}
 }
 
 // Reverse a list of events
-func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
-	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
+func Reversed(in []*types.HeaderedEvent) []*types.HeaderedEvent {
+	out := make([]*types.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[len(in)-i-1]
 	}
 	return out
 }
 
-func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*gomatrixserverlib.HeaderedEvent) {
+func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*types.HeaderedEvent) {
 	t.Helper()
 	if len(gotEventIDs) != len(wants) {
 		t.Errorf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
@@ -101,7 +103,7 @@ func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*gomatrixse
 	}
 }
 
-func AssertEventsEqual(t *testing.T, gots, wants []*gomatrixserverlib.HeaderedEvent) {
+func AssertEventsEqual(t *testing.T, gots, wants []*types.HeaderedEvent) {
 	t.Helper()
 	if len(gots) != len(wants) {
 		t.Fatalf("length mismatch: got %d events, want %d", len(gots), len(wants))

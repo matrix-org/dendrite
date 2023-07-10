@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -54,7 +54,7 @@ func (r *Inputer) updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := updater.Events(ctx, nil, eventNIDs)
+	events, err := updater.Events(ctx, "", eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (r *Inputer) updateMemberships(
 		if change.addedEventNID != 0 {
 			ae, _ = helpers.EventMap(events).Lookup(change.addedEventNID)
 		}
-		if updates, err = r.updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
+		if updates, err = r.updateMembership(ctx, updater, targetUserNID, re, ae, updates); err != nil {
 			return nil, err
 		}
 	}
@@ -79,6 +79,7 @@ func (r *Inputer) updateMemberships(
 }
 
 func (r *Inputer) updateMembership(
+	ctx context.Context,
 	updater *shared.RoomUpdater,
 	targetUserNID types.EventStateKeyNID,
 	remove, add *types.Event,
@@ -86,7 +87,7 @@ func (r *Inputer) updateMembership(
 ) ([]api.OutputEvent, error) {
 	var err error
 	// Default the membership to Leave if no event was added or removed.
-	newMembership := gomatrixserverlib.Leave
+	newMembership := spec.Leave
 	if add != nil {
 		newMembership, err = add.Membership()
 		if err != nil {
@@ -96,7 +97,7 @@ func (r *Inputer) updateMembership(
 
 	var targetLocal bool
 	if add != nil {
-		targetLocal = r.isLocalTarget(add)
+		targetLocal = r.isLocalTarget(ctx, add)
 	}
 
 	mu, err := updater.MembershipUpdater(targetUserNID, targetLocal)
@@ -120,13 +121,13 @@ func (r *Inputer) updateMembership(
 	}
 
 	switch newMembership {
-	case gomatrixserverlib.Invite:
+	case spec.Invite:
 		return helpers.UpdateToInviteMembership(mu, add, updates, updater.RoomVersion())
-	case gomatrixserverlib.Join:
+	case spec.Join:
 		return updateToJoinMembership(mu, add, updates)
-	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
+	case spec.Leave, spec.Ban:
 		return updateToLeaveMembership(mu, add, newMembership, updates)
-	case gomatrixserverlib.Knock:
+	case spec.Knock:
 		return updateToKnockMembership(mu, add, updates)
 	default:
 		panic(fmt.Errorf(
@@ -135,11 +136,18 @@ func (r *Inputer) updateMembership(
 	}
 }
 
-func (r *Inputer) isLocalTarget(event *types.Event) bool {
+func (r *Inputer) isLocalTarget(ctx context.Context, event *types.Event) bool {
 	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
-		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
-		isTargetLocalUser = domain == r.ServerName
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return isTargetLocalUser
+		}
+		userID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*statekey))
+		if err != nil || userID == nil {
+			return isTargetLocalUser
+		}
+		isTargetLocalUser = userID.Domain() == r.ServerName
 	}
 	return isTargetLocalUser
 }
@@ -160,9 +168,10 @@ func updateToJoinMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
+				RoomID:           add.RoomID(),
+				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
+				TargetSenderID:   spec.SenderID(*add.StateKey()),
 			},
 		})
 	}
@@ -186,9 +195,10 @@ func updateToLeaveMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
+				RoomID:           add.RoomID(),
 				Membership:       newMembership,
 				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
+				TargetSenderID:   spec.SenderID(*add.StateKey()),
 			},
 		})
 	}

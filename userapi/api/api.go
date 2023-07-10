@@ -25,7 +25,9 @@ import (
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 )
@@ -62,10 +64,10 @@ type FederationUserAPI interface {
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error)
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
-	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse) error
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse) error
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
 // api functions required by the sync api
@@ -86,12 +88,18 @@ type ClientUserAPI interface {
 	UserLoginAPI
 	ClientKeyAPI
 	ProfileAPI
+	KeyBackupAPI
 	QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
-	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
+	QueryPushRules(ctx context.Context, userID string) (*pushrules.AccountRuleSets, error)
 	QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error
+	PerformAdminCreateRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error)
+	PerformAdminListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error)
+	PerformAdminGetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error)
+	PerformAdminDeleteRegistrationToken(ctx context.Context, tokenString string) error
+	PerformAdminUpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*clientapi.RegistrationToken, error)
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
@@ -99,13 +107,11 @@ type ClientUserAPI interface {
 	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
 	PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *struct{}) error
 	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
-	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
+	PerformPushRulesPut(ctx context.Context, userID string, ruleSets *pushrules.AccountRuleSets) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
-	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
-	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) error
 
 	QueryThreePIDsForLocalpart(ctx context.Context, req *QueryThreePIDsForLocalpartRequest, res *QueryThreePIDsForLocalpartResponse) error
 	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
@@ -113,10 +119,17 @@ type ClientUserAPI interface {
 	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
 }
 
+type KeyBackupAPI interface {
+	DeleteKeyBackup(ctx context.Context, userID, version string) (bool, error)
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest) (string, error)
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest) (*QueryKeyBackupResponse, error)
+	UpdateBackupKeyAuthData(ctx context.Context, req *PerformKeyBackupRequest) (*PerformKeyBackupResponse, error)
+}
+
 type ProfileAPI interface {
 	QueryProfile(ctx context.Context, userID string) (*authtypes.Profile, error)
-	SetAvatarURL(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, avatarURL string) (*authtypes.Profile, bool, error)
-	SetDisplayName(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, displayName string) (*authtypes.Profile, bool, error)
+	SetAvatarURL(ctx context.Context, localpart string, serverName spec.ServerName, avatarURL string) (*authtypes.Profile, bool, error)
+	SetDisplayName(ctx context.Context, localpart string, serverName spec.ServerName, displayName string) (*authtypes.Profile, bool, error)
 }
 
 // custom api functions required by pinecone / p2p demos
@@ -136,11 +149,10 @@ type UserLoginAPI interface {
 }
 
 type PerformKeyBackupRequest struct {
-	UserID       string
-	Version      string // optional if modifying a key backup
-	AuthData     json.RawMessage
-	Algorithm    string
-	DeleteBackup bool // if true will delete the backup based on 'Version'.
+	UserID    string
+	Version   string // optional if modifying a key backup
+	AuthData  json.RawMessage
+	Algorithm string
 
 	// The keys to upload, if any. If blank, creates/updates/deletes key version metadata only.
 	Keys struct {
@@ -181,9 +193,6 @@ type InternalKeyBackupSession struct {
 }
 
 type PerformKeyBackupResponse struct {
-	Error    string // set if there was a problem performing the request
-	BadInput bool   // if set, the Error was due to bad input (HTTP 400)
-
 	Exists  bool   // set to true if the Version exists
 	Version string // the newly created version
 
@@ -201,7 +210,6 @@ type QueryKeyBackupRequest struct {
 }
 
 type QueryKeyBackupResponse struct {
-	Error  string
 	Exists bool
 
 	Algorithm string          `json:"algorithm"`
@@ -315,9 +323,9 @@ type QuerySearchProfilesResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformAccountCreationRequest struct {
-	AccountType AccountType                  // Required: whether this is a guest or user account
-	Localpart   string                       // Required: The localpart for this account. Ignored if account type is guest.
-	ServerName  gomatrixserverlib.ServerName // optional: if not specified, default server name used instead
+	AccountType AccountType     // Required: whether this is a guest or user account
+	Localpart   string          // Required: The localpart for this account. Ignored if account type is guest.
+	ServerName  spec.ServerName // optional: if not specified, default server name used instead
 
 	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
 	Password     string // optional: if missing then this account will be a passwordless account
@@ -332,10 +340,10 @@ type PerformAccountCreationResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformPasswordUpdateRequest struct {
-	Localpart     string                       // Required: The localpart for this account.
-	ServerName    gomatrixserverlib.ServerName // Required: The domain for this account.
-	Password      string                       // Required: The new password to set.
-	LogoutDevices bool                         // Optional: Whether to log out all user devices.
+	Localpart     string          // Required: The localpart for this account.
+	ServerName    spec.ServerName // Required: The domain for this account.
+	Password      string          // Required: The new password to set.
+	LogoutDevices bool            // Optional: Whether to log out all user devices.
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
@@ -359,8 +367,8 @@ type PerformLastSeenUpdateResponse struct {
 // PerformDeviceCreationRequest is the request for PerformDeviceCreation
 type PerformDeviceCreationRequest struct {
 	Localpart   string
-	ServerName  gomatrixserverlib.ServerName // optional: if blank, default server name used
-	AccessToken string                       // optional: if blank one will be made on your behalf
+	ServerName  spec.ServerName // optional: if blank, default server name used
+	AccessToken string          // optional: if blank one will be made on your behalf
 	// optional: if nil an ID is generated for you. If set, replaces any existing device session,
 	// which will generate a new access token and invalidate the old one.
 	DeviceID *string
@@ -385,7 +393,7 @@ type PerformDeviceCreationResponse struct {
 // PerformAccountDeactivationRequest is the request for PerformAccountDeactivation
 type PerformAccountDeactivationRequest struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName // optional: if blank, default server name used
+	ServerName spec.ServerName // optional: if blank, default server name used
 }
 
 // PerformAccountDeactivationResponse is the response for PerformAccountDeactivation
@@ -435,7 +443,7 @@ type Device struct {
 	AccountType  AccountType
 }
 
-func (d *Device) UserDomain() gomatrixserverlib.ServerName {
+func (d *Device) UserDomain() spec.ServerName {
 	_, domain, err := gomatrixserverlib.SplitID('@', d.UserID)
 	if err != nil {
 		// This really is catastrophic because it means that someone
@@ -451,7 +459,7 @@ func (d *Device) UserDomain() gomatrixserverlib.ServerName {
 type Account struct {
 	UserID       string
 	Localpart    string
-	ServerName   gomatrixserverlib.ServerName
+	ServerName   spec.ServerName
 	AppServiceID string
 	AccountType  AccountType
 	// TODO: Associations (e.g. with application services)
@@ -517,7 +525,7 @@ const (
 
 type QueryPushersRequest struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
 type QueryPushersResponse struct {
@@ -527,13 +535,13 @@ type QueryPushersResponse struct {
 type PerformPusherSetRequest struct {
 	Pusher     // Anonymous field because that's how clientapi unmarshals it.
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 	Append     bool `json:"append"`
 }
 
 type PerformPusherDeletionRequest struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 	SessionID  int64
 }
 
@@ -558,25 +566,12 @@ const (
 	HTTPKind  PusherKind = "http"
 )
 
-type PerformPushRulesPutRequest struct {
-	UserID   string                     `json:"user_id"`
-	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
-}
-
-type QueryPushRulesRequest struct {
-	UserID string `json:"user_id"`
-}
-
-type QueryPushRulesResponse struct {
-	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
-}
-
 type QueryNotificationsRequest struct {
-	Localpart  string                       `json:"localpart"`   // Required.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"` // Required.
-	From       string                       `json:"from,omitempty"`
-	Limit      int                          `json:"limit,omitempty"`
-	Only       string                       `json:"only,omitempty"`
+	Localpart  string          `json:"localpart"`   // Required.
+	ServerName spec.ServerName `json:"server_name"` // Required.
+	From       string          `json:"from,omitempty"`
+	Limit      int             `json:"limit,omitempty"`
+	Only       string          `json:"only,omitempty"`
 }
 
 type QueryNotificationsResponse struct {
@@ -585,16 +580,16 @@ type QueryNotificationsResponse struct {
 }
 
 type Notification struct {
-	Actions    []*pushrules.Action         `json:"actions"`     // Required.
-	Event      synctypes.ClientEvent       `json:"event"`       // Required.
-	ProfileTag string                      `json:"profile_tag"` // Required by Sytest, but actually optional.
-	Read       bool                        `json:"read"`        // Required.
-	RoomID     string                      `json:"room_id"`     // Required.
-	TS         gomatrixserverlib.Timestamp `json:"ts"`          // Required.
+	Actions    []*pushrules.Action   `json:"actions"`     // Required.
+	Event      synctypes.ClientEvent `json:"event"`       // Required.
+	ProfileTag string                `json:"profile_tag"` // Required by Sytest, but actually optional.
+	Read       bool                  `json:"read"`        // Required.
+	RoomID     string                `json:"room_id"`     // Required.
+	TS         spec.Timestamp        `json:"ts"`          // Required.
 }
 
 type QueryNumericLocalpartRequest struct {
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
 type QueryNumericLocalpartResponse struct {
@@ -603,7 +598,7 @@ type QueryNumericLocalpartResponse struct {
 
 type QueryAccountAvailabilityRequest struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
 type QueryAccountAvailabilityResponse struct {
@@ -612,7 +607,7 @@ type QueryAccountAvailabilityResponse struct {
 
 type QueryAccountByPasswordRequest struct {
 	Localpart         string
-	ServerName        gomatrixserverlib.ServerName
+	ServerName        spec.ServerName
 	PlaintextPassword string
 }
 
@@ -627,12 +622,12 @@ type QueryLocalpartForThreePIDRequest struct {
 
 type QueryLocalpartForThreePIDResponse struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
 type QueryThreePIDsForLocalpartRequest struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
 type QueryThreePIDsForLocalpartResponse struct {
@@ -644,13 +639,13 @@ type PerformForgetThreePIDRequest QueryLocalpartForThreePIDRequest
 type PerformSaveThreePIDAssociationRequest struct {
 	ThreePID   string
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 	Medium     string
 }
 
 type QueryAccountByLocalpartRequest struct {
 	Localpart  string
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
 type QueryAccountByLocalpartResponse struct {
@@ -660,17 +655,17 @@ type QueryAccountByLocalpartResponse struct {
 // API functions required by the clientapi
 type ClientKeyAPI interface {
 	UploadDeviceKeysAPI
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse) error
 
-	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse) error
+	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 	PerformMarkAsStaleIfNeeded(ctx context.Context, req *PerformMarkAsStaleRequest, res *struct{}) error
 }
 
 type UploadDeviceKeysAPI interface {
-	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse) error
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
 }
 
 // API functions required by the syncapi
@@ -682,10 +677,10 @@ type SyncKeyAPI interface {
 
 type FederationKeyAPI interface {
 	UploadDeviceKeysAPI
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
-	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse) error
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse) error
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -960,6 +955,6 @@ type QuerySignaturesResponse struct {
 
 type PerformMarkAsStaleRequest struct {
 	UserID   string
-	Domain   gomatrixserverlib.ServerName
+	Domain   spec.ServerName
 	DeviceID string
 }

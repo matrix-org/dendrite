@@ -24,8 +24,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +34,7 @@ const (
 	FailuresUntilBlacklist      = 8
 )
 
-func (t *testFedClient) QueryKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string) (fclient.RespQueryKeys, error) {
+func (t *testFedClient) QueryKeys(ctx context.Context, origin, s spec.ServerName, keys map[string][]string) (fclient.RespQueryKeys, error) {
 	t.queryKeysCalled = true
 	if t.shouldFail {
 		return fclient.RespQueryKeys{}, fmt.Errorf("Failure")
@@ -42,7 +42,7 @@ func (t *testFedClient) QueryKeys(ctx context.Context, origin, s gomatrixserverl
 	return fclient.RespQueryKeys{}, nil
 }
 
-func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (fclient.RespClaimKeys, error) {
+func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s spec.ServerName, oneTimeKeys map[string]map[string]string) (fclient.RespClaimKeys, error) {
 	t.claimKeysCalled = true
 	if t.shouldFail {
 		return fclient.RespClaimKeys{}, fmt.Errorf("Failure")

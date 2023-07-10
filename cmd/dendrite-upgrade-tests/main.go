@@ -72,7 +72,7 @@ RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
 # Replace the connection string with a single postgres DB, using user/db = 'postgres' and no password
-RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml 
+RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml
 # No password when connecting over localhost
 RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/11/main/pg_hba.conf
 # Bump up max conns for moar concurrency
@@ -119,7 +119,7 @@ RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key
 
 # Make sure the SQLite databases are in a persistent location, we're already mapping
 # the postgresql folder so let's just use that for simplicity
-RUN sed -i "s%connection_string:.file:%connection_string: file:\/var\/lib\/postgresql\/11\/main\/%g" dendrite.yaml 
+RUN sed -i "s%connection_string:.file:%connection_string: file:\/var\/lib\/postgresql\/11\/main\/%g" dendrite.yaml
 
 # This entry script starts postgres, waits for it to be up then starts dendrite
 RUN echo '\

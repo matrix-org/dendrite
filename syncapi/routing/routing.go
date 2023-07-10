@@ -18,10 +18,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -96,7 +95,7 @@ func Setup(
 	}, httputil.WithAllowGuests())).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomId}/context/{eventId}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("context", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -112,7 +111,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("relations", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -126,7 +125,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("relation_type", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -140,7 +139,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}/{eventType}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("relation_type_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -158,18 +157,21 @@ func Setup(
 			if !cfg.Fulltext.Enabled {
 				return util.JSONResponse{
 					Code: http.StatusNotImplemented,
-					JSON: jsonerror.Unknown("Search has been disabled by the server administrator."),
+					JSON: spec.Unknown("Search has been disabled by the server administrator."),
 				}
 			}
 			var nextBatch *string
 			if err := req.ParseForm(); err != nil {
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if req.Form.Has("next_batch") {
 				nb := req.FormValue("next_batch")
 				nextBatch = &nb
 			}
-			return Search(req, device, syncDB, fts, nextBatch)
+			return Search(req, device, syncDB, fts, nextBatch, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -201,7 +203,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			at := req.URL.Query().Get("at")
-			membership := gomatrixserverlib.Join
+			membership := spec.Join
 			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, true, &membership, nil, at)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)

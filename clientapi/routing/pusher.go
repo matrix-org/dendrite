@@ -19,9 +19,9 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -34,7 +34,10 @@ func GetPushers(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	err = userAPI.QueryPushers(req.Context(), &userapi.QueryPushersRequest{
 		Localpart:  localpart,
@@ -42,7 +45,10 @@ func GetPushers(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryPushers failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	for i := range queryRes.Pushers {
 		queryRes.Pushers[i].SessionID = 0
@@ -63,7 +69,10 @@ func SetPusher(
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	body := userapi.PerformPusherSetRequest{}
 	if resErr := httputil.UnmarshalJSONRequest(req, &body); resErr != nil {
@@ -99,7 +108,10 @@ func SetPusher(
 	err = userAPI.PerformPusherSet(req.Context(), &body, &struct{}{})
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformPusherSet failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -111,6 +123,6 @@ func SetPusher(
 func invalidParam(msg string) util.JSONResponse {
 	return util.JSONResponse{
 		Code: http.StatusBadRequest,
-		JSON: jsonerror.InvalidParam(msg),
+		JSON: spec.InvalidParam(msg),
 	}
 }

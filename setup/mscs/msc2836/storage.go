@@ -8,21 +8,22 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 type eventInfo struct {
 	EventID        string
-	OriginServerTS gomatrixserverlib.Timestamp
+	OriginServerTS spec.Timestamp
 	RoomID         string
 }
 
 type Database interface {
 	// StoreRelation stores the parent->child and child->parent relationship for later querying.
 	// Also stores the event metadata e.g timestamp
-	StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error
+	StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error
 	// ChildrenForParent returns the events who have the given `eventID` as an m.relationship with the
 	// provided `relType`. The returned slice is sorted by origin_server_ts according to whether
 	// `recentFirst` is true or false.
@@ -34,7 +35,7 @@ type Database interface {
 	// UpdateChildMetadata persists the children_count and children_hash from this event if and only if
 	// the count is greater than what was previously there. If the count is updated, the event will be
 	// updated to be unexplored.
-	UpdateChildMetadata(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error
+	UpdateChildMetadata(ctx context.Context, ev *types.HeaderedEvent) error
 	// ChildMetadata returns the children_count and children_hash for the event ID in question.
 	// Also returns the `explored` flag, which is set to true when MarkChildrenExplored is called and is set
 	// back to `false` when a larger count is inserted via UpdateChildMetadata.
@@ -221,7 +222,7 @@ func newSQLiteDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOption
 	return &d, nil
 }
 
-func (p *DB) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
+func (p *DB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 	parent, child, relType := parentChildEventIDs(ev)
 	if parent == "" || child == "" {
 		return nil
@@ -243,7 +244,7 @@ func (p *DB) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEv
 	})
 }
 
-func (p *DB) UpdateChildMetadata(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
+func (p *DB) UpdateChildMetadata(ctx context.Context, ev *types.HeaderedEvent) error {
 	eventCount, eventHash := extractChildMetadata(ev)
 	if eventCount == 0 {
 		return nil // nothing to update with
@@ -314,7 +315,7 @@ func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*even
 	return &ei, nil
 }
 
-func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent, child, relType string) {
+func parentChildEventIDs(ev *types.HeaderedEvent) (parent, child, relType string) {
 	if ev == nil {
 		return
 	}
@@ -333,7 +334,7 @@ func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent, child, re
 	return body.Relationship.EventID, ev.EventID(), body.Relationship.RelType
 }
 
-func roomIDAndServers(ev *gomatrixserverlib.HeaderedEvent) (roomID string, servers []string) {
+func roomIDAndServers(ev *types.HeaderedEvent) (roomID string, servers []string) {
 	servers = []string{}
 	if ev == nil {
 		return
@@ -348,10 +349,10 @@ func roomIDAndServers(ev *gomatrixserverlib.HeaderedEvent) (roomID string, serve
 	return body.RoomID, body.Servers
 }
 
-func extractChildMetadata(ev *gomatrixserverlib.HeaderedEvent) (count int, hash []byte) {
+func extractChildMetadata(ev *types.HeaderedEvent) (count int, hash []byte) {
 	unsigned := struct {
-		Counts map[string]int                `json:"children"`
-		Hash   gomatrixserverlib.Base64Bytes `json:"children_hash"`
+		Counts map[string]int   `json:"children"`
+		Hash   spec.Base64Bytes `json:"children_hash"`
 	}{}
 	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err != nil {
 		// expected if there is no unsigned field at all

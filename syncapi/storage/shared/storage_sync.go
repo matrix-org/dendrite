@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -83,7 +85,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForNotificationData(ctx context.C
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilterPart, excludeEventIDs)
 }
 
@@ -98,11 +100,11 @@ func (d *DatabaseTransaction) MembershipCount(ctx context.Context, roomID, membe
 func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID string) (*types.Summary, error) {
 	summary := &types.Summary{Heroes: []string{}}
 
-	joinCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, gomatrixserverlib.Join)
+	joinCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, spec.Join)
 	if err != nil {
 		return summary, err
 	}
-	inviteCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, gomatrixserverlib.Invite)
+	inviteCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, spec.Invite)
 	if err != nil {
 		return summary, err
 	}
@@ -111,7 +113,7 @@ func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID
 
 	// Get the room name and canonical alias, if any
 	filter := synctypes.DefaultStateFilter()
-	filterTypes := []string{gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias}
+	filterTypes := []string{spec.MRoomName, spec.MRoomCanonicalAlias}
 	filterRooms := []string{roomID}
 
 	filter.Types = &filterTypes
@@ -123,11 +125,11 @@ func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID
 
 	for _, ev := range evs {
 		switch ev.Type() {
-		case gomatrixserverlib.MRoomName:
+		case spec.MRoomName:
 			if gjson.GetBytes(ev.Content(), "name").Str != "" {
 				return summary, nil
 			}
-		case gomatrixserverlib.MRoomCanonicalAlias:
+		case spec.MRoomCanonicalAlias:
 			if gjson.GetBytes(ev.Content(), "alias").Str != "" {
 				return summary, nil
 			}
@@ -135,14 +137,14 @@ func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID
 	}
 
 	// If there's no room name or canonical alias, get the room heroes, excluding the user
-	heroes, err := d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{gomatrixserverlib.Join, gomatrixserverlib.Invite})
+	heroes, err := d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{spec.Join, spec.Invite})
 	if err != nil {
 		return summary, err
 	}
 
 	// "When no joined or invited members are available, this should consist of the banned and left users"
 	if len(heroes) == 0 {
-		heroes, err = d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{gomatrixserverlib.Leave, gomatrixserverlib.Ban})
+		heroes, err = d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{spec.Leave, spec.Ban})
 		if err != nil {
 			return summary, err
 		}
@@ -160,7 +162,7 @@ func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID st
 	return d.Topology.SelectPositionInTopology(ctx, d.txn, eventID)
 }
 
-func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
+func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*rstypes.HeaderedEvent, map[string]*rstypes.HeaderedEvent, types.StreamPosition, error) {
 	return d.Invites.SelectInviteEventsInRange(ctx, d.txn, targetUserID, r)
 }
 
@@ -177,7 +179,7 @@ func (d *DatabaseTransaction) RoomReceiptsAfter(ctx context.Context, roomIDs []s
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	streamEvents, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
@@ -185,7 +187,7 @@ func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
 }
 
 func (d *DatabaseTransaction) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
@@ -206,13 +208,13 @@ func (d *DatabaseTransaction) SharedUsers(ctx context.Context, userID string, ot
 
 func (d *DatabaseTransaction) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*rstypes.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectStateEvent(ctx, d.txn, roomID, evType, stateKey)
 }
 
 func (d *DatabaseTransaction) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *synctypes.StateFilter,
-) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
+) (stateEvents []*rstypes.HeaderedEvent, err error) {
 	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilter, nil)
 	return
 }
@@ -301,7 +303,7 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 // oldest event in the room's topology.
 func (d *DatabaseTransaction) GetBackwardTopologyPos(
 	ctx context.Context,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*rstypes.HeaderedEvent,
 ) (types.TopologyToken, error) {
 	zeroToken := types.TopologyToken{}
 	if len(events) == 0 {
@@ -324,7 +326,7 @@ func (d *DatabaseTransaction) GetBackwardTopologyPos(
 func (d *DatabaseTransaction) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
-	stateFilter *synctypes.StateFilter,
+	stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI,
 ) (deltas []types.StateDelta, joinedRoomsIDs []string, err error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -349,7 +351,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	joinedRoomIDs := make([]string, 0, len(memberships))
 	for roomID, membership := range memberships {
 		allRoomIDs = append(allRoomIDs, roomID)
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			joinedRoomIDs = append(joinedRoomIDs, roomID)
 		}
 	}
@@ -415,8 +417,8 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		}
 		if !peek.Deleted {
 			deltas = append(deltas, types.StateDelta{
-				Membership:  gomatrixserverlib.Peek,
-				StateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
+				Membership:  spec.Peek,
+				StateEvents: d.StreamEventsToEvents(ctx, device, state[peek.RoomID], rsAPI),
 				RoomID:      peek.RoomID,
 			})
 		}
@@ -428,12 +430,12 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		for _, ev := range stateStreamEvents {
 			// Look for our membership in the state events and skip over any
 			// membership events that are not related to us.
-			membership, prevMembership := getMembershipFromEvent(ev.Event, userID)
+			membership, prevMembership := getMembershipFromEvent(ctx, ev.PDU, userID, rsAPI)
 			if membership == "" {
 				continue
 			}
 
-			if membership == gomatrixserverlib.Join {
+			if membership == spec.Join {
 				// If our membership is now join but the previous membership wasn't
 				// then this is a "join transition", so we'll insert this room.
 				if prevMembership != membership {
@@ -461,7 +463,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 			deltas = append(deltas, types.StateDelta{
 				Membership:    membership,
 				MembershipPos: ev.StreamPosition,
-				StateEvents:   d.StreamEventsToEvents(device, stateFiltered[roomID]),
+				StateEvents:   d.StreamEventsToEvents(ctx, device, stateFiltered[roomID], rsAPI),
 				RoomID:        roomID,
 			})
 			break
@@ -472,8 +474,8 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	// join transitions above.
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
-			Membership:  gomatrixserverlib.Join,
-			StateEvents: d.StreamEventsToEvents(device, stateFiltered[joinedRoomID]),
+			Membership:  spec.Join,
+			StateEvents: d.StreamEventsToEvents(ctx, device, stateFiltered[joinedRoomID], rsAPI),
 			RoomID:      joinedRoomID,
 			NewlyJoined: newlyJoinedRooms[joinedRoomID],
 		})
@@ -489,7 +491,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
-	stateFilter *synctypes.StateFilter,
+	stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI,
 ) ([]types.StateDelta, []string, error) {
 	// Look up all memberships for the user. We only care about rooms that a
 	// user has ever interacted with — joined to, kicked/banned from, left.
@@ -505,7 +507,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	joinedRoomIDs := make([]string, 0, len(memberships))
 	for roomID, membership := range memberships {
 		allRoomIDs = append(allRoomIDs, roomID)
-		if membership == gomatrixserverlib.Join {
+		if membership == spec.Join {
 			joinedRoomIDs = append(joinedRoomIDs, roomID)
 		}
 	}
@@ -529,8 +531,8 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 				return nil, nil, stateErr
 			}
 			deltas[peek.RoomID] = types.StateDelta{
-				Membership:  gomatrixserverlib.Peek,
-				StateEvents: d.StreamEventsToEvents(device, s),
+				Membership:  spec.Peek,
+				StateEvents: d.StreamEventsToEvents(ctx, device, s, rsAPI),
 				RoomID:      peek.RoomID,
 			}
 		}
@@ -554,12 +556,12 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership, _ := getMembershipFromEvent(ev.Event, userID); membership != "" {
-				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
+			if membership, _ := getMembershipFromEvent(ctx, ev.PDU, userID, rsAPI); membership != "" {
+				if membership != spec.Join { // We've already added full state for all joined rooms above.
 					deltas[roomID] = types.StateDelta{
 						Membership:    membership,
 						MembershipPos: ev.StreamPosition,
-						StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
+						StateEvents:   d.StreamEventsToEvents(ctx, device, stateStreamEvents, rsAPI),
 						RoomID:        roomID,
 					}
 				}
@@ -579,8 +581,8 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 			return nil, nil, stateErr
 		}
 		deltas[joinedRoomID] = types.StateDelta{
-			Membership:  gomatrixserverlib.Join,
-			StateEvents: d.StreamEventsToEvents(device, s),
+			Membership:  spec.Join,
+			StateEvents: d.StreamEventsToEvents(ctx, device, s, rsAPI),
 			RoomID:      joinedRoomID,
 		}
 	}
@@ -636,7 +638,7 @@ func (d *DatabaseTransaction) GetRoomReceipts(ctx context.Context, roomIDs []str
 func (d *DatabaseTransaction) GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, rooms map[string]string) (map[string]*eventutil.NotificationData, error) {
 	roomIDs := make([]string, 0, len(rooms))
 	for roomID, membership := range rooms {
-		if membership != gomatrixserverlib.Join {
+		if membership != spec.Join {
 			continue
 		}
 		roomIDs = append(roomIDs, roomID)

@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var crossSigningSigsSchema = `
@@ -94,12 +95,12 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 	for rows.Next() {
 		var userID string
 		var keyID gomatrixserverlib.KeyID
-		var signature gomatrixserverlib.Base64Bytes
+		var signature spec.Base64Bytes
 		if err := rows.Scan(&userID, &keyID, &signature); err != nil {
 			return nil, err
 		}
 		if _, ok := r[userID]; !ok {
-			r[userID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+			r[userID] = map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 		}
 		r[userID][keyID] = signature
 	}
@@ -110,7 +111,7 @@ func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
 	ctx context.Context, txn *sql.Tx,
 	originUserID string, originKeyID gomatrixserverlib.KeyID,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
-	signature gomatrixserverlib.Base64Bytes,
+	signature spec.Base64Bytes,
 ) error {
 	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningSigsForTargetStmt).ExecContext(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
 		return fmt.Errorf("s.upsertCrossSigningSigsForTargetStmt: %w", err)

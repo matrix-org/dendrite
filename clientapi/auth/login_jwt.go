@@ -8,8 +8,8 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -41,7 +41,7 @@ func (t *LoginTypeTokenJwt) LoginFromJSON(ctx context.Context, reqBytes []byte) 
 	if r.Token == "" {
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Token field for JWT is missing"),
+			JSON: spec.Forbidden("Token field for JWT is missing"),
 		}
 	}
 	c := &Claims{}
@@ -56,14 +56,14 @@ func (t *LoginTypeTokenJwt) LoginFromJSON(ctx context.Context, reqBytes []byte) 
 		util.GetLogger(ctx).WithError(err).Error("jwt.ParseWithClaims failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Couldn't parse JWT"),
+			JSON: spec.Forbidden("Couldn't parse JWT"),
 		}
 	}
 
 	if !token.Valid {
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Invalid JWT"),
+			JSON: spec.Forbidden("Invalid JWT"),
 		}
 	}
 

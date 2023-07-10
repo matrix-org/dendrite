@@ -23,13 +23,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -57,7 +56,7 @@ type filter struct {
 func GetPostPublicRooms(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var request PublicRoomReq
@@ -68,11 +67,11 @@ func GetPostPublicRooms(
 	if request.IncludeAllNetworks && request.NetworkID != "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
+			JSON: spec.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
 		}
 	}
 
-	serverName := gomatrixserverlib.ServerName(request.Server)
+	serverName := spec.ServerName(request.Server)
 	if serverName != "" && !cfg.Matrix.IsLocalServerName(serverName) {
 		res, err := federation.GetPublicRoomsFiltered(
 			req.Context(), cfg.Matrix.ServerName, serverName,
@@ -82,7 +81,10 @@ func GetPostPublicRooms(
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -93,7 +95,10 @@ func GetPostPublicRooms(
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -173,7 +178,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 	if httpReq.Method != "GET" && httpReq.Method != "POST" {
 		return &util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
+			JSON: spec.NotFound("Bad method"),
 		}
 	}
 	if httpReq.Method == "GET" {
@@ -184,7 +189,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON("limit param is not a number"),
+				JSON: spec.BadJSON("limit param is not a number"),
 			}
 		}
 		request.Limit = int64(limit)

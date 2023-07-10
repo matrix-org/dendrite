@@ -23,7 +23,9 @@ import (
 
 	"github.com/tidwall/gjson"
 
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -93,7 +95,7 @@ func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransac
 	}, nil
 }
 
-func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
@@ -101,14 +103,55 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
+}
+
+func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Device, in []types.StreamEvent, rsAPI api.SyncRoomserverAPI) []*rstypes.HeaderedEvent {
+	out := make([]*rstypes.HeaderedEvent, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i].HeaderedEvent
+		if device != nil && in[i].TransactionID != nil {
+			userID, err := spec.NewUserID(device.UserID, true)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			roomID, err := spec.NewRoomID(in[i].RoomID())
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Room ID is invalid")
+				continue
+			}
+			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			if deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
+				err := out[i].SetUnsignedField(
+					"transaction_id", in[i].TransactionID.TransactionID,
+				)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"event_id": out[i].EventID(),
+					}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}
+			}
+		}
+	}
+	return out
 }
 
 // AddInviteEvent stores a new invite event for a user.
 // If the invite was successfully stored this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.
 func (d *Database) AddInviteEvent(
-	ctx context.Context, inviteEvent *gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, inviteEvent *rstypes.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
@@ -192,31 +235,11 @@ func (d *Database) UpsertAccountData(
 	return
 }
 
-func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent {
-	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
-	for i := 0; i < len(in); i++ {
-		out[i] = in[i].HeaderedEvent
-		if device != nil && in[i].TransactionID != nil {
-			if device.UserID == in[i].Sender() && device.SessionID == in[i].TransactionID.SessionID {
-				err := out[i].SetUnsignedField(
-					"transaction_id", in[i].TransactionID.TransactionID,
-				)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						"event_id": out[i].EventID(),
-					}).WithError(err).Warnf("Failed to add transaction ID to event")
-				}
-			}
-		}
-	}
-	return out
-}
-
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 // This function should always be called within a sqlutil.Writer for safety in SQLite.
-func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
+func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *rstypes.HeaderedEvent) error {
 	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
 	}
@@ -249,8 +272,8 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 func (d *Database) WriteEvent(
 	ctx context.Context,
-	ev *gomatrixserverlib.HeaderedEvent,
-	addStateEvents []*gomatrixserverlib.HeaderedEvent,
+	ev *rstypes.HeaderedEvent,
+	addStateEvents []*rstypes.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 	historyVisibility gomatrixserverlib.HistoryVisibility,
@@ -291,7 +314,7 @@ func (d *Database) WriteEvent(
 func (d *Database) updateRoomState(
 	ctx context.Context, txn *sql.Tx,
 	removedEventIDs []string,
-	addedEvents []*gomatrixserverlib.HeaderedEvent,
+	addedEvents []*rstypes.HeaderedEvent,
 	pduPosition types.StreamPosition,
 	topoPosition types.StreamPosition,
 ) error {
@@ -352,7 +375,7 @@ func (d *Database) PutFilter(
 	return filterID, err
 }
 
-func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error {
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error {
 	redactedEvents, err := d.Events(ctx, []string{redactedEventID})
 	if err != nil {
 		return err
@@ -361,13 +384,13 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
-	eventToRedact := redactedEvents[0].Unwrap()
-	redactionEvent := redactedBecause.Unwrap()
-	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
+	eventToRedact := redactedEvents[0].PDU
+	redactionEvent := redactedBecause.PDU
+	if err = eventutil.RedactEvent(ctx, redactionEvent, eventToRedact, querier); err != nil {
 		return err
 	}
 
-	newEvent := eventToRedact.Headered(redactedBecause.RoomVersion)
+	newEvent := &rstypes.HeaderedEvent{PDU: eventToRedact}
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.OutputEvents.UpdateEventJSON(ctx, txn, newEvent)
 	})
@@ -502,8 +525,24 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) (string, string) {
-	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
+func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userID string, rsAPI api.SyncRoomserverAPI) (string, string) {
+	if ev.StateKey() == nil || *ev.StateKey() == "" {
+		return "", ""
+	}
+	fullUser, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return "", ""
+	}
+	roomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return "", ""
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *fullUser)
+	if err != nil {
+		return "", ""
+	}
+
+	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(string(senderID)) {
 		return "", ""
 	}
 	membership, err := ev.Membership()
@@ -515,7 +554,7 @@ func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) (string,
 }
 
 // StoreReceipt stores user receipts
-func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
+func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		pos, err = d.Receipts.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId, timestamp)
 		return err
@@ -531,14 +570,14 @@ func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userI
 	return
 }
 
-func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, rstypes.HeaderedEvent, error) {
 	return d.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
 }
 
-func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) ([]*rstypes.HeaderedEvent, error) {
 	return d.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
 }
-func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) (int, []*rstypes.HeaderedEvent, error) {
 	return d.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
 
@@ -552,7 +591,7 @@ func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, igno
 	})
 }
 
-func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS spec.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	var pos types.StreamPosition
 	var err error
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -570,17 +609,17 @@ func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID s
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
 
-func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]rstypes.HeaderedEvent, error) {
 	return d.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
-		gomatrixserverlib.MRoomName,
-		gomatrixserverlib.MRoomTopic,
+		spec.MRoomName,
+		spec.MRoomTopic,
 		"m.room.message",
 	})
 }
 
-func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedEvent) error {
 	// No need to unmarshal if the event is a redaction
-	if event.Type() == gomatrixserverlib.MRoomRedaction {
+	if event.Type() == spec.MRoomRedaction {
 		return nil
 	}
 	var content gomatrixserverlib.RelationContent
@@ -635,7 +674,7 @@ func (s *Database) UpdateLastActive(ctx context.Context, userId string, lastActi
 	return s.Presence.UpdateLastActive(ctx, userId, lastActiveTs)
 }
 
-func (d *Database) UpdateMultiRoomVisibility(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (d *Database) UpdateMultiRoomVisibility(ctx context.Context, event *rstypes.HeaderedEvent) error {
 	var mrdEv mrd.StateEvent
 	err := json.Unmarshal(event.Content(), &mrdEv)
 	if err != nil {
@@ -643,7 +682,7 @@ func (d *Database) UpdateMultiRoomVisibility(ctx context.Context, event *gomatri
 	}
 	if mrdEv.Hidden {
 		err = d.MultiRoomQ.DeleteMultiRoomVisibility(ctx, mrd.DeleteMultiRoomVisibilityParams{
-			UserID: event.Sender(),
+			UserID: string(event.SenderID()),
 			Type:   event.Type(),
 			RoomID: event.RoomID(),
 		})
@@ -653,7 +692,7 @@ func (d *Database) UpdateMultiRoomVisibility(ctx context.Context, event *gomatri
 	}
 	if mrdEv.ExpireTs > 0 {
 		err = d.MultiRoomQ.InsertMultiRoomVisibility(ctx, mrd.InsertMultiRoomVisibilityParams{
-			UserID:   event.Sender(),
+			UserID:   string(event.SenderID()),
 			Type:     event.Type(),
 			RoomID:   event.RoomID(),
 			ExpireTs: mrdEv.ExpireTs,

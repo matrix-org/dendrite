@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type TypingStreamProvider struct {
@@ -33,7 +32,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 ) types.StreamPosition {
 	var err error
 	for roomID, membership := range req.Rooms {
-		if membership != gomatrixserverlib.Join {
+		if membership != spec.Join {
 			continue
 		}
 
@@ -53,7 +52,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 				}
 			}
 			ev := synctypes.ClientEvent{
-				Type: gomatrixserverlib.MTyping,
+				Type: spec.MTyping,
 			}
 			ev.Content, err = json.Marshal(map[string]interface{}{
 				"user_ids": typingUsers,

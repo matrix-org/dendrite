@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -136,15 +137,6 @@ FROM room_ids,
               ) AS x
 `
 
-const selectEarlyEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
-	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
-	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
-	" ORDER BY id ASC LIMIT $8"
-
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
@@ -206,7 +198,6 @@ type outputRoomEventsStatements struct {
 	selectMaxEventIDStmt           *sql.Stmt
 	selectRecentEventsStmt         *sql.Stmt
 	selectRecentEventsForSyncStmt  *sql.Stmt
-	selectEarlyEventsStmt          *sql.Stmt
 	selectStateInRangeFilteredStmt *sql.Stmt
 	selectStateInRangeStmt         *sql.Stmt
 	updateEventJSONStmt            *sql.Stmt
@@ -262,7 +253,6 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectMaxEventIDStmt, selectMaxEventIDSQL},
 		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
 		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
-		{&s.selectEarlyEventsStmt, selectEarlyEventsSQL},
 		{&s.selectStateInRangeFilteredStmt, selectStateInRangeFilteredSQL},
 		{&s.selectStateInRangeStmt, selectStateInRangeSQL},
 		{&s.updateEventJSONStmt, updateEventJSONSQL},
@@ -275,7 +265,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	}.Prepare(db)
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
@@ -340,8 +330,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		}
 
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
 		needSet := stateNeeded[ev.RoomID()]
@@ -386,7 +376,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 // of the inserted event.
 func (s *outputRoomEventsStatements) InsertEvent(
 	ctx context.Context, txn *sql.Tx,
-	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
+	event *rstypes.HeaderedEvent, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (streamPos types.StreamPosition, err error) {
 	var txnID *string
@@ -417,7 +407,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		event.EventID(),
 		headeredJSON,
 		event.Type(),
-		event.Sender(),
+		event.UserID.String(),
 		containsURL,
 		pq.StringArray(addState),
 		pq.StringArray(removeState),
@@ -476,8 +466,8 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 
@@ -528,39 +518,6 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		}
 	}
 	return result, rows.Err()
-}
-
-// selectEarlyEvents returns the earliest events in the given room, starting
-// from a given position, up to a maximum of 'limit'.
-func (s *outputRoomEventsStatements) SelectEarlyEvents(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *synctypes.RoomEventFilter,
-) ([]types.StreamEvent, error) {
-	senders, notSenders := getSendersRoomEventFilter(eventFilter)
-	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(
-		ctx, roomID, r.Low(), r.High(),
-		pq.StringArray(senders),
-		pq.StringArray(notSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
-		eventFilter.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
-	if err != nil {
-		return nil, err
-	}
-	// The events need to be returned from oldest to latest, which isn't
-	// necessarily the way the SQL query returns them, so a sort is necessary to
-	// ensure the events are in the right order in the slice.
-	sort.SliceStable(events, func(i int, j int) bool {
-		return events[i].StreamPosition < events[j].StreamPosition
-	})
-	return events, nil
 }
 
 // selectEvents returns the events for the given event IDs. If an event is
@@ -621,7 +578,7 @@ func (s *outputRoomEventsStatements) DeleteEventsForRoom(
 	return err
 }
 
-func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (id int, evt gomatrixserverlib.HeaderedEvent, err error) {
+func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (id int, evt rstypes.HeaderedEvent, err error) {
 	row := sqlutil.TxStmt(txn, s.selectContextEventStmt).QueryRowContext(ctx, roomID, eventID)
 
 	var eventAsString string
@@ -639,7 +596,7 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 
 func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter,
-) (evts []*gomatrixserverlib.HeaderedEvent, err error) {
+) (evts []*rstypes.HeaderedEvent, err error) {
 	senders, notSenders := getSendersRoomEventFilter(filter)
 	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(
 		ctx, roomID, id, filter.Limit,
@@ -656,7 +613,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 	for rows.Next() {
 		var (
 			eventBytes        []byte
-			evt               *gomatrixserverlib.HeaderedEvent
+			evt               *rstypes.HeaderedEvent
 			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&eventBytes, &historyVisibility); err != nil {
@@ -674,7 +631,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 
 func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter,
-) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
+) (lastID int, evts []*rstypes.HeaderedEvent, err error) {
 	senders, notSenders := getSendersRoomEventFilter(filter)
 	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(
 		ctx, roomID, id, filter.Limit,
@@ -691,7 +648,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	for rows.Next() {
 		var (
 			eventBytes        []byte
-			evt               *gomatrixserverlib.HeaderedEvent
+			evt               *rstypes.HeaderedEvent
 			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&lastID, &eventBytes, &historyVisibility); err != nil {
@@ -724,8 +681,8 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 
@@ -753,7 +710,7 @@ func (s *outputRoomEventsStatements) PurgeEvents(
 	return err
 }
 
-func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]rstypes.HeaderedEvent, error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, afterID, pq.StringArray(types), limit)
 	if err != nil {
 		return nil, err
@@ -762,14 +719,14 @@ func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, l
 
 	var eventID string
 	var id int64
-	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	result := make(map[int64]rstypes.HeaderedEvent)
 	for rows.Next() {
-		var ev gomatrixserverlib.HeaderedEvent
+		var ev rstypes.HeaderedEvent
 		var eventBytes []byte
 		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
 			return nil, err
 		}
-		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		if err = json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result[id] = ev

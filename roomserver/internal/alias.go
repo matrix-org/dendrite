@@ -25,7 +25,9 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -111,17 +113,14 @@ func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 	return nil
 }
 
+// nolint:gocyclo
 // RemoveRoomAlias implements alias.RoomserverInternalAPI
+// nolint: gocyclo
 func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	_, virtualHost, err := r.Cfg.Global.SplitLocalID('@', request.UserID)
-	if err != nil {
-		return err
-	}
-
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
@@ -132,17 +131,28 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return nil
 	}
 
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+
+	sender, err := r.QueryUserIDForSender(ctx, *validRoomID, request.SenderID)
+	if err != nil || sender == nil {
+		return fmt.Errorf("r.QueryUserIDForSender: %w", err)
+	}
+	virtualHost := sender.Domain()
+
 	response.Found = true
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetCreatorIDForAlias: %w", err)
 	}
 
-	if creatorID != request.UserID {
-		var plEvent *gomatrixserverlib.HeaderedEvent
+	if spec.SenderID(creatorID) != request.SenderID {
+		var plEvent *types.HeaderedEvent
 		var pls *gomatrixserverlib.PowerLevelContent
 
-		plEvent, err = r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
+		plEvent, err = r.DB.GetStateEvent(ctx, roomID, spec.MRoomPowerLevels, "")
 		if err != nil {
 			return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 		}
@@ -152,13 +162,13 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			return fmt.Errorf("plEvent.PowerLevels: %w", err)
 		}
 
-		if pls.UserLevel(request.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+		if pls.UserLevel(request.SenderID) < pls.EventLevel(spec.MRoomCanonicalAlias, true) {
 			response.Removed = false
 			return nil
 		}
 	}
 
-	ev, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomCanonicalAlias, "")
+	ev, err := r.DB.GetStateEvent(ctx, roomID, spec.MRoomCanonicalAlias, "")
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	} else if ev != nil {
@@ -170,30 +180,33 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			sender := request.UserID
-			if request.UserID != ev.Sender() {
-				sender = ev.Sender()
+			senderID := request.SenderID
+			if request.SenderID != ev.SenderID() {
+				senderID = ev.SenderID()
+			}
+			sender, err := r.QueryUserIDForSender(ctx, *validRoomID, senderID)
+			if err != nil || sender == nil {
+				return err
 			}
 
-			_, senderDomain, err := r.Cfg.Global.SplitLocalID('@', sender)
+			validRoomID, err := spec.NewRoomID(roomID)
+			if err != nil {
+				return err
+			}
+			identity, err := r.SigningIdentityFor(ctx, *validRoomID, *sender)
 			if err != nil {
 				return err
 			}
 
-			identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
-			if err != nil {
-				return err
-			}
-
-			builder := &gomatrixserverlib.EventBuilder{
-				Sender:   sender,
+			proto := &gomatrixserverlib.ProtoEvent{
+				SenderID: string(senderID),
 				RoomID:   ev.RoomID(),
 				Type:     ev.Type(),
 				StateKey: ev.StateKey(),
 				Content:  res,
 			}
 
-			eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+			eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
 			if err != nil {
 				return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 			}
@@ -202,16 +215,16 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			stateRes := &api.QueryLatestEventsAndStateResponse{}
-			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
+			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, r, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
 				return err
 			}
 
-			newEvent, err := eventutil.BuildEvent(ctx, builder, &r.Cfg.Global, identity, time.Now(), &eventsNeeded, stateRes)
+			newEvent, err := eventutil.BuildEvent(ctx, proto, &identity, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}
 
-			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r, api.KindNew, []*types.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}

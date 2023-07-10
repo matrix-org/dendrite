@@ -49,11 +49,10 @@ func AddPublicRoutes(
 	dendriteConfig *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.FederationUserAPI,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fedAPI federationAPI.FederationInternalAPI,
-	servers federationAPI.ServersInRoomProvider,
 	enableMetrics bool,
 ) {
 	cfg := &dendriteConfig.FederationAPI
@@ -87,7 +86,7 @@ func AddPublicRoutes(
 		dendriteConfig,
 		rsAPI, f, keyRing,
 		federation, userAPI, mscCfg,
-		servers, producer, enableMetrics,
+		producer, enableMetrics,
 	)
 }
 
@@ -98,7 +97,7 @@ func NewInternalAPI(
 	dendriteCfg *config.Dendrite,
 	cm sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
-	federation api.FederationClient,
+	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *caching.Caches,
 	keyRing *gomatrixserverlib.KeyRing,

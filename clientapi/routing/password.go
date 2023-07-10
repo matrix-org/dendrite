@@ -7,12 +7,12 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -62,7 +62,7 @@ func Password(
 		sessionID = util.RandomString(sessionIDLength)
 	}
 	var localpart string
-	var domain gomatrixserverlib.ServerName
+	var domain spec.ServerName
 	switch r.Auth.Type {
 	case authtypes.LoginTypePassword:
 		// Check if the existing password is correct.
@@ -78,7 +78,10 @@ func Password(
 		localpart, domain, err = gomatrixserverlib.SplitID('@', device.UserID)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 	case authtypes.LoginTypeEmail:
@@ -91,12 +94,15 @@ func Password(
 		bound, threePid.Address, threePid.Medium, err = threepid.CheckAssociation(req.Context(), r.Auth.ThreePidCreds, cfg, nil)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if !bound {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.MatrixError{
+				JSON: spec.MatrixError{
 					ErrCode: "M_THREEPID_AUTH_FAILED",
 					Err:     "Failed to auth 3pid",
 				},
@@ -109,12 +115,15 @@ func Password(
 		}, &res)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryLocalpartForThreePID failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if res.Localpart == "" {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.MatrixError{
+				JSON: spec.MatrixError{
 					ErrCode: "M_THREEPID_NOT_FOUND",
 					Err:     "3pid is not bound to any account",
 				},
@@ -161,11 +170,17 @@ func Password(
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !passwordRes.PasswordUpdated {
 		util.GetLogger(req.Context()).Error("Expected password to have been updated but wasn't")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// If the request asks us to log out all other devices then
@@ -191,7 +206,10 @@ func Password(
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		pushersReq := &api.PerformPusherDeletionRequest{
@@ -201,7 +219,10 @@ func Password(
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 

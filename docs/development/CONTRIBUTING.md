@@ -1,6 +1,7 @@
 ---
 title: Contributing
 parent: Development
+nav_order: 1
 permalink: /development/contributing
 ---
 

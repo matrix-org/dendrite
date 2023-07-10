@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const (
@@ -45,7 +46,7 @@ var KeyTypeIntToPurpose = map[int16]fclient.CrossSigningKeyPurpose{
 }
 
 // Map of purpose -> public key
-type CrossSigningKeyMap map[fclient.CrossSigningKeyPurpose]gomatrixserverlib.Base64Bytes
+type CrossSigningKeyMap map[fclient.CrossSigningKeyPurpose]spec.Base64Bytes
 
 // Map of user ID -> key ID -> signature
-type CrossSigningSigMap map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes
+type CrossSigningSigMap map[string]map[gomatrixserverlib.KeyID]spec.Base64Bytes

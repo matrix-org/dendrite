@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
@@ -37,7 +38,7 @@ type SigningKeyUpdateConsumer struct {
 	topic             string
 	userAPI           api.UploadDeviceKeysAPI
 	cfg               *config.UserAPI
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 }
 
 // NewSigningKeyUpdateConsumer creates a new SigningKeyUpdateConsumer. Call Start() to begin consuming from key servers.
@@ -75,7 +76,7 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		logrus.WithError(err).Errorf("Failed to read from signing key update input topic")
 		return true
 	}
-	origin := gomatrixserverlib.ServerName(msg.Header.Get("origin"))
+	origin := spec.ServerName(msg.Header.Get("origin"))
 	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
 		logrus.WithError(err).Error("failed to split user id")
 		return true
@@ -99,10 +100,7 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		UserID:           updatePayload.UserID,
 	}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
-	if err := t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes); err != nil {
-		logrus.WithError(err).Error("failed to upload device keys")
-		return false
-	}
+	t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	if uploadRes.Error != nil {
 		logrus.WithError(uploadRes.Error).Error("failed to upload device keys")
 		return true

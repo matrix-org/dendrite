@@ -1,8 +1,9 @@
 ---
 title: Generating signing keys
-parent: Installation
-nav_order: 8
-permalink: /installation/signingkeys
+parent: Manual
+grand_parent: Installation
+nav_order: 3
+permalink: /installation/manual/signingkeys
 ---
 
 # Generating signing keys
@@ -11,7 +12,7 @@ All Matrix homeservers require a signing private key, which will be used to auth
 federation requests and events.
 
 The `generate-keys` utility can be used to generate a private key. Assuming that Dendrite was
-built using `build.sh`, you should find the `generate-keys` utility in the `bin` folder.
+built using `go build -o bin/ ./cmd/...`, you should find the `generate-keys` utility in the `bin` folder.
 
 To generate a Matrix signing private key:
 

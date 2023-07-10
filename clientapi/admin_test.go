@@ -2,13 +2,13 @@ package clientapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -19,16 +19,653 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
+	capi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
+
+func TestAdminCreateToken(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RegistrationRequiresToken = true
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
+			bob:        {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		testCases := []struct {
+			name           string
+			requestingUser *test.User
+			requestOpt     test.HTTPRequestOpt
+			wantOK         bool
+			withHeader     bool
+		}{
+			{
+				name:           "Missing auth",
+				requestingUser: bob,
+				wantOK:         false,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token": "token1",
+				},
+				),
+			},
+			{
+				name:           "Bob is denied access",
+				requestingUser: bob,
+				wantOK:         false,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token": "token2",
+				},
+				),
+			},
+			{
+				name:           "Alice can create a token without specifyiing any information",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				requestOpt:     test.WithJSONBody(t, map[string]interface{}{}),
+			},
+			{
+				name:           "Alice can to create a token specifying a name",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token": "token3",
+				},
+				),
+			},
+			{
+				name:           "Alice cannot to create a token that already exists",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token": "token3",
+				},
+				),
+			},
+			{
+				name:           "Alice can create a token specifying valid params",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token":        "token4",
+					"uses_allowed": 5,
+					"expiry_time":  time.Now().Add(5*24*time.Hour).UnixNano() / int64(time.Millisecond),
+				},
+				),
+			},
+			{
+				name:           "Alice cannot create a token specifying invalid name",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token": "token@",
+				},
+				),
+			},
+			{
+				name:           "Alice cannot create a token specifying invalid uses_allowed",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token":        "token5",
+					"uses_allowed": -1,
+				},
+				),
+			},
+			{
+				name:           "Alice cannot create a token specifying invalid expiry_time",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"token":       "token6",
+					"expiry_time": time.Now().Add(-1*5*24*time.Hour).UnixNano() / int64(time.Millisecond),
+				},
+				),
+			},
+			{
+				name:           "Alice cannot to create a token specifying invalid length",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"length": 80,
+				},
+				),
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/registrationTokens/new")
+				if tc.requestOpt != nil {
+					req = test.NewRequest(t, http.MethodPost, "/_dendrite/admin/registrationTokens/new", tc.requestOpt)
+				}
+				if tc.withHeader {
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
+				}
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func TestAdminListRegistrationTokens(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RegistrationRequiresToken = true
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
+			bob:        {},
+		}
+		tokens := []capi.RegistrationToken{
+			{
+				Token:       getPointer("valid"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+			{
+				Token:       getPointer("invalid"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(-1*5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+		}
+		for _, tkn := range tokens {
+			tkn := tkn
+			userAPI.PerformAdminCreateRegistrationToken(ctx, &tkn)
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		testCases := []struct {
+			name             string
+			requestingUser   *test.User
+			valid            string
+			isValidSpecified bool
+			wantOK           bool
+			withHeader       bool
+		}{
+			{
+				name:             "Missing auth",
+				requestingUser:   bob,
+				wantOK:           false,
+				isValidSpecified: false,
+			},
+			{
+				name:             "Bob is denied access",
+				requestingUser:   bob,
+				wantOK:           false,
+				withHeader:       true,
+				isValidSpecified: false,
+			},
+			{
+				name:           "Alice can list all tokens",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+			},
+			{
+				name:             "Alice can list all valid tokens",
+				requestingUser:   aliceAdmin,
+				wantOK:           true,
+				withHeader:       true,
+				valid:            "true",
+				isValidSpecified: true,
+			},
+			{
+				name:             "Alice can list all invalid tokens",
+				requestingUser:   aliceAdmin,
+				wantOK:           true,
+				withHeader:       true,
+				valid:            "false",
+				isValidSpecified: true,
+			},
+			{
+				name:             "No response when valid has a bad value",
+				requestingUser:   aliceAdmin,
+				wantOK:           false,
+				withHeader:       true,
+				valid:            "trueee",
+				isValidSpecified: true,
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				var path string
+				if tc.isValidSpecified {
+					path = fmt.Sprintf("/_dendrite/admin/registrationTokens?valid=%v", tc.valid)
+				} else {
+					path = "/_dendrite/admin/registrationTokens"
+				}
+				req := test.NewRequest(t, http.MethodGet, path)
+				if tc.withHeader {
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
+				}
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func TestAdminGetRegistrationToken(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RegistrationRequiresToken = true
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
+			bob:        {},
+		}
+		tokens := []capi.RegistrationToken{
+			{
+				Token:       getPointer("alice_token1"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+			{
+				Token:       getPointer("alice_token2"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(-1*5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+		}
+		for _, tkn := range tokens {
+			tkn := tkn
+			userAPI.PerformAdminCreateRegistrationToken(ctx, &tkn)
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		testCases := []struct {
+			name           string
+			requestingUser *test.User
+			token          string
+			wantOK         bool
+			withHeader     bool
+		}{
+			{
+				name:           "Missing auth",
+				requestingUser: bob,
+				wantOK:         false,
+			},
+			{
+				name:           "Bob is denied access",
+				requestingUser: bob,
+				wantOK:         false,
+				withHeader:     true,
+			},
+			{
+				name:           "Alice can GET alice_token1",
+				token:          "alice_token1",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+			},
+			{
+				name:           "Alice can GET alice_token2",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				token:          "alice_token2",
+			},
+			{
+				name:           "Alice cannot GET a token that does not exists",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token3",
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				path := fmt.Sprintf("/_dendrite/admin/registrationTokens/%s", tc.token)
+				req := test.NewRequest(t, http.MethodGet, path)
+				if tc.withHeader {
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
+				}
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func TestAdminDeleteRegistrationToken(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RegistrationRequiresToken = true
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
+			bob:        {},
+		}
+		tokens := []capi.RegistrationToken{
+			{
+				Token:       getPointer("alice_token1"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+			{
+				Token:       getPointer("alice_token2"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(-1*5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+		}
+		for _, tkn := range tokens {
+			tkn := tkn
+			userAPI.PerformAdminCreateRegistrationToken(ctx, &tkn)
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		testCases := []struct {
+			name           string
+			requestingUser *test.User
+			token          string
+			wantOK         bool
+			withHeader     bool
+		}{
+			{
+				name:           "Missing auth",
+				requestingUser: bob,
+				wantOK:         false,
+			},
+			{
+				name:           "Bob is denied access",
+				requestingUser: bob,
+				wantOK:         false,
+				withHeader:     true,
+			},
+			{
+				name:           "Alice can DELETE alice_token1",
+				token:          "alice_token1",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+			},
+			{
+				name:           "Alice can DELETE alice_token2",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				token:          "alice_token2",
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				path := fmt.Sprintf("/_dendrite/admin/registrationTokens/%s", tc.token)
+				req := test.NewRequest(t, http.MethodDelete, path)
+				if tc.withHeader {
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
+				}
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func TestAdminUpdateRegistrationToken(t *testing.T) {
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RegistrationRequiresToken = true
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
+			bob:        {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		tokens := []capi.RegistrationToken{
+			{
+				Token:       getPointer("alice_token1"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+			{
+				Token:       getPointer("alice_token2"),
+				UsesAllowed: getPointer(int32(10)),
+				ExpiryTime:  getPointer(time.Now().Add(-1*5*24*time.Hour).UnixNano() / int64(time.Millisecond)),
+				Pending:     getPointer(int32(0)),
+				Completed:   getPointer(int32(0)),
+			},
+		}
+		for _, tkn := range tokens {
+			tkn := tkn
+			userAPI.PerformAdminCreateRegistrationToken(ctx, &tkn)
+		}
+		testCases := []struct {
+			name           string
+			requestingUser *test.User
+			method         string
+			token          string
+			requestOpt     test.HTTPRequestOpt
+			wantOK         bool
+			withHeader     bool
+		}{
+			{
+				name:           "Missing auth",
+				requestingUser: bob,
+				wantOK:         false,
+				token:          "alice_token1",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": 10,
+				},
+				),
+			},
+			{
+				name:           "Bob is denied access",
+				requestingUser: bob,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token1",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": 10,
+				},
+				),
+			},
+			{
+				name:           "Alice can UPDATE a token's uses_allowed property",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				token:          "alice_token1",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": 10,
+				}),
+			},
+			{
+				name:           "Alice can UPDATE a token's expiry_time property",
+				requestingUser: aliceAdmin,
+				wantOK:         true,
+				withHeader:     true,
+				token:          "alice_token2",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"expiry_time": time.Now().Add(5*24*time.Hour).UnixNano() / int64(time.Millisecond),
+				},
+				),
+			},
+			{
+				name:           "Alice can UPDATE a token's uses_allowed and expiry_time property",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token1",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": 20,
+					"expiry_time":  time.Now().Add(10*24*time.Hour).UnixNano() / int64(time.Millisecond),
+				},
+				),
+			},
+			{
+				name:           "Alice CANNOT update a token with invalid properties",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token2",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": -5,
+					"expiry_time":  time.Now().Add(-1*5*24*time.Hour).UnixNano() / int64(time.Millisecond),
+				},
+				),
+			},
+			{
+				name:           "Alice CANNOT UPDATE a token that does not exist",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token9",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": 100,
+				},
+				),
+			},
+			{
+				name:           "Alice can UPDATE token specifying uses_allowed as null - Valid for infinite uses",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token1",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"uses_allowed": nil,
+				},
+				),
+			},
+			{
+				name:           "Alice can UPDATE token specifying expiry_time AS null - Valid for infinite time",
+				requestingUser: aliceAdmin,
+				wantOK:         false,
+				withHeader:     true,
+				token:          "alice_token1",
+				requestOpt: test.WithJSONBody(t, map[string]interface{}{
+					"expiry_time": nil,
+				},
+				),
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				path := fmt.Sprintf("/_dendrite/admin/registrationTokens/%s", tc.token)
+				req := test.NewRequest(t, http.MethodPut, path)
+				if tc.requestOpt != nil {
+					req = test.NewRequest(t, http.MethodPut, path, tc.requestOpt)
+				}
+				if tc.withHeader {
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
+				}
+				rec := httptest.NewRecorder()
+				routers.DendriteAdmin.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
+				if tc.wantOK && rec.Code != http.StatusOK {
+					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+func getPointer[T any](s T) *T {
+	return &s
+}
 
 func TestAdminResetPassword(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
@@ -55,10 +692,10 @@ func TestAdminResetPassword(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]string{
-			aliceAdmin: "",
-			bob:        "",
-			vhUser:     "",
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
+			bob:        {},
+			vhUser:     {},
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -104,7 +741,7 @@ func TestAdminResetPassword(t *testing.T) {
 				}
 
 				if tc.withHeader {
-					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser])
+					req.Header.Set("Authorization", "Bearer "+accessTokens[tc.requestingUser].accessToken)
 				}
 
 				rec := httptest.NewRecorder()
@@ -124,7 +761,7 @@ func TestPurgeRoom(t *testing.T) {
 	room := test.NewRoom(t, aliceAdmin, test.RoomPreset(test.PresetTrustedPrivateChat))
 
 	// Invite Bob
-	room.CreateAndInsert(t, aliceAdmin, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, aliceAdmin, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
 
@@ -134,7 +771,11 @@ func TestPurgeRoom(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
+		defer func() {
+			// give components the time to process purge requests
+			time.Sleep(time.Millisecond * 50)
+			close()
+		}()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -143,8 +784,8 @@ func TestPurgeRoom(t *testing.T) {
 
 		// this starts the JetStream consumers
 		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
-		federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
-		rsAPI.SetFederationAPI(nil, nil)
+		fsAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
+		rsAPI.SetFederationAPI(fsAPI, nil)
 
 		// Create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -155,8 +796,8 @@ func TestPurgeRoom(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]string{
-			aliceAdmin: "",
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -175,7 +816,7 @@ func TestPurgeRoom(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/purgeRoom/"+tc.roomID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -195,7 +836,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 	room := test.NewRoom(t, aliceAdmin)
 
 	// Join Bob
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -225,8 +866,8 @@ func TestAdminEvacuateRoom(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]string{
-			aliceAdmin: "",
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -244,7 +885,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/evacuateRoom/"+tc.roomID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -292,10 +933,10 @@ func TestAdminEvacuateUser(t *testing.T) {
 	room2 := test.NewRoom(t, aliceAdmin)
 
 	// Join Bob
-	room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
-	room2.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room2.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
@@ -328,8 +969,8 @@ func TestAdminEvacuateUser(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]string{
-			aliceAdmin: "",
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -349,7 +990,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/evacuateUser/"+tc.userID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -410,8 +1051,8 @@ func TestAdminMarkAsStale(t *testing.T) {
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
 		// Create the users in the userapi and login
-		accessTokens := map[*test.User]string{
-			aliceAdmin: "",
+		accessTokens := map[*test.User]userDevice{
+			aliceAdmin: {},
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
@@ -429,7 +1070,7 @@ func TestAdminMarkAsStale(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/refreshDevices/"+tc.userID)
 
-				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
+				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin].accessToken)
 
 				rec := httptest.NewRecorder()
 				routers.DendriteAdmin.ServeHTTP(rec, req)
@@ -440,36 +1081,4 @@ func TestAdminMarkAsStale(t *testing.T) {
 			})
 		}
 	})
-}
-
-func createAccessTokens(t *testing.T, accessTokens map[*test.User]string, userAPI uapi.UserInternalAPI, ctx context.Context, routers httputil.Routers) {
-	t.Helper()
-	for u := range accessTokens {
-		localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
-		userRes := &uapi.PerformAccountCreationResponse{}
-		password := util.RandomString(8)
-		if err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
-			AccountType: u.AccountType,
-			Localpart:   localpart,
-			ServerName:  serverName,
-			Password:    password,
-		}, userRes); err != nil {
-			t.Errorf("failed to create account: %s", err)
-		}
-
-		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
-			"type": authtypes.LoginTypePassword,
-			"identifier": map[string]interface{}{
-				"type": "m.id.user",
-				"user": u.ID,
-			},
-			"password": password,
-		}))
-		rec := httptest.NewRecorder()
-		routers.Client.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("failed to login: %s", rec.Body.String())
-		}
-		accessTokens[u] = gjson.GetBytes(rec.Body.Bytes(), "access_token").String()
-	}
 }

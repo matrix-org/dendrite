@@ -67,6 +67,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
@@ -101,6 +103,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
         uses: actions/setup-go@v3
         with:
@@ -232,6 +236,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
         uses: actions/setup-go@v3
         with:

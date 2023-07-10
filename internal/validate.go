@@ -20,8 +20,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -58,19 +57,19 @@ func PasswordResponse(err error) *util.JSONResponse {
 	case ErrPasswordWeak:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.WeakPassword(ErrPasswordWeak.Error()),
+			JSON: spec.WeakPassword(ErrPasswordWeak.Error()),
 		}
 	case ErrPasswordTooLong:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(ErrPasswordTooLong.Error()),
+			JSON: spec.BadJSON(ErrPasswordTooLong.Error()),
 		}
 	}
 	return nil
 }
 
 // ValidateUsername returns an error if the username is invalid
-func ValidateUsername(localpart string, domain gomatrixserverlib.ServerName) error {
+func ValidateUsername(localpart string, domain spec.ServerName) error {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return ErrUsernameTooLong
@@ -88,19 +87,19 @@ func UsernameResponse(err error) *util.JSONResponse {
 	case ErrUsernameTooLong:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case ErrUsernameInvalid, ErrUsernameUnderscore:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 	return nil
 }
 
 // ValidateApplicationServiceUsername returns an error if the username is invalid for an application service
-func ValidateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) error {
+func ValidateApplicationServiceUsername(localpart string, domain spec.ServerName) error {
 	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return ErrUsernameTooLong
 	} else if !validUsernameRegex.MatchString(localpart) {

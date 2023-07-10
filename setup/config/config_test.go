@@ -19,8 +19,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -275,7 +275,7 @@ func Test_SigningIdentityFor(t *testing.T) {
 	tests := []struct {
 		name         string
 		virtualHosts []*VirtualHost
-		serverName   gomatrixserverlib.ServerName
+		serverName   spec.ServerName
 		want         *fclient.SigningIdentity
 		wantErr      bool
 	}{
@@ -285,17 +285,17 @@ func Test_SigningIdentityFor(t *testing.T) {
 		},
 		{
 			name:       "no identity found",
-			serverName: gomatrixserverlib.ServerName("doesnotexist"),
+			serverName: spec.ServerName("doesnotexist"),
 			wantErr:    true,
 		},
 		{
 			name:       "found identity",
-			serverName: gomatrixserverlib.ServerName("main"),
+			serverName: spec.ServerName("main"),
 			want:       &fclient.SigningIdentity{ServerName: "main"},
 		},
 		{
 			name:       "identity found on virtual hosts",
-			serverName: gomatrixserverlib.ServerName("vh2"),
+			serverName: spec.ServerName("vh2"),
 			virtualHosts: []*VirtualHost{
 				{SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"}},
 				{SigningIdentity: fclient.SigningIdentity{ServerName: "vh2"}},

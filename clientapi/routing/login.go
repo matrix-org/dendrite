@@ -19,20 +19,19 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 type loginResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
+	UserID      string          `json:"user_id"`
+	AccessToken string          `json:"access_token"`
+	HomeServer  spec.ServerName `json:"home_server"`
+	DeviceID    string          `json:"device_id"`
 }
 
 type flows struct {
@@ -87,7 +86,7 @@ func Login(
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
-		JSON: jsonerror.NotFound("Bad method"),
+		JSON: spec.NotFound("Bad method"),
 	}
 }
 
@@ -98,13 +97,19 @@ func completeAuth(
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var performRes userapi.PerformDeviceCreationResponse
@@ -120,7 +125,7 @@ func completeAuth(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+			JSON: spec.Unknown("failed to create device: " + err.Error()),
 		}
 	}
 

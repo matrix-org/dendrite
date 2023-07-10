@@ -13,7 +13,11 @@
 package auth
 
 import (
+	"context"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // TODO: This logic should live in gomatrixserverlib
@@ -21,9 +25,10 @@ import (
 // IsServerAllowed returns true if the server is allowed to see events in the room
 // at this particular state. This function implements https://matrix.org/docs/spec/client_server/r0.6.0#id87
 func IsServerAllowed(
-	serverName gomatrixserverlib.ServerName,
+	ctx context.Context, querier api.QuerySenderIDAPI,
+	serverName spec.ServerName,
 	serverCurrentlyInRoom bool,
-	authEvents []*gomatrixserverlib.Event,
+	authEvents []gomatrixserverlib.PDU,
 ) bool {
 	historyVisibility := HistoryVisibilityForRoom(authEvents)
 
@@ -32,7 +37,7 @@ func IsServerAllowed(
 		return true
 	}
 	// 2. If the user's membership was join, allow.
-	joinedUserExists := IsAnyUserOnServerWithMembership(serverName, authEvents, gomatrixserverlib.Join)
+	joinedUserExists := IsAnyUserOnServerWithMembership(ctx, querier, serverName, authEvents, spec.Join)
 	if joinedUserExists {
 		return true
 	}
@@ -41,7 +46,7 @@ func IsServerAllowed(
 		return true
 	}
 	// 4. If the user's membership was invite, and the history_visibility was set to invited, allow.
-	invitedUserExists := IsAnyUserOnServerWithMembership(serverName, authEvents, gomatrixserverlib.Invite)
+	invitedUserExists := IsAnyUserOnServerWithMembership(ctx, querier, serverName, authEvents, spec.Invite)
 	if invitedUserExists && historyVisibility == gomatrixserverlib.HistoryVisibilityInvited {
 		return true
 	}
@@ -50,12 +55,12 @@ func IsServerAllowed(
 	return false
 }
 
-func HistoryVisibilityForRoom(authEvents []*gomatrixserverlib.Event) gomatrixserverlib.HistoryVisibility {
+func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.PDU) gomatrixserverlib.HistoryVisibility {
 	// https://matrix.org/docs/spec/client_server/r0.6.0#id87
 	// By default if no history_visibility is set, or if the value is not understood, the visibility is assumed to be shared.
 	visibility := gomatrixserverlib.HistoryVisibilityShared
 	for _, ev := range authEvents {
-		if ev.Type() != gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() != spec.MRoomHistoryVisibility {
 			continue
 		}
 		if vis, err := ev.HistoryVisibility(); err == nil {
@@ -65,9 +70,9 @@ func HistoryVisibilityForRoom(authEvents []*gomatrixserverlib.Event) gomatrixser
 	return visibility
 }
 
-func IsAnyUserOnServerWithMembership(serverName gomatrixserverlib.ServerName, authEvents []*gomatrixserverlib.Event, wantMembership string) bool {
+func IsAnyUserOnServerWithMembership(ctx context.Context, querier api.QuerySenderIDAPI, serverName spec.ServerName, authEvents []gomatrixserverlib.PDU, wantMembership string) bool {
 	for _, ev := range authEvents {
-		if ev.Type() != gomatrixserverlib.MRoomMember {
+		if ev.Type() != spec.MRoomMember {
 			continue
 		}
 		membership, err := ev.Membership()
@@ -80,12 +85,16 @@ func IsAnyUserOnServerWithMembership(serverName gomatrixserverlib.ServerName, au
 			continue
 		}
 
-		_, domain, err := gomatrixserverlib.SplitID('@', *stateKey)
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			continue
+		}
+		userID, err := querier.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*stateKey))
 		if err != nil {
 			continue
 		}
 
-		if domain == serverName {
+		if userID.Domain() == serverName {
 			return true
 		}
 	}

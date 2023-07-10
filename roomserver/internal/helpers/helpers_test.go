@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -41,7 +42,7 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 		var authNIDs []types.EventNID
 		for _, x := range room.Events() {
 
-			roomInfo, err := db.GetOrCreateRoomInfo(context.Background(), x.Unwrap())
+			roomInfo, err := db.GetOrCreateRoomInfo(context.Background(), x.PDU)
 			assert.NoError(t, err)
 			assert.NotNil(t, roomInfo)
 
@@ -52,18 +53,18 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 			eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(context.Background(), x.StateKey())
 			assert.NoError(t, err)
 
-			evNID, _, err := db.StoreEvent(context.Background(), x.Event, roomInfo, eventTypeNID, eventStateKeyNID, authNIDs, false)
+			evNID, _, err := db.StoreEvent(context.Background(), x.PDU, roomInfo, eventTypeNID, eventStateKeyNID, authNIDs, false)
 			assert.NoError(t, err)
 			authNIDs = append(authNIDs, evNID)
 		}
 
 		// Alice should have no pending invites and should have a NID
-		pendingInvite, _, _, _, err := IsInvitePending(context.Background(), db, room.ID, alice.ID)
+		pendingInvite, _, _, _, err := IsInvitePending(context.Background(), db, room.ID, spec.SenderID(alice.ID))
 		assert.NoError(t, err, "failed to get pending invites")
 		assert.False(t, pendingInvite, "unexpected pending invite")
 
 		// Bob should have no pending invites and receive a new NID
-		pendingInvite, _, _, _, err = IsInvitePending(context.Background(), db, room.ID, bob.ID)
+		pendingInvite, _, _, _, err = IsInvitePending(context.Background(), db, room.ID, spec.SenderID(bob.ID))
 		assert.NoError(t, err, "failed to get pending invites")
 		assert.False(t, pendingInvite, "unexpected pending invite")
 	})

@@ -8,10 +8,10 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 )
 
@@ -39,7 +39,10 @@ func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.FederationRoomser
 	}
 	response, err := publicRooms(req.Context(), request, rsAPI)
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -106,8 +109,10 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
-			reqErr := jsonerror.InternalServerError()
-			return &reqErr
+			return &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		request.Limit = int16(limit)
 		request.Since = httpReq.FormValue("since")
@@ -118,7 +123,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 
 	return &util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
-		JSON: jsonerror.NotFound("Bad method"),
+		JSON: spec.NotFound("Bad method"),
 	}
 }
 
@@ -126,11 +131,11 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.FederationRoomserverAPI) ([]fclient.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
-	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
+	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCanonicalAlias, StateKey: ""}
 	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
 	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
-	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
-	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
+	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomHistoryVisibility, StateKey: ""}
+	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomJoinRules, StateKey: ""}
 
 	var stateRes roomserverAPI.QueryBulkStateContentResponse
 	err := rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
@@ -138,7 +143,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple, avatarTuple,
-			{EventType: gomatrixserverlib.MRoomMember, StateKey: "*"},
+			{EventType: spec.MRoomMember, StateKey: "*"},
 		},
 	}, &stateRes)
 	if err != nil {
@@ -154,7 +159,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		joinCount := 0
 		var joinRule, guestAccess string
 		for tuple, contentVal := range data {
-			if tuple.EventType == gomatrixserverlib.MRoomMember && contentVal == "join" {
+			if tuple.EventType == spec.MRoomMember && contentVal == "join" {
 				joinCount++
 				continue
 			}
@@ -178,7 +183,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 				guestAccess = contentVal
 			}
 		}
-		if joinRule == gomatrixserverlib.Public && guestAccess == "can_join" {
+		if joinRule == spec.Public && guestAccess == "can_join" {
 			pub.GuestCanJoin = true
 		}
 		pub.JoinedMembersCount = joinCount

@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
@@ -145,7 +146,7 @@ func main() {
 		}
 	}
 
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.ServerName = spec.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	configErrors := &config.ConfigErrors{}

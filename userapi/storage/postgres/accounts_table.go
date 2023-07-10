@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -79,10 +78,10 @@ type accountsStatements struct {
 	selectAccountByLocalpartStmt  *sql.Stmt
 	selectPasswordHashStmt        *sql.Stmt
 	selectNewNumericLocalpartStmt *sql.Stmt
-	serverName                    gomatrixserverlib.ServerName
+	serverName                    spec.ServerName
 }
 
-func NewPostgresAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.AccountsTable, error) {
+func NewPostgresAccountsTable(db *sql.DB, serverName spec.ServerName) (tables.AccountsTable, error) {
 	s := &accountsStatements{
 		serverName: serverName,
 	}
@@ -127,7 +126,7 @@ func NewPostgresAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerNam
 // on success.
 func (s *accountsStatements) InsertAccount(
 	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 	hash, appserviceID string, accountType api.AccountType,
 ) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
@@ -153,7 +152,7 @@ func (s *accountsStatements) InsertAccount(
 }
 
 func (s *accountsStatements) UpdatePassword(
-	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, localpart string, serverName spec.ServerName,
 	passwordHash string,
 ) (err error) {
 	_, err = s.updatePasswordStmt.ExecContext(ctx, passwordHash, localpart, serverName)
@@ -161,21 +160,21 @@ func (s *accountsStatements) UpdatePassword(
 }
 
 func (s *accountsStatements) DeactivateAccount(
-	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, localpart string, serverName spec.ServerName,
 ) (err error) {
 	_, err = s.deactivateAccountStmt.ExecContext(ctx, localpart, serverName)
 	return
 }
 
 func (s *accountsStatements) SelectPasswordHash(
-	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, localpart string, serverName spec.ServerName,
 ) (hash string, err error) {
 	err = s.selectPasswordHashStmt.QueryRowContext(ctx, localpart, serverName).Scan(&hash)
 	return
 }
 
 func (s *accountsStatements) SelectAccountByLocalpart(
-	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, localpart string, serverName spec.ServerName,
 ) (*api.Account, error) {
 	var appserviceIDPtr sql.NullString
 	var acc api.Account
@@ -197,7 +196,7 @@ func (s *accountsStatements) SelectAccountByLocalpart(
 }
 
 func (s *accountsStatements) SelectNewNumericLocalpart(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) (id int64, err error) {
 	stmt := s.selectNewNumericLocalpartStmt
 	if txn != nil {

@@ -21,10 +21,10 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -38,7 +38,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 	if err != nil {
 		err := &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Reading request body failed: " + err.Error()),
+			JSON: spec.BadJSON("Reading request body failed: " + err.Error()),
 		}
 		return nil, nil, err
 	}
@@ -50,7 +50,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 	if err := json.Unmarshal(reqBytes, &header); err != nil {
 		err := &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Reading request body failed: " + err.Error()),
+			JSON: spec.BadJSON("Reading request body failed: " + err.Error()),
 		}
 		return nil, nil, err
 	}
@@ -77,7 +77,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 	default:
 		err := util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("unhandled login type: " + header.Type),
+			JSON: spec.InvalidParam("unhandled login type: " + header.Type),
 		}
 		return nil, nil, &err
 	}

@@ -17,9 +17,9 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -43,7 +43,7 @@ func CreateOpenIDToken(
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot request tokens for other users"),
+			JSON: spec.Forbidden("Cannot request tokens for other users"),
 		}
 	}
 
@@ -55,7 +55,10 @@ func CreateOpenIDToken(
 	err := userAPI.PerformOpenIDTokenCreation(req.Context(), &request, &response)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("userAPI.CreateOpenIDToken failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

@@ -48,6 +48,7 @@ func NewSyncStreamProviders(
 		},
 		InviteStreamProvider: &InviteStreamProvider{
 			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			rsAPI:                 rsAPI,
 		},
 		SendToDeviceStreamProvider: &SendToDeviceStreamProvider{
 			DefaultStreamProvider: DefaultStreamProvider{DB: d},
