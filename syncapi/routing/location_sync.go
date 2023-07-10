@@ -18,11 +18,11 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
@@ -42,13 +42,19 @@ func GetLocationSync(
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to get snapshot for locations sync")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	mr, err := snapshot.SelectAllMultiRoomDataInRoom(req.Context(), roomID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to select all most recent multiroom data for room")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 	return util.JSONResponse{
