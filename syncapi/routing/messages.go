@@ -359,13 +359,31 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}
 
+	// Apply room history visibility filter
+	startTime := time.Now()
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.device.UserID, "messages")
+	if err != nil {
+		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+	}
+	logrus.WithFields(logrus.Fields{
+		"duration":      time.Since(startTime),
+		"room_id":       r.roomID,
+		"events_before": len(events),
+		"events_after":  len(filteredEvents),
+	}).Debug("applied history visibility (messages)")
+
+	// No events left after applying history visibility
+	if len(filteredEvents) == 0 {
+		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+	}
+
 	// Get the position of the first and the last event in the room's topology.
 	// This position is currently determined by the event's depth, so we could
 	// also use it instead of retrieving from the database. However, if we ever
 	// change the way topological positions are defined (as depth isn't the most
 	// reliable way to define it), it would be easier and less troublesome to
 	// only have to change it in one place, i.e. the database.
-	start, end, err = r.getStartEnd(events)
+	start, end, err = r.getStartEnd(filteredEvents)
 	if err != nil {
 		return []synctypes.ClientEvent{}, *r.from, *r.to, err
 	}
@@ -380,24 +398,12 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 			}
 			return out
 		}
-		events = reversed(events)
-	}
-	if len(events) == 0 {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+		filteredEvents = reversed(filteredEvents)
 	}
 
-	// Apply room history visibility filter
-	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.device.UserID, "messages")
-	logrus.WithFields(logrus.Fields{
-		"duration":      time.Since(startTime),
-		"room_id":       r.roomID,
-		"events_before": len(events),
-		"events_after":  len(filteredEvents),
-	}).Debug("applied history visibility (messages)")
 	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-	}), start, end, err
+	}), start, end, nil
 }
 
 func (r *messagesReq) getStartEnd(events []*rstypes.HeaderedEvent) (start, end types.TopologyToken, err error) {
