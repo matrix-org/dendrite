@@ -567,15 +567,17 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	if res.HistoryVisibility == "" {
 		res.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
 	}
-	for i := range res.Events {
+	events := res.Events
+	for i := range events {
+		events[i].Visibility = res.HistoryVisibility
 		_, err = r.db.WriteEvent(
 			context.Background(),
-			res.Events[i],
+			events[i],
 			[]*rstypes.HeaderedEvent{},
 			[]string{},
 			[]string{},
 			nil, true,
-			res.HistoryVisibility,
+			events[i].Visibility,
 		)
 		if err != nil {
 			return nil, err
@@ -583,13 +585,9 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	}
 
 	// we may have got more than the requested limit so resize now
-	events := res.Events
 	if len(events) > limit {
 		// last `limit` events
 		events = events[len(events)-limit:]
-	}
-	for _, ev := range events {
-		ev.Visibility = res.HistoryVisibility
 	}
 
 	return events, nil
