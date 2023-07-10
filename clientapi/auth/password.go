@@ -230,6 +230,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 			JSON: spec.Unknown("unable to connect to ldap: " + err.Error()),
 		}
 	}
+	// nolint: errcheck
 	defer conn.Close()
 
 	if t.Config.Ldap.AdminBindEnabled {

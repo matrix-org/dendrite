@@ -80,7 +80,7 @@ media_store/
 # golang workspaces
 go.work*
 
-__debug_bin
+__debug_bin*
 
 cmd/dendrite-monolith-server/dendrite-monolith-server
 build
