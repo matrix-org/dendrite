@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -186,6 +187,16 @@ func main() {
 			logrus.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}
+
+	upCounter := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "dendrite",
+		Name:      "up",
+		ConstLabels: map[string]string{
+			"version": internal.VersionString(),
+		},
+	})
+	upCounter.Add(1)
+	prometheus.MustRegister(upCounter)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
