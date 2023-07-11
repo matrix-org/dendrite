@@ -224,7 +224,8 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	})
 }
 
-// The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
+// The purpose of this test is to ensure that backfilling returns no start/end if a given filter removes
+// all events.
 func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := MustCreateDatabase(t, dbType)

@@ -336,10 +336,10 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		// removed all of them. This means there are no events for this user
 		// anymore. Let them know.
 		if errors.Is(err, shared.ErrNoEventsForFilter) {
-			return []synctypes.ClientEvent{}, emptyToken, emptyToken, nil
+			return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
 		}
 		err = fmt.Errorf("GetEventsInRange: %w", err)
-		return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
+		return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 	}
 
 	var events []*rstypes.HeaderedEvent
@@ -354,17 +354,17 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	// on the ordering), or we've reached a backward extremity.
 	if len(streamEvents) == 0 {
 		if events, err = r.handleEmptyEventsSlice(); err != nil {
-			return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
+			return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 		}
 	} else {
 		if events, err = r.handleNonEmptyEventsSlice(streamEvents); err != nil {
-			return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
+			return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 		}
 	}
 
 	// If we didn't get any event, we don't need to proceed any further.
 	if len(events) == 0 {
-		return []synctypes.ClientEvent{}, emptyToken, emptyToken, nil
+		return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
 	}
 
 	// Apply room history visibility filter
@@ -382,7 +382,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 
 	// No events left after applying history visibility
 	if len(filteredEvents) == 0 {
-		return []synctypes.ClientEvent{}, emptyToken, emptyToken, nil
+		return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
 	}
 
 	// Get the position of the first and the last event in the room's topology.
