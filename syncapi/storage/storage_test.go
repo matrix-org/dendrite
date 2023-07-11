@@ -14,6 +14,7 @@ import (
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
@@ -219,6 +220,39 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			}
 			gots := snapshot.StreamEventsToEvents(context.Background(), nil, paginatedEvents, nil)
 			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
+		})
+	})
+}
+
+// The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
+func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := MustCreateDatabase(t, dbType)
+		defer close()
+		alice := test.NewUser(t)
+		r := test.NewRoom(t, alice)
+		for i := 0; i < 10; i++ {
+			r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("hi %d", i)})
+		}
+		events := r.Events()
+		_ = MustWriteEvents(t, db, events)
+
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
+			t.Logf("max topo pos = %+v", from)
+			// head towards the beginning of time
+			to := types.TopologyToken{}
+
+			// backpaginate 20 messages starting at the latest position.
+			notTypes := []string{spec.MRoomRedaction}
+			senders := []string{alice.ID}
+			filter := &synctypes.RoomEventFilter{Limit: 20, NotTypes: &notTypes, Senders: &senders}
+			paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
+			assert.Equal(t, shared.ErrNoEventsForFilter, err)
+			assert.Nil(t, paginatedEvents)
+			for _, x := range paginatedEvents {
+				t.Logf("EventType: %s", x.Type())
+			}
 		})
 	})
 }

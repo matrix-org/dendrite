@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 
@@ -231,6 +232,8 @@ func (d *DatabaseTransaction) GetAccountDataInRange(
 	return d.AccountData.SelectAccountDataInRange(ctx, d.txn, userID, r, accountDataFilterPart)
 }
 
+var ErrNoEventsForFilter = errors.New("no events returned using the provided filter")
+
 func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	ctx context.Context,
 	from, to *types.TopologyToken,
@@ -264,6 +267,15 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 
 	// Retrieve the events' contents using their IDs.
 	events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eIDs, filter, true)
+	if err != nil {
+		return
+	}
+	// Check if we should be able to return events.
+	// If we received 0 events, this most likely means that the provided filter removed them.
+	if len(eIDs) > 0 && len(events) == 0 {
+		return nil, ErrNoEventsForFilter
+	}
+
 	return
 }
 

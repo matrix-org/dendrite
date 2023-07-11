@@ -16,12 +16,14 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"sort"
 	"time"
 
+	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -330,6 +332,12 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	// Retrieve the events from the local database.
 	streamEvents, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
+		// While there are events in the topological range, the provided filter
+		// removed all of them. This means there are no events for this user
+		// anymore. Let them know.
+		if errors.Is(err, shared.ErrNoEventsForFilter) {
+			return []synctypes.ClientEvent{}, emptyToken, emptyToken, nil
+		}
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return []synctypes.ClientEvent{}, emptyToken, emptyToken, err
 	}
