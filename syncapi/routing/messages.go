@@ -364,7 +364,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 
 	// If we didn't get any event, we don't need to proceed any further.
 	if len(events) == 0 {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+		return []synctypes.ClientEvent{}, emptyToken, emptyToken, nil
 	}
 
 	// Apply room history visibility filter
@@ -382,7 +382,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 
 	// No events left after applying history visibility
 	if len(filteredEvents) == 0 {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+		return []synctypes.ClientEvent{}, emptyToken, emptyToken, nil
 	}
 
 	// Get the position of the first and the last event in the room's topology.
