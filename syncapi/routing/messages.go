@@ -336,7 +336,15 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		// removed all of them. This means there are no events for this user
 		// anymore. Let them know.
 		if errors.Is(err, shared.ErrNoEventsForFilter) {
-			return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
+			if len(streamEvents) == 0 {
+				return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
+			}
+			// We possibly received events, try to get start/end from them
+			start, end, err = r.getStartEnd(r.snapshot.StreamEventsToEvents(ctx, r.device, streamEvents, rsAPI))
+			if err != nil {
+				return []synctypes.ClientEvent{}, *r.from, *r.to, err
+			}
+			return []synctypes.ClientEvent{}, start, end, nil
 		}
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return []synctypes.ClientEvent{}, *r.from, emptyToken, err

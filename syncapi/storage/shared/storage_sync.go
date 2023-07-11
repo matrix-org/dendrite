@@ -273,7 +273,13 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	// Check if we should be able to return events.
 	// If we received 0 events, this most likely means that the provided filter removed them.
 	if len(eIDs) > 0 && len(events) == 0 {
-		return nil, ErrNoEventsForFilter
+		// We try to fetch the events without a filter, so we can tell the client if there
+		// are more events earlier than the requested and filtered.
+		events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eIDs, nil, true)
+		if err != nil {
+			return
+		}
+		return events, ErrNoEventsForFilter
 	}
 
 	return

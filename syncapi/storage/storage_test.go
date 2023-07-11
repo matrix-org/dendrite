@@ -250,7 +250,8 @@ func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
 			filter := &synctypes.RoomEventFilter{Limit: 20, NotTypes: &notTypes, Senders: &senders}
 			paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 			assert.Equal(t, shared.ErrNoEventsForFilter, err)
-			assert.Nil(t, paginatedEvents)
+			gots := snapshot.StreamEventsToEvents(context.Background(), nil, paginatedEvents, nil)
+			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-15:]))
 		})
 	})
 }
