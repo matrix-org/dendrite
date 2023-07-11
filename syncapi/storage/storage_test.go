@@ -250,9 +250,6 @@ func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
 			paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 			assert.Equal(t, shared.ErrNoEventsForFilter, err)
 			assert.Nil(t, paginatedEvents)
-			for _, x := range paginatedEvents {
-				t.Logf("EventType: %s", x.Type())
-			}
 		})
 	})
 }
