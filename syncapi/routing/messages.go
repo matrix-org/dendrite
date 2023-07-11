@@ -253,8 +253,8 @@ func OnIncomingMessagesRequest(
 	}
 
 	// If start and end are equal, we either reached the beginning or something else
-	// is wrong. To avoid endless loops from clients, set end to 0 an empty string
-	if start == end {
+	// is wrong. If we have nothing to return set end to 0.
+	if start == end || len(clientEvents) == 0 {
 		end = types.TopologyToken{}
 	}
 
@@ -286,11 +286,6 @@ func OnIncomingMessagesRequest(
 		})...)
 	}
 
-	// If we didn't return any events, set the end to an empty string, so it will be omitted
-	// in the response JSON.
-	if len(res.Chunk) == 0 {
-		res.End = ""
-	}
 	if fromStream != nil {
 		res.StartStream = fromStream.String()
 	}
@@ -489,6 +484,12 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
 	events []*rstypes.HeaderedEvent, err error,
 ) {
+	// We've reached the beginning of the room, nothing more to do.
+	if r.backwardOrdering && streamEvents[len(streamEvents)-1].Type() == spec.MRoomCreate && streamEvents[len(streamEvents)-1].StateKeyEquals("") {
+		events = append(events, r.snapshot.StreamEventsToEvents(r.ctx, nil, streamEvents, r.rsAPI)...)
+		sort.Sort(eventsByDepth(events))
+		return events, nil
+	}
 	// Check if we have enough events.
 	isSetLargeEnough := len(streamEvents) >= r.filter.Limit
 	if !isSetLargeEnough {
