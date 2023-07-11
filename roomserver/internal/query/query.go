@@ -974,6 +974,20 @@ func (r *Queryer) LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixse
 	return joinedUsers, nil
 }
 
+func (r *Queryer) JoinedUserCount(ctx context.Context, roomID string) (int, error) {
+	info, err := r.DB.RoomInfo(ctx, roomID)
+	if err != nil {
+		return 0, err
+	}
+	if info == nil {
+		return 0, nil
+	}
+
+	// TODO: this can be further optimised by just using a SELECT COUNT query
+	nids, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
+	return len(nids), err
+}
+
 // nolint:gocyclo
 func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
 	// Look up if we know anything about the room. If it doesn't exist
