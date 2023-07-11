@@ -1,8 +1,10 @@
 ---
 title: Preparing database storage
 parent: Installation
-nav_order: 3
-permalink: /installation/database
+nav_order: 2
+parent: Manual
+grand_parent: Installation
+permalink: /installation/manual/database
 ---
 
 # Preparing database storage
@@ -13,31 +15,22 @@ may need to perform some manual steps outlined below.
 ## PostgreSQL
 
 Dendrite can automatically populate the database with the relevant tables and indexes, but
-it is not capable of creating the databases themselves. You will need to create the databases
+it is not capable of creating the database itself. You will need to create the database
 manually.
 
-The databases **must** be created with UTF-8 encoding configured or you will likely run into problems
+The database **must** be created with UTF-8 encoding configured, or you will likely run into problems
 with your Dendrite deployment.
 
-At this point, you can choose to either use a single database for all Dendrite components,
-or you can run each component with its own separate database:
+You will need to create a single PostgreSQL database. Deployments
+can use a single global connection pool, which makes updating the configuration file much easier.
+Only one database connection string to manage and likely simpler to back up the database. All
+components will be sharing the same database resources (CPU, RAM, storage).
 
-* **Single database**: You will need to create a single PostgreSQL database. Monolith deployments
-  can use a single global connection pool, which makes updating the configuration file much easier.
-  Only one database connection string to manage and likely simpler to back up the database. All
-  components will be sharing the same database resources (CPU, RAM, storage).
-
-* **Separate databases**: You will need to create a separate PostgreSQL database for each
-  component. You will need to configure each component that has storage in the Dendrite
-  configuration file with its own connection parameters. Allows running a different database engine
-  for each component on a different machine if needs be, each with their own CPU, RAM and storage —
-  almost certainly overkill unless you are running a very large Dendrite deployment.
-
-For either configuration, you will want to:
+You will most likely want to:
 
 1. Configure a role (with a username and password) which Dendrite can use to connect to the
    database;
-2. Create the database(s) themselves, ensuring that the Dendrite role has privileges over them.
+2. Create the database itself, ensuring that the Dendrite role has privileges over them.
    As Dendrite will create and manage the database tables, indexes and sequences by itself, the
    Dendrite role must have suitable privileges over the database.
 
@@ -69,27 +62,6 @@ Create the database itself, using the `dendrite` role from above:
 
 ```bash
 sudo -u postgres createdb -O dendrite -E UTF-8 dendrite
-```
-
-### Multiple database creation
-
-The following eight components require a database. In this example they will be named:
-
-| Appservice API | `dendrite_appservice`    |
-| Federation API | `dendrite_federationapi` |
-| Media API      | `dendrite_mediaapi`      |
-| MSCs           | `dendrite_mscs`          |
-| Roomserver     | `dendrite_roomserver`    |
-| Sync API       | `dendrite_syncapi`       |
-| Key server     | `dendrite_keyserver`     |
-| User API       | `dendrite_userapi`       |
-
-... therefore you will need to create eight different databases:
-
-```bash
-for i in appservice federationapi mediaapi mscs roomserver syncapi keyserver userapi; do
-    sudo -u postgres createdb -O dendrite -E UTF-8 dendrite_$i
-done
 ```
 
 ## SQLite

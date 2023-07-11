@@ -22,10 +22,12 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
@@ -38,7 +40,7 @@ var (
 
 type StateDelta struct {
 	RoomID      string
-	StateEvents []*gomatrixserverlib.HeaderedEvent
+	StateEvents []*types.HeaderedEvent
 	NewlyJoined bool
 	Membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
@@ -59,7 +61,7 @@ func NewStreamPositionFromString(s string) (StreamPosition, error) {
 
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
-	*gomatrixserverlib.HeaderedEvent
+	*types.HeaderedEvent
 	StreamPosition  StreamPosition
 	TransactionID   *api.TransactionID
 	ExcludeFromSync bool
@@ -352,7 +354,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 type PrevEventRef struct {
 	PrevContent   json.RawMessage `json:"prev_content"`
 	ReplacesState string          `json:"replaces_state"`
-	PrevSender    string          `json:"prev_sender"`
+	PrevSenderID  string          `json:"prev_sender"`
 }
 
 type DeviceLists struct {
@@ -550,7 +552,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
+func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID, stateKey *string) *InviteResponse {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -563,7 +565,7 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := synctypes.ToClientEvent(event.Unwrap(), synctypes.FormatSync)
+	inviteEvent := synctypes.ToClientEvent(event.PDU, synctypes.FormatSync, userID, stateKey)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
@@ -619,11 +621,11 @@ type Peek struct {
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
 type OutputReceiptEvent struct {
-	UserID    string                      `json:"user_id"`
-	RoomID    string                      `json:"room_id"`
-	EventID   string                      `json:"event_id"`
-	Type      string                      `json:"type"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+	UserID    string         `json:"user_id"`
+	RoomID    string         `json:"room_id"`
+	EventID   string         `json:"event_id"`
+	Type      string         `json:"type"`
+	Timestamp spec.Timestamp `json:"timestamp"`
 }
 
 // OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.

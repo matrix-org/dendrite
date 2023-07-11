@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/test/testrig"
 )
@@ -326,7 +326,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	// Invite Bob
-	room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+	room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
 
@@ -345,7 +345,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, ev := range txn.Events {
-				if ev.Type != gomatrixserverlib.MRoomMember {
+				if ev.Type != spec.MRoomMember {
 					continue
 				}
 				// Usually we would check the event content for the membership, but since

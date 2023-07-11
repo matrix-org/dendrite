@@ -20,48 +20,97 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
 // InviteV2 implements /_matrix/federation/v2/invite/{roomID}/{eventID}
 func InviteV2(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
-	roomID string,
+	request *fclient.FederationRequest,
+	roomID spec.RoomID,
 	eventID string,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
-	inviteReq := gomatrixserverlib.InviteV2Request{}
+	inviteReq := fclient.InviteV2Request{}
 	err := json.Unmarshal(request.Content(), &inviteReq)
 	switch e := err.(type) {
 	case gomatrixserverlib.UnsupportedRoomVersionError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
+			JSON: spec.UnsupportedRoomVersion(
 				fmt.Sprintf("Room version %q is not supported by this server.", e.Version),
 			),
 		}
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case nil:
-		return processInvite(
-			httpReq.Context(), true, inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
-		)
+		if inviteReq.Event().StateKey() == nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("The invite event has no state key"),
+			}
+		}
+
+		invitedUser, userErr := spec.NewUserID(*inviteReq.Event().StateKey(), true)
+		if userErr != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam("The user ID is invalid"),
+			}
+		}
+		if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
+			}
+		}
+
+		if inviteReq.Event().EventID() != eventID {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
+			}
+		}
+
+		input := gomatrixserverlib.HandleInviteInput{
+			RoomVersion:       inviteReq.RoomVersion(),
+			RoomID:            roomID,
+			InvitedUser:       *invitedUser,
+			KeyID:             cfg.Matrix.KeyID,
+			PrivateKey:        cfg.Matrix.PrivateKey,
+			Verifier:          keys,
+			RoomQuerier:       rsAPI,
+			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+			StateQuerier:      rsAPI.StateQuerier(),
+			InviteEvent:       inviteReq.Event(),
+			StrippedState:     inviteReq.InviteRoomState(),
+			UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+			},
+		}
+		event, jsonErr := handleInvite(httpReq.Context(), input, rsAPI)
+		if jsonErr != nil {
+			return *jsonErr
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: fclient.RespInviteV2{Event: event.JSON()},
+		}
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
 }
@@ -69,8 +118,8 @@ func InviteV2(
 // InviteV1 implements /_matrix/federation/v1/invite/{roomID}/{eventID}
 func InviteV1(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
-	roomID string,
+	request *fclient.FederationRequest,
+	roomID spec.RoomID,
 	eventID string,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
@@ -78,153 +127,122 @@ func InviteV1(
 ) util.JSONResponse {
 	roomVer := gomatrixserverlib.RoomVersionV1
 	body := request.Content()
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(body, false, roomVer)
+	// roomVer is hardcoded to v1 so we know we won't panic on Must
+	event, err := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventFromTrustedJSON(body, false)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: spec.BadJSON(err.Error()),
 		}
 	case nil:
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
 		}
 	}
-	var strippedState []gomatrixserverlib.InviteV2StrippedState
-	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
+	var strippedState []gomatrixserverlib.InviteStrippedState
+	if jsonErr := json.Unmarshal(event.Unsigned(), &strippedState); jsonErr != nil {
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
-	}
-	return processInvite(
-		httpReq.Context(), false, event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
-	)
-}
-
-func processInvite(
-	ctx context.Context,
-	isInviteV2 bool,
-	event *gomatrixserverlib.Event,
-	roomVer gomatrixserverlib.RoomVersion,
-	strippedState []gomatrixserverlib.InviteV2StrippedState,
-	roomID string,
-	eventID string,
-	cfg *config.FederationAPI,
-	rsAPI api.FederationRoomserverAPI,
-	keys gomatrixserverlib.JSONVerifier,
-) util.JSONResponse {
-
-	// Check that we can accept invites for this room version.
-	if _, err := roomserverVersion.SupportedRoomVersion(roomVer); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Room version %q is not supported by this server.", roomVer),
-			),
-		}
-	}
-
-	// Check that the room ID is correct.
-	if event.RoomID() != roomID {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
-		}
-	}
-
-	// Check that the event ID is correct.
-	if event.EventID() != eventID {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
-		}
 	}
 
 	if event.StateKey() == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The invite event has no state key"),
+			JSON: spec.BadJSON("The invite event has no state key"),
 		}
 	}
 
-	_, domain, err := cfg.Matrix.SplitLocalID('@', *event.StateKey())
+	invitedUser, err := spec.NewUserID(*event.StateKey(), true)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
+			JSON: spec.InvalidParam("The user ID is invalid"),
 		}
 	}
-
-	// Check that the event is signed by the server sending the request.
-	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
-	if err != nil {
+	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
 		}
 	}
-	_, serverName, err := gomatrixserverlib.SplitID('@', event.Sender())
-	if err != nil {
+
+	if event.EventID() != eventID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event JSON contains an invalid sender"),
-		}
-	}
-	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             serverName,
-		Message:                redacted,
-		AtTS:                   event.OriginServerTS(),
-		StrictValidityChecking: true,
-	}}
-	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("keys.VerifyJSONs failed")
-		return jsonerror.InternalServerError()
-	}
-	if verifyResults[0].Error != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The invite must be signed by the server it originated on"),
+			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
 		}
 	}
 
-	// Sign the event so that other servers will know that we have received the invite.
-	signedEvent := event.Sign(
-		string(domain), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
-	)
-
-	// Add the invite event to the roomserver.
-	inviteEvent := signedEvent.Headered(roomVer)
-	request := &api.PerformInviteRequest{
-		Event:           inviteEvent,
-		InviteRoomState: strippedState,
-		RoomVersion:     inviteEvent.RoomVersion,
-		SendAsServer:    string(api.DoNotSendToOtherServers),
-		TransactionID:   nil,
+	input := gomatrixserverlib.HandleInviteInput{
+		RoomVersion:       roomVer,
+		RoomID:            roomID,
+		InvitedUser:       *invitedUser,
+		KeyID:             cfg.Matrix.KeyID,
+		PrivateKey:        cfg.Matrix.PrivateKey,
+		Verifier:          keys,
+		RoomQuerier:       rsAPI,
+		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
+		StateQuerier:      rsAPI.StateQuerier(),
+		InviteEvent:       event,
+		StrippedState:     strippedState,
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 	}
-	response := &api.PerformInviteResponse{}
-	if err := rsAPI.PerformInvite(ctx, request, response); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
-		return util.JSONResponse{
+	event, jsonErr := handleInvite(httpReq.Context(), input, rsAPI)
+	if jsonErr != nil {
+		return *jsonErr
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: fclient.RespInvite{Event: event.JSON()},
+	}
+}
+
+func handleInvite(ctx context.Context, input gomatrixserverlib.HandleInviteInput, rsAPI api.FederationRoomserverAPI) (gomatrixserverlib.PDU, *util.JSONResponse) {
+	inviteEvent, err := gomatrixserverlib.HandleInvite(ctx, input)
+	switch e := err.(type) {
+	case nil:
+	case spec.InternalServerError:
+		util.GetLogger(ctx).WithError(err)
+		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError{},
+		}
+	case spec.MatrixError:
+		util.GetLogger(ctx).WithError(err)
+		code := http.StatusInternalServerError
+		switch e.ErrCode {
+		case spec.ErrorForbidden:
+			code = http.StatusForbidden
+		case spec.ErrorUnsupportedRoomVersion:
+			fallthrough // http.StatusBadRequest
+		case spec.ErrorBadJSON:
+			code = http.StatusBadRequest
+		}
+
+		return nil, &util.JSONResponse{
+			Code: code,
+			JSON: e,
+		}
+	default:
+		util.GetLogger(ctx).WithError(err)
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("unknown error"),
 		}
 	}
-	if response.Error != nil {
-		return response.Error.JSONResponse()
-	}
-	// Return the signed event to the originating server, it should then tell
-	// the other servers in the room that we have been invited.
-	if isInviteV2 {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: fclient.RespInviteV2{Event: signedEvent.JSON()},
-		}
-	} else {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: fclient.RespInvite{Event: signedEvent.JSON()},
+
+	headeredInvite := &types.HeaderedEvent{PDU: inviteEvent}
+	if err = rsAPI.HandleInvite(ctx, headeredInvite); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
+		return nil, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
 		}
 	}
+	return inviteEvent, nil
 }

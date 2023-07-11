@@ -19,13 +19,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type PresenceStreamProvider struct {
@@ -118,7 +118,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		req.Response.Presence.Events = append(req.Response.Presence.Events, synctypes.ClientEvent{
 			Content: content,
 			Sender:  presence.UserID,
-			Type:    gomatrixserverlib.MPresence,
+			Type:    spec.MPresence,
 		})
 		if presence.StreamPos > lastPos {
 			lastPos = presence.StreamPos
@@ -190,7 +190,7 @@ func membershipEventPresent(events []synctypes.ClientEvent, userID string) bool 
 	for _, ev := range events {
 		// it's enough to know that we have our member event here, don't need to check membership content
 		// as it's implied by being in the respective section of the sync response.
-		if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
+		if ev.Type == spec.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
 			// ignore e.g. join -> join changes
 			if gjson.GetBytes(ev.Unsigned, "prev_content.membership").Str == gjson.GetBytes(ev.Content, "membership").Str {
 				continue

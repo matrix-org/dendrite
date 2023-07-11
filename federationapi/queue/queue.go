@@ -23,16 +23,17 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
 
@@ -43,12 +44,12 @@ type OutgoingQueues struct {
 	process     *process.ProcessContext
 	disabled    bool
 	rsAPI       api.FederationRoomserverAPI
-	origin      gomatrixserverlib.ServerName
-	client      fedapi.FederationClient
+	origin      spec.ServerName
+	client      fclient.FederationClient
 	statistics  *statistics.Statistics
-	signing     map[gomatrixserverlib.ServerName]*fclient.SigningIdentity
+	signing     map[spec.ServerName]*fclient.SigningIdentity
 	queuesMutex sync.Mutex // protects the below
-	queues      map[gomatrixserverlib.ServerName]*destinationQueue
+	queues      map[spec.ServerName]*destinationQueue
 }
 
 func init() {
@@ -87,8 +88,8 @@ func NewOutgoingQueues(
 	db storage.Database,
 	process *process.ProcessContext,
 	disabled bool,
-	origin gomatrixserverlib.ServerName,
-	client fedapi.FederationClient,
+	origin spec.ServerName,
+	client fclient.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
 	signing []*fclient.SigningIdentity,
@@ -101,15 +102,15 @@ func NewOutgoingQueues(
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
-		signing:    map[gomatrixserverlib.ServerName]*fclient.SigningIdentity{},
-		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
+		signing:    map[spec.ServerName]*fclient.SigningIdentity{},
+		queues:     map[spec.ServerName]*destinationQueue{},
 	}
 	for _, identity := range signing {
 		queues.signing[identity.ServerName] = identity
 	}
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
-		serverNames := map[gomatrixserverlib.ServerName]struct{}{}
+		serverNames := map[spec.ServerName]struct{}{}
 		if names, err := db.GetPendingPDUServerNames(process.Context()); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
@@ -140,7 +141,7 @@ func NewOutgoingQueues(
 
 type queuedPDU struct {
 	dbReceipt *receipt.Receipt
-	pdu       *gomatrixserverlib.HeaderedEvent
+	pdu       *types.HeaderedEvent
 }
 
 type queuedEDU struct {
@@ -148,7 +149,7 @@ type queuedEDU struct {
 	edu       *gomatrixserverlib.EDU
 }
 
-func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
+func (oqs *OutgoingQueues) getQueue(destination spec.ServerName) *destinationQueue {
 	if oqs.statistics.ForServer(destination).Blacklisted() {
 		return nil
 	}
@@ -187,8 +188,8 @@ func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
-	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
-	destinations []gomatrixserverlib.ServerName,
+	ev *types.HeaderedEvent, origin spec.ServerName,
+	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
 		log.Trace("Federation is disabled, not sending event")
@@ -203,7 +204,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 	// Deduplicate destinations and remove the origin from the list of
 	// destinations just to be sure.
-	destmap := map[gomatrixserverlib.ServerName]struct{}{}
+	destmap := map[spec.ServerName]struct{}{}
 	for _, d := range destinations {
 		destmap[d] = struct{}{}
 	}
@@ -277,8 +278,8 @@ func (oqs *OutgoingQueues) SendEvent(
 
 // SendEDU sends an EDU event to the destinations.
 func (oqs *OutgoingQueues) SendEDU(
-	e *gomatrixserverlib.EDU, origin gomatrixserverlib.ServerName,
-	destinations []gomatrixserverlib.ServerName,
+	e *gomatrixserverlib.EDU, origin spec.ServerName,
+	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
 		log.Trace("Federation is disabled, not sending EDU")
@@ -293,7 +294,7 @@ func (oqs *OutgoingQueues) SendEDU(
 
 	// Deduplicate destinations and remove the origin from the list of
 	// destinations just to be sure.
-	destmap := map[gomatrixserverlib.ServerName]struct{}{}
+	destmap := map[spec.ServerName]struct{}{}
 	for _, d := range destinations {
 		destmap[d] = struct{}{}
 	}
@@ -376,7 +377,7 @@ func (oqs *OutgoingQueues) SendEDU(
 }
 
 // RetryServer attempts to resend events to the given server if we had given up.
-func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName, wasBlacklisted bool) {
+func (oqs *OutgoingQueues) RetryServer(srv spec.ServerName, wasBlacklisted bool) {
 	if oqs.disabled {
 		return
 	}

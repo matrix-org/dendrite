@@ -17,6 +17,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -41,6 +42,11 @@ type RoomNID int64
 type EventMetadata struct {
 	EventNID EventNID
 	RoomNID  RoomNID
+}
+
+type UserRoomKeyPair struct {
+	RoomNID          RoomNID
+	EventStateKeyNID EventStateKeyNID
 }
 
 // StateSnapshotNID is a numeric ID for the state at an event.
@@ -199,7 +205,7 @@ func (s StateAtEvent) IsStateEvent() bool {
 // The StateAtEvent is used to construct the current state of the room from the latest events.
 type StateAtEventAndReference struct {
 	StateAtEvent
-	gomatrixserverlib.EventReference
+	EventID string
 }
 
 type StateAtEventAndReferences []StateAtEventAndReference
@@ -228,7 +234,7 @@ func (s StateAtEventAndReferences) EventIDs() string {
 // It is when performing bulk event lookup in the database.
 type Event struct {
 	EventNID EventNID
-	*gomatrixserverlib.Event
+	gomatrixserverlib.PDU
 }
 
 const (
@@ -328,3 +334,5 @@ func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
 	r.stateSnapshotNID = r2.stateSnapshotNID
 	r.isStub = r2.isStub
 }
+
+var ErrorInvalidRoomInfo = fmt.Errorf("room info is invalid")

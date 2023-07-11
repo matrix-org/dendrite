@@ -20,12 +20,12 @@ import (
 	"time"
 
 	clienthttputil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
@@ -38,14 +38,14 @@ type queryKeysRequest struct {
 // QueryDeviceKeys returns device keys for users on this server.
 // https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-query
 func QueryDeviceKeys(
-	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
+	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer spec.ServerName,
 ) util.JSONResponse {
 	var qkr queryKeysRequest
 	err := json.Unmarshal(request.Content(), &qkr)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// make sure we only query users on our domain
@@ -62,14 +62,15 @@ func QueryDeviceKeys(
 	}
 
 	var queryRes api.QueryKeysResponse
-	if err := keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
+	keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
 		UserToDevices: qkr.DeviceKeys,
-	}, &queryRes); err != nil {
-		return jsonerror.InternalAPIError(httpReq.Context(), err)
-	}
+	}, &queryRes)
 	if queryRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -92,14 +93,14 @@ type claimOTKsRequest struct {
 // ClaimOneTimeKeys claims OTKs for users on this server.
 // https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-claim
 func ClaimOneTimeKeys(
-	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.FederationKeyAPI, thisServer gomatrixserverlib.ServerName,
+	httpReq *http.Request, request *fclient.FederationRequest, keyAPI api.FederationKeyAPI, thisServer spec.ServerName,
 ) util.JSONResponse {
 	var cor claimOTKsRequest
 	err := json.Unmarshal(request.Content(), &cor)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// make sure we only claim users on our domain
@@ -116,14 +117,15 @@ func ClaimOneTimeKeys(
 	}
 
 	var claimRes api.PerformClaimKeysResponse
-	if err := keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
+	keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: cor.OneTimeKeys,
-	}, &claimRes); err != nil {
-		return jsonerror.InternalAPIError(httpReq.Context(), err)
-	}
+	}, &claimRes)
 	if claimRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -135,7 +137,7 @@ func ClaimOneTimeKeys(
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) util.JSONResponse {
+func LocalKeys(cfg *config.FederationAPI, serverName spec.ServerName) util.JSONResponse {
 	keys, err := localKeys(cfg, serverName)
 	if err != nil {
 		return util.MessageResponse(http.StatusNotFound, err.Error())
@@ -143,7 +145,7 @@ func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
-func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg *config.FederationAPI, serverName spec.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 	var identity *fclient.SigningIdentity
 	var err error
@@ -153,10 +155,10 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 		}
 		publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = cfg.Matrix.ServerName
-		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
+		keys.ValidUntilTS = spec.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 			cfg.Matrix.KeyID: {
-				Key: gomatrixserverlib.Base64Bytes(publicKey),
+				Key: spec.Base64Bytes(publicKey),
 			},
 		}
 		keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
@@ -174,10 +176,10 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 		}
 		publicKey := virtualHost.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = virtualHost.ServerName
-		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(virtualHost.KeyValidityPeriod))
+		keys.ValidUntilTS = spec.AsTimestamp(time.Now().Add(virtualHost.KeyValidityPeriod))
 		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 			virtualHost.KeyID: {
-				Key: gomatrixserverlib.Base64Bytes(publicKey),
+				Key: spec.Base64Bytes(publicKey),
 			},
 		}
 		// TODO: Virtual hosts probably want to be able to specify old signing
@@ -200,11 +202,11 @@ func NotaryKeys(
 	fsAPI federationAPI.FederationInternalAPI,
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
-	serverName := gomatrixserverlib.ServerName(httpReq.Host) // TODO: this is not ideal
+	serverName := spec.ServerName(httpReq.Host) // TODO: this is not ideal
 	if !cfg.Matrix.IsLocalServerName(serverName) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Server name not known"),
+			JSON: spec.NotFound("Server name not known"),
 		}
 	}
 
@@ -247,7 +249,10 @@ func NotaryKeys(
 			j, err := json.Marshal(keys)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			js, err := gomatrixserverlib.SignJSON(
@@ -255,7 +260,10 @@ func NotaryKeys(
 			)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			response.ServerKeys = append(response.ServerKeys, js)

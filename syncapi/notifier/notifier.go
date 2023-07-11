@@ -20,9 +20,11 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,7 +37,8 @@ import (
 // the event, but the token has already advanced by the time they fetch it, resulting
 // in missed events.
 type Notifier struct {
-	lock *sync.RWMutex
+	lock  *sync.RWMutex
+	rsAPI api.SyncRoomserverAPI
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
 	roomIDToJoinedUsers map[string]*userIDSet
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
@@ -54,8 +57,9 @@ type Notifier struct {
 // NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
-func NewNotifier() *Notifier {
+func NewNotifier(rsAPI api.SyncRoomserverAPI) *Notifier {
 	return &Notifier{
+		rsAPI:                  rsAPI,
 		roomIDToJoinedUsers:    make(map[string]*userIDSet),
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
@@ -78,7 +82,7 @@ func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
 // OnNewEvent is called when a new event is received from the room server. Must only be
 // called from a single goroutine, to avoid races between updates which could set the
 // current sync position incorrectly.
-// Chooses which user sync streams to update by a provided *gomatrixserverlib.Event
+// Chooses which user sync streams to update by a provided gomatrixserverlib.PDU
 // (based on the users in the event's room),
 // a roomID directly, or a list of user IDs, prioritised by parameter ordering.
 // posUpdate contains the latest position(s) for one or more types of events.
@@ -86,7 +90,7 @@ func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
 // Typically a consumer supplies a posUpdate with the latest sync position for the
 // event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
-	ev *gomatrixserverlib.HeaderedEvent, roomID string, userIDs []string,
+	ev *rstypes.HeaderedEvent, roomID string, userIDs []string,
 	posUpdate types.StreamingToken,
 ) {
 	// update the current position then notify relevant /sync streams.
@@ -97,32 +101,45 @@ func (n *Notifier) OnNewEvent(
 	n._removeEmptyUserStreams()
 
 	if ev != nil {
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+				"Notifier.OnNewEvent: RoomID is invalid",
+			)
+			return
+		}
 		// Map this event's room_id to a list of joined users, and wake them up.
 		usersToNotify := n._joinedUsers(ev.RoomID())
 		// Map this event's room_id to a list of peeking devices, and wake them up.
 		peekingDevicesToNotify := n._peekingDevices(ev.RoomID())
 		// If this is an invite, also add in the invitee to this list.
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-			targetUserID := *ev.StateKey()
-			membership, err := ev.Membership()
+			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), *validRoomID, spec.SenderID(*ev.StateKey()))
 			if err != nil {
 				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
-					"Notifier.OnNewEvent: Failed to unmarshal member event",
+					"Notifier.OnNewEvent: Failed to find the userID for this event",
 				)
 			} else {
-				// Keep the joined user map up-to-date
-				switch membership {
-				case gomatrixserverlib.Invite:
-					usersToNotify = append(usersToNotify, targetUserID)
-				case gomatrixserverlib.Join:
-					// Manually append the new user's ID so they get notified
-					// along all members in the room
-					usersToNotify = append(usersToNotify, targetUserID)
-					n._addJoinedUser(ev.RoomID(), targetUserID)
-				case gomatrixserverlib.Leave:
-					fallthrough
-				case gomatrixserverlib.Ban:
-					n._removeJoinedUser(ev.RoomID(), targetUserID)
+				membership, err := ev.Membership()
+				if err != nil {
+					log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+						"Notifier.OnNewEvent: Failed to unmarshal member event",
+					)
+				} else {
+					// Keep the joined user map up-to-date
+					switch membership {
+					case spec.Invite:
+						usersToNotify = append(usersToNotify, targetUserID.String())
+					case spec.Join:
+						// Manually append the new user's ID so they get notified
+						// along all members in the room
+						usersToNotify = append(usersToNotify, targetUserID.String())
+						n._addJoinedUser(ev.RoomID(), targetUserID.String())
+					case spec.Leave:
+						fallthrough
+					case spec.Ban:
+						n._removeJoinedUser(ev.RoomID(), targetUserID.String())
+					}
 				}
 			}
 		}

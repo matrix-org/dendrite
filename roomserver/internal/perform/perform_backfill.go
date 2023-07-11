@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
@@ -37,13 +38,14 @@ import (
 const maxBackfillServers = 5
 
 type Backfiller struct {
-	IsLocalServerName func(gomatrixserverlib.ServerName) bool
+	IsLocalServerName func(spec.ServerName) bool
 	DB                storage.Database
 	FSAPI             federationAPI.RoomserverFederationAPI
 	KeyRing           gomatrixserverlib.JSONVerifier
+	Querier           api.QuerySenderIDAPI
 
 	// The servers which should be preferred above other servers when backfilling
-	PreferServers []gomatrixserverlib.ServerName
+	PreferServers []spec.ServerName
 }
 
 // PerformBackfill implements api.RoomServerQueryAPI
@@ -78,14 +80,14 @@ func (r *Backfiller) PerformBackfill(
 	}
 
 	// Scan the event tree for events to send back.
-	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName, r.Querier)
 	if err != nil {
 		return err
 	}
 
 	// Retrieve events from the list that was filled previously. If we fail to get
 	// events from the database then attempt once to get them from federation instead.
-	var loadedEvents []*gomatrixserverlib.Event
+	var loadedEvents []gomatrixserverlib.PDU
 	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, info, resultNIDs)
 	if err != nil {
 		if _, ok := err.(types.MissingEventError); ok {
@@ -98,7 +100,7 @@ func (r *Backfiller) PerformBackfill(
 		if _, ok := redactEventIDs[event.EventID()]; ok {
 			event.Redact()
 		}
-		response.Events = append(response.Events, event.Headered(info.RoomVersion))
+		response.Events = append(response.Events, &types.HeaderedEvent{PDU: event})
 	}
 
 	return err
@@ -112,7 +114,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
-	requester := newBackfillRequester(r.DB, r.FSAPI, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers)
+	requester := newBackfillRequester(r.DB, r.FSAPI, r.Querier, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers, info.RoomVersion)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
@@ -120,7 +122,9 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	// Specifically the test "Outbound federation can backfill events"
 	events, err := gomatrixserverlib.RequestBackfill(
 		ctx, req.VirtualHost, requester,
-		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100,
+		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+		},
 	)
 	// Only return an error if we really couldn't get any events.
 	if err != nil && len(events) == 0 {
@@ -132,7 +136,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	logrus.WithError(err).WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
 
 	// persist these new events - auth checks have already been done
-	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
+	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, r.Querier, events)
 
 	for _, ev := range backfilledEventMap {
 		// now add state for these events
@@ -167,7 +171,10 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 
 	// TODO: update backwards extremities, as that should be moved from syncapi to roomserver at some point.
 
-	res.Events = events
+	res.Events = make([]*types.HeaderedEvent, len(events))
+	for i := range events {
+		res.Events[i] = &types.HeaderedEvent{PDU: events[i]}
+	}
 	res.HistoryVisibility = requester.historyVisiblity
 	return nil
 }
@@ -175,7 +182,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 // fetchAndStoreMissingEvents does a best-effort fetch and store of missing events specified in stateIDs. Returns no error as it is just
 // best effort.
 func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
-	backfillRequester *backfillRequester, stateIDs []string, virtualHost gomatrixserverlib.ServerName) {
+	backfillRequester *backfillRequester, stateIDs []string, virtualHost spec.ServerName) {
 
 	servers := backfillRequester.servers
 
@@ -185,7 +192,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 		util.GetLogger(ctx).WithError(err).Warn("cannot query missing events")
 		return
 	}
-	missingMap := make(map[string]*gomatrixserverlib.HeaderedEvent) // id -> event
+	missingMap := make(map[string]*types.HeaderedEvent) // id -> event
 	for _, id := range stateIDs {
 		if _, ok := nidMap[id]; !ok {
 			missingMap[id] = nil
@@ -206,7 +213,9 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 				continue
 			}
 			loader := gomatrixserverlib.NewEventsLoader(roomVer, r.KeyRing, backfillRequester, backfillRequester.ProvideEvents, false)
-			result, err := loader.LoadAndVerify(ctx, res.PDUs, gomatrixserverlib.TopologicalOrderByPrevEvents)
+			result, err := loader.LoadAndVerify(ctx, res.PDUs, gomatrixserverlib.TopologicalOrderByPrevEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return r.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+			})
 			if err != nil {
 				logger.WithError(err).Warn("failed to load and verify event")
 				continue
@@ -226,63 +235,68 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 					logger.WithError(err).Warn("event failed PDU checks")
 					continue
 				}
-				missingMap[id] = res.Event
+				missingMap[id] = &types.HeaderedEvent{PDU: res.Event}
 			}
 		}
 	}
 
-	var newEvents []*gomatrixserverlib.HeaderedEvent
+	var newEvents []gomatrixserverlib.PDU
 	for _, ev := range missingMap {
 		if ev != nil {
-			newEvents = append(newEvents, ev)
+			newEvents = append(newEvents, ev.PDU)
 		}
 	}
 	util.GetLogger(ctx).Infof("Persisting %d new events", len(newEvents))
-	persistEvents(ctx, r.DB, newEvents)
+	persistEvents(ctx, r.DB, r.Querier, newEvents)
 }
 
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
 	db                storage.Database
 	fsAPI             federationAPI.RoomserverFederationAPI
-	virtualHost       gomatrixserverlib.ServerName
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
-	preferServer      map[gomatrixserverlib.ServerName]bool
+	querier           api.QuerySenderIDAPI
+	virtualHost       spec.ServerName
+	isLocalServerName func(spec.ServerName) bool
+	preferServer      map[spec.ServerName]bool
 	bwExtrems         map[string][]string
 
 	// per-request state
-	servers                 []gomatrixserverlib.ServerName
+	servers                 []spec.ServerName
 	eventIDToBeforeStateIDs map[string][]string
-	eventIDMap              map[string]*gomatrixserverlib.Event
+	eventIDMap              map[string]gomatrixserverlib.PDU
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
-	roomInfo                types.RoomInfo
+	roomVersion             gomatrixserverlib.RoomVersion
 }
 
 func newBackfillRequester(
 	db storage.Database, fsAPI federationAPI.RoomserverFederationAPI,
-	virtualHost gomatrixserverlib.ServerName,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
-	bwExtrems map[string][]string, preferServers []gomatrixserverlib.ServerName,
+	querier api.QuerySenderIDAPI,
+	virtualHost spec.ServerName,
+	isLocalServerName func(spec.ServerName) bool,
+	bwExtrems map[string][]string, preferServers []spec.ServerName,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) *backfillRequester {
-	preferServer := make(map[gomatrixserverlib.ServerName]bool)
+	preferServer := make(map[spec.ServerName]bool)
 	for _, p := range preferServers {
 		preferServer[p] = true
 	}
 	return &backfillRequester{
 		db:                      db,
 		fsAPI:                   fsAPI,
+		querier:                 querier,
 		virtualHost:             virtualHost,
 		isLocalServerName:       isLocalServerName,
 		eventIDToBeforeStateIDs: make(map[string][]string),
-		eventIDMap:              make(map[string]*gomatrixserverlib.Event),
+		eventIDMap:              make(map[string]gomatrixserverlib.PDU),
 		bwExtrems:               bwExtrems,
 		preferServer:            preferServer,
 		historyVisiblity:        gomatrixserverlib.HistoryVisibilityShared,
+		roomVersion:             roomVersion,
 	}
 }
 
-func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent *gomatrixserverlib.HeaderedEvent) ([]string, error) {
-	b.eventIDMap[targetEvent.EventID()] = targetEvent.Unwrap()
+func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent gomatrixserverlib.PDU) ([]string, error) {
+	b.eventIDMap[targetEvent.EventID()] = targetEvent
 	if ids, ok := b.eventIDToBeforeStateIDs[targetEvent.EventID()]; ok {
 		return ids, nil
 	}
@@ -304,7 +318,7 @@ func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent
 		if !ok {
 			goto FederationHit
 		}
-		newStateIDs := b.calculateNewStateIDs(targetEvent.Unwrap(), prevEvent, prevEventStateIDs)
+		newStateIDs := b.calculateNewStateIDs(targetEvent, prevEvent, prevEventStateIDs)
 		if newStateIDs != nil {
 			b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
 			return newStateIDs, nil
@@ -333,7 +347,7 @@ FederationHit:
 	return nil, lastErr
 }
 
-func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent *gomatrixserverlib.Event, prevEventStateIDs []string) []string {
+func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent gomatrixserverlib.PDU, prevEventStateIDs []string) []string {
 	newStateIDs := prevEventStateIDs[:]
 	if prevEvent.StateKey() == nil {
 		// state is the same as the previous event
@@ -371,7 +385,7 @@ func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent *gomatri
 }
 
 func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
-	event *gomatrixserverlib.HeaderedEvent, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
+	event gomatrixserverlib.PDU, eventIDs []string) (map[string]gomatrixserverlib.PDU, error) {
 
 	// try to fetch the events from the database first
 	events, err := b.ProvideEvents(roomVer, eventIDs)
@@ -381,7 +395,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 	} else {
 		logrus.Infof("Fetched %d/%d events from the database", len(events), len(eventIDs))
 		if len(events) == len(eventIDs) {
-			result := make(map[string]*gomatrixserverlib.Event)
+			result := make(map[string]gomatrixserverlib.PDU)
 			for i := range events {
 				result[events[i].EventID()] = events[i]
 				b.eventIDMap[events[i].EventID()] = events[i]
@@ -415,7 +429,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // It returns a list of servers which can be queried for backfill requests. These servers
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
-func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
+func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []spec.ServerName {
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.
 	successor := ""
@@ -452,14 +466,14 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID].EventNID)
+	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID].EventNID, b.querier)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil
 	}
 
 	// possibly return all joined servers depending on history visiblity
-	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, info, stateEntries, b.virtualHost)
+	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, b.querier, info, stateEntries, b.virtualHost)
 	b.historyVisiblity = visibility
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
@@ -478,19 +492,23 @@ FindSuccessor:
 	memberEvents = append(memberEvents, memberEventsFromVis...)
 
 	// Store the server names in a temporary map to avoid duplicates.
-	serverSet := make(map[gomatrixserverlib.ServerName]bool)
+	serverSet := make(map[spec.ServerName]bool)
 	for _, event := range memberEvents {
-		if _, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender()); err == nil {
-			serverSet[senderDomain] = true
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			continue
+		}
+		if sender, err := b.querier.QueryUserIDForSender(ctx, *validRoomID, event.SenderID()); err == nil {
+			serverSet[sender.Domain()] = true
 		}
 	}
-	var servers []gomatrixserverlib.ServerName
+	var servers []spec.ServerName
 	for server := range serverSet {
 		if b.isLocalServerName(server) {
 			continue
 		}
 		if b.preferServer[server] { // insert at the front
-			servers = append([]gomatrixserverlib.ServerName{server}, servers...)
+			servers = append([]spec.ServerName{server}, servers...)
 		} else { // insert at the back
 			servers = append(servers, server)
 		}
@@ -505,14 +523,14 @@ FindSuccessor:
 
 // Backfill performs a backfill request to the given server.
 // https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
-func (b *backfillRequester) Backfill(ctx context.Context, origin, server gomatrixserverlib.ServerName, roomID string,
+func (b *backfillRequester) Backfill(ctx context.Context, origin, server spec.ServerName, roomID string,
 	limit int, fromEventIDs []string) (gomatrixserverlib.Transaction, error) {
 
 	tx, err := b.fsAPI.Backfill(ctx, origin, server, roomID, limit, fromEventIDs)
 	return tx, err
 }
 
-func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
+func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
 	ctx := context.Background()
 	nidMap, err := b.db.EventNIDs(ctx, eventIDs)
 	if err != nil {
@@ -521,22 +539,18 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 	}
 	eventNIDs := make([]types.EventNID, len(nidMap))
 	i := 0
-	roomNID := b.roomInfo.RoomNID
 	for _, nid := range nidMap {
 		eventNIDs[i] = nid.EventNID
 		i++
-		if roomNID == 0 {
-			roomNID = nid.RoomNID
-		}
 	}
-	eventsWithNids, err := b.db.Events(ctx, &b.roomInfo, eventNIDs)
+	eventsWithNids, err := b.db.Events(ctx, b.roomVersion, eventNIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_nids", eventNIDs).Error("Failed to load events")
 		return nil, err
 	}
-	events := make([]*gomatrixserverlib.Event, len(eventsWithNids))
+	events := make([]gomatrixserverlib.PDU, len(eventsWithNids))
 	for i := range eventsWithNids {
-		events[i] = eventsWithNids[i].Event
+		events[i] = eventsWithNids[i].PDU
 	}
 	return events, nil
 }
@@ -546,8 +560,8 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 // TODO: Long term we probably want a history_visibility table which stores eventNID | visibility_enum so we can just
 // pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
-	ctx context.Context, db storage.RoomDatabase, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
-	thisServer gomatrixserverlib.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
+	ctx context.Context, db storage.RoomDatabase, querier api.QuerySenderIDAPI, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
+	thisServer spec.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
@@ -559,19 +573,22 @@ func joinEventsFromHistoryVisibility(
 	}
 
 	// Get all of the events in this state
-	stateEvents, err := db.Events(ctx, roomInfo, eventNIDs)
+	if roomInfo == nil {
+		return nil, gomatrixserverlib.HistoryVisibilityJoined, types.ErrorInvalidRoomInfo
+	}
+	stateEvents, err := db.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		// even though the default should be shared, restricting the visibility to joined
 		// feels more secure here.
 		return nil, gomatrixserverlib.HistoryVisibilityJoined, err
 	}
-	events := make([]*gomatrixserverlib.Event, len(stateEvents))
+	events := make([]gomatrixserverlib.PDU, len(stateEvents))
 	for i := range stateEvents {
-		events[i] = stateEvents[i].Event
+		events[i] = stateEvents[i].PDU
 	}
 
 	// Can we see events in the room?
-	canSeeEvents := auth.IsServerAllowed(thisServer, true, events)
+	canSeeEvents := auth.IsServerAllowed(ctx, querier, thisServer, true, events)
 	visibility := auth.HistoryVisibilityForRoom(events)
 	if !canSeeEvents {
 		logrus.Infof("ServersAtEvent history not visible to us: %s", visibility)
@@ -582,11 +599,11 @@ func joinEventsFromHistoryVisibility(
 	if err != nil {
 		return nil, visibility, err
 	}
-	evs, err := db.Events(ctx, roomInfo, joinEventNIDs)
+	evs, err := db.Events(ctx, roomInfo.RoomVersion, joinEventNIDs)
 	return evs, visibility, err
 }
 
-func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (types.RoomNID, map[string]types.Event) {
+func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySenderIDAPI, events []gomatrixserverlib.PDU) (types.RoomNID, map[string]types.Event) {
 	var roomNID types.RoomNID
 	var eventNID types.EventNID
 	backfilledEventMap := make(map[string]types.Event)
@@ -603,7 +620,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			i++
 		}
 
-		roomInfo, err := db.GetOrCreateRoomInfo(ctx, ev.Unwrap())
+		roomInfo, err := db.GetOrCreateRoomInfo(ctx, ev)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get or create roomNID")
 			continue
@@ -622,15 +639,15 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			continue
 		}
 
-		eventNID, _, err = db.StoreEvent(ctx, ev.Unwrap(), roomInfo, eventTypeNID, eventStateKeyNID, authNids, false)
+		eventNID, _, err = db.StoreEvent(ctx, ev, roomInfo, eventTypeNID, eventStateKeyNID, authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue
 		}
 
-		resolver := state.NewStateResolution(db, roomInfo)
+		resolver := state.NewStateResolution(db, roomInfo, querier)
 
-		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.Unwrap(), &resolver)
+		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev, &resolver, querier)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue
@@ -639,12 +656,12 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 		// It's also possible for this event to be a redaction which results in another event being
 		// redacted, which we don't care about since we aren't returning it in this backfill.
 		if redactedEvent != nil && redactedEvent.EventID() == ev.EventID() {
-			ev = redactedEvent.Headered(ev.RoomVersion)
+			ev = redactedEvent
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{
 			EventNID: eventNID,
-			Event:    ev.Unwrap(),
+			PDU:      ev,
 		}
 	}
 	return roomNID, backfilledEventMap

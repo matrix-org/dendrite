@@ -77,7 +77,10 @@ docs/_site
 
 media_store/
 
-__debug_bin
+# golang workspaces
+go.work*
+
+__debug_bin*
 
 cmd/dendrite-monolith-server/dendrite-monolith-server
 build

@@ -38,3 +38,4 @@ jobs:
         with:
           config: helm/cr.yaml
           charts_dir: helm/
+          mark_as_latest: false

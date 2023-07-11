@@ -22,15 +22,14 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/google/uuid"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -89,14 +88,16 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}, &res)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("userApi.QueryLocalpartForThreePID failed")
-			resp := jsonerror.InternalServerError()
-			return nil, &resp
+			return nil, &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown(""),
+			}
 		}
 		username = "@" + res.Localpart + ":" + string(t.Config.Matrix.ServerName)
 		if username == "" {
 			return nil, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
-				JSON: jsonerror.Forbidden("Invalid username or password"),
+				JSON: spec.Forbidden("Invalid username or password"),
 			}
 		}
 	} else {
@@ -105,26 +106,26 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("A username must be supplied."),
+			JSON: spec.BadJSON("A username must be supplied."),
 		}
 	}
 	if len(r.Password) == 0 {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("A password must be supplied."),
+			JSON: spec.BadJSON("A password must be supplied."),
 		}
 	}
 	localpart, domain, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 	if !t.Config.Matrix.IsLocalServerName(domain) {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername("The server name is not known."),
+			JSON: spec.InvalidUsername("The server name is not known."),
 		}
 	}
 
@@ -135,7 +136,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		if !ok {
 			return nil, &util.JSONResponse{
 				Code: http.StatusTooManyRequests,
-				JSON: jsonerror.LimitExceeded("Too Many Requests", retryIn.Milliseconds()),
+				JSON: spec.LimitExceeded("Too Many Requests", retryIn.Milliseconds()),
 			}
 		}
 	}
@@ -147,7 +148,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Unable to fetch account by password."),
+			JSON: spec.Unknown("Unable to fetch account by password."),
 		}
 	}
 
@@ -177,7 +178,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	return &r.Login, nil
 }
 
-func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string, domain gomatrixserverlib.ServerName, password string) (*api.Account, *util.JSONResponse) {
+func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string, domain spec.ServerName, password string) (*api.Account, *util.JSONResponse) {
 	res := &api.QueryAccountByPasswordResponse{}
 	err := t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 		Localpart:         strings.ToLower(localpart),
@@ -187,7 +188,7 @@ func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Unable to fetch account by password."),
+			JSON: spec.Unknown("Unable to fetch account by password."),
 		}
 	}
 
@@ -202,7 +203,7 @@ func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string
 		if err != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("Unable to fetch account by password."),
+				JSON: spec.Unknown("Unable to fetch account by password."),
 			}
 		}
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
@@ -213,7 +214,7 @@ func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string
 			}
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
+				JSON: spec.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	}
@@ -226,9 +227,10 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 	if err != nil {
 		return false, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("unable to connect to ldap: " + err.Error()),
+			JSON: spec.Unknown("unable to connect to ldap: " + err.Error()),
 		}
 	}
+	// nolint: errcheck
 	defer conn.Close()
 
 	if t.Config.Ldap.AdminBindEnabled {
@@ -236,7 +238,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 		if err != nil {
 			return false, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("unable to bind to ldap: " + err.Error()),
+				JSON: spec.Unknown("unable to bind to ldap: " + err.Error()),
 			}
 		}
 		filter := strings.ReplaceAll(t.Config.Ldap.SearchFilter, "{username}", username)
@@ -249,19 +251,19 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 		if err != nil {
 			return false, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("unable to bind to search ldap: " + err.Error()),
+				JSON: spec.Unknown("unable to bind to search ldap: " + err.Error()),
 			}
 		}
 		if len(result.Entries) > 1 {
 			return false, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
-				JSON: jsonerror.BadJSON("'user' must be duplicated."),
+				JSON: spec.BadJSON("'user' must be duplicated."),
 			}
 		}
 		if len(result.Entries) < 1 {
 			return false, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
-				JSON: jsonerror.BadJSON("'user' not found."),
+				JSON: spec.BadJSON("'user' not found."),
 			}
 		}
 
@@ -273,7 +275,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 			if err != nil {
 				return false, &util.JSONResponse{
 					Code: http.StatusUnauthorized,
-					JSON: jsonerror.InvalidUsername(err.Error()),
+					JSON: spec.InvalidUsername(err.Error()),
 				}
 			}
 			if t.Rt != nil {
@@ -281,7 +283,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 			}
 			return false, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
+				JSON: spec.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	} else {
@@ -293,7 +295,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 			if err != nil {
 				return false, &util.JSONResponse{
 					Code: http.StatusUnauthorized,
-					JSON: jsonerror.InvalidUsername(err.Error()),
+					JSON: spec.InvalidUsername(err.Error()),
 				}
 			}
 			if t.Rt != nil {
@@ -301,7 +303,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 			}
 			return false, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
+				JSON: spec.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	}
@@ -310,7 +312,7 @@ func (t *LoginTypePassword) authenticateLdap(username, password string) (bool, *
 	if err != nil {
 		return false, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 	return isAdmin, nil
@@ -335,7 +337,7 @@ func (t *LoginTypePassword) isLdapAdmin(conn *ldap.Conn, username string) (bool,
 	return true, nil
 }
 
-func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart string, domain gomatrixserverlib.ServerName, admin bool) (*api.Account, *util.JSONResponse) {
+func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart string, domain spec.ServerName, admin bool) (*api.Account, *util.JSONResponse) {
 	var existing api.QueryAccountByLocalpartResponse
 	err := t.UserLoginAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
 		Localpart:  localpart,
@@ -348,7 +350,7 @@ func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart st
 	if err != sql.ErrNoRows {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 
@@ -369,12 +371,12 @@ func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart st
 		if _, ok := err.(*api.ErrorConflict); ok {
 			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+				JSON: spec.UserInUse("Desired user ID is already taken."),
 			}
 		}
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+			JSON: spec.Unknown("failed to create account: " + err.Error()),
 		}
 	}
 	return created.Account, nil

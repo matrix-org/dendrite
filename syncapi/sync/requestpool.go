@@ -25,12 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -61,7 +60,7 @@ type PresencePublisher interface {
 }
 
 type PresenceConsumer interface {
-	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool)
+	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts spec.Timestamp, fromSync bool)
 }
 
 // NewRequestPool makes a new RequestPool
@@ -138,7 +137,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	newPresence := types.PresenceInternal{
 		Presence:     presenceID,
 		UserID:       userID,
-		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		LastActiveTS: spec.AsTimestamp(time.Now()),
 	}
 
 	// ensure we also send the current status_msg to federated servers and not nil
@@ -170,7 +169,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	// the /sync response else we may not return presence: online immediately.
 	rp.consumer.EmitPresence(
 		context.Background(), userID, presenceID, newPresence.ClientFields.StatusMsg,
-		gomatrixserverlib.AsTimestamp(time.Now()), true,
+		spec.AsTimestamp(time.Now()), true,
 	)
 }
 
@@ -236,12 +235,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		if err == types.ErrMalformedSyncToken {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue(err.Error()),
+				JSON: spec.InvalidParam(err.Error()),
 			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(err.Error()),
+			JSON: spec.Unknown(err.Error()),
 		}
 	}
 
@@ -538,32 +537,38 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	if from == "" || to == "" {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidArgumentValue("missing ?from= or ?to="),
+			JSON: spec.InvalidParam("missing ?from= or ?to="),
 		}
 	}
 	fromToken, err := types.NewStreamTokenFromString(from)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidArgumentValue("bad 'from' value"),
+			JSON: spec.InvalidParam("bad 'from' value"),
 		}
 	}
 	toToken, err := types.NewStreamTokenFromString(to)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidArgumentValue("bad 'to' value"),
+			JSON: spec.InvalidParam("bad 'to' value"),
 		}
 	}
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -574,7 +579,10 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	succeeded = true
 	return util.JSONResponse{

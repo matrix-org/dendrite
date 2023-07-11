@@ -15,15 +15,16 @@
 package routing
 
 import (
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -59,7 +60,10 @@ func GetDeviceByID(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var targetDevice *api.Device
 	for _, device := range queryRes.Devices {
@@ -71,7 +75,7 @@ func GetDeviceByID(
 	if targetDevice == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Unknown device"),
+			JSON: spec.NotFound("Unknown device"),
 		}
 	}
 
@@ -96,7 +100,10 @@ func GetDevicesByLocalpart(
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	res := devicesJSON{}
@@ -138,18 +145,21 @@ func UpdateDeviceByID(
 	}, &performRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceUpdate failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !performRes.DeviceExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.Forbidden("device does not exist"),
+			JSON: spec.Forbidden("device does not exist"),
 		}
 	}
 	if performRes.Forbidden {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("device not owned by current user"),
+			JSON: spec.Forbidden("device not owned by current user"),
 		}
 	}
 
@@ -179,7 +189,7 @@ func DeleteDeviceById(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
 
@@ -189,7 +199,7 @@ func DeleteDeviceById(
 		if dev != deviceID {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("session & device mismatch"),
+				JSON: spec.Forbidden("session and device mismatch"),
 			}
 		}
 	}
@@ -211,7 +221,10 @@ func DeleteDeviceById(
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// make sure that the access token being used matches the login creds used for user interactive auth, else
@@ -219,7 +232,7 @@ func DeleteDeviceById(
 	if login.Username() != localpart && login.Username() != device.UserID {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("Cannot delete another user's device"),
+			JSON: spec.Forbidden("Cannot delete another user's device"),
 		}
 	}
 
@@ -229,7 +242,10 @@ func DeleteDeviceById(
 		DeviceIDs: []string{deviceID},
 	}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	deleteOK = true
@@ -242,13 +258,39 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
+	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
-	payload := devicesDeleteJSON{}
 
-	if resErr := httputil.UnmarshalJSONRequest(req, &payload); resErr != nil {
-		return *resErr
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
+		}
+	}
+	defer req.Body.Close() // nolint:errcheck
+
+	// initiate UIA
+	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
+	if errRes != nil {
+		return *errRes
+	}
+
+	if login.Username() != device.UserID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("unable to delete devices for other user"),
+		}
+	}
+
+	payload := devicesDeleteJSON{}
+	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	defer req.Body.Close() // nolint: errcheck
@@ -259,7 +301,10 @@ func DeleteDevices(
 		DeviceIDs: payload.Devices,
 	}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

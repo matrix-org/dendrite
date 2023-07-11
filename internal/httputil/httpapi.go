@@ -31,9 +31,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -101,7 +101,7 @@ func MakeAuthAPI(
 		if !opts.GuestAccessAllowed && device.AccountType == userapi.AccountTypeGuest {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.GuestAccessForbidden("Guest access not allowed"),
+				JSON: spec.GuestAccessForbidden("Guest access not allowed"),
 			}
 		}
 
@@ -177,7 +177,7 @@ func MakeAdminAPI(
 		if device.AccountType != userapi.AccountTypeAdmin {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("This API can only be used by admin users."),
+				JSON: spec.Forbidden("This API can only be used by admin users."),
 			}
 		}
 		return f(req, device)

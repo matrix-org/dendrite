@@ -23,12 +23,13 @@ import (
 
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var (
 	userIDCounter = int64(0)
 
-	serverName = gomatrixserverlib.ServerName("test")
+	serverName = spec.ServerName("test")
 	keyID      = gomatrixserverlib.KeyID("ed25519:test")
 	privateKey = ed25519.NewKeyFromSeed([]byte{
 		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
@@ -53,12 +54,12 @@ type User struct {
 	// key ID and private key of the server who has this user, if known.
 	keyID   gomatrixserverlib.KeyID
 	privKey ed25519.PrivateKey
-	srvName gomatrixserverlib.ServerName
+	srvName spec.ServerName
 }
 
 type UserOpt func(*User)
 
-func WithSigningServer(srvName gomatrixserverlib.ServerName, keyID gomatrixserverlib.KeyID, privKey ed25519.PrivateKey) UserOpt {
+func WithSigningServer(srvName spec.ServerName, keyID gomatrixserverlib.KeyID, privKey ed25519.PrivateKey) UserOpt {
 	return func(u *User) {
 		u.keyID = keyID
 		u.privKey = privKey

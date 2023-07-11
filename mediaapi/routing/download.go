@@ -30,14 +30,13 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -72,7 +71,7 @@ type downloadRequest struct {
 func Download(
 	w http.ResponseWriter,
 	req *http.Request,
-	origin gomatrixserverlib.ServerName,
+	origin spec.ServerName,
 	mediaID types.MediaID,
 	cfg *config.MediaAPI,
 	db storage.Database,
@@ -130,7 +129,7 @@ func Download(
 		// TODO: Handle the fact we might have started writing the response
 		dReq.jsonErrorResponse(w, util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Failed to download: " + err.Error()),
+			JSON: spec.NotFound("Failed to download: " + err.Error()),
 		})
 		return
 	}
@@ -138,7 +137,7 @@ func Download(
 	if metadata == nil {
 		dReq.jsonErrorResponse(w, util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("File not found"),
+			JSON: spec.NotFound("File not found"),
 		})
 		return
 	}
@@ -168,7 +167,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 	if !mediaIDRegex.MatchString(string(r.MediaMetadata.MediaID)) {
 		return &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
+			JSON: spec.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
 		}
 	}
 	// Note: the origin will be validated either by comparison to the configured server name of this homeserver
@@ -176,7 +175,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 	if r.MediaMetadata.Origin == "" {
 		return &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("serverName must be a non-empty string"),
+			JSON: spec.NotFound("serverName must be a non-empty string"),
 		}
 	}
 
@@ -184,7 +183,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		if r.ThumbnailSize.Width <= 0 || r.ThumbnailSize.Height <= 0 {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown("width and height must be greater than 0"),
+				JSON: spec.Unknown("width and height must be greater than 0"),
 			}
 		}
 		// Default method to scale if not set
@@ -194,7 +193,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		if r.ThumbnailSize.ResizeMethod != types.Crop && r.ThumbnailSize.ResizeMethod != types.Scale {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown("method must be one of crop or scale"),
+				JSON: spec.Unknown("method must be one of crop or scale"),
 			}
 		}
 	}

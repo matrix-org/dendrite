@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, *sql.DB, func()) {
@@ -101,6 +102,56 @@ func TestOutputRoomEventsTable(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatalf("err: %s", err)
+		}
+	})
+}
+
+func TestReindex(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	room.CreateAndInsert(t, alice, spec.MRoomName, map[string]interface{}{
+		"name": "my new room name",
+	}, test.WithStateKey(""))
+
+	room.CreateAndInsert(t, alice, spec.MRoomTopic, map[string]interface{}{
+		"topic": "my new room topic",
+	}, test.WithStateKey(""))
+
+	room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{
+		"msgbody": "my room message",
+		"type":    "m.text",
+	})
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		tab, db, close := newOutputRoomEventsTable(t, dbType)
+		defer close()
+		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
+			for _, ev := range room.Events() {
+				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
+				if err != nil {
+					return fmt.Errorf("failed to InsertEvent: %s", err)
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("err: %s", err)
+		}
+
+		events, err := tab.ReIndex(ctx, nil, 10, 0, []string{
+			spec.MRoomName,
+			spec.MRoomTopic,
+			"m.room.message"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		wantEventCount := 3
+		if len(events) != wantEventCount {
+			t.Fatalf("expected %d events, got %d", wantEventCount, len(events))
 		}
 	})
 }

@@ -27,9 +27,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // MembershipRequest represents the body of an incoming POST request
@@ -62,13 +64,33 @@ type idServerStoreInviteResponse struct {
 }
 
 var (
-	// ErrMissingParameter is the error raised if a request for 3PID invite has
-	// an incomplete body
-	ErrMissingParameter = errors.New("'address', 'id_server' and 'medium' must all be supplied")
-	// ErrNotTrusted is the error raised if an identity server isn't in the list
-	// of trusted servers in the configuration file.
-	ErrNotTrusted = errors.New("untrusted server")
+	errMissingParameter = fmt.Errorf("'address', 'id_server' and 'medium' must all be supplied")
+	errNotTrusted       = fmt.Errorf("untrusted server")
 )
+
+// ErrMissingParameter is the error raised if a request for 3PID invite has
+// an incomplete body
+type ErrMissingParameter struct{}
+
+func (e ErrMissingParameter) Error() string {
+	return errMissingParameter.Error()
+}
+
+func (e ErrMissingParameter) Unwrap() error {
+	return errMissingParameter
+}
+
+// ErrNotTrusted is the error raised if an identity server isn't in the list
+// of trusted servers in the configuration file.
+type ErrNotTrusted struct{}
+
+func (e ErrNotTrusted) Error() string {
+	return errNotTrusted.Error()
+}
+
+func (e ErrNotTrusted) Unwrap() error {
+	return errNotTrusted
+}
 
 // CheckAndProcessInvite analyses the body of an incoming membership request.
 // If the fields relative to a third-party-invite are all supplied, lookups the
@@ -97,7 +119,7 @@ func CheckAndProcessInvite(
 	} else if body.Address == "" || body.IDServer == "" || body.Medium == "" {
 		// If at least one of the 3PID-specific fields is supplied but not all
 		// of them, return an error
-		err = ErrMissingParameter
+		err = ErrMissingParameter{}
 		return
 	}
 
@@ -278,7 +300,7 @@ func queryIDServerPubKey(ctx context.Context, idServerName string, keyID string)
 	}
 
 	var pubKeyRes struct {
-		PublicKey gomatrixserverlib.Base64Bytes `json:"public_key"`
+		PublicKey spec.Base64Bytes `json:"public_key"`
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -333,8 +355,20 @@ func emit3PIDInviteEvent(
 	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) error {
-	builder := &gomatrixserverlib.EventBuilder{
-		Sender:   device.UserID,
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return err
+	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	sender, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
+	if err != nil {
+		return err
+	}
+	proto := &gomatrixserverlib.ProtoEvent{
+		SenderID: string(sender),
 		RoomID:   roomID,
 		Type:     "m.room.third_party_invite",
 		StateKey: &res.Token,
@@ -348,7 +382,7 @@ func emit3PIDInviteEvent(
 		PublicKeys:     res.PublicKeys,
 	}
 
-	if err := builder.SetContent(content); err != nil {
+	if err = proto.SetContent(content); err != nil {
 		return err
 	}
 
@@ -358,7 +392,7 @@ func emit3PIDInviteEvent(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.QueryAndBuildEvent(ctx, builder, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, proto, identity, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}
@@ -366,8 +400,8 @@ func emit3PIDInviteEvent(
 	return api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			event.Headered(queryRes.RoomVersion),
+		[]*types.HeaderedEvent{
+			event,
 		},
 		device.UserDomain(),
 		cfg.Matrix.ServerName,

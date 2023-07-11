@@ -1,5 +1,59 @@
 # Changelog
 
+## Dendrite 0.13.1 (2023-07-06)
+
+This releases fixes a long-standing "off-by-one" error which could result in state resets. Upgrading to this version is **highly** recommended.
+
+When deduplicating state events, we were checking if the event in question was already in a state snapshot. If it was in a previous state snapshot, we would 
+then remove it from the list of events to store. If this happened, we were, unfortunately, skipping the next event to check. This resulted in 
+events getting stored in state snapshots where they may not be needed. When we now compared two of those state snapshots, one of them
+contained the skipped event, while the other didn't. This difference possibly shouldn't exist, resulting in unexpected state resets and explains
+reports of missing state events as well.
+
+Rooms where a state reset occurred earlier should, hopefully, reconcile over time.
+
+### Fixes:
+
+- A long-standing "off-by-one" error has been fixed, which could result in state resets
+- Roomserver Prometheus Metrics are available again
+
+### Features
+
+- Updated dependencies
+  - Internal NATS Server has been updated from v2.9.15 to v2.9.19
+
+## Dendrite 0.13.0 (2023-06-30)
+
+### Features
+
+- Results in responses to `/search` now highlight words more accurately and not only the search terms as before
+- Support for connecting to appservices listening on unix sockets has been added (contributed by [cyberb](https://github.com/cyberb))
+- Admin APIs for token authenticated registration have been added (contributed by [santhoshivan23](https://github.com/santhoshivan23))
+- Initial support for [MSC4014: Pseudonymous Identities](https://github.com/matrix-org/matrix-spec-proposals/blob/kegan/pseudo-ids/proposals/4014-pseudonymous-identities.md)
+  - This is **highly experimental**, things like changing usernames/avatars, inviting users, upgrading rooms isn't working
+
+### Fixes
+
+- `m.upload.size` is now optional, finally allowing uploads with unlimited file size
+- A bug while resolving server names has been fixed (contributed by [anton-molyboha](https://github.com/anton-molyboha))
+- Application services should only receive one invitation instead of 2 (or worse), which could result in state resets previously
+- Several admin endpoints are now using `POST` instead of `GET`
+- `/delete_devices` now uses user-interactive authentication
+- Several "membership" (e.g `/kick`, `/ban`) endpoints are using less heavy database queries to check if the user is allowed to perform this action
+- `/3pid` endpoints are now available on `/v3` instead of the `/unstable` prefix
+- Upgrading rooms ignores state events of other users, which could result in failed upgrades before
+- Uploading key backups with a wrong version now returns `M_WRONG_ROOM_KEYS_VERSION`
+- A potential state reset when joining the same room multiple times in short sequence has been fixed
+- A bug where we returned the full event as `redacted_because` in redaction events has been fixed
+- The `displayname` and `avatar_url` can now be set to empty strings
+- Unsafe hotserving of files has been fixed (contributed by [joshqou](https://github.com/joshqou))
+- Joining new rooms would potentially return "redacted" events, due to history visibility not being set correctly, this could result in events being rejected 
+- Backfilling resulting in `unsuported room version ''` should now be solved
+
+### Other
+
+- Huge refactoring of Dendrite and gomatrixserverlib
+
 ## Dendrite 0.12.0 (2023-03-13)
 
 ### Features

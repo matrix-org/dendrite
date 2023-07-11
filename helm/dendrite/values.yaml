@@ -19,29 +19,38 @@ signing_key:
 resources:
   requests:
     memory: "512Mi"
-
   limits:
     memory: "4096Mi"
 
 persistence:
-  # -- The storage class to use for volume claims. Defaults to the
-  # cluster default storage class.
+  # -- The storage class to use for volume claims.
+  # Used unless specified at the specific component.
+  # Defaults to the cluster default storage class.
   storageClass: ""
   jetstream:
     # -- Use an existing volume claim for jetstream
     existingClaim: ""
     # -- PVC Storage Request for the jetstream volume
     capacity: "1Gi"
+    # -- The storage class to use for volume claims.
+    # Defaults to persistence.storageClass
+    storageClass: ""
   media:
     # -- Use an existing volume claim for media files
     existingClaim: ""
     # -- PVC Storage Request for the media volume
     capacity: "1Gi"
+    # -- The storage class to use for volume claims.
+    # Defaults to persistence.storageClass
+    storageClass: ""
   search:
     # -- Use an existing volume claim for the fulltext search index
     existingClaim: ""
     # -- PVC Storage Request for the search volume
     capacity: "1Gi"
+    # -- The storage class to use for volume claims.
+    # Defaults to persistence.storageClass
+    storageClass: ""
 
 # -- Add additional volumes to the Dendrite Pod
 extraVolumes: []
@@ -49,7 +58,6 @@ extraVolumes: []
 # - name: extra-config
 #   secret:
 #     secretName: extra-config
-
 
 # -- Configure additional mount points volumes in the Dendrite Pod
 extraVolumeMounts: []
@@ -212,7 +220,6 @@ dendrite_config:
       # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
       # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
-
   app_service_api:
     # -- Disable the validation of TLS certificates of appservices. This is
     # not recommended in production since it may allow appservice traffic
@@ -359,14 +366,18 @@ postgresql:
     enabled: false
 
 ingress:
-  # -- Create an ingress for a monolith deployment
+  # -- Create an ingress for the deployment
   enabled: false
-  hosts: []
+  # -- The ingressClass to use. Will be converted to annotation if not yet supported.
   className: ""
-  hostName: ""
   # -- Extra, custom annotations
   annotations: {}
-
+  # -- The ingress hostname for your matrix server.
+  # Should align with the server_name and well_known_* hosts.
+  # If not set, generated from the dendrite_config values.
+  hostName: ""
+  # -- TLS configuration. Should contain information for the server_name and well-known hosts.
+  # Alternatively, set tls.generate=true to generate defaults based on the dendrite_config.
   tls: []
 
 service:

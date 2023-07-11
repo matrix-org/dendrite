@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/storage/tables"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const notaryServerKeysJSONSchema = `
@@ -56,7 +57,7 @@ func NewSQLiteNotaryServerKeysTable(db *sql.DB) (s *notaryServerKeysStatements, 
 }
 
 func (s *notaryServerKeysStatements) InsertJSONResponse(
-	ctx context.Context, txn *sql.Tx, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName gomatrixserverlib.ServerName, validUntil gomatrixserverlib.Timestamp,
+	ctx context.Context, txn *sql.Tx, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName spec.ServerName, validUntil spec.Timestamp,
 ) (tables.NotaryID, error) {
 	var notaryID tables.NotaryID
 	return notaryID, txn.Stmt(s.insertServerKeysJSONStmt).QueryRowContext(ctx, string(keyQueryResponseJSON.Raw), serverName, validUntil).Scan(&notaryID)

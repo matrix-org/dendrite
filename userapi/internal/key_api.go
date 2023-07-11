@@ -25,6 +25,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -62,7 +63,7 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 	return nil
 }
 
-func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) error {
+func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) {
 	res.OneTimeKeys = make(map[string]map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})
 	// wrap request map in a top-level by-domain map
@@ -80,7 +81,7 @@ func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.Perform
 		domainToDeviceKeys[string(serverName)] = nested
 	}
 	for domain, local := range domainToDeviceKeys {
-		if !a.Config.Matrix.IsLocalServerName(gomatrixserverlib.ServerName(domain)) {
+		if !a.Config.Matrix.IsLocalServerName(spec.ServerName(domain)) {
 			continue
 		}
 		// claim local keys
@@ -109,7 +110,6 @@ func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.Perform
 	if len(domainToDeviceKeys) > 0 {
 		a.claimRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
 	}
-	return nil
 }
 
 func (a *UserInternalAPI) claimRemoteKeys(
@@ -129,7 +129,7 @@ func (a *UserInternalAPI) claimRemoteKeys(
 			defer cancel()
 			defer wg.Done()
 
-			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, a.Config.Matrix.ServerName, gomatrixserverlib.ServerName(domain), keysToClaim)
+			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, a.Config.Matrix.ServerName, spec.ServerName(domain), keysToClaim)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -227,7 +227,7 @@ func (a *UserInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *a
 }
 
 // nolint:gocyclo
-func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) error {
+func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	var respMu sync.Mutex
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.MasterKeys = make(map[string]fclient.CrossSigningKey)
@@ -251,7 +251,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("failed to query local device keys: %s", err),
 				}
-				return nil
+				return
 			}
 
 			// pull out display names after we have the keys so we handle wildcards correctly
@@ -321,7 +321,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 
 	for targetUserID, masterKey := range res.MasterKeys {
 		if masterKey.Signatures == nil {
-			masterKey.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+			masterKey.Signatures = map[string]map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 		}
 		for targetKeyID := range masterKey.Keys {
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
@@ -329,7 +329,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				// Stop executing the function if the context was canceled/the deadline was exceeded,
 				// as we can't continue without a valid context.
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					return nil
+					return
 				}
 				logrus.WithError(err).Errorf("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
@@ -340,7 +340,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 			for sourceUserID, forSourceUser := range sigMap {
 				for sourceKeyID, sourceSig := range forSourceUser {
 					if _, ok := masterKey.Signatures[sourceUserID]; !ok {
-						masterKey.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+						masterKey.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 					}
 					masterKey.Signatures[sourceUserID][sourceKeyID] = sourceSig
 				}
@@ -355,7 +355,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				// Stop executing the function if the context was canceled/the deadline was exceeded,
 				// as we can't continue without a valid context.
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					return nil
+					return
 				}
 				logrus.WithError(err).Errorf("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
@@ -368,12 +368,12 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				continue
 			}
 			if deviceKey.Signatures == nil {
-				deviceKey.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+				deviceKey.Signatures = map[string]map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 			}
 			for sourceUserID, forSourceUser := range sigMap {
 				for sourceKeyID, sourceSig := range forSourceUser {
 					if _, ok := deviceKey.Signatures[sourceUserID]; !ok {
-						deviceKey.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+						deviceKey.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]spec.Base64Bytes{}
 					}
 					deviceKey.Signatures[sourceUserID][sourceKeyID] = sourceSig
 				}
@@ -383,7 +383,6 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 			}
 		}
 	}
-	return nil
 }
 
 func (a *UserInternalAPI) remoteKeysFromDatabase(
@@ -424,13 +423,13 @@ func (a *UserInternalAPI) queryRemoteKeys(
 
 	domains := map[string]struct{}{}
 	for domain := range domainToDeviceKeys {
-		if a.Config.Matrix.IsLocalServerName(gomatrixserverlib.ServerName(domain)) {
+		if a.Config.Matrix.IsLocalServerName(spec.ServerName(domain)) {
 			continue
 		}
 		domains[domain] = struct{}{}
 	}
 	for domain := range domainToCrossSigningKeys {
-		if a.Config.Matrix.IsLocalServerName(gomatrixserverlib.ServerName(domain)) {
+		if a.Config.Matrix.IsLocalServerName(spec.ServerName(domain)) {
 			continue
 		}
 		domains[domain] = struct{}{}
@@ -514,7 +513,7 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 		}
 	}
 	for userID := range userIDsForAllDevices {
-		err := a.Updater.ManualUpdate(context.Background(), gomatrixserverlib.ServerName(serverName), userID)
+		err := a.Updater.ManualUpdate(context.Background(), spec.ServerName(serverName), userID)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				logrus.ErrorKey: err,
@@ -542,7 +541,7 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 	if len(devKeys) == 0 {
 		return
 	}
-	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, a.Config.Matrix.ServerName, gomatrixserverlib.ServerName(serverName), devKeys)
+	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, a.Config.Matrix.ServerName, spec.ServerName(serverName), devKeys)
 	if err == nil {
 		resultCh <- &queryKeysResp
 		return
@@ -671,7 +670,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 	} else {
 		// assert that the user ID / device ID are not lying for each key
 		for _, key := range req.DeviceKeys {
-			var serverName gomatrixserverlib.ServerName
+			var serverName spec.ServerName
 			_, serverName, err = gomatrixserverlib.SplitID('@', key.UserID)
 			if err != nil {
 				continue // ignore invalid users

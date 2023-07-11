@@ -19,7 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const blacklistSchema = `
@@ -69,7 +69,7 @@ func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
 }
 
 func (s *blacklistStatements) InsertBlacklist(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
 	_, err := stmt.ExecContext(ctx, serverName)
@@ -77,7 +77,7 @@ func (s *blacklistStatements) InsertBlacklist(
 }
 
 func (s *blacklistStatements) SelectBlacklist(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) (bool, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectBlacklistStmt)
 	res, err := stmt.QueryContext(ctx, serverName)
@@ -92,7 +92,7 @@ func (s *blacklistStatements) SelectBlacklist(
 }
 
 func (s *blacklistStatements) DeleteBlacklist(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
 	_, err := stmt.ExecContext(ctx, serverName)

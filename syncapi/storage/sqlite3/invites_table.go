@@ -22,9 +22,9 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const inviteEventsSchema = `
@@ -89,7 +89,7 @@ func NewSqliteInvitesTable(db *sql.DB, streamID *StreamIDStatements) (tables.Inv
 }
 
 func (s *inviteEventsStatements) InsertInviteEvent(
-	ctx context.Context, txn *sql.Tx, inviteEvent *gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, txn *sql.Tx, inviteEvent *rstypes.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	streamPos, err = s.streamIDStatements.nextInviteID(ctx, txn)
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 		streamPos,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
-		*inviteEvent.StateKey(),
+		inviteEvent.UserID.String(),
 		headeredJSON,
 	)
 	return
@@ -130,7 +130,7 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
-) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
+) (map[string]*rstypes.HeaderedEvent, map[string]*rstypes.HeaderedEvent, types.StreamPosition, error) {
 	var lastPos types.StreamPosition
 	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
@@ -138,8 +138,8 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 		return nil, nil, lastPos, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
-	result := map[string]*gomatrixserverlib.HeaderedEvent{}
-	retired := map[string]*gomatrixserverlib.HeaderedEvent{}
+	result := map[string]*rstypes.HeaderedEvent{}
+	retired := map[string]*rstypes.HeaderedEvent{}
 	for rows.Next() {
 		var (
 			id        types.StreamPosition
@@ -162,7 +162,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 			continue
 		}
 
-		var event *gomatrixserverlib.HeaderedEvent
+		var event *rstypes.HeaderedEvent
 		if err := json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, nil, lastPos, err
 		}
