@@ -259,12 +259,12 @@ func OnIncomingMessagesRequest(
 	}
 
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"from":         from.String(),
-		"to":           to.String(),
-		"limit":        filter.Limit,
-		"backwards":    backwardOrdering,
-		"return_start": start.String(),
-		"return_end":   end.String(),
+		"request_from":   from.String(),
+		"request_to":     to.String(),
+		"limit":          filter.Limit,
+		"backwards":      backwardOrdering,
+		"response_start": start.String(),
+		"response_end":   end.String(),
 	}).Info("Responding")
 
 	res := messagesResp{
@@ -484,12 +484,6 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
 	events []*rstypes.HeaderedEvent, err error,
 ) {
-	// We've reached the beginning of the room, nothing more to do.
-	if r.backwardOrdering && streamEvents[len(streamEvents)-1].Type() == spec.MRoomCreate && streamEvents[len(streamEvents)-1].StateKeyEquals("") {
-		events = append(events, r.snapshot.StreamEventsToEvents(r.ctx, nil, streamEvents, r.rsAPI)...)
-		sort.Sort(eventsByDepth(events))
-		return events, nil
-	}
 	// Check if we have enough events.
 	isSetLargeEnough := len(streamEvents) >= r.filter.Limit
 	if !isSetLargeEnough {
