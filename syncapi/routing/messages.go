@@ -325,7 +325,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 ) {
 	emptyToken := types.TopologyToken{}
 	// Retrieve the events from the local database.
-	streamEvents, start, end, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
+	streamEvents, _, end, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return []synctypes.ClientEvent{}, *r.from, emptyToken, err
@@ -378,7 +378,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	// If we backfilled in the process of getting events, we need
 	// to re-fetch the start/end positions
 	if r.didBackfill {
-		start, end, err = r.getStartEnd(filteredEvents)
+		_, end, err = r.getStartEnd(filteredEvents)
 		if err != nil {
 			return []synctypes.ClientEvent{}, *r.from, *r.to, err
 		}
@@ -402,6 +402,8 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		}
 		filteredEvents = reversed(filteredEvents)
 	}
+
+	start = *r.from
 
 	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
