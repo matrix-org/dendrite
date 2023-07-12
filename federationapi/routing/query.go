@@ -145,9 +145,8 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 		}
 	}
 
-	walker := rsAPI.QueryRoomHierarchy(httpReq.Context(), types.NewServerNameNotDevice(request.Origin()), roomID, suggestedOnly, 1)
-
-	discoveredRooms, err := walker.NextPage(-1)
+	walker := roomserverAPI.NewRoomHierarchyWalker(types.NewServerNameNotDevice(request.Origin()), roomID, suggestedOnly, 1)
+	discoveredRooms, _, err := rsAPI.QueryNextRoomHierarchyPage(httpReq.Context(), walker, -1)
 
 	if err != nil {
 		switch err.(type) {

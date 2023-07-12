@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
@@ -512,24 +511,63 @@ type QueryRoomHierarchyRequest struct {
 	From          int  `json:"json"`
 }
 
-// An iterator-like interface for walking a room/space hierarchy, returning each rooms information.
+// A struct storing the intermediate state of a room hierarchy query for pagination purposes.
 //
 // Used for implementing space summaries / room hierarchies
-type RoomHierarchyWalker interface {
-	// Walk the room hierarchy to retrieve room information until either
-	// no room left, or provided limit reached. If limit provided is -1, then this is
-	// treated as no limit.
-	NextPage(limit int) ([]fclient.MSC2946Room, error)
-	// Returns true if there are no more rooms left to walk
-	Done() bool
-	// Returns a stripped down version of the hiearchy walker suitable for pagination caching
-	GetCached() CachedRoomHierarchyWalker
+//
+// Use NewRoomHierarchyWalker on the roomserver API to construct this.
+type RoomHierarchyWalker struct {
+	RootRoomID    spec.RoomID
+	Caller        types.DeviceOrServerName
+	SuggestedOnly bool
+	MaxDepth      int
+	Processed     RoomSet
+	Unvisited     []RoomHierarchyWalkerQueuedRoom
 }
 
-// Stripped down version of RoomHierarchyWalker suitable for caching (for pagination)
-type CachedRoomHierarchyWalker interface {
-	// Converts this cached walker back into an actual walker, to resume walking from.
-	GetWalker() RoomHierarchyWalker
-	// Validates that the given parameters match those stored in the cache
-	ValidateParams(suggestedOnly bool, maxDepth int) bool
+type RoomHierarchyWalkerQueuedRoom struct {
+	RoomID       spec.RoomID
+	ParentRoomID *spec.RoomID
+	Depth        int
+	Vias         []string // vias to query this room by
+}
+
+func NewRoomHierarchyWalker(caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker {
+	walker := RoomHierarchyWalker{
+		RootRoomID:    roomID,
+		Caller:        caller,
+		SuggestedOnly: suggestedOnly,
+		MaxDepth:      maxDepth,
+		Unvisited: []RoomHierarchyWalkerQueuedRoom{{
+			RoomID:       roomID,
+			ParentRoomID: nil,
+			Depth:        0,
+		}},
+		Processed: NewRoomSet(),
+	}
+
+	return walker
+}
+
+type RoomSet map[spec.RoomID]struct{}
+
+func NewRoomSet() RoomSet {
+	return RoomSet{}
+}
+
+func (s RoomSet) Contains(val spec.RoomID) bool {
+	_, ok := s[val]
+	return ok
+}
+
+func (s RoomSet) Add(val spec.RoomID) {
+	s[val] = struct{}{}
+}
+
+func (s RoomSet) Copy() RoomSet {
+	copied := make(RoomSet, len(s))
+	for k, _ := range s {
+		copied.Add(k)
+	}
+	return copied
 }

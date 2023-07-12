@@ -125,7 +125,7 @@ type QueryEventsAPI interface {
 }
 
 type QueryRoomHierarchyAPI interface {
-	QueryRoomHierarchy(ctx context.Context, caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker
+	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.MSC2946Room, *RoomHierarchyWalker, error)
 }
 
 // API functions required by the syncapi

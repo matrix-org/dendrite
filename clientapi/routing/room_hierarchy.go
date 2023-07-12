@@ -30,24 +30,28 @@ import (
 )
 
 type RoomHierarchyPaginationCache struct {
-	cache map[string]roomserverAPI.CachedRoomHierarchyWalker
+	cache map[string]roomserverAPI.RoomHierarchyWalker
 	mu    sync.Mutex
 }
 
 func NewRoomHierarchyPaginationCache() RoomHierarchyPaginationCache {
 	return RoomHierarchyPaginationCache{
-		cache: map[string]roomserverAPI.CachedRoomHierarchyWalker{},
+		cache: map[string]roomserverAPI.RoomHierarchyWalker{},
 	}
 }
 
-func (c *RoomHierarchyPaginationCache) Get(token string) roomserverAPI.CachedRoomHierarchyWalker {
+func (c *RoomHierarchyPaginationCache) Get(token string) *roomserverAPI.RoomHierarchyWalker {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	line := c.cache[token]
-	return line
+	line, ok := c.cache[token]
+	if ok {
+		return &line
+	} else {
+		return nil
+	}
 }
 
-func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.CachedRoomHierarchyWalker) string {
+func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.RoomHierarchyWalker) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	token := uuid.NewString()
@@ -114,21 +118,21 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 
 	var walker roomserverAPI.RoomHierarchyWalker
 	if from == "" { // No pagination token provided, so start new hierarchy walker
-		walker = rsAPI.QueryRoomHierarchy(req.Context(), types.NewDeviceNotServerName(*device), roomID, suggestedOnly, maxDepth)
+		walker = roomserverAPI.NewRoomHierarchyWalker(types.NewDeviceNotServerName(*device), roomID, suggestedOnly, maxDepth)
 	} else { // Attempt to resume cached walker
 		cachedWalker := paginationCache.Get(from)
 
-		if cachedWalker == nil || !cachedWalker.ValidateParams(suggestedOnly, maxDepth) {
+		if cachedWalker == nil || cachedWalker.SuggestedOnly != suggestedOnly || cachedWalker.MaxDepth != maxDepth {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam("pagination not found for provided token ('from') with given 'max_depth', 'suggested_only' and room ID"),
 			}
 		}
 
-		walker = cachedWalker.GetWalker()
+		walker = *cachedWalker
 	}
 
-	discoveredRooms, err := walker.NextPage(limit)
+	discoveredRooms, nextWalker, err := rsAPI.QueryNextRoomHierarchyPage(req.Context(), walker, limit)
 
 	if err != nil {
 		switch err.(type) {
@@ -147,9 +151,9 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	}
 
 	nextBatch := ""
-	if !walker.Done() {
-		cacheLine := walker.GetCached()
-		nextBatch = paginationCache.AddLine(cacheLine)
+	// nextWalker will be nil if there's no more rooms left to walk
+	if nextWalker != nil {
+		nextBatch = paginationCache.AddLine(*nextWalker)
 	}
 
 	return util.JSONResponse{
