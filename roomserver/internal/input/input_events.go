@@ -526,8 +526,19 @@ func (r *Inputer) processRoomEvent(
 // leavePseudoIDRoom leaves/kicks a user in the event of a membership event redaction.
 // TODO: This doesn't play well with users re-joining rooms, as in this case we have multiple join events with a mxid_mapping.
 func (r *Inputer) leavePseudoIDRoom(ctx context.Context, roomID spec.RoomID, originalRedactedEvent, redactionEvent gomatrixserverlib.PDU) error {
+
+	stateKey := originalRedactedEvent.StateKey()
+	currentStateEvent, err := r.DB.GetStateEvent(ctx, roomID.String(), originalRedactedEvent.Type(), *stateKey)
+	if err != nil {
+		return err
+	}
+	// If the redacted event is NOT the current state event, do nothing
+	if currentStateEvent.EventID() != originalRedactedEvent.EventID() {
+		return nil
+	}
+
 	var memberContent gomatrixserverlib.MemberContent
-	if err := json.Unmarshal(originalRedactedEvent.Content(), &memberContent); err != nil {
+	if err = json.Unmarshal(originalRedactedEvent.Content(), &memberContent); err != nil {
 		return err
 	}
 	if memberContent.Membership != spec.Join {
@@ -548,9 +559,6 @@ func (r *Inputer) leavePseudoIDRoom(ctx context.Context, roomID spec.RoomID, ori
 	if !r.Cfg.Matrix.IsLocalServerName(userID.Domain()) {
 		return nil
 	}
-
-	// check that the redacted event is the _current_ membership event
-	stateKey := originalRedactedEvent.StateKey()
 
 	signingIdentity, err := r.SigningIdentity(ctx, roomID, *userID)
 	if err != nil {
