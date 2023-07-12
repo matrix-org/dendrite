@@ -250,6 +250,12 @@ func OnIncomingMessagesRequest(
 		}
 	}
 
+	// If start and end are equal, we either reached the beginning or something else
+	// is wrong. To avoid endless loops from clients, set end to 0 an empty string
+	if start == end {
+		end = types.TopologyToken{}
+	}
+
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"from":         from.String(),
 		"to":           to.String(),
