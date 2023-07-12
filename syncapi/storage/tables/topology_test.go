@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.DB, func()) {
@@ -60,28 +61,37 @@ func TestTopologyTable(t *testing.T) {
 				highestPos = topoPos + 1
 			}
 			// check ordering works without limit
-			eventIDs, err := tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 100, true)
-			if err != nil {
-				return fmt.Errorf("failed to SelectEventIDsInRange: %s", err)
-			}
+			eventIDs, start, end, err := tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 100, true)
+			assert.NoError(t, err, "failed to SelectEventIDsInRange")
 			test.AssertEventIDsEqual(t, eventIDs, events[:])
-			eventIDs, err = tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 100, false)
-			if err != nil {
-				return fmt.Errorf("failed to SelectEventIDsInRange: %s", err)
-			}
-			test.AssertEventIDsEqual(t, eventIDs, test.Reversed(events[:]))
-			// check ordering works with limit
-			eventIDs, err = tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 3, true)
-			if err != nil {
-				return fmt.Errorf("failed to SelectEventIDsInRange: %s", err)
-			}
-			test.AssertEventIDsEqual(t, eventIDs, events[:3])
-			eventIDs, err = tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 3, false)
-			if err != nil {
-				return fmt.Errorf("failed to SelectEventIDsInRange: %s", err)
-			}
-			test.AssertEventIDsEqual(t, eventIDs, test.Reversed(events[len(events)-3:]))
+			assert.Equal(t, types.TopologyToken{Depth: 1, PDUPosition: 0}, start)
+			assert.Equal(t, types.TopologyToken{Depth: 5, PDUPosition: 4}, end)
 
+			eventIDs, start, end, err = tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 100, false)
+			assert.NoError(t, err, "failed to SelectEventIDsInRange")
+			test.AssertEventIDsEqual(t, eventIDs, test.Reversed(events[:]))
+			assert.Equal(t, types.TopologyToken{Depth: 5, PDUPosition: 4}, start)
+			assert.Equal(t, types.TopologyToken{Depth: 1, PDUPosition: 0}, end)
+
+			// check ordering works with limit
+			eventIDs, start, end, err = tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 3, true)
+			assert.NoError(t, err, "failed to SelectEventIDsInRange")
+			test.AssertEventIDsEqual(t, eventIDs, events[:3])
+			assert.Equal(t, types.TopologyToken{Depth: 1, PDUPosition: 0}, start)
+			assert.Equal(t, types.TopologyToken{Depth: 3, PDUPosition: 2}, end)
+
+			eventIDs, start, end, err = tab.SelectEventIDsInRange(ctx, txn, room.ID, 0, highestPos, highestPos, 3, false)
+			assert.NoError(t, err, "failed to SelectEventIDsInRange")
+			test.AssertEventIDsEqual(t, eventIDs, test.Reversed(events[len(events)-3:]))
+			assert.Equal(t, types.TopologyToken{Depth: 5, PDUPosition: 4}, start)
+			assert.Equal(t, types.TopologyToken{Depth: 3, PDUPosition: 2}, end)
+
+			// Check that we return no values for invalid rooms
+			eventIDs, start, end, err = tab.SelectEventIDsInRange(ctx, txn, "!doesnotexist:localhost", 0, highestPos, highestPos, 10, false)
+			assert.NoError(t, err, "failed to SelectEventIDsInRange")
+			assert.Equal(t, 0, len(eventIDs))
+			assert.Equal(t, types.TopologyToken{}, start)
+			assert.Equal(t, types.TopologyToken{}, end)
 			return nil
 		})
 		if err != nil {

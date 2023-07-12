@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math"
 
@@ -232,15 +231,13 @@ func (d *DatabaseTransaction) GetAccountDataInRange(
 	return d.AccountData.SelectAccountDataInRange(ctx, d.txn, userID, r, accountDataFilterPart)
 }
 
-var ErrNoEventsForFilter = errors.New("no events returned using the provided filter")
-
 func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	ctx context.Context,
 	from, to *types.TopologyToken,
 	roomID string,
 	filter *synctypes.RoomEventFilter,
 	backwardOrdering bool,
-) (events []types.StreamEvent, err error) {
+) (events []types.StreamEvent, start, end types.TopologyToken, err error) {
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
 	if backwardOrdering {
 		// Backward ordering means the 'from' token has a higher depth than the 'to' token
@@ -258,7 +255,7 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 
 	// Select the event IDs from the defined range.
 	var eIDs []string
-	eIDs, err = d.Topology.SelectEventIDsInRange(
+	eIDs, start, end, err = d.Topology.SelectEventIDsInRange(
 		ctx, d.txn, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, filter.Limit, !backwardOrdering,
 	)
 	if err != nil {
@@ -269,17 +266,6 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eIDs, filter, true)
 	if err != nil {
 		return
-	}
-	// Check if we should be able to return events.
-	// If we received 0 events, this most likely means that the provided filter removed them.
-	if len(eIDs) > 0 && len(events) == 0 {
-		// We try to fetch the events without a filter, so we can tell the client if there
-		// are more events earlier than the requested and filtered.
-		events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eIDs, nil, true)
-		if err != nil {
-			return
-		}
-		return events, ErrNoEventsForFilter
 	}
 
 	return

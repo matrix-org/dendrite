@@ -16,14 +16,12 @@ package routing
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"sort"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -55,6 +53,7 @@ type messagesReq struct {
 	wasToProvided    bool
 	backwardOrdering bool
 	filter           *synctypes.RoomEventFilter
+	didBackfill      bool
 }
 
 type messagesResp struct {
@@ -265,6 +264,7 @@ func OnIncomingMessagesRequest(
 		"backwards":      backwardOrdering,
 		"response_start": start.String(),
 		"response_end":   end.String(),
+		"backfilled":     mReq.didBackfill,
 	}).Info("Responding")
 
 	res := messagesResp{
@@ -325,25 +325,12 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 ) {
 	emptyToken := types.TopologyToken{}
 	// Retrieve the events from the local database.
-	streamEvents, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
+	streamEvents, start, end, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
-		// While there are events in the topological range, the provided filter
-		// removed all of them. This means there are no events for this user
-		// anymore. Let them know.
-		if errors.Is(err, shared.ErrNoEventsForFilter) {
-			if len(streamEvents) == 0 {
-				return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
-			}
-			// We possibly received events, try to get start/end from them
-			start, end, err = r.getStartEnd(r.snapshot.StreamEventsToEvents(ctx, r.device, streamEvents, rsAPI))
-			if err != nil {
-				return []synctypes.ClientEvent{}, *r.from, *r.to, err
-			}
-			return []synctypes.ClientEvent{}, start, end, nil
-		}
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 	}
+	end.Decrement()
 
 	var events []*rstypes.HeaderedEvent
 	util.GetLogger(r.ctx).WithFields(logrus.Fields{
@@ -388,19 +375,23 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
 	}
 
-	// Get the position of the first and the last event in the room's topology.
-	// This position is currently determined by the event's depth, so we could
-	// also use it instead of retrieving from the database. However, if we ever
-	// change the way topological positions are defined (as depth isn't the most
-	// reliable way to define it), it would be easier and less troublesome to
-	// only have to change it in one place, i.e. the database.
-	start, end, err = r.getStartEnd(filteredEvents)
-	if err != nil {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, err
+	// If we backfilled in the process of getting events, we need
+	// to re-fetch the start/end positions
+	if r.didBackfill {
+		start, end, err = r.getStartEnd(filteredEvents)
+		if err != nil {
+			return []synctypes.ClientEvent{}, *r.from, *r.to, err
+		}
 	}
 
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
+		if events[len(events)-1].Type() == spec.MRoomCreate {
+			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
+			// else to go. This seems to fix Element iOS from looping on /messages endlessly.
+			end = types.TopologyToken{}
+		}
+
 		// This reverses the array from old->new to new->old
 		reversed := func(in []*rstypes.HeaderedEvent) []*rstypes.HeaderedEvent {
 			out := make([]*rstypes.HeaderedEvent, len(in))
@@ -467,6 +458,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 		if err != nil {
 			return
 		}
+		r.didBackfill = true
 	} else {
 		// If not, it means the slice was empty because we reached the room's
 		// creation, so return an empty slice.
@@ -516,7 +508,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 		if err != nil {
 			return
 		}
-
+		r.didBackfill = true
 		// Append the PDUs to the list to send back to the client.
 		events = append(events, pdus...)
 	}
