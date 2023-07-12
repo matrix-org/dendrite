@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -162,6 +161,12 @@ func UpdateDeviceByID(
 			JSON: spec.Forbidden("device not owned by current user"),
 		}
 	}
+	if performRes.Forbidden {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("device not owned by current user"),
+		}
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -258,39 +263,13 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.ClientUserAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
-
-	bodyBytes, err := io.ReadAll(req.Body)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
-		}
-	}
-	defer req.Body.Close() // nolint:errcheck
-
-	// initiate UIA
-	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
-	if errRes != nil {
-		return *errRes
-	}
-
-	if login.Username() != device.UserID {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("unable to delete devices for other user"),
-		}
-	}
-
 	payload := devicesDeleteJSON{}
-	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
+
+	if resErr := httputil.UnmarshalJSONRequest(req, &payload); resErr != nil {
+		return *resErr
 	}
 
 	defer req.Body.Close() // nolint: errcheck
