@@ -111,6 +111,7 @@ type DatabaseTransaction interface {
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter synctypes.EventFilter) (map[string]*types.PresenceInternal, error)
 	RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (events []types.StreamEvent, prevBatch, nextBatch string, err error)
 	SelectMultiRoomData(ctx context.Context, r *types.Range, joinedRooms []string) (types.MultiRoom, error)
+	SelectAllMultiRoomDataInRoom(ctx context.Context, roomId string) (types.MultiRoom, error)
 }
 
 type Database interface {

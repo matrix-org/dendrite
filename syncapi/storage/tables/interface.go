@@ -245,4 +245,5 @@ type Relations interface {
 
 type MultiRoom interface {
 	SelectMultiRoomData(ctx context.Context, r *types.Range, joinedRooms []string, txn *sql.Tx) ([]*types.MultiRoomDataRow, error)
+	SelectAllMultiRoomDataInRoom(ctx context.Context, roomId string, txn *sql.Tx) ([]*types.MultiRoomDataRow, error)
 }
