@@ -48,14 +48,14 @@ const insertEventInTopologySQL = "" +
 	" RETURNING topological_position"
 
 const selectEventIDsInRangeASCSQL = "" +
-	"SELECT event_id FROM syncapi_output_room_events_topology" +
+	"SELECT event_id, topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND (" +
 	"(topological_position > $2 AND topological_position < $3) OR" +
 	"(topological_position = $4 AND stream_position >= $5)" +
 	") ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
 
 const selectEventIDsInRangeDESCSQL = "" +
-	"SELECT event_id FROM syncapi_output_room_events_topology" +
+	"SELECT event_id, topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND (" +
 	"(topological_position > $2 AND topological_position < $3) OR" +
 	"(topological_position = $4 AND stream_position <= $5)" +
@@ -113,12 +113,13 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 }
 
 // SelectEventIDsInRange selects the IDs of events which positions are within a
-// given range in a given room's topological order.
+// given range in a given room's topological order. Returns the start/end topological tokens for
+// the returned eventIDs.
 // Returns an empty slice if no events match the given range.
 func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	ctx context.Context, txn *sql.Tx, roomID string, minDepth, maxDepth, maxStreamPos types.StreamPosition,
 	limit int, chronologicalOrder bool,
-) (eventIDs []string, err error) {
+) (eventIDs []string, start, end types.TopologyToken, err error) {
 	// Decide on the selection's order according to whether chronological order
 	// is requested or not.
 	var stmt *sql.Stmt
@@ -132,7 +133,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
 	if err == sql.ErrNoRows {
 		// If no event matched the request, return an empty slice.
-		return []string{}, nil
+		return []string{}, start, end, nil
 	} else if err != nil {
 		return
 	}
@@ -140,14 +141,23 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 
 	// Return the IDs.
 	var eventID string
+	var token types.TopologyToken
+	var tokens []types.TopologyToken
 	for rows.Next() {
-		if err = rows.Scan(&eventID); err != nil {
+		if err = rows.Scan(&eventID, &token.Depth, &token.PDUPosition); err != nil {
 			return
 		}
 		eventIDs = append(eventIDs, eventID)
+		tokens = append(tokens, token)
 	}
 
-	return eventIDs, rows.Err()
+	// The values are already ordered by SQL, so we can use them as is.
+	if len(tokens) > 0 {
+		start = tokens[0]
+		end = tokens[len(tokens)-1]
+	}
+
+	return eventIDs, start, end, rows.Err()
 }
 
 // SelectPositionInTopology returns the position of a given event in the

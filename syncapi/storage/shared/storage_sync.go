@@ -237,7 +237,7 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	roomID string,
 	filter *synctypes.RoomEventFilter,
 	backwardOrdering bool,
-) (events []types.StreamEvent, err error) {
+) (events []types.StreamEvent, start, end types.TopologyToken, err error) {
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
 	if backwardOrdering {
 		// Backward ordering means the 'from' token has a higher depth than the 'to' token
@@ -255,7 +255,7 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 
 	// Select the event IDs from the defined range.
 	var eIDs []string
-	eIDs, err = d.Topology.SelectEventIDsInRange(
+	eIDs, start, end, err = d.Topology.SelectEventIDsInRange(
 		ctx, d.txn, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, filter.Limit, !backwardOrdering,
 	)
 	if err != nil {
@@ -264,6 +264,10 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 
 	// Retrieve the events' contents using their IDs.
 	events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eIDs, filter, true)
+	if err != nil {
+		return
+	}
+
 	return
 }
 

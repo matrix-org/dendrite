@@ -433,6 +433,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		}
 
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
