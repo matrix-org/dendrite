@@ -299,3 +299,42 @@ func TestMessageStats(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkLocalRoomMembers(b *testing.B) {
+	t := &testing.T{}
+
+	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer close()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	natsInstance := &jetstream.NATSInstance{}
+	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+	rsAPI.SetFederationAPI(nil, nil)
+	db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	assert.NoError(b, err)
+
+	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}
+	_, sk, err := ed25519.GenerateKey(nil)
+	assert.NoError(b, err)
+
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	for i := 0; i < 100; i++ {
+		user := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
+		room.CreateAndInsert(t, user, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(user.ID))
+	}
+
+	err = rsapi.SendEvents(processCtx.Context(), rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
+	assert.NoError(b, err)
+
+	expectedLocalMember := &localMembership{UserID: alice.ID, Localpart: alice.Localpart, Domain: "test", MemberContent: gomatrixserverlib.MemberContent{Membership: spec.Join}}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		members, count, err := consumer.localRoomMembers(processCtx.Context(), room.ID)
+		assert.NoError(b, err)
+		assert.Equal(b, 101, count)
+		assert.Equal(b, expectedLocalMember, members[0])
+	}
+}
