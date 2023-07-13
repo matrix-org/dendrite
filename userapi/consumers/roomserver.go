@@ -405,15 +405,22 @@ func newLocalMembership(event *synctypes.ClientEvent) (*localMembership, error) 
 // localRoomMembers fetches the current local members of a room, and
 // the total number of members.
 func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
+	// Get only locally joined users to avoid unmarshalling and caching
+	// membership events we only use to calculate the room size.
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
+		LocalOnly:  true,
 	}
 	var res rsapi.QueryMembershipsForRoomResponse
-
-	// XXX: This could potentially race if the state for the event is not known yet
-	// e.g. the event came over federation but we do not have the full state persisted.
 	if err := s.rsAPI.QueryMembershipsForRoom(ctx, req, &res); err != nil {
+		return nil, 0, err
+	}
+
+	// Since we only queried locally joined users above,
+	// we also need to ask the roomserver about the joined user count.
+	totalCount, err := s.rsAPI.JoinedUserCount(ctx, roomID)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -426,31 +433,18 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 		if *event.StateKey == "" {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.SplitID('@', *event.StateKey)
-		if err != nil {
-			log.WithError(err).Error("failed to get servername from statekey")
-			continue
-		}
-		// Only get memberships for our server
-		if serverName != s.serverName {
-			continue
-		}
+		// We're going to trust the Query from above to really just return
+		// local users
 		member, err := newLocalMembership(&event)
 		if err != nil {
 			log.WithError(err).Errorf("Parsing MemberContent")
-			continue
-		}
-		if member.Membership != spec.Join {
-			continue
-		}
-		if member.Domain != s.cfg.Matrix.ServerName {
 			continue
 		}
 
 		members = append(members, member)
 	}
 
-	return members, len(res.JoinEvents), nil
+	return members, totalCount, nil
 }
 
 // roomName returns the name in the event (if type==m.room.name), or

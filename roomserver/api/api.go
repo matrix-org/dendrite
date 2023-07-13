@@ -227,6 +227,7 @@ type UserRoomserverAPI interface {
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformJoin(ctx context.Context, req *PerformJoinRequest) (roomID string, joinedVia spec.ServerName, err error)
+	JoinedUserCount(ctx context.Context, roomID string) (int, error)
 }
 
 type FederationRoomserverAPI interface {
