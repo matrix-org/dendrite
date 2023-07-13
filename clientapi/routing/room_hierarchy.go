@@ -29,17 +29,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// For storing pagination information for room hierarchies
 type RoomHierarchyPaginationCache struct {
 	cache map[string]roomserverAPI.RoomHierarchyWalker
 	mu    sync.Mutex
 }
 
+// Create a new, empty, pagination cache.
 func NewRoomHierarchyPaginationCache() RoomHierarchyPaginationCache {
 	return RoomHierarchyPaginationCache{
 		cache: map[string]roomserverAPI.RoomHierarchyWalker{},
 	}
 }
 
+// Get a cached page, or nil if there is no associated page in the cache.
 func (c *RoomHierarchyPaginationCache) Get(token string) *roomserverAPI.RoomHierarchyWalker {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -51,6 +54,7 @@ func (c *RoomHierarchyPaginationCache) Get(token string) *roomserverAPI.RoomHier
 	}
 }
 
+// Add a cache line to the pagination cache.
 func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.RoomHierarchyWalker) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -166,6 +170,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 
 }
 
+// Success response for /_matrix/client/v1/rooms/{roomID}/hierarchy
 type RoomHierarchyClientResponse struct {
 	Rooms     []fclient.MSC2946Room `json:"rooms"`
 	NextBatch string                `json:"next_batch,omitempty"`

@@ -515,7 +515,8 @@ type QueryRoomHierarchyRequest struct {
 //
 // Used for implementing space summaries / room hierarchies
 //
-// Use NewRoomHierarchyWalker on the roomserver API to construct this.
+// Use NewRoomHierarchyWalker to construct this, and QueryNextRoomHierarchyPage on the roomserver API
+// to traverse the room hierarchy.
 type RoomHierarchyWalker struct {
 	RootRoomID    spec.RoomID
 	Caller        types.DeviceOrServerName
@@ -532,6 +533,9 @@ type RoomHierarchyWalkerQueuedRoom struct {
 	Vias         []string // vias to query this room by
 }
 
+// Create a new room hierarchy walker, starting from the provided root room ID.
+//
+// Use the resulting struct with QueryNextRoomHierarchyPage on the roomserver API to traverse the room hierarchy.
 func NewRoomHierarchyWalker(caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker {
 	walker := RoomHierarchyWalker{
 		RootRoomID:    roomID,
@@ -549,17 +553,21 @@ func NewRoomHierarchyWalker(caller types.DeviceOrServerName, roomID spec.RoomID,
 	return walker
 }
 
+// A set of room IDs.
 type RoomSet map[spec.RoomID]struct{}
 
+// Create a new empty room set.
 func NewRoomSet() RoomSet {
 	return RoomSet{}
 }
 
+// Check if a room ID is in a room set.
 func (s RoomSet) Contains(val spec.RoomID) bool {
 	_, ok := s[val]
 	return ok
 }
 
+// Add a room ID to a room set.
 func (s RoomSet) Add(val spec.RoomID) {
 	s[val] = struct{}{}
 }

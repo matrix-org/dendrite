@@ -125,6 +125,13 @@ type QueryEventsAPI interface {
 }
 
 type QueryRoomHierarchyAPI interface {
+	// Traverse the room hierarchy using the provided walker up to the provided limit,
+	// returning a new walker which can be used to fetch the next page.
+	//
+	// If limit is -1, this is treated as no limit, and the entire hierarchy will be traversed.
+	//
+	// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
+	// can be cached.
 	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.MSC2946Room, *RoomHierarchyWalker, error)
 }
 

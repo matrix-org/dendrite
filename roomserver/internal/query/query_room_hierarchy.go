@@ -39,9 +39,13 @@ const (
 	ConstSpaceParentEventType         = "m.space.parent"
 )
 
-// Walk the room hierarchy to retrieve room information until either
-// no room left, or provided limit reached. If limit provided is -1, then this is
-// treated as no limit.
+// Traverse the room hierarchy using the provided walker up to the provided limit,
+// returning a new walker which can be used to fetch the next page.
+//
+// If limit is -1, this is treated as no limit, and the entire hierarchy will be traversed.
+//
+// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
+// can be cached.
 func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker roomserver.RoomHierarchyWalker, limit int) ([]fclient.MSC2946Room, *roomserver.RoomHierarchyWalker, error) {
 	if authorised, _ := authorised(ctx, querier, walker.Caller, walker.RootRoomID, nil); !authorised {
 		return nil, nil, roomserver.ErrRoomUnknownOrNotAllowed{Err: fmt.Errorf("room is unknown/forbidden")}
@@ -234,7 +238,7 @@ func authorisedServer(ctx context.Context, querier *Queryer, roomID spec.RoomID,
 		}
 
 		if rule == spec.Restricted {
-			allowJoinedToRoomIDs = append(allowJoinedToRoomIDs, restrictedJoinRuleAllowedRooms(ctx, joinRuleEv, "m.room_membership")...)
+			allowJoinedToRoomIDs = append(allowJoinedToRoomIDs, restrictedJoinRuleAllowedRooms(ctx, joinRuleEv)...)
 		}
 	}
 
@@ -308,7 +312,7 @@ func authorisedUser(ctx context.Context, querier *Queryer, clientCaller *userapi
 		} else if rule == spec.Public || rule == spec.Knock {
 			allowed = true
 		} else if rule == spec.Restricted {
-			allowedRoomIDs := restrictedJoinRuleAllowedRooms(ctx, joinRuleEv, "m.room_membership")
+			allowedRoomIDs := restrictedJoinRuleAllowedRooms(ctx, joinRuleEv)
 			// check parent is in the allowed set
 			for _, a := range allowedRoomIDs {
 				if *parentRoomID == a {
@@ -342,6 +346,7 @@ func authorisedUser(ctx context.Context, querier *Queryer, clientCaller *userapi
 	return false, false
 }
 
+// helper function to fetch a state event
 func stateEvent(ctx context.Context, querier *Queryer, roomID spec.RoomID, evType, stateKey string) *types.HeaderedEvent {
 	var queryRes roomserver.QueryCurrentStateResponse
 	tuple := gomatrixserverlib.StateKeyTuple{
@@ -358,6 +363,7 @@ func stateEvent(ctx context.Context, querier *Queryer, roomID spec.RoomID, evTyp
 	return queryRes.StateEvents[tuple]
 }
 
+// returns true if the current server is participating in the provided room
 func roomExists(ctx context.Context, querier *Queryer, roomID spec.RoomID) bool {
 	var queryRes roomserver.QueryServerJoinedToRoomResponse
 	err := querier.QueryServerJoinedToRoom(ctx, &roomserver.QueryServerJoinedToRoomRequest{
@@ -473,6 +479,7 @@ func childReferences(querier *Queryer, suggestedOnly bool, roomID spec.RoomID) (
 	return el, nil
 }
 
+// fetch public room information for provided room
 func publicRoomsChunk(ctx context.Context, querier *Queryer, roomID spec.RoomID) *fclient.PublicRoom {
 	pubRooms, err := roomserver.PopulatePublicRooms(ctx, []string{roomID.String()}, querier)
 	if err != nil {
@@ -498,7 +505,8 @@ func stripped(ev gomatrixserverlib.PDU) *fclient.MSC2946StrippedEvent {
 	}
 }
 
-func restrictedJoinRuleAllowedRooms(ctx context.Context, joinRuleEv *types.HeaderedEvent, allowType string) (allows []spec.RoomID) {
+// given join_rule event, return list of rooms where membership of that room allows joining.
+func restrictedJoinRuleAllowedRooms(ctx context.Context, joinRuleEv *types.HeaderedEvent) (allows []spec.RoomID) {
 	rule, _ := joinRuleEv.JoinRule()
 	if rule != spec.Restricted {
 		return nil
@@ -509,7 +517,7 @@ func restrictedJoinRuleAllowedRooms(ctx context.Context, joinRuleEv *types.Heade
 		return nil
 	}
 	for _, allow := range jrContent.Allow {
-		if allow.Type == allowType {
+		if allow.Type == spec.MRoomMembership {
 			allowedRoomID, err := spec.NewRoomID(allow.RoomID)
 			if err != nil {
 				util.GetLogger(ctx).Warnf("invalid room ID '%s' found in join_rule on room %s: %s", allow.RoomID, joinRuleEv.RoomID(), err)
