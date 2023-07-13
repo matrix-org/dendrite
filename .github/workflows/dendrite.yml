@@ -283,7 +283,7 @@ jobs:
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade (PostgreSQL)
-        run: ./dendrite-upgrade-tests --head .
+        run: ./dendrite-upgrade-tests .
 
   # run database upgrade tests, skipping over one version
   upgrade_test_direct:
@@ -301,7 +301,7 @@ jobs:
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade (PostgreSQL)
-        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
+        run: ./dendrite-upgrade-tests -direct -from HEAD-2 .
 
   # run Sytest in different variations
   sytest:

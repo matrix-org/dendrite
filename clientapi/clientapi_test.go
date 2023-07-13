@@ -255,7 +255,6 @@ func TestDeleteDevice(t *testing.T) {
 	})
 }
 
-// Deleting devices requires the UIA dance, so do this in a different test
 func TestDeleteDevices(t *testing.T) {
 	alice := test.NewUser(t)
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
@@ -300,34 +299,15 @@ func TestDeleteDevices(t *testing.T) {
 			devices = append(devices, devRes.Device.ID)
 		}
 
-		// initiate UIA
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/delete_devices", strings.NewReader(""))
-		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
-		routers.Client.ServeHTTP(rec, req)
-		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("expected HTTP 401, got %d: %s", rec.Code, rec.Body.String())
-		}
-		// get the session ID
-		sessionID := gjson.GetBytes(rec.Body.Bytes(), "session").Str
-
-		// prepare UIA request body
+		// prepare request body
 		reqBody := bytes.Buffer{}
 		if err := json.NewEncoder(&reqBody).Encode(map[string]interface{}{
-			"auth": map[string]string{
-				"session":  sessionID,
-				"type":     authtypes.LoginTypePassword,
-				"user":     alice.ID,
-				"password": accessTokens[alice].password,
-			},
 			"devices": devices[5:],
 		}); err != nil {
 			t.Fatal(err)
 		}
-
-		// do the same request again, this time with our UIA,
-		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/delete_devices", &reqBody)
+		req := httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/delete_devices", strings.NewReader(reqBody.String()))
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
