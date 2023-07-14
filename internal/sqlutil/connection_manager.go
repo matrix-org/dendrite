@@ -29,24 +29,26 @@ type Connections struct {
 	processContext *process.ProcessContext
 }
 
-func NewConnectionManager(processCtx *process.ProcessContext, globalConfig config.DatabaseOptions) Connections {
-	return Connections{
+func NewConnectionManager(processCtx *process.ProcessContext, globalConfig config.DatabaseOptions) *Connections {
+	return &Connections{
 		globalConfig:   globalConfig,
 		processContext: processCtx,
 	}
 }
 
 func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB, Writer, error) {
-	writer := NewDummyWriter()
-	if dbProperties.ConnectionString.IsSQLite() {
-		writer = NewExclusiveWriter()
-	}
 	var err error
 	if dbProperties.ConnectionString == "" {
 		// if no connectionString was provided, try the global one
 		dbProperties = &c.globalConfig
 	}
-	if dbProperties.ConnectionString != "" || c.db == nil {
+
+	writer := NewDummyWriter()
+	if dbProperties.ConnectionString.IsSQLite() {
+		writer = NewExclusiveWriter()
+	}
+
+	if dbProperties.ConnectionString != "" && c.db == nil {
 		// Open a new database connection using the supplied config.
 		c.db, err = Open(dbProperties, writer)
 		if err != nil {
