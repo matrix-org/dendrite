@@ -16,7 +16,9 @@ package consumers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -411,13 +413,26 @@ func JoinedHostsFromEvents(ctx context.Context, evs []gomatrixserverlib.PDU, rsA
 		if err != nil {
 			return nil, err
 		}
+		var domain spec.ServerName
 		userID, err := rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*ev.StateKey()))
 		if err != nil {
-			return nil, err
+			if errors.As(err, new(base64.CorruptInputError)) {
+				// Fallback to using the "old" way of getting the user domain, avoids
+				// "illegal base64 data at input byte 0" errors
+				// FIXME: we should do this in QueryUserIDForSender instead
+				_, domain, err = gomatrixserverlib.SplitID('@', *ev.StateKey())
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
+		} else {
+			domain = userID.Domain()
 		}
 
 		joinedHosts = append(joinedHosts, types.JoinedHost{
-			MemberEventID: ev.EventID(), ServerName: userID.Domain(),
+			MemberEventID: ev.EventID(), ServerName: domain,
 		})
 	}
 	return joinedHosts, nil
