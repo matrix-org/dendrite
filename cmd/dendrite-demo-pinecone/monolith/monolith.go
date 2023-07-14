@@ -143,12 +143,11 @@ func (p *P2PMonolith) SetupDendrite(
 	fsAPI := federationapi.NewInternalAPI(
 		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-
-	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(p.Router, p.Sessions, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(p.Router, p.Sessions, fsAPI, federation)

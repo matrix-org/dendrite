@@ -120,6 +120,7 @@ func TestGetPutDevices(t *testing.T) {
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -168,6 +169,7 @@ func TestDeleteDevice(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the rsAPI/ for this test, so nil for other APIs/caches etc.
@@ -272,6 +274,7 @@ func TestDeleteDevices(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the rsAPI/ for this test, so nil for other APIs/caches etc.
@@ -947,6 +950,7 @@ func TestCapabilities(t *testing.T) {
 
 		// Needed to create accounts
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
@@ -993,6 +997,7 @@ func TestTurnserver(t *testing.T) {
 
 	// Needed to create accounts
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, caching.DisableMetrics)
+	rsAPI.SetFederationAPI(nil, nil)
 	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 	//rsAPI.SetUserAPI(userAPI)
 	// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
@@ -1090,6 +1095,7 @@ func Test3PID(t *testing.T) {
 
 		// Needed to create accounts
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
@@ -1265,6 +1271,7 @@ func TestPushRules(t *testing.T) {
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -1651,6 +1658,7 @@ func TestKeys(t *testing.T) {
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -2112,6 +2120,7 @@ func TestKeyBackup(t *testing.T) {
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
