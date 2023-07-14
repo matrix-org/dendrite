@@ -574,7 +574,7 @@ func (s RoomSet) Add(val spec.RoomID) {
 
 func (s RoomSet) Copy() RoomSet {
 	copied := make(RoomSet, len(s))
-	for k, _ := range s {
+	for k := range s {
 		copied.Add(k)
 	}
 	return copied

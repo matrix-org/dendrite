@@ -92,7 +92,8 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	limit := 1000 // Default to 1000
 	limitStr := req.URL.Query().Get("limit")
 	if limitStr != "" {
-		maybeLimit, err := strconv.Atoi(limitStr)
+		var maybeLimit int
+		maybeLimit, err = strconv.Atoi(limitStr)
 		if err != nil || maybeLimit < 0 {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
@@ -108,7 +109,8 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	maxDepth := -1 // '-1' representing no maximum depth
 	maxDepthStr := req.URL.Query().Get("max_depth")
 	if maxDepthStr != "" {
-		maybeMaxDepth, err := strconv.Atoi(maxDepthStr)
+		var maybeMaxDepth int
+		maybeMaxDepth, err = strconv.Atoi(maxDepthStr)
 		if err != nil || maybeMaxDepth < 0 {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
