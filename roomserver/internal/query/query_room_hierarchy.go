@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
@@ -30,13 +29,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
-)
-
-const (
-	ConstCreateEventContentKey        = "type"
-	ConstCreateEventContentValueSpace = "m.space"
-	ConstSpaceChildEventType          = "m.space.child"
-	ConstSpaceParentEventType         = "m.space.parent"
 )
 
 // Traverse the room hierarchy using the provided walker up to the provided limit,
@@ -80,8 +72,12 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 		var roomType string
 		create := stateEvent(ctx, querier, queuedRoom.RoomID, spec.MRoomCreate, "")
 		if create != nil {
-			// escape the `.`s so gjson doesn't think it's nested
-			roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
+			var createContent gomatrixserverlib.CreateContent
+			err := json.Unmarshal(create.Content(), &createContent)
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).WithField("create_content", create.Content()).Warn("failed to unmarshal m.room.create event")
+			}
+			roomType = createContent.RoomType
 		}
 
 		// Collect rooms/events to send back (either locally or fetched via federation)
@@ -103,11 +99,11 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 				// mark this room as a space room as the federated server responded.
 				// we need to do this so we add the children of this room to the unvisited stack
 				// as these children may be rooms we do know about.
-				roomType = ConstCreateEventContentValueSpace
+				roomType = spec.MSpace
 			}
 		} else if authorised, isJoinedOrInvited := authorised(ctx, querier, walker.Caller, queuedRoom.RoomID, queuedRoom.ParentRoomID); authorised {
 			// Get all `m.space.child` state events for this room
-			events, err := childReferences(querier, walker.SuggestedOnly, queuedRoom.RoomID)
+			events, err := childReferences(ctx, querier, walker.SuggestedOnly, queuedRoom.RoomID)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).WithField("room_id", queuedRoom.RoomID).Error("failed to extract references for room")
 				continue
@@ -132,7 +128,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 
 		// don't walk the children
 		// if the parent is not a space room
-		if roomType != ConstCreateEventContentValueSpace {
+		if roomType != spec.MSpace {
 			continue
 		}
 
@@ -422,7 +418,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 }
 
 // references returns all child references pointing to or from this room.
-func childReferences(querier *Queryer, suggestedOnly bool, roomID spec.RoomID) ([]fclient.MSC2946StrippedEvent, error) {
+func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, roomID spec.RoomID) ([]fclient.MSC2946StrippedEvent, error) {
 	createTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: spec.MRoomCreate,
 		StateKey:  "",
@@ -433,7 +429,7 @@ func childReferences(querier *Queryer, suggestedOnly bool, roomID spec.RoomID) (
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			createTuple, {
-				EventType: ConstSpaceChildEventType,
+				EventType: spec.MSpaceChild,
 				StateKey:  "*",
 			},
 		},
@@ -443,10 +439,14 @@ func childReferences(querier *Queryer, suggestedOnly bool, roomID spec.RoomID) (
 	}
 
 	// don't return any child refs if the room is not a space room
-	if res.StateEvents[createTuple] != nil {
-		// escape the `.`s so gjson doesn't think it's nested
-		roomType := gjson.GetBytes(res.StateEvents[createTuple].Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
-		if roomType != ConstCreateEventContentValueSpace {
+	if create := res.StateEvents[createTuple]; create != nil {
+		var createContent gomatrixserverlib.CreateContent
+		err := json.Unmarshal(create.Content(), &createContent)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).WithField("create_content", create.Content()).Warn("failed to unmarshal m.room.create event")
+		}
+		roomType := createContent.RoomType
+		if roomType != spec.MSpace {
 			return []fclient.MSC2946StrippedEvent{}, nil
 		}
 	}
