@@ -43,10 +43,10 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 		return nil, nil, roomserver.ErrRoomUnknownOrNotAllowed{Err: fmt.Errorf("room is unknown/forbidden")}
 	}
 
-	var discoveredRooms []fclient.MSC2946Room
+	discoveredRooms := []fclient.MSC2946Room{}
 
-	// Copy unvisited and processed to avoid modifying walker
-	unvisited := []roomserver.RoomHierarchyWalkerQueuedRoom{}
+	// Copy unvisited and processed to avoid modifying original walker (which is typically in cache)
+	unvisited := make([]roomserver.RoomHierarchyWalkerQueuedRoom, len(walker.Unvisited))
 	copy(unvisited, walker.Unvisited)
 	processed := walker.Processed.Copy()
 

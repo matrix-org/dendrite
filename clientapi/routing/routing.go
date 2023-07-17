@@ -509,14 +509,14 @@ func Setup(
 
 	// Defined outside of handler to persist between calls
 	// TODO: clear based on some criteria
-	roomHierarchyPaginationCache := new(RoomHierarchyPaginationCache)
+	roomHierarchyPaginationCache := NewRoomHierarchyPaginationCache()
 	v1mux.Handle("/rooms/{roomID}/hierarchy",
 		httputil.MakeAuthAPI("spaces", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return QueryRoomHierarchy(req, device, vars["roomID"], rsAPI, roomHierarchyPaginationCache)
+			return QueryRoomHierarchy(req, device, vars["roomID"], rsAPI, &roomHierarchyPaginationCache)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
