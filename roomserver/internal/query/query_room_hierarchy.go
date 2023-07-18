@@ -52,7 +52,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 
 	// Depth first -> stack data structure
 	for len(unvisited) > 0 {
-		if len(discoveredRooms) >= limit {
+		if len(discoveredRooms) >= limit && limit != -1 {
 			break
 		}
 
