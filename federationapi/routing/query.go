@@ -151,6 +151,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	if err != nil {
 		switch err.(type) {
 		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
+			util.GetLogger(httpReq.Context()).WithError(err).Debugln("room unknown/forbidden when handling SS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("room is unknown/forbidden"),
@@ -165,6 +166,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	}
 
 	if len(discoveredRooms) == 0 {
+		util.GetLogger(httpReq.Context()).Debugln("no rooms found when handling SS room hierarchy request")
 		return util.JSONResponse{
 			Code: 404,
 			JSON: spec.NotFound("room is unknown/forbidden"),

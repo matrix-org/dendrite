@@ -143,6 +143,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	if err != nil {
 		switch err.(type) {
 		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
+			util.GetLogger(req.Context()).WithError(err).Debugln("room unknown/forbidden when handling CS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("room is unknown/forbidden"),
