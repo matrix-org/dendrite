@@ -36,7 +36,7 @@ type SyncServerDatasource struct {
 
 // NewDatabase creates a new sync server database
 // nolint: gocyclo
-func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 
