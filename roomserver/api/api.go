@@ -132,7 +132,7 @@ type QueryRoomHierarchyAPI interface {
 	//
 	// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
 	// can be cached.
-	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.MSC2946Room, *RoomHierarchyWalker, error)
+	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *RoomHierarchyWalker, error)
 }
 
 // API functions required by the syncapi

@@ -38,12 +38,12 @@ import (
 //
 // If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
 // can be cached.
-func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker roomserver.RoomHierarchyWalker, limit int) ([]fclient.MSC2946Room, *roomserver.RoomHierarchyWalker, error) {
+func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker roomserver.RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *roomserver.RoomHierarchyWalker, error) {
 	if authorised, _ := authorised(ctx, querier, walker.Caller, walker.RootRoomID, nil); !authorised {
 		return nil, nil, roomserver.ErrRoomUnknownOrNotAllowed{Err: fmt.Errorf("room is unknown/forbidden")}
 	}
 
-	discoveredRooms := []fclient.MSC2946Room{}
+	discoveredRooms := []fclient.RoomHierarchyRoom{}
 
 	// Copy unvisited and processed to avoid modifying original walker (which is typically in cache)
 	unvisited := make([]roomserver.RoomHierarchyWalkerQueuedRoom, len(walker.Unvisited))
@@ -81,7 +81,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 		}
 
 		// Collect rooms/events to send back (either locally or fetched via federation)
-		var discoveredChildEvents []fclient.MSC2946StrippedEvent
+		var discoveredChildEvents []fclient.RoomHierarchyStrippedEvent
 
 		// If we know about this room and the caller is authorised (joined/world_readable) then pull
 		// events locally
@@ -112,7 +112,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 
 			pubRoom := publicRoomsChunk(ctx, querier, queuedRoom.RoomID)
 
-			discoveredRooms = append(discoveredRooms, fclient.MSC2946Room{
+			discoveredRooms = append(discoveredRooms, fclient.RoomHierarchyRoom{
 				PublicRoom:    *pubRoom,
 				RoomType:      roomType,
 				ChildrenState: events,
@@ -377,7 +377,7 @@ func roomExists(ctx context.Context, querier *Queryer, roomID spec.RoomID) bool 
 
 // federatedRoomInfo returns more of the spaces graph from another server. Returns nil if this was
 // unsuccessful.
-func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.DeviceOrServerName, suggestedOnly bool, roomID spec.RoomID, vias []string) *fclient.MSC2946SpacesResponse {
+func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.DeviceOrServerName, suggestedOnly bool, roomID spec.RoomID, vias []string) *fclient.RoomHierarchyResponse {
 	// only do federated requests for client requests
 	if caller.Device() == nil {
 		return nil
@@ -401,12 +401,12 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 		}
 		// ensure nil slices are empty as we send this to the client sometimes
 		if res.Room.ChildrenState == nil {
-			res.Room.ChildrenState = []fclient.MSC2946StrippedEvent{}
+			res.Room.ChildrenState = []fclient.RoomHierarchyStrippedEvent{}
 		}
 		for i := 0; i < len(res.Children); i++ {
 			child := res.Children[i]
 			if child.ChildrenState == nil {
-				child.ChildrenState = []fclient.MSC2946StrippedEvent{}
+				child.ChildrenState = []fclient.RoomHierarchyStrippedEvent{}
 			}
 			res.Children[i] = child
 		}
@@ -418,7 +418,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 }
 
 // references returns all child references pointing to or from this room.
-func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, roomID spec.RoomID) ([]fclient.MSC2946StrippedEvent, error) {
+func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, roomID spec.RoomID) ([]fclient.RoomHierarchyStrippedEvent, error) {
 	createTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: spec.MRoomCreate,
 		StateKey:  "",
@@ -447,12 +447,12 @@ func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, 
 		}
 		roomType := createContent.RoomType
 		if roomType != spec.MSpace {
-			return []fclient.MSC2946StrippedEvent{}, nil
+			return []fclient.RoomHierarchyStrippedEvent{}, nil
 		}
 	}
 	delete(res.StateEvents, createTuple)
 
-	el := make([]fclient.MSC2946StrippedEvent, 0, len(res.StateEvents))
+	el := make([]fclient.RoomHierarchyStrippedEvent, 0, len(res.StateEvents))
 	for _, ev := range res.StateEvents {
 		content := gjson.ParseBytes(ev.Content())
 		// only return events that have a `via` key as per MSC1772
@@ -492,11 +492,11 @@ func publicRoomsChunk(ctx context.Context, querier *Queryer, roomID spec.RoomID)
 	return &pubRooms[0]
 }
 
-func stripped(ev gomatrixserverlib.PDU) *fclient.MSC2946StrippedEvent {
+func stripped(ev gomatrixserverlib.PDU) *fclient.RoomHierarchyStrippedEvent {
 	if ev.StateKey() == nil {
 		return nil
 	}
-	return &fclient.MSC2946StrippedEvent{
+	return &fclient.RoomHierarchyStrippedEvent{
 		Type:           ev.Type(),
 		StateKey:       *ev.StateKey(),
 		Content:        ev.Content(),

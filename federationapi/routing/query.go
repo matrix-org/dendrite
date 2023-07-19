@@ -174,7 +174,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	}
 	return util.JSONResponse{
 		Code: 200,
-		JSON: fclient.MSC2946SpacesResponse{
+		JSON: fclient.RoomHierarchyResponse{
 			Room:     discoveredRooms[0],
 			Children: discoveredRooms[1:],
 		},

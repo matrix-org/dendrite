@@ -175,6 +175,6 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 
 // Success response for /_matrix/client/v1/rooms/{roomID}/hierarchy
 type RoomHierarchyClientResponse struct {
-	Rooms     []fclient.MSC2946Room `json:"rooms"`
-	NextBatch string                `json:"next_batch,omitempty"`
+	Rooms     []fclient.RoomHierarchyRoom `json:"rooms"`
+	NextBatch string                      `json:"next_batch,omitempty"`
 }

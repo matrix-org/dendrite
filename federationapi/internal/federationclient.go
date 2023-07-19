@@ -196,14 +196,14 @@ func (a *FederationInternalAPI) MSC2836EventRelationships(
 
 func (a *FederationInternalAPI) RoomHierarchies(
 	ctx context.Context, origin, s spec.ServerName, roomID string, suggestedOnly bool,
-) (res fclient.MSC2946SpacesResponse, err error) {
+) (res fclient.RoomHierarchyResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
-		return a.federation.MSC2946Spaces(ctx, origin, s, roomID, suggestedOnly)
+		return a.federation.RoomHierarchy(ctx, origin, s, roomID, suggestedOnly)
 	})
 	if err != nil {
 		return res, err
 	}
-	return ires.(fclient.MSC2946SpacesResponse), nil
+	return ires.(fclient.RoomHierarchyResponse), nil
 }
