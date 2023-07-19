@@ -213,7 +213,7 @@ dendrite_config:
 
   # -- Configuration for experimental MSC's. (Valid values are: msc2836)
   mscs:
-    mscs:
+    mscs: []
       # A list of enabled MSC's
       # Currently valid values are:
       # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
