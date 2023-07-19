@@ -64,6 +64,10 @@ Use [dendrite.matrix.org](https://dendrite.matrix.org) which we officially suppo
 
 ## Does Dendrite support Space Summaries?
 
+Yes
+
+## Does Dendrite support Threads?
+
 Yes, to enable them [msc2836](https://github.com/matrix-org/matrix-spec-proposals/pull/2836) would need to be added to mscs configuration in order to support Threading. Other MSCs are not currently supported.
 
 ```
