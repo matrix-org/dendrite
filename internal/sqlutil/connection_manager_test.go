@@ -19,7 +19,6 @@ func TestConnectionManager(t *testing.T) {
 			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 
 			dbProps := &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}
-			t.Logf("XXX: %s", conStr)
 			db, writer, err := cm.Connection(dbProps)
 			if err != nil {
 				t.Fatal(err)
