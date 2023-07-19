@@ -126,7 +126,7 @@ func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 }
 
 func (p *P2PMonolith) SetupDendrite(
-	processCtx *process.ProcessContext, cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers,
+	processCtx *process.ProcessContext, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers,
 	port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
 
 	p.port = port

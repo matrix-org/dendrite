@@ -31,7 +31,7 @@ import (
 func NewInternalAPI(
 	processContext *process.ProcessContext,
 	cfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	caches caching.RoomServerCaches,
 	enableMetrics bool,
