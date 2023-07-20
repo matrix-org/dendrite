@@ -503,3 +503,79 @@ func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.
 	}
 	return membership, err
 }
+
+type QueryRoomHierarchyRequest struct {
+	SuggestedOnly bool `json:"suggested_only"`
+	Limit         int  `json:"limit"`
+	MaxDepth      int  `json:"max_depth"`
+	From          int  `json:"json"`
+}
+
+// A struct storing the intermediate state of a room hierarchy query for pagination purposes.
+//
+// Used for implementing space summaries / room hierarchies
+//
+// Use NewRoomHierarchyWalker to construct this, and QueryNextRoomHierarchyPage on the roomserver API
+// to traverse the room hierarchy.
+type RoomHierarchyWalker struct {
+	RootRoomID    spec.RoomID
+	Caller        types.DeviceOrServerName
+	SuggestedOnly bool
+	MaxDepth      int
+	Processed     RoomSet
+	Unvisited     []RoomHierarchyWalkerQueuedRoom
+}
+
+type RoomHierarchyWalkerQueuedRoom struct {
+	RoomID       spec.RoomID
+	ParentRoomID *spec.RoomID
+	Depth        int
+	Vias         []string // vias to query this room by
+}
+
+// Create a new room hierarchy walker, starting from the provided root room ID.
+//
+// Use the resulting struct with QueryNextRoomHierarchyPage on the roomserver API to traverse the room hierarchy.
+func NewRoomHierarchyWalker(caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker {
+	walker := RoomHierarchyWalker{
+		RootRoomID:    roomID,
+		Caller:        caller,
+		SuggestedOnly: suggestedOnly,
+		MaxDepth:      maxDepth,
+		Unvisited: []RoomHierarchyWalkerQueuedRoom{{
+			RoomID:       roomID,
+			ParentRoomID: nil,
+			Depth:        0,
+		}},
+		Processed: NewRoomSet(),
+	}
+
+	return walker
+}
+
+// A set of room IDs.
+type RoomSet map[spec.RoomID]struct{}
+
+// Create a new empty room set.
+func NewRoomSet() RoomSet {
+	return RoomSet{}
+}
+
+// Check if a room ID is in a room set.
+func (s RoomSet) Contains(val spec.RoomID) bool {
+	_, ok := s[val]
+	return ok
+}
+
+// Add a room ID to a room set.
+func (s RoomSet) Add(val spec.RoomID) {
+	s[val] = struct{}{}
+}
+
+func (s RoomSet) Copy() RoomSet {
+	copied := make(RoomSet, len(s))
+	for k := range s {
+		copied.Add(k)
+	}
+	return copied
+}

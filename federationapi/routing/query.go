@@ -20,12 +20,14 @@ import (
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // RoomAliasToID converts the queried alias into a room ID and returns it
@@ -114,5 +116,67 @@ func RoomAliasToID(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: resp,
+	}
+}
+
+// Query the immediate children of a room/space
+//
+// Implements /_matrix/federation/v1/hierarchy/{roomID}
+func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationRequest, roomIDStr string, rsAPI roomserverAPI.FederationRoomserverAPI) util.JSONResponse {
+	parsedRoomID, err := spec.NewRoomID(roomIDStr)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.InvalidParam("room is unknown/forbidden"),
+		}
+	}
+	roomID := *parsedRoomID
+
+	suggestedOnly := false // Defaults to false (spec-defined)
+	switch httpReq.URL.Query().Get("suggested_only") {
+	case "true":
+		suggestedOnly = true
+	case "false":
+	case "": // Empty string is returned when query param is not set
+	default:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("query parameter 'suggested_only', if set, must be 'true' or 'false'"),
+		}
+	}
+
+	walker := roomserverAPI.NewRoomHierarchyWalker(types.NewServerNameNotDevice(request.Origin()), roomID, suggestedOnly, 1)
+	discoveredRooms, _, err := rsAPI.QueryNextRoomHierarchyPage(httpReq.Context(), walker, -1)
+
+	if err != nil {
+		switch err.(type) {
+		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
+			util.GetLogger(httpReq.Context()).WithError(err).Debugln("room unknown/forbidden when handling SS room hierarchy request")
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("room is unknown/forbidden"),
+			}
+		default:
+			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (SS API)")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
+	}
+
+	if len(discoveredRooms) == 0 {
+		util.GetLogger(httpReq.Context()).Debugln("no rooms found when handling SS room hierarchy request")
+		return util.JSONResponse{
+			Code: 404,
+			JSON: spec.NotFound("room is unknown/forbidden"),
+		}
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: fclient.RoomHierarchyResponse{
+			Room:     discoveredRooms[0],
+			Children: discoveredRooms[1:],
+		},
 	}
 }

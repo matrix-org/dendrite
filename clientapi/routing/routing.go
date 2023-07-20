@@ -288,6 +288,8 @@ func Setup(
 	// Note that 'apiversion' is chosen because it must not collide with a variable used in any of the routing!
 	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
+	v1mux := publicAPIMux.PathPrefix("/v1/").Subrouter()
+
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
 	v3mux.Handle("/createRoom",
@@ -504,6 +506,19 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
+
+	// Defined outside of handler to persist between calls
+	// TODO: clear based on some criteria
+	roomHierarchyPaginationCache := NewRoomHierarchyPaginationCache()
+	v1mux.Handle("/rooms/{roomID}/hierarchy",
+		httputil.MakeAuthAPI("spaces", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return QueryRoomHierarchy(req, device, vars["roomID"], rsAPI, &roomHierarchyPaginationCache)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		if r := rateLimits.Limit(req, nil); r != nil {

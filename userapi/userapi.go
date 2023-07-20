@@ -36,6 +36,9 @@ import (
 
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+//
+// Creating a new instance of the user API requires a roomserver API with a federation API set
+// using its `SetFederationAPI` method, other you may get nil-dereference errors.
 func NewInternalAPI(
 	processContext *process.ProcessContext,
 	dendriteCfg *config.Dendrite,
