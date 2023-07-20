@@ -123,6 +123,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		ServerName:          r.ServerName,
 		SigningIdentity:     r.SigningIdentityFor,
 		FSAPI:               fsAPI,
+		RSAPI:               r,
 		KeyRing:             keyRing,
 		ACLs:                r.ServerACLs,
 		Queryer:             r.Queryer,

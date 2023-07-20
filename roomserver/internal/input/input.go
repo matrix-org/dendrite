@@ -83,6 +83,7 @@ type Inputer struct {
 	ServerName          spec.ServerName
 	SigningIdentity     func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	FSAPI               fedapi.RoomserverFederationAPI
+	RSAPI               api.RoomserverInternalAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
 	InputRoomEventTopic string
