@@ -276,7 +276,6 @@ media_api:
 mscs:
   mscs:
   #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
-  #  - msc2946  # (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
 # Configuration for the Sync API.
 sync_api:

@@ -1,7 +1,7 @@
 
 # dendrite
 
-![Version: 0.13.0](https://img.shields.io/badge/Version-0.13.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.13.0](https://img.shields.io/badge/AppVersion-0.13.0-informational?style=flat-square)
+![Version: 0.13.1](https://img.shields.io/badge/Version-0.13.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.13.1](https://img.shields.io/badge/AppVersion-0.13.1-informational?style=flat-square)
 Dendrite Matrix Homeserver
 
 Status: **NOT PRODUCTION READY**
@@ -48,13 +48,16 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | signing_key.create | bool | `true` | Create a new signing key, if not exists |
 | signing_key.existingSecret | string | `""` | Use an existing secret |
 | resources | object | sets some sane default values | Default resource requests/limits. |
-| persistence.storageClass | string | `""` | The storage class to use for volume claims. Defaults to the cluster default storage class. |
+| persistence.storageClass | string | `""` | The storage class to use for volume claims. Used unless specified at the specific component. Defaults to the cluster default storage class. |
 | persistence.jetstream.existingClaim | string | `""` | Use an existing volume claim for jetstream |
 | persistence.jetstream.capacity | string | `"1Gi"` | PVC Storage Request for the jetstream volume |
+| persistence.jetstream.storageClass | string | `""` | The storage class to use for volume claims. Defaults to persistence.storageClass |
 | persistence.media.existingClaim | string | `""` | Use an existing volume claim for media files |
 | persistence.media.capacity | string | `"1Gi"` | PVC Storage Request for the media volume |
+| persistence.media.storageClass | string | `""` | The storage class to use for volume claims. Defaults to persistence.storageClass |
 | persistence.search.existingClaim | string | `""` | Use an existing volume claim for the fulltext search index |
 | persistence.search.capacity | string | `"1Gi"` | PVC Storage Request for the search volume |
+| persistence.search.storageClass | string | `""` | The storage class to use for volume claims. Defaults to persistence.storageClass |
 | extraVolumes | list | `[]` | Add additional volumes to the Dendrite Pod |
 | extraVolumeMounts | list | `[]` | Configure additional mount points volumes in the Dendrite Pod |
 | strategy.type | string | `"RollingUpdate"` | Strategy to use for rolling updates (e.g. Recreate, RollingUpdate) If you are using ReadWriteOnce volumes, you should probably use Recreate |
@@ -97,7 +100,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | dendrite_config.global.dns_cache.cache_lifetime | string | `"10m"` | Duration for how long DNS cache items should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more) |
 | dendrite_config.global.profiling.enabled | bool | `false` | Enable pprof. You will need to manually create a port forwarding to the deployment to access PPROF, as it will only listen on localhost and the defined port. e.g. `kubectl port-forward deployments/dendrite 65432:65432` |
 | dendrite_config.global.profiling.port | int | `65432` | pprof port, if enabled |
-| dendrite_config.mscs | object | `{"mscs":["msc2946"]}` | Configuration for experimental MSC's. (Valid values are: msc2836 and msc2946) |
+| dendrite_config.mscs | object | `{"mscs":[]}` | Configuration for experimental MSC's. (Valid values are: msc2836) |
 | dendrite_config.app_service_api.disable_tls_validation | bool | `false` | Disable the validation of TLS certificates of appservices. This is not recommended in production since it may allow appservice traffic to be sent to an insecure endpoint. |
 | dendrite_config.app_service_api.config_files | list | `[]` | Appservice config files to load on startup. (**NOTE**: This is overriden by Helm, if a folder `./appservices/` exists) |
 | dendrite_config.client_api.registration_disabled | bool | `true` | Prevents new users from being able to register on this homeserver, except when using the registration shared secret below. |
@@ -144,12 +147,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | postgresql.auth.password | string | `"changeme"` |  |
 | postgresql.auth.database | string | `"dendrite"` |  |
 | postgresql.persistence.enabled | bool | `false` |  |
-| ingress.enabled | bool | `false` | Create an ingress for a monolith deployment |
-| ingress.hosts | list | `[]` |  |
-| ingress.className | string | `""` |  |
-| ingress.hostName | string | `""` |  |
+| ingress.enabled | bool | `false` | Create an ingress for the deployment |
+| ingress.className | string | `""` | The ingressClass to use. Will be converted to annotation if not yet supported. |
 | ingress.annotations | object | `{}` | Extra, custom annotations |
-| ingress.tls | list | `[]` |  |
+| ingress.hostName | string | `""` | The ingress hostname for your matrix server. Should align with the server_name and well_known_* hosts. If not set, generated from the dendrite_config values. |
+| ingress.tls | list | `[]` | TLS configuration. Should contain information for the server_name and well-known hosts. Alternatively, set tls.generate=true to generate defaults based on the dendrite_config. |
 | service.type | string | `"ClusterIP"` |  |
 | service.port | int | `8008` |  |
 | prometheus.servicemonitor.enabled | bool | `false` | Enable ServiceMonitor for Prometheus-Operator for scrape metric-endpoint |
@@ -187,3 +189,5 @@ grafana:
 ```
 PS: The label `release=kube-prometheus-stack` is setup with the helmchart of the Prometheus Operator. For Grafana Dashboards it may be necessary to enable scanning in the correct namespaces (or ALL), enabled by `sidecar.dashboards.searchNamespace` in [Helmchart of grafana](https://artifacthub.io/packages/helm/grafana/grafana) (which is part of PrometheusOperator, so `grafana.sidecar.dashboards.searchNamespace`)
 
+----------------------------------------------
+Autogenerated from chart metadata using [helm-docs v1.11.0](https://github.com/norwoodj/helm-docs/releases/v1.11.0)

@@ -596,6 +596,13 @@ func Setup(
 			return GetOpenIDUserInfo(req, userAPI)
 		}),
 	).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/hierarchy/{roomID}", MakeFedAPI(
+		"federation_room_hierarchy", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
+		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
+			return QueryRoomHierarchy(httpReq, request, vars["roomID"], rsAPI)
+		},
+	)).Methods(http.MethodGet)
 }
 
 func ErrorIfLocalServerNotInRoom(

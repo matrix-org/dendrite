@@ -91,15 +91,8 @@ func NewRoomserverAPI(
 		NATSClient:             nc,
 		Durable:                dendriteCfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
-		Queryer: &query.Queryer{
-			DB:                roomserverDB,
-			Cache:             caches,
-			IsLocalServerName: dendriteCfg.Global.IsLocalServerName,
-			ServerACLs:        serverACLs,
-			Cfg:               dendriteCfg,
-		},
-		enableMetrics: enableMetrics,
-		// perform-er structs get initialised when we have a federation sender to use
+		enableMetrics:          enableMetrics,
+		// perform-er structs + queryer struct get initialised when we have a federation sender to use
 	}
 	return a
 }
@@ -110,6 +103,15 @@ func NewRoomserverAPI(
 func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
+
+	r.Queryer = &query.Queryer{
+		DB:                r.DB,
+		Cache:             r.Cache,
+		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
+		ServerACLs:        r.ServerACLs,
+		Cfg:               r.Cfg,
+		FSAPI:             fsAPI,
+	}
 
 	r.Inputer = &input.Inputer{
 		Cfg:                 &r.Cfg.RoomServer,

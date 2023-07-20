@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
-	"github.com/matrix-org/dendrite/setup/mscs/msc2946"
 	"github.com/matrix-org/util"
 )
 
@@ -44,8 +43,6 @@ func EnableMSC(cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.R
 	switch msc {
 	case "msc2836":
 		return msc2836.Enable(cfg, cm, routers, monolith.RoomserverAPI, monolith.FederationAPI, monolith.UserAPI, monolith.KeyRing)
-	case "msc2946":
-		return msc2946.Enable(cfg, routers, monolith.RoomserverAPI, monolith.UserAPI, monolith.FederationAPI, monolith.KeyRing, caches)
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:
