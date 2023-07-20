@@ -451,7 +451,7 @@ func (r *Inputer) processRoomEvent(
 	// TODO: Revist this to ensure we don't replace a current state mxid_mapping with an older one.
 	if event.Type() == spec.MRoomMember {
 		mapping := gomatrixserverlib.MemberContent{}
-		if err := json.Unmarshal(event.Content(), &mapping); err != nil {
+		if err = json.Unmarshal(event.Content(), &mapping); err != nil {
 			return err
 		}
 		if mapping.MXIDMapping != nil {
