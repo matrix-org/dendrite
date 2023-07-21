@@ -17,7 +17,6 @@ package mscs
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -26,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Enable MSCs - returns an error on unknown MSCs
@@ -46,7 +46,7 @@ func EnableMSC(cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.R
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:
-		return fmt.Errorf("EnableMSC: unknown msc '%s'", msc)
+		logrus.Warnf("EnableMSC: unknown MSC '%s', this MSC is either not supported or is natively supported by Dendrite", msc)
 	}
 	return nil
 }
