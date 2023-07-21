@@ -48,6 +48,22 @@ func TestConnectionManager(t *testing.T) {
 			if !reflect.DeepEqual(writer, writer2) {
 				t.Fatalf("expected database writer to be reused")
 			}
+
+			// This test does not work with Postgres, because we can't just simply append
+			// "x" or replace the database to use.
+			if dbType == test.DBTypePostgres {
+				return
+			}
+
+			// Test different connection string
+			dbProps = &config.DatabaseOptions{ConnectionString: config.DataSource(conStr + "x")}
+			db3, _, err := cm.Connection(dbProps)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if reflect.DeepEqual(db, db3) {
+				t.Fatalf("expected different database connection")
+			}
 		})
 	})
 
@@ -112,6 +128,12 @@ func TestConnectionManager(t *testing.T) {
 	// test invalid connection string configured
 	cm2 := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	_, _, err := cm2.Connection(&config.DatabaseOptions{ConnectionString: "http://"})
+	if err == nil {
+		t.Fatal("expected an error but got none")
+	}
+
+	// empty connection string is not allowed
+	_, _, err = cm2.Connection(&config.DatabaseOptions{})
 	if err == nil {
 		t.Fatal("expected an error but got none")
 	}
