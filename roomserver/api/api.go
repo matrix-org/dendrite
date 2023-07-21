@@ -34,6 +34,17 @@ func (e ErrNotAllowed) Error() string {
 	return e.Err.Error()
 }
 
+// ErrRoomUnknownOrNotAllowed is an error return if either the provided
+// room ID does not exist, or points to a room that the requester does
+// not have access to.
+type ErrRoomUnknownOrNotAllowed struct {
+	Err error
+}
+
+func (e ErrRoomUnknownOrNotAllowed) Error() string {
+	return e.Err.Error()
+}
+
 type RestrictedJoinAPI interface {
 	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
 	InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error)
@@ -113,6 +124,17 @@ type QueryEventsAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 }
 
+type QueryRoomHierarchyAPI interface {
+	// Traverse the room hierarchy using the provided walker up to the provided limit,
+	// returning a new walker which can be used to fetch the next page.
+	//
+	// If limit is -1, this is treated as no limit, and the entire hierarchy will be traversed.
+	//
+	// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
+	// can be cached.
+	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *RoomHierarchyWalker, error)
+}
+
 // API functions required by the syncapi
 type SyncRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
@@ -187,6 +209,7 @@ type ClientRoomserverAPI interface {
 	QueryEventsAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
+	QueryRoomHierarchyAPI
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
@@ -236,6 +259,7 @@ type FederationRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
+	QueryRoomHierarchyAPI
 	UserRoomPrivateKeyCreator
 	CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error)
 	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)

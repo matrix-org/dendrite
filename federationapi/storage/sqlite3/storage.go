@@ -34,7 +34,7 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, d.writer, err = conMan.Connection(dbProperties); err != nil {

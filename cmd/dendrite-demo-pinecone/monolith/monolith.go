@@ -98,7 +98,7 @@ func GenerateDefaultConfig(sk ed25519.PrivateKey, storageDir string, cacheDir st
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(storageDir, dbPrefix)))
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(storageDir, dbPrefix)))
 	cfg.RelayAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-relayapi.db", filepath.Join(storageDir, dbPrefix)))
-	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+	cfg.MSCs.MSCs = []string{"msc2836"}
 	cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(storageDir, dbPrefix)))
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
@@ -126,7 +126,7 @@ func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 }
 
 func (p *P2PMonolith) SetupDendrite(
-	processCtx *process.ProcessContext, cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers,
+	processCtx *process.ProcessContext, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers,
 	port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
 
 	p.port = port
@@ -143,12 +143,11 @@ func (p *P2PMonolith) SetupDendrite(
 	fsAPI := federationapi.NewInternalAPI(
 		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
 
 	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-
-	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(p.Router, p.Sessions, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(p.Router, p.Sessions, fsAPI, federation)
