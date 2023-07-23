@@ -181,18 +181,6 @@ func SendKick(
 		return *errRes
 	}
 
-	pl, errRes := getPowerlevels(req, rsAPI, roomID)
-	if errRes != nil {
-		return *errRes
-	}
-	allowedToKick := pl.UserLevel(senderID) >= pl.Kick
-	if !allowedToKick {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("You don't have permission to kick this user, power level too low."),
-		}
-	}
-
 	bodyUserID, err := spec.NewUserID(body.UserID, true)
 	if err != nil {
 		return util.JSONResponse{
@@ -200,6 +188,19 @@ func SendKick(
 			JSON: spec.BadJSON("body userID is invalid"),
 		}
 	}
+
+	pl, errRes := getPowerlevels(req, rsAPI, roomID)
+	if errRes != nil {
+		return *errRes
+	}
+	allowedToKick := pl.UserLevel(senderID) >= pl.Kick || bodyUserID.String() == deviceUserID.String()
+	if !allowedToKick {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, power level too low."),
+		}
+	}
+
 	var queryRes roomserverAPI.QueryMembershipForUserResponse
 	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
