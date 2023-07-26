@@ -181,10 +181,37 @@ func SetLocalAlias(
 		return *resErr
 	}
 
+	maybeRoomID, err := spec.NewRoomID(r.RoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
+		}
+	}
+	roomID := *maybeRoomID // should be safe due to error check
+
+	maybeUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+	userID := *maybeUserID
+
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), roomID, userID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("QuerySenderIDForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
 	queryReq := roomserverAPI.SetRoomAliasRequest{
-		UserID: device.UserID,
-		RoomID: r.RoomID,
-		Alias:  alias,
+		SenderID: senderID,
+		RoomID:   r.RoomID,
+		Alias:    alias,
 	}
 	var queryRes roomserverAPI.SetRoomAliasResponse
 	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {

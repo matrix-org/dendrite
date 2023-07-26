@@ -274,9 +274,8 @@ func TestPurgeRoom(t *testing.T) {
 		if !isPublished {
 			t.Fatalf("room should be published before purging")
 		}
-
 		aliasResp := &api.SetRoomAliasResponse{}
-		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", UserID: alice.ID}, aliasResp); err != nil {
+		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", SenderID: spec.SenderID(alice.ID)}, aliasResp); err != nil {
 			t.Fatal(err)
 		}
 		// check the alias is actually there

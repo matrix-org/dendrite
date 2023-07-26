@@ -23,7 +23,7 @@ import (
 // SetRoomAliasRequest is a request to SetRoomAlias
 type SetRoomAliasRequest struct {
 	// ID of the user setting the alias
-	UserID string `json:"user_id"`
+	SenderID spec.SenderID `json:"sender"`
 	// New alias for the room
 	Alias string `json:"alias"`
 	// The room ID the alias is referring to
