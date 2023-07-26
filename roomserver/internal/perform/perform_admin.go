@@ -204,18 +204,6 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return err
 	}
 
-	// Evacuate the room before purging it from the database
-	evacAffected, err := r.PerformAdminEvacuateRoom(ctx, roomID)
-	if err != nil {
-		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to evacuate room before purging")
-		return err
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"room_id":         roomID,
-		"evacuated_users": len(evacAffected),
-	}).Warn("Evacuated room, purging room from roomserver now")
-
 	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
 		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
