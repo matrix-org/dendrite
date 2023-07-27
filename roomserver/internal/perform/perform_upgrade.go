@@ -116,7 +116,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// 4. Move local aliases to the new room
-	if pErr = moveLocalAliases(ctx, roomID, newRoomID, senderID, userID, r.URSAPI); pErr != nil {
+	if pErr = moveLocalAliases(ctx, roomID, newRoomID, senderID, r.URSAPI); pErr != nil {
 		return "", pErr
 	}
 
@@ -171,7 +171,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 }
 
 func moveLocalAliases(ctx context.Context,
-	roomID, newRoomID string, senderID spec.SenderID, userID spec.UserID,
+	roomID, newRoomID string, senderID spec.SenderID,
 	URSAPI api.RoomserverInternalAPI,
 ) (err error) {
 

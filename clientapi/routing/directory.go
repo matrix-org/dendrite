@@ -274,10 +274,17 @@ func RemoveLocalAlias(
 	// as meaning they are not in the room, since lacking a sender ID could be caused by other bugs.
 	// TODO: maybe have QuerySenderIDForUser return richer errors?
 	var queryResp roomserverAPI.QueryMembershipForUserResponse
-	rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: validRoomID.String(),
 		UserID: *userID,
 	}, &queryResp)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.QueryMembershipForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
 	if !queryResp.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
