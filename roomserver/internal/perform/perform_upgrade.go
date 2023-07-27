@@ -188,10 +188,13 @@ func moveLocalAliases(ctx context.Context,
 	}
 
 	for _, alias := range aliasRes.Aliases {
-		removeAliasReq := api.RemoveRoomAliasRequest{SenderID: senderID, Alias: alias}
-		removeAliasRes := api.RemoveRoomAliasResponse{}
-		if err = URSAPI.RemoveRoomAlias(ctx, &removeAliasReq, &removeAliasRes); err != nil {
+		aliasFound, aliasRemoved, err := URSAPI.RemoveRoomAlias(ctx, senderID, alias)
+		if err != nil {
 			return fmt.Errorf("Failed to remove old room alias: %w", err)
+		} else if !aliasFound {
+			return fmt.Errorf("Failed to remove old room alias: alias not found, possible race")
+		} else if !aliasRemoved {
+			return fmt.Errorf("Failed to remove old alias")
 		}
 
 		aliasAlreadyExists, err := URSAPI.SetRoomAlias(ctx, senderID, *parsedNewRoomID, alias)

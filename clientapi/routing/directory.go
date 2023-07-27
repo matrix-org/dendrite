@@ -300,27 +300,23 @@ func RemoveLocalAlias(
 		}
 	}
 
-	queryReq := roomserverAPI.RemoveRoomAliasRequest{
-		Alias:    alias,
-		SenderID: deviceSenderID,
-	}
-	var queryRes roomserverAPI.RemoveRoomAliasResponse
-	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
+	aliasFound, aliasRemoved, err := rsAPI.RemoveRoomAlias(req.Context(), deviceSenderID, alias)
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+			JSON: spec.Unknown("internal server error"),
 		}
 	}
 
-	if !queryRes.Found {
+	if !aliasFound {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
 
-	if !queryRes.Removed {
+	if !aliasRemoved {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You do not have permission to remove this alias."),
