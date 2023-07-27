@@ -433,23 +433,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// from creating the room but still failing due to the alias having already
 	// been taken.
 	if roomAlias != "" {
-		aliasReq := api.SetRoomAliasRequest{
-			SenderID: senderID,
-			Alias:    roomAlias,
-			RoomID:   roomID.String(),
-		}
-
-		var aliasResp api.SetRoomAliasResponse
-		err = c.RSAPI.SetRoomAlias(ctx, &aliasReq, &aliasResp)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+		aliasAlreadyExists, aliasErr := c.RSAPI.SetRoomAlias(ctx, senderID, roomID, roomAlias)
+		if aliasErr != nil {
+			util.GetLogger(ctx).WithError(aliasErr).Error("aliasAPI.SetRoomAlias failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
 			}
 		}
 
-		if aliasResp.AliasExists {
+		if aliasAlreadyExists {
 			return "", &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.RoomInUse("Room alias already exists."),

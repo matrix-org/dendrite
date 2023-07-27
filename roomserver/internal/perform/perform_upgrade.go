@@ -181,6 +181,12 @@ func moveLocalAliases(ctx context.Context,
 		return fmt.Errorf("Failed to get old room aliases: %w", err)
 	}
 
+	// TODO: this should be spec.RoomID further up the call stack
+	parsedNewRoomID, err := spec.NewRoomID(newRoomID)
+	if err != nil {
+		return err
+	}
+
 	for _, alias := range aliasRes.Aliases {
 		removeAliasReq := api.RemoveRoomAliasRequest{SenderID: senderID, Alias: alias}
 		removeAliasRes := api.RemoveRoomAliasResponse{}
@@ -188,10 +194,11 @@ func moveLocalAliases(ctx context.Context,
 			return fmt.Errorf("Failed to remove old room alias: %w", err)
 		}
 
-		setAliasReq := api.SetRoomAliasRequest{SenderID: senderID, Alias: alias, RoomID: newRoomID}
-		setAliasRes := api.SetRoomAliasResponse{}
-		if err = URSAPI.SetRoomAlias(ctx, &setAliasReq, &setAliasRes); err != nil {
+		aliasAlreadyExists, err := URSAPI.SetRoomAlias(ctx, senderID, *parsedNewRoomID, alias)
+		if err != nil {
 			return fmt.Errorf("Failed to set new room alias: %w", err)
+		} else if aliasAlreadyExists {
+			return fmt.Errorf("Failed to set new room alias: alias exists when it should have just been removed")
 		}
 	}
 	return nil

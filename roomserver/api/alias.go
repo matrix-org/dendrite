@@ -20,22 +20,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-// SetRoomAliasRequest is a request to SetRoomAlias
-type SetRoomAliasRequest struct {
-	// ID of the user setting the alias
-	SenderID spec.SenderID `json:"sender"`
-	// New alias for the room
-	Alias string `json:"alias"`
-	// The room ID the alias is referring to
-	RoomID string `json:"room_id"`
-}
-
-// SetRoomAliasResponse is a response to SetRoomAlias
-type SetRoomAliasResponse struct {
-	// Does the alias already refer to a room?
-	AliasExists bool `json:"alias_exists"`
-}
-
 // GetRoomIDForAliasRequest is a request to GetRoomIDForAlias
 type GetRoomIDForAliasRequest struct {
 	// Alias we want to lookup

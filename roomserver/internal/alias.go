@@ -35,27 +35,27 @@ import (
 // SetRoomAlias implements alias.RoomserverInternalAPI
 func (r *RoomserverInternalAPI) SetRoomAlias(
 	ctx context.Context,
-	request *api.SetRoomAliasRequest,
-	response *api.SetRoomAliasResponse,
-) error {
+	senderID spec.SenderID,
+	roomID spec.RoomID,
+	alias string,
+) (aliasAlreadyUsed bool, err error) {
 	// Check if the alias isn't already referring to a room
-	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
+	existingRoomID, err := r.DB.GetRoomIDForAlias(ctx, alias)
 	if err != nil {
-		return err
+		return false, err
 	}
-	if len(roomID) > 0 {
+
+	if len(existingRoomID) > 0 {
 		// If the alias already exists, stop the process
-		response.AliasExists = true
-		return nil
+		return true, nil
 	}
-	response.AliasExists = false
 
 	// Save the new alias
-	if err := r.DB.SetRoomAlias(ctx, request.Alias, request.RoomID, string(request.SenderID)); err != nil {
-		return err
+	if err := r.DB.SetRoomAlias(ctx, alias, roomID.String(), string(senderID)); err != nil {
+		return false, err
 	}
 
-	return nil
+	return false, nil
 }
 
 // GetRoomIDForAlias implements alias.RoomserverInternalAPI

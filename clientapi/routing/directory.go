@@ -206,13 +206,8 @@ func SetLocalAlias(
 		}
 	}
 
-	queryReq := roomserverAPI.SetRoomAliasRequest{
-		SenderID: senderID,
-		RoomID:   r.RoomID,
-		Alias:    alias,
-	}
-	var queryRes roomserverAPI.SetRoomAliasResponse
-	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
+	aliasAlreadyExists, err := rsAPI.SetRoomAlias(req.Context(), senderID, *roomID, alias)
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -220,7 +215,7 @@ func SetLocalAlias(
 		}
 	}
 
-	if queryRes.AliasExists {
+	if aliasAlreadyExists {
 		return util.JSONResponse{
 			Code: http.StatusConflict,
 			JSON: spec.Unknown("The alias " + alias + " already exists."),
