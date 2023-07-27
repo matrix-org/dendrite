@@ -267,11 +267,36 @@ func RemoveLocalAlias(
 			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
+
+	// This seems like the kind of auth check that should be done in the roomserver, but
+	// if this check fails (user is not in the room), then there will be no SenderID for the user
+	// for pseudo-ID rooms - it will just return "". However, we can't use lack of a sender ID
+	// as meaning they are not in the room, since lacking a sender ID could be caused by other bugs.
+	// TODO: maybe have QuerySenderIDForUser return richer errors?
+	var queryResp roomserverAPI.QueryMembershipForUserResponse
+	rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+		RoomID: validRoomID.String(),
+		UserID: *userID,
+	}, &queryResp)
+	if !queryResp.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You do not have permission to remove this alias."),
+		}
+	}
+
 	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+	// TODO: how to handle this case? missing user/room keys seem to be a whole new class of errors
+	if deviceSenderID == "" {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
 		}
 	}
 
