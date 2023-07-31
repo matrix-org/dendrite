@@ -116,7 +116,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// 4. Move local aliases to the new room
-	if pErr = moveLocalAliases(ctx, roomID, newRoomID, senderID, userID, r.URSAPI); pErr != nil {
+	if pErr = moveLocalAliases(ctx, roomID, newRoomID, senderID, r.URSAPI); pErr != nil {
 		return "", pErr
 	}
 
@@ -171,7 +171,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 }
 
 func moveLocalAliases(ctx context.Context,
-	roomID, newRoomID string, senderID spec.SenderID, userID spec.UserID,
+	roomID, newRoomID string, senderID spec.SenderID,
 	URSAPI api.RoomserverInternalAPI,
 ) (err error) {
 
@@ -181,17 +181,27 @@ func moveLocalAliases(ctx context.Context,
 		return fmt.Errorf("Failed to get old room aliases: %w", err)
 	}
 
+	// TODO: this should be spec.RoomID further up the call stack
+	parsedNewRoomID, err := spec.NewRoomID(newRoomID)
+	if err != nil {
+		return err
+	}
+
 	for _, alias := range aliasRes.Aliases {
-		removeAliasReq := api.RemoveRoomAliasRequest{SenderID: senderID, Alias: alias}
-		removeAliasRes := api.RemoveRoomAliasResponse{}
-		if err = URSAPI.RemoveRoomAlias(ctx, &removeAliasReq, &removeAliasRes); err != nil {
+		aliasFound, aliasRemoved, err := URSAPI.RemoveRoomAlias(ctx, senderID, alias)
+		if err != nil {
 			return fmt.Errorf("Failed to remove old room alias: %w", err)
+		} else if !aliasFound {
+			return fmt.Errorf("Failed to remove old room alias: alias not found, possible race")
+		} else if !aliasRemoved {
+			return fmt.Errorf("Failed to remove old alias")
 		}
 
-		setAliasReq := api.SetRoomAliasRequest{UserID: userID.String(), Alias: alias, RoomID: newRoomID}
-		setAliasRes := api.SetRoomAliasResponse{}
-		if err = URSAPI.SetRoomAlias(ctx, &setAliasReq, &setAliasRes); err != nil {
+		aliasAlreadyExists, err := URSAPI.SetRoomAlias(ctx, senderID, *parsedNewRoomID, alias)
+		if err != nil {
 			return fmt.Errorf("Failed to set new room alias: %w", err)
+		} else if aliasAlreadyExists {
+			return fmt.Errorf("Failed to set new room alias: alias exists when it should have just been removed")
 		}
 	}
 	return nil

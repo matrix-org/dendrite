@@ -227,6 +227,11 @@ func TestPurgeRoom(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
+	roomID, err := spec.NewRoomID(room.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Invite Bob
 	inviteEvent := room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
@@ -274,9 +279,7 @@ func TestPurgeRoom(t *testing.T) {
 		if !isPublished {
 			t.Fatalf("room should be published before purging")
 		}
-
-		aliasResp := &api.SetRoomAliasResponse{}
-		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", UserID: alice.ID}, aliasResp); err != nil {
+		if _, err = rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID), *roomID, "myalias"); err != nil {
 			t.Fatal(err)
 		}
 		// check the alias is actually there
@@ -930,14 +933,17 @@ func TestUpgrade(t *testing.T) {
 			upgradeUser: alice.ID,
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
+				roomID, err := spec.NewRoomID(r.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
 				}
 
-				if err := rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{
-					RoomID: r.ID,
-					Alias:  "#myroomalias:test",
-				}, &api.SetRoomAliasResponse{}); err != nil {
+				if _, err := rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID),
+					*roomID,
+					"#myroomalias:test"); err != nil {
 					t.Fatal(err)
 				}
 

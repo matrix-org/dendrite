@@ -16,25 +16,7 @@ package api
 
 import (
 	"regexp"
-
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
-
-// SetRoomAliasRequest is a request to SetRoomAlias
-type SetRoomAliasRequest struct {
-	// ID of the user setting the alias
-	UserID string `json:"user_id"`
-	// New alias for the room
-	Alias string `json:"alias"`
-	// The room ID the alias is referring to
-	RoomID string `json:"room_id"`
-}
-
-// SetRoomAliasResponse is a response to SetRoomAlias
-type SetRoomAliasResponse struct {
-	// Does the alias already refer to a room?
-	AliasExists bool `json:"alias_exists"`
-}
 
 // GetRoomIDForAliasRequest is a request to GetRoomIDForAlias
 type GetRoomIDForAliasRequest struct {
@@ -61,22 +43,6 @@ type GetAliasesForRoomIDRequest struct {
 type GetAliasesForRoomIDResponse struct {
 	// The aliases the alias refers to
 	Aliases []string `json:"aliases"`
-}
-
-// RemoveRoomAliasRequest is a request to RemoveRoomAlias
-type RemoveRoomAliasRequest struct {
-	// ID of the user removing the alias
-	SenderID spec.SenderID `json:"user_id"`
-	// The room alias to remove
-	Alias string `json:"alias"`
-}
-
-// RemoveRoomAliasResponse is a response to RemoveRoomAlias
-type RemoveRoomAliasResponse struct {
-	// Did the alias exist before?
-	Found bool `json:"found"`
-	// Did we remove it?
-	Removed bool `json:"removed"`
 }
 
 type AliasEvent struct {
