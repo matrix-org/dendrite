@@ -1052,3 +1052,14 @@ func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, 
 
 	return nil, nil
 }
+
+func (r *Queryer) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
+	res := api.QueryMembershipForUserResponse{}
+	err := r.QueryMembershipForSenderID(ctx, roomID, senderID, &res)
+
+	membership := ""
+	if err == nil {
+		membership = res.Membership
+	}
+	return membership, err
+}

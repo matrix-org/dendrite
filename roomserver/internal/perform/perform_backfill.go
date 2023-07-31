@@ -266,6 +266,7 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.PDU
 	historyVisiblity        gomatrixserverlib.HistoryVisibility
 	roomVersion             gomatrixserverlib.RoomVersion
+	membershipQuerier       gomatrixserverlib.MembershipQuerier
 }
 
 func newBackfillRequester(
@@ -292,7 +293,12 @@ func newBackfillRequester(
 		preferServer:            preferServer,
 		historyVisiblity:        gomatrixserverlib.HistoryVisibilityShared,
 		roomVersion:             roomVersion,
+		membershipQuerier:       fsAPI,
 	}
+}
+
+func (b *backfillRequester) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
+	return b.fsAPI.CurrentMembership(ctx, roomID, senderID)
 }
 
 func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent gomatrixserverlib.PDU) ([]string, error) {
@@ -647,7 +653,7 @@ func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySe
 
 		resolver := state.NewStateResolution(db, roomInfo, querier)
 
-		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev, &resolver, querier)
+		_, redactedEvent, _, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev, &resolver, querier)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue

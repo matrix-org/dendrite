@@ -34,11 +34,13 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -592,6 +594,15 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		return event, nil
 	}
 
+	prevContent := prevEvent.Content()
+	// if we're storing a pseudoID event, make sure to delete the mxid_mapping
+	if event.Type() == spec.MRoomMember && event.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		prevContent, err = sjson.DeleteBytes(prevEvent.Content(), "mxid_mapping")
+		if err != nil {
+			return event, err
+		}
+	}
+
 	prevEventSender := string(prevEvent.SenderID())
 	prevUser, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, prevEvent.SenderID())
 	if err == nil && prevUser != nil {
@@ -599,7 +610,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	}
 
 	prev := types.PrevEventRef{
-		PrevContent:   prevEvent.Content(),
+		PrevContent:   prevContent,
 		ReplacesState: prevEvent.EventID(),
 		PrevSenderID:  prevEventSender,
 	}

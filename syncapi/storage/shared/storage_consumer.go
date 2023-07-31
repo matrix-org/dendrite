@@ -381,9 +381,48 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 
 	newEvent := &rstypes.HeaderedEvent{PDU: eventToRedact}
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		// if we are redacting a state event, also update the current_room_state table
+		if newEvent.StateKey() != nil {
+			if err = d.redactCurrentStateEvent(ctx, txn, newEvent, querier); err != nil {
+				return err
+			}
+		}
 		return d.OutputEvents.UpdateEventJSON(ctx, txn, newEvent)
 	})
 	return err
+}
+
+// redactCurrentStateEvent updates the JSON data in the current_room_state table
+func (d *Database) redactCurrentStateEvent(ctx context.Context, txn *sql.Tx, newEvent *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error {
+	// resolve the state key, which may be user pseudoID
+	if *newEvent.StateKey() != "" {
+		validRoomID, err := spec.NewRoomID(newEvent.RoomID())
+		if err != nil {
+			return err
+		}
+		var sku *spec.UserID
+		stateKey := newEvent.StateKey()
+		sku, err = querier.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*stateKey))
+		if err == nil && sku != nil {
+			sKey := sku.String()
+			newEvent.StateKeyResolved = &sKey
+		}
+	}
+
+	// get the current stream position of the event
+	streamEvents, err := d.CurrentRoomState.SelectEventsWithEventIDs(ctx, txn, []string{newEvent.EventID()})
+	if err == nil && len(streamEvents) > 0 {
+		var membershipPtr *string
+		var membership string
+		membership, err = streamEvents[0].Membership()
+		if err == nil {
+			membershipPtr = &membership
+		}
+		if err = d.CurrentRoomState.UpsertRoomState(ctx, txn, newEvent, membershipPtr, streamEvents[0].StreamPosition); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // fetchStateEvents converts the set of event IDs into a set of events. It will fetch any which are missing from the database.
