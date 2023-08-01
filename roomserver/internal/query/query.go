@@ -283,7 +283,7 @@ func (r *Queryer) QueryMembershipForUser(
 		return err
 	}
 
-	return r.QueryMembershipForSenderID(ctx, *roomID, senderID, response)
+	return r.QueryMembershipForSenderID(ctx, *roomID, *senderID, response)
 }
 
 // QueryMembershipAtEvent returns the known memberships at a given event.
@@ -1009,21 +1009,26 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.Ro
 	return verImpl.CheckRestrictedJoin(ctx, r.Cfg.Global.ServerName, &api.JoinRoomQuerier{Roomserver: r}, roomID, senderID)
 }
 
-func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+func (r *Queryer) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
 	version, err := r.DB.GetRoomVersion(ctx, roomID.String())
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	switch version {
 	case gomatrixserverlib.RoomVersionPseudoIDs:
 		key, err := r.DB.SelectUserRoomPublicKey(ctx, userID, roomID)
 		if err != nil {
-			return "", err
+			return nil, err
+		} else if key == nil {
+			return nil, nil
+		} else {
+			senderID := spec.SenderID(spec.Base64Bytes(key).Encode())
+			return &senderID, nil
 		}
-		return spec.SenderID(spec.Base64Bytes(key).Encode()), nil
 	default:
-		return spec.SenderID(userID.String()), nil
+		senderID := spec.SenderID(userID.String())
+		return &senderID, nil
 	}
 }
 

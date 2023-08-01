@@ -74,6 +74,15 @@ func SendRedaction(
 		return *resErr
 	}
 
+	// if user is member of room, and sender ID is nil, then this user doesn't have a pseudo ID for some reason,
+	// which is unexpected.
+	if senderID == nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID, req.URL); ok {
@@ -98,7 +107,7 @@ func SendRedaction(
 	// "Users may redact their own events, and any user with a power level greater than or equal
 	// to the redact power level of the room may redact events there"
 	// https://matrix.org/docs/spec/client_server/r0.6.1#put-matrix-client-r0-rooms-roomid-redact-eventid-txnid
-	allowedToRedact := ev.SenderID() == senderID
+	allowedToRedact := ev.SenderID() == *senderID
 	if !allowedToRedact {
 		plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
 			EventType: spec.MRoomPowerLevels,
@@ -119,7 +128,7 @@ func SendRedaction(
 				),
 			}
 		}
-		allowedToRedact = pl.UserLevel(senderID) >= pl.Redact
+		allowedToRedact = pl.UserLevel(*senderID) >= pl.Redact
 	}
 	if !allowedToRedact {
 		return util.JSONResponse{
@@ -136,7 +145,7 @@ func SendRedaction(
 
 	// create the new event and set all the fields we can
 	proto := gomatrixserverlib.ProtoEvent{
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   roomID,
 		Type:     spec.MRoomRedaction,
 		Redacts:  eventID,

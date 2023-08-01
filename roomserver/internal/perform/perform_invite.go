@@ -133,6 +133,8 @@ func (r *Inviter) PerformInvite(
 	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.InviteInput.RoomID, req.InviteInput.Inviter)
 	if err != nil {
 		return err
+	} else if senderID == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", req.InviteInput.Inviter, req.InviteInput.RoomID)
 	}
 	info, err := r.DB.RoomInfo(ctx, req.InviteInput.RoomID.String())
 	if err != nil {
@@ -140,7 +142,7 @@ func (r *Inviter) PerformInvite(
 	}
 
 	proto := gomatrixserverlib.ProtoEvent{
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   req.InviteInput.RoomID.String(),
 		Type:     "m.room.member",
 	}
@@ -187,7 +189,7 @@ func (r *Inviter) PerformInvite(
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
-		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
 			return r.RSAPI.QuerySenderIDForUser(ctx, roomID, userID)
 		},
 		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {

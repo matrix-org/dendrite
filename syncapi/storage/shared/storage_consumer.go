@@ -122,13 +122,13 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 				continue
 			}
 			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
-			if err != nil {
+			if err != nil || deviceSenderID == nil {
 				logrus.WithFields(logrus.Fields{
 					"event_id": out[i].EventID(),
 				}).WithError(err).Warnf("Failed to add transaction ID to event")
 				continue
 			}
-			if deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
+			if *deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
 				err := out[i].SetUnsignedField(
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)
@@ -527,11 +527,11 @@ func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userI
 		return "", ""
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *fullUser)
-	if err != nil {
+	if err != nil || senderID == nil {
 		return "", ""
 	}
 
-	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(string(senderID)) {
+	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(string(*senderID)) {
 		return "", ""
 	}
 	membership, err := ev.Membership()

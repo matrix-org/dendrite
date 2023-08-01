@@ -251,8 +251,10 @@ func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID strin
 		senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *uID)
 		if err != nil {
 			return err
+		} else if senderID == nil {
+			return fmt.Errorf("sender ID not found for %s in %s", uID, *validRoomID)
 		}
-		userMap[string(senderID)] = level
+		userMap[string(*senderID)] = level
 		delete(userMap, user)
 	}
 	r["users"] = userMap
@@ -314,7 +316,7 @@ func generateSendEvent(
 		}
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
-	if err != nil {
+	if err != nil || senderID == nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Unable to find senderID for user"),
@@ -323,7 +325,7 @@ func generateSendEvent(
 
 	// create the new event and set all the fields we can
 	proto := gomatrixserverlib.ProtoEvent{
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   roomID,
 		Type:     eventType,
 		StateKey: stateKey,

@@ -201,11 +201,11 @@ func (r *Joiner) performJoinRoomByID(
 	if err == nil && info != nil {
 		switch info.RoomVersion {
 		case gomatrixserverlib.RoomVersionPseudoIDs:
-			senderID, err = r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
+			senderIDPtr, err := r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
 			if err == nil {
 				checkInvitePending = true
 			}
-			if senderID == "" {
+			if senderIDPtr == nil {
 				// create user room key if needed
 				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 				if keyErr != nil {
@@ -213,6 +213,8 @@ func (r *Joiner) performJoinRoomByID(
 					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
 				senderID = spec.SenderIDFromPseudoIDKey(key)
+			} else {
+				senderID = *senderIDPtr
 			}
 		default:
 			checkInvitePending = true

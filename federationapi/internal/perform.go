@@ -481,8 +481,10 @@ func (r *FederationInternalAPI) PerformLeave(
 		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			return err
+		} else if senderID == nil {
+			return fmt.Errorf("sender ID not found for %s in %s", *userID, *roomID)
 		}
-		senderIDString := string(senderID)
+		senderIDString := string(*senderID)
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
 		respMakeLeave.LeaveEvent.SenderID = senderIDString
 		respMakeLeave.LeaveEvent.StateKey = &senderIDString

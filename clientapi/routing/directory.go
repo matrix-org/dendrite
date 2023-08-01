@@ -204,9 +204,15 @@ func SetLocalAlias(
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
 		}
+	} else if senderID == nil {
+		util.GetLogger(req.Context()).WithField("roomID", *roomID).WithField("userID", *userID).Error("Sender ID not found")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
 	}
 
-	aliasAlreadyExists, err := rsAPI.SetRoomAlias(req.Context(), senderID, *roomID, alias)
+	aliasAlreadyExists, err := rsAPI.SetRoomAlias(req.Context(), *senderID, *roomID, alias)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 		return util.JSONResponse{
@@ -293,14 +299,14 @@ func RemoveLocalAlias(
 		}
 	}
 	// TODO: how to handle this case? missing user/room keys seem to be a whole new class of errors
-	if deviceSenderID == "" {
+	if deviceSenderID == nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
 		}
 	}
 
-	aliasFound, aliasRemoved, err := rsAPI.RemoveRoomAlias(req.Context(), deviceSenderID, alias)
+	aliasFound, aliasRemoved, err := rsAPI.RemoveRoomAlias(req.Context(), *deviceSenderID, alias)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
 		return util.JSONResponse{
@@ -385,7 +391,7 @@ func SetVisibility(
 		}
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
-	if err != nil {
+	if err != nil || senderID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("failed to find senderID for this user"),
@@ -416,7 +422,7 @@ func SetVisibility(
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
-	if power.UserLevel(senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
+	if power.UserLevel(*senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),

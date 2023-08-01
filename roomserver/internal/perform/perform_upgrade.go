@@ -62,10 +62,13 @@ func (r *Upgrader) performRoomUpgrade(
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
 		return "", err
+	} else if senderID == nil {
+		util.GetLogger(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
+		return "", fmt.Errorf("No sender ID for %s in %s", userID, *fullRoomID)
 	}
 
 	// 1. Check if the user is authorized to actually perform the upgrade (can send m.room.tombstone)
-	if !r.userIsAuthorized(ctx, senderID, roomID) {
+	if !r.userIsAuthorized(ctx, *senderID, roomID) {
 		return "", api.ErrNotAllowed{Err: fmt.Errorf("You don't have permission to upgrade the room, power level too low.")}
 	}
 
@@ -83,20 +86,20 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// Make the tombstone event
-	tombstoneEvent, pErr := r.makeTombstoneEvent(ctx, evTime, senderID, userID.Domain(), roomID, newRoomID)
+	tombstoneEvent, pErr := r.makeTombstoneEvent(ctx, evTime, *senderID, userID.Domain(), roomID, newRoomID)
 	if pErr != nil {
 		return "", pErr
 	}
 
 	// Generate the initial events we need to send into the new room. This includes copied state events and bans
 	// as well as the power level events needed to set up the room
-	eventsToMake, pErr := r.generateInitialEvents(ctx, oldRoomRes, senderID, roomID, roomVersion, tombstoneEvent)
+	eventsToMake, pErr := r.generateInitialEvents(ctx, oldRoomRes, *senderID, roomID, roomVersion, tombstoneEvent)
 	if pErr != nil {
 		return "", pErr
 	}
 
 	// Send the setup events to the new room
-	if pErr = r.sendInitialEvents(ctx, evTime, senderID, userID.Domain(), newRoomID, roomVersion, eventsToMake); pErr != nil {
+	if pErr = r.sendInitialEvents(ctx, evTime, *senderID, userID.Domain(), newRoomID, roomVersion, eventsToMake); pErr != nil {
 		return "", pErr
 	}
 
@@ -111,17 +114,17 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// If the old room had a canonical alias event, it should be deleted in the old room
-	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, senderID, userID.Domain(), roomID); pErr != nil {
+	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, *senderID, userID.Domain(), roomID); pErr != nil {
 		return "", pErr
 	}
 
 	// 4. Move local aliases to the new room
-	if pErr = moveLocalAliases(ctx, roomID, newRoomID, senderID, r.URSAPI); pErr != nil {
+	if pErr = moveLocalAliases(ctx, roomID, newRoomID, *senderID, r.URSAPI); pErr != nil {
 		return "", pErr
 	}
 
 	// 6. Restrict power levels in the old room
-	if pErr = r.restrictOldRoomPowerLevels(ctx, evTime, senderID, userID.Domain(), roomID); pErr != nil {
+	if pErr = r.restrictOldRoomPowerLevels(ctx, evTime, *senderID, userID.Domain(), roomID); pErr != nil {
 		return "", pErr
 	}
 
