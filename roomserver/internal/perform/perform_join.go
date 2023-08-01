@@ -201,8 +201,8 @@ func (r *Joiner) performJoinRoomByID(
 	if err == nil && info != nil {
 		switch info.RoomVersion {
 		case gomatrixserverlib.RoomVersionPseudoIDs:
-			senderIDPtr, err := r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
-			if err == nil {
+			senderIDPtr, queryErr := r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
+			if queryErr == nil {
 				checkInvitePending = true
 			}
 			if senderIDPtr == nil {

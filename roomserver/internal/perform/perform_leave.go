@@ -73,6 +73,7 @@ func (r *Leaver) PerformLeave(
 	return nil, fmt.Errorf("room ID %q is invalid", req.RoomID)
 }
 
+// nolint:gocyclo
 func (r *Leaver) performLeaveRoomByID(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
