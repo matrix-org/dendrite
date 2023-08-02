@@ -840,8 +840,11 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
 			return nil, err
+		} else if localSender == nil {
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
+			return nil, fmt.Errorf("no sender ID for user %s in %s", userID.String(), roomID.String())
 		}
-		if event.StateKey() != nil && *event.StateKey() == string(localSender) {
+		if event.StateKey() != nil && *event.StateKey() == string(*localSender) {
 			req.Notification.UserIsTarget = true
 		}
 	}

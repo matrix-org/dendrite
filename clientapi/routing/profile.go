@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -362,8 +363,10 @@ func buildMembershipEvents(
 		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 		if err != nil {
 			return nil, err
+		} else if senderID == nil {
+			return nil, fmt.Errorf("sender ID not found for %s in %s", *fullUserID, *validRoomID)
 		}
-		senderIDString := string(senderID)
+		senderIDString := string(*senderID)
 		proto := gomatrixserverlib.ProtoEvent{
 			SenderID: senderIDString,
 			RoomID:   roomID,

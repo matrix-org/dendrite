@@ -292,10 +292,12 @@ func (r *Admin) PerformAdminDownloadState(
 	senderID, err := r.Queryer.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return err
+	} else if senderID == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", *fullUserID, *validRoomID)
 	}
 	proto := &gomatrixserverlib.ProtoEvent{
 		Type:     "org.matrix.dendrite.state_download",
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   roomID,
 		Content:  spec.RawJSON("{}"),
 	}

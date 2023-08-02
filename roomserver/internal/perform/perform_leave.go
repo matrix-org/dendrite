@@ -73,6 +73,7 @@ func (r *Leaver) PerformLeave(
 	return nil, fmt.Errorf("room ID %q is invalid", req.RoomID)
 }
 
+// nolint:gocyclo
 func (r *Leaver) performLeaveRoomByID(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
@@ -83,20 +84,20 @@ func (r *Leaver) performLeaveRoomByID(
 		return nil, err
 	}
 	leaver, err := r.RSAPI.QuerySenderIDForUser(ctx, *roomID, req.Leaver)
-	if err != nil {
+	if err != nil || leaver == nil {
 		return nil, fmt.Errorf("leaver %s has no matching senderID in this room", req.Leaver.String())
 	}
 
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, leaver)
+	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, *leaver)
 	if err == nil && isInvitePending {
 		sender, serr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, senderUser)
 		if serr != nil || sender == nil {
 			return nil, fmt.Errorf("sender %q has no matching userID", senderUser)
 		}
 		if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
-			return r.performFederatedRejectInvite(ctx, req, res, *sender, eventID, leaver)
+			return r.performFederatedRejectInvite(ctx, req, res, *sender, eventID, *leaver)
 		}
 		// check that this is not a "server notice room"
 		accData := &userapi.QueryAccountDataResponse{}
@@ -132,7 +133,7 @@ func (r *Leaver) performLeaveRoomByID(
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
 			{
 				EventType: spec.MRoomMember,
-				StateKey:  string(leaver),
+				StateKey:  string(*leaver),
 			},
 		},
 	}
@@ -157,7 +158,7 @@ func (r *Leaver) performLeaveRoomByID(
 	}
 
 	// Prepare the template for the leave event.
-	senderIDString := string(leaver)
+	senderIDString := string(*leaver)
 	proto := gomatrixserverlib.ProtoEvent{
 		Type:     spec.MRoomMember,
 		SenderID: senderIDString,
