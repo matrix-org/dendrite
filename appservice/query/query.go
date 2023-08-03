@@ -217,7 +217,7 @@ func (a *AppServiceQueryAPI) Locations(
 		}
 
 		if err := requestDo[[]api.ASLocationResponse](as.HTTPClient, url+"?"+params.Encode(), &asLocations); err != nil {
-			log.WithError(err).Error("unable to get 'locations' from application service")
+			log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'locations' from application service")
 			continue
 		}
 
@@ -252,7 +252,7 @@ func (a *AppServiceQueryAPI) User(
 		}
 
 		if err := requestDo[[]api.ASUserResponse](as.HTTPClient, url+"?"+params.Encode(), &asUsers); err != nil {
-			log.WithError(err).Error("unable to get 'user' from application service")
+			log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'user' from application service")
 			continue
 		}
 
@@ -290,7 +290,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, as := range a.Cfg.Derived.ApplicationServices {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](as.HTTPClient, as.RequestUrl()+api.ASProtocolPath+req.Protocol, &proto); err != nil {
-				log.WithError(err).Error("unable to get 'protocol' from application service")
+				log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'protocol' from application service")
 				continue
 			}
 
@@ -320,7 +320,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, p := range as.Protocols {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](as.HTTPClient, as.RequestUrl()+api.ASProtocolPath+p, &proto); err != nil {
-				log.WithError(err).Error("unable to get 'protocol' from application service")
+				log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'protocol' from application service")
 				continue
 			}
 			existing, ok := response[p]
