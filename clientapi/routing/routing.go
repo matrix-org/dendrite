@@ -1256,7 +1256,7 @@ func Setup(
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
-			return GetCapabilities()
+			return GetCapabilities(rsAPI)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 

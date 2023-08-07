@@ -55,6 +55,11 @@ type RestrictedJoinAPI interface {
 	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
 }
 
+type DefaultRoomVersionAPI interface {
+	// Returns the default room version used.
+	DefaultRoomVersion() gomatrixserverlib.RoomVersion
+}
+
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
 	SyncRoomserverAPI
@@ -64,6 +69,7 @@ type RoomserverInternalAPI interface {
 	FederationRoomserverAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
+	DefaultRoomVersionAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -210,6 +216,7 @@ type ClientRoomserverAPI interface {
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
 	QueryRoomHierarchyAPI
+	DefaultRoomVersionAPI
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error

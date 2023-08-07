@@ -929,7 +929,7 @@ func TestCapabilities(t *testing.T) {
 				"enabled": true,
 			},
 			"m.room_versions": map[string]interface{}{
-				"default":   version.DefaultRoomVersion(),
+				"default":   config.DefaultForDefaultRoomVersion(),
 				"available": versionsMap,
 			},
 		},

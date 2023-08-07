@@ -28,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -135,7 +134,7 @@ func SendServerNotice(
 
 	var (
 		roomID      string
-		roomVersion = version.DefaultRoomVersion()
+		roomVersion = rsAPI.DefaultRoomVersion()
 	)
 
 	// create a new room for the user

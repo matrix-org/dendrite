@@ -11,7 +11,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -1060,7 +1059,7 @@ func TestUpgrade(t *testing.T) {
 				if err != nil {
 					t.Fatalf("upgrade userID is invalid")
 				}
-				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, version.DefaultRoomVersion())
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, rsAPI.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}
