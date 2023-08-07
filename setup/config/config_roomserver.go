@@ -10,7 +10,7 @@ import (
 type RoomServer struct {
 	Matrix *Global `yaml:"-"`
 
-	DefaultRoomVersion gomatrixserverlib.RoomVersion
+	DefaultRoomVersion gomatrixserverlib.RoomVersion `yaml:"default_room_version,omitempty"`
 
 	Database DatabaseOptions `yaml:"database,omitempty"`
 }
@@ -30,8 +30,8 @@ func (c *RoomServer) Verify(configErrs *ConfigErrors) {
 	}
 
 	if !gomatrixserverlib.KnownRoomVersion(c.DefaultRoomVersion) {
-		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.default_room_version': unsupported default room version: %q", c.DefaultRoomVersion))
-	} else if gomatrixserverlib.StableRoomVersion(c.DefaultRoomVersion) {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.default_room_version': unsupported room version: %q", c.DefaultRoomVersion))
+	} else if !gomatrixserverlib.StableRoomVersion(c.DefaultRoomVersion) {
 		log.Warnf("WARNING: Provided default room version %q is unstable", c.DefaultRoomVersion)
 	}
 }
