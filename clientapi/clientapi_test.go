@@ -923,13 +923,17 @@ func TestCapabilities(t *testing.T) {
 		}
 	}
 
+	var tempRoomServerCfg config.RoomServer
+	tempRoomServerCfg.Defaults(config.DefaultOpts{})
+	defaultRoomVersion := tempRoomServerCfg.DefaultRoomVersion
+
 	expectedMap := map[string]interface{}{
 		"capabilities": map[string]interface{}{
 			"m.change_password": map[string]bool{
 				"enabled": true,
 			},
 			"m.room_versions": map[string]interface{}{
-				"default":   version.DefaultRoomVersion(),
+				"default":   defaultRoomVersion,
 				"available": versionsMap,
 			},
 		},
