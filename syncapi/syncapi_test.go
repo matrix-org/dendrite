@@ -74,8 +74,13 @@ func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsa
 	return nil
 }
 
-func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembershipAtEventRequest, res *rsapi.QueryMembershipAtEventResponse) error {
-	return nil
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(
+	ctx context.Context,
+	roomID spec.RoomID,
+	eventIDs []string,
+	senderID spec.SenderID,
+) (map[string]*rstypes.HeaderedEvent, error) {
+	return nil, nil
 }
 
 type syncUserAPI struct {

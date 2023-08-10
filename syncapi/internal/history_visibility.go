@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -101,13 +102,15 @@ func (ev eventVisibility) allowed() (allowed bool) {
 
 // ApplyHistoryVisibilityFilter applies the room history visibility filter on types.HeaderedEvents.
 // Returns the filtered events and an error, if any.
+//
+// This function assumes that all provided events are from the same room.
 func ApplyHistoryVisibilityFilter(
 	ctx context.Context,
 	syncDB storage.DatabaseTransaction,
 	rsAPI api.SyncRoomserverAPI,
 	events []*types.HeaderedEvent,
 	alwaysIncludeEventIDs map[string]struct{},
-	userID, endpoint string,
+	userID spec.UserID, endpoint string,
 ) ([]*types.HeaderedEvent, error) {
 	if len(events) == 0 {
 		return events, nil
@@ -115,15 +118,29 @@ func ApplyHistoryVisibilityFilter(
 	start := time.Now()
 
 	// try to get the current membership of the user
-	membershipCurrent, _, err := syncDB.SelectMembershipForUser(ctx, events[0].RoomID(), userID, math.MaxInt64)
+	membershipCurrent, _, err := syncDB.SelectMembershipForUser(ctx, events[0].RoomID(), userID.String(), math.MaxInt64)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the mapping from eventID -> eventVisibility
 	eventsFiltered := make([]*types.HeaderedEvent, 0, len(events))
-	visibilities := visibilityForEvents(ctx, rsAPI, events, userID, events[0].RoomID())
+	firstEvRoomID, err := spec.NewRoomID(events[0].RoomID())
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *firstEvRoomID, userID)
+	if err != nil {
+		return nil, err
+	}
+	visibilities := visibilityForEvents(ctx, rsAPI, events, senderID, *firstEvRoomID)
+
 	for _, ev := range events {
+		// Validate same room assumption
+		if ev.RoomID() != firstEvRoomID.String() {
+			return nil, fmt.Errorf("events from different rooms supplied to ApplyHistoryVisibilityFilter")
+		}
+
 		evVis := visibilities[ev.EventID()]
 		evVis.membershipCurrent = membershipCurrent
 		// Always include specific state events for /sync responses
@@ -133,23 +150,15 @@ func ApplyHistoryVisibilityFilter(
 				continue
 			}
 		}
-		// NOTSPEC: Always allow user to see their own membership events (spec contains more "rules")
 
-		user, err := spec.NewUserID(userID, true)
-		if err != nil {
-			return nil, err
-		}
-		roomID, err := spec.NewRoomID(ev.RoomID())
-		if err != nil {
-			return nil, err
-		}
-		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *user)
-		if err == nil && senderID != nil {
+		// NOTSPEC: Always allow user to see their own membership events (spec contains more "rules")
+		if senderID != nil {
 			if ev.Type() == spec.MRoomMember && ev.StateKeyEquals(string(*senderID)) {
 				eventsFiltered = append(eventsFiltered, ev)
 				continue
 			}
 		}
+
 		// Always allow history evVis events on boundaries. This is done
 		// by setting the effective evVis to the least restrictive
 		// of the old vs new.
@@ -178,13 +187,13 @@ func ApplyHistoryVisibilityFilter(
 }
 
 // visibilityForEvents returns a map from eventID to eventVisibility containing the visibility and the membership
-// of `userID` at the given event.
+// of `senderID` at the given event. If provided sender ID is nil, assume that membership is Leave
 // Returns an error if the roomserver can't calculate the memberships.
 func visibilityForEvents(
 	ctx context.Context,
 	rsAPI api.SyncRoomserverAPI,
 	events []*types.HeaderedEvent,
-	userID, roomID string,
+	senderID *spec.SenderID, roomID spec.RoomID,
 ) map[string]eventVisibility {
 	eventIDs := make([]string, len(events))
 	for i := range events {
@@ -194,15 +203,13 @@ func visibilityForEvents(
 	result := make(map[string]eventVisibility, len(eventIDs))
 
 	// get the membership events for all eventIDs
-	membershipResp := &api.QueryMembershipAtEventResponse{}
-
-	err := rsAPI.QueryMembershipAtEvent(ctx, &api.QueryMembershipAtEventRequest{
-		RoomID:   roomID,
-		EventIDs: eventIDs,
-		UserID:   userID,
-	}, membershipResp)
-	if err != nil {
-		logrus.WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
+	var err error
+	membershipEvents := make(map[string]*types.HeaderedEvent)
+	if senderID != nil {
+		membershipEvents, err = rsAPI.QueryMembershipAtEvent(ctx, roomID, eventIDs, *senderID)
+		if err != nil {
+			logrus.WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
+		}
 	}
 
 	// Create a map from eventID -> eventVisibility
@@ -212,7 +219,7 @@ func visibilityForEvents(
 			membershipAtEvent: spec.Leave, // default to leave, to not expose events by accident
 			visibility:        event.Visibility,
 		}
-		ev, ok := membershipResp.Membership[eventID]
+		ev, ok := membershipEvents[eventID]
 		if !ok || ev == nil {
 			result[eventID] = vis
 			continue

@@ -141,11 +141,28 @@ type QueryRoomHierarchyAPI interface {
 	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *RoomHierarchyWalker, error)
 }
 
+type QueryMembershipAPI interface {
+	QueryMembershipForSenderID(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, res *QueryMembershipForUserResponse) error
+	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
+	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+	QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
+
+	// QueryMembershipAtEvent queries the memberships at the given events.
+	// Returns a map from eventID to *types.HeaderedEvent of membership events.
+	QueryMembershipAtEvent(
+		ctx context.Context,
+		roomID spec.RoomID,
+		eventIDs []string,
+		senderID spec.SenderID,
+	) (map[string]*types.HeaderedEvent, error)
+}
+
 // API functions required by the syncapi
 type SyncRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
+	QueryMembershipAPI
 	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
@@ -154,12 +171,6 @@ type SyncRoomserverAPI interface {
 		ctx context.Context,
 		req *QueryEventsByIDRequest,
 		res *QueryEventsByIDResponse,
-	) error
-	// Query the membership event for an user for a room.
-	QueryMembershipForUser(
-		ctx context.Context,
-		req *QueryMembershipForUserRequest,
-		res *QueryMembershipForUserResponse,
 	) error
 
 	// Query the state after a list of events in a room from the room server.
@@ -174,14 +185,6 @@ type SyncRoomserverAPI interface {
 		ctx context.Context,
 		req *PerformBackfillRequest,
 		res *PerformBackfillResponse,
-	) error
-
-	// QueryMembershipAtEvent queries the memberships at the given events.
-	// Returns a map from eventID to a slice of types.HeaderedEvent.
-	QueryMembershipAtEvent(
-		ctx context.Context,
-		request *QueryMembershipAtEventRequest,
-		response *QueryMembershipAtEventResponse,
 	) error
 }
 
@@ -278,15 +281,12 @@ type FederationRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
 	QueryRoomHierarchyAPI
+	QueryMembershipAPI
 	UserRoomPrivateKeyCreator
 	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
-	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
-	QueryMembershipForSenderID(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, res *QueryMembershipForUserResponse) error
-	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
-	QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
 	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
 	// which room to use by querying the first events roomID.

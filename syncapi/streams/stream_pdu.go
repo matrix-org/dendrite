@@ -562,8 +562,13 @@ func applyHistoryVisibilityFilter(
 		}
 	}
 
+	parsedUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, err
+	}
+
 	startTime := time.Now()
-	events, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
+	events, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, recentEvents, alwaysIncludeIDs, *parsedUserID, "sync")
 	if err != nil {
 		return nil, err
 	}
