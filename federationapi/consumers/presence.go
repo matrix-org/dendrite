@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
@@ -94,14 +95,21 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
-	var queryRes roomserverAPI.QueryRoomsForUserResponse
-	err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
-		UserID:         userID,
-		WantMembership: "join",
-	}, &queryRes)
+	parsedUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
+		return true
+	}
+
+	roomIDs, err := t.rsAPI.QueryRoomsForUser(t.ctx, *parsedUserID, "join")
 	if err != nil {
 		log.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
+	}
+
+	roomIDStrs := make([]string, len(roomIDs))
+	for i, roomID := range roomIDs {
+		roomIDStrs[i] = roomID.String()
 	}
 
 	presence := msg.Header.Get("presence")
@@ -112,7 +120,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	// send this presence to all servers who share rooms with this user.
-	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
+	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
 		return true

@@ -291,16 +291,6 @@ type QuerySharedUsersResponse struct {
 	UserIDsToCount map[string]int
 }
 
-type QueryRoomsForUserRequest struct {
-	UserID string
-	// The desired membership of the user. If this is the empty string then no rooms are returned.
-	WantMembership string
-}
-
-type QueryRoomsForUserResponse struct {
-	RoomIDs []string
-}
-
 type QueryBulkStateContentRequest struct {
 	// Returns state events in these rooms
 	RoomIDs []string

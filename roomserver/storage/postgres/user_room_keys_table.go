@@ -56,12 +56,15 @@ const selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_use
 
 const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
 
+const selectAllUserRoomPublicKeyForUserSQL = `SELECT room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1`
+
 type userRoomKeysStatements struct {
-	insertUserRoomPrivateKeyStmt *sql.Stmt
-	insertUserRoomPublicKeyStmt  *sql.Stmt
-	selectUserRoomKeyStmt        *sql.Stmt
-	selectUserRoomPublicKeyStmt  *sql.Stmt
-	selectUserNIDsStmt           *sql.Stmt
+	insertUserRoomPrivateKeyStmt       *sql.Stmt
+	insertUserRoomPublicKeyStmt        *sql.Stmt
+	selectUserRoomKeyStmt              *sql.Stmt
+	selectUserRoomPublicKeyStmt        *sql.Stmt
+	selectUserNIDsStmt                 *sql.Stmt
+	selectAllUserRoomPublicKeysForUser *sql.Stmt
 }
 
 func CreateUserRoomKeysTable(db *sql.DB) error {
@@ -77,6 +80,7 @@ func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
 		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
 		{&s.selectUserRoomPublicKeyStmt, selectUserRoomPublicKeySQL},
 		{&s.selectUserNIDsStmt, selectUserNIDsSQL},
+		{&s.selectAllUserRoomPublicKeysForUser, selectAllUserRoomPublicKeyForUserSQL},
 	}.Prepare(db)
 }
 
@@ -149,4 +153,25 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 		result[spec.Base64Bytes(publicKey).Encode()] = userRoomKeyPair
 	}
 	return result, rows.Err()
+}
+
+func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID) (map[types.RoomNID]ed25519.PublicKey, error) {
+	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectAllUserRoomPublicKeysForUser)
+
+	rows, err := stmt.QueryContext(ctx, userNID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	resultMap := make(map[types.RoomNID]ed25519.PublicKey)
+
+	var roomNID types.RoomNID
+	var pubkey ed25519.PublicKey
+	for rows.Next() {
+		if err = rows.Scan(&roomNID, &pubkey); err != nil {
+			return nil, err
+		}
+		resultMap[roomNID] = pubkey
+	}
+	return resultMap, err
 }

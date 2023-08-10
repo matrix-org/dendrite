@@ -846,13 +846,20 @@ func (r *Queryer) QueryCurrentState(ctx context.Context, req *api.QueryCurrentSt
 	return nil
 }
 
-func (r *Queryer) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, req.WantMembership)
+func (r *Queryer) QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error) {
+	roomIDStrs, err := r.DB.GetRoomsByMembership(ctx, userID, desiredMembership)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	res.RoomIDs = roomIDs
-	return nil
+	roomIDs := make([]spec.RoomID, len(roomIDStrs))
+	for i, roomIDStr := range roomIDStrs {
+		roomID, err := spec.NewRoomID(roomIDStr)
+		if err != nil {
+			return nil, nil
+		}
+		roomIDs[i] = *roomID
+	}
+	return roomIDs, nil
 }
 
 func (r *Queryer) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
@@ -895,7 +902,12 @@ func (r *Queryer) QueryLeftUsers(ctx context.Context, req *api.QueryLeftUsersReq
 }
 
 func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, "join")
+	parsedUserID, err := spec.NewUserID(req.UserID, true)
+	if err != nil {
+		return err
+	}
+
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, *parsedUserID, "join")
 	if err != nil {
 		return err
 	}

@@ -161,12 +161,12 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Join)
 	if err != nil {
 		return nil, err
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Invite)
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
