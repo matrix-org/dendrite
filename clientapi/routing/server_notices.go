@@ -106,8 +106,8 @@ func SendServerNotice(
 	allUserRooms := []spec.RoomID{}
 	// Get rooms the user is either joined, invited or has left.
 	for _, membership := range []string{"join", "invite", "leave"} {
-		userRooms, err := rsAPI.QueryRoomsForUser(ctx, *userID, membership)
-		if err != nil {
+		userRooms, queryErr := rsAPI.QueryRoomsForUser(ctx, *userID, membership)
+		if queryErr != nil {
 			return util.ErrorResponse(err)
 		}
 		allUserRooms = append(allUserRooms, userRooms...)
