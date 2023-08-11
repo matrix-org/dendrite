@@ -97,7 +97,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 
 	parsedUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
+		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("invalid user ID")
 		return true
 	}
 

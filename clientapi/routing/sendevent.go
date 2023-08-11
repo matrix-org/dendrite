@@ -318,8 +318,8 @@ func generateSendEvent(
 	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return nil, &util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.NotFound("Unable to find senderID for user"),
+			Code: http.StatusInternalServerError,
+			JSON: spec.NotFound("internal server error"),
 		}
 	} else if senderID == nil {
 		// TODO: is it always the case that lack of a sender ID means they're not joined?
