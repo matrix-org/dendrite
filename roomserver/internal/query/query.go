@@ -855,7 +855,7 @@ func (r *Queryer) QueryRoomsForUser(ctx context.Context, userID spec.UserID, des
 	for i, roomIDStr := range roomIDStrs {
 		roomID, err := spec.NewRoomID(roomIDStr)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 		roomIDs[i] = *roomID
 	}
