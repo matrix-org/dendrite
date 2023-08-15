@@ -1347,7 +1347,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 }
 
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
-func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
+func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID, membership string) ([]string, error) {
 	var membershipState tables.MembershipState
 	switch membership {
 	case "join":
@@ -1361,17 +1361,73 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 	default:
 		return nil, fmt.Errorf("GetRoomsByMembership: invalid membership %s", membership)
 	}
-	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+
+	// Convert provided user ID to NID
+	userNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
+		} else {
+			return nil, fmt.Errorf("SelectEventStateKeyNID: cannot map user ID to state key NIDs: %w", err)
 		}
-		return nil, fmt.Errorf("GetRoomsByMembership: cannot map user ID to state key NID: %w", err)
 	}
-	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, nil, stateKeyNID, membershipState)
+
+	// Use this NID to fetch all associated room keys (for pseudo ID rooms)
+	roomKeyMap, err := d.UserRoomKeyTable.SelectAllPublicKeysForUser(ctx, nil, userNID)
 	if err != nil {
-		return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectRoomsWithMembership: %w", err)
+		if err == sql.ErrNoRows {
+			roomKeyMap = map[types.RoomNID]ed25519.PublicKey{}
+		} else {
+			return nil, fmt.Errorf("SelectAllPublicKeysForUser: could not select user room public keys for user: %w", err)
+		}
 	}
+
+	var eventStateKeyNIDs []types.EventStateKeyNID
+
+	// If there are room keys (i.e. this user is in pseudo ID rooms), then gather the appropriate NIDs
+	if len(roomKeyMap) != 0 {
+		// Convert keys to string representation
+		userRoomKeys := make([]string, len(roomKeyMap))
+		i := 0
+		for _, key := range roomKeyMap {
+			userRoomKeys[i] = spec.Base64Bytes(key).Encode()
+			i += 1
+		}
+
+		// Convert the string representation to its NID
+		pseudoIDStateKeys, sqlErr := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, userRoomKeys)
+		if sqlErr != nil {
+			if sqlErr == sql.ErrNoRows {
+				pseudoIDStateKeys = map[string]types.EventStateKeyNID{}
+			} else {
+				return nil, fmt.Errorf("BulkSelectEventStateKeyNID: could not select state keys for public room keys: %w", err)
+			}
+		}
+
+		// Collect all NIDs together
+		eventStateKeyNIDs = make([]types.EventStateKeyNID, len(pseudoIDStateKeys)+1)
+		eventStateKeyNIDs[0] = userNID
+		i = 1
+		for _, nid := range pseudoIDStateKeys {
+			eventStateKeyNIDs[i] = nid
+			i += 1
+		}
+	} else {
+		// If there are no room keys (so no pseudo ID rooms), we only need to care about the user ID NID.
+		eventStateKeyNIDs = []types.EventStateKeyNID{userNID}
+	}
+
+	// Fetch rooms that match membership for each NID
+	roomNIDs := []types.RoomNID{}
+	for _, nid := range eventStateKeyNIDs {
+		var roomNIDsChunk []types.RoomNID
+		roomNIDsChunk, err = d.MembershipTable.SelectRoomsWithMembership(ctx, nil, nid, membershipState)
+		if err != nil {
+			return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectRoomsWithMembership: %w", err)
+		}
+		roomNIDs = append(roomNIDs, roomNIDsChunk...)
+	}
+
 	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, roomNIDs)
 	if err != nil {
 		return nil, fmt.Errorf("GetRoomsByMembership: failed to lookup room nids: %w", err)

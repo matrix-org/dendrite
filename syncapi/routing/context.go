@@ -138,7 +138,7 @@ func Context(
 
 	// verify the user is allowed to see the context for this room/event
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, *userID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return util.JSONResponse{
@@ -176,7 +176,7 @@ func Context(
 	}
 
 	startTime = time.Now()
-	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, device.UserID)
+	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, *userID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return util.JSONResponse{
@@ -257,7 +257,7 @@ func Context(
 func applyHistoryVisibilityOnContextEvents(
 	ctx context.Context, snapshot storage.DatabaseTransaction, rsAPI roomserver.SyncRoomserverAPI,
 	eventsBefore, eventsAfter []*rstypes.HeaderedEvent,
-	userID string,
+	userID spec.UserID,
 ) (filteredBefore, filteredAfter []*rstypes.HeaderedEvent, err error) {
 	eventIDsBefore := make(map[string]struct{}, len(eventsBefore))
 	eventIDsAfter := make(map[string]struct{}, len(eventsAfter))

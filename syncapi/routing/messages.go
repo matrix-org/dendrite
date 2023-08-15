@@ -50,6 +50,7 @@ type messagesReq struct {
 	from             *types.TopologyToken
 	to               *types.TopologyToken
 	device           *userapi.Device
+	deviceUserID     spec.UserID
 	wasToProvided    bool
 	backwardOrdering bool
 	filter           *synctypes.RoomEventFilter
@@ -76,6 +77,15 @@ func OnIncomingMessagesRequest(
 	lazyLoadCache caching.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
+
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
 
 	// NewDatabaseTransaction is used here instead of NewDatabaseSnapshot as we
 	// expect to be able to write to the database in response to a /messages
@@ -240,6 +250,7 @@ func OnIncomingMessagesRequest(
 		filter:           filter,
 		backwardOrdering: backwardOrdering,
 		device:           device,
+		deviceUserID:     *deviceUserID,
 	}
 
 	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
@@ -359,7 +370,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 
 	// Apply room history visibility filter
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.device.UserID, "messages")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.deviceUserID, "messages")
 	if err != nil {
 		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}

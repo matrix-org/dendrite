@@ -69,8 +69,8 @@ func (s *mockRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spe
 }
 
 // QueryRoomsForUser retrieves a list of room IDs matching the given query.
-func (s *mockRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
-	return nil
+func (s *mockRoomserverAPI) QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error) {
+	return nil, nil
 }
 
 // QueryBulkStateContent does a bulk query for state event content in the given rooms.

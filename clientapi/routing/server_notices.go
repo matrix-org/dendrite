@@ -94,34 +94,42 @@ func SendServerNotice(
 		}
 	}
 
+	userID, err := spec.NewUserID(r.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid user ID"),
+		}
+	}
+
 	// get rooms for specified user
-	allUserRooms := []string{}
-	userRooms := api.QueryRoomsForUserResponse{}
+	allUserRooms := []spec.RoomID{}
 	// Get rooms the user is either joined, invited or has left.
 	for _, membership := range []string{"join", "invite", "leave"} {
-		if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-			UserID:         r.UserID,
-			WantMembership: membership,
-		}, &userRooms); err != nil {
+		userRooms, queryErr := rsAPI.QueryRoomsForUser(ctx, *userID, membership)
+		if queryErr != nil {
 			return util.ErrorResponse(err)
 		}
-		allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
+		allUserRooms = append(allUserRooms, userRooms...)
 	}
 
 	// get rooms of the sender
-	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
-	senderRooms := api.QueryRoomsForUserResponse{}
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         senderUserID,
-		WantMembership: "join",
-	}, &senderRooms); err != nil {
+	senderUserID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName), true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+	senderRooms, err := rsAPI.QueryRoomsForUser(ctx, *senderUserID, "join")
+	if err != nil {
 		return util.ErrorResponse(err)
 	}
 
 	// check if we have rooms in common
-	commonRooms := []string{}
+	commonRooms := []spec.RoomID{}
 	for _, userRoomID := range allUserRooms {
-		for _, senderRoomID := range senderRooms.RoomIDs {
+		for _, senderRoomID := range senderRooms {
 			if userRoomID == senderRoomID {
 				commonRooms = append(commonRooms, senderRoomID)
 			}
@@ -139,7 +147,7 @@ func SendServerNotice(
 
 	// create a new room for the user
 	if len(commonRooms) == 0 {
-		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
+		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID.String())
 		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
 		pl, err := json.Marshal(powerLevelContent)
 		if err != nil {
@@ -195,7 +203,7 @@ func SendServerNotice(
 			}
 		}
 
-		roomID = commonRooms[0]
+		roomID = commonRooms[0].String()
 		membershipRes := api.QueryMembershipForUserResponse{}
 		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
