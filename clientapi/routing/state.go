@@ -217,34 +217,47 @@ func OnIncomingStateTypeRequest(
 	var worldReadable bool
 	var wantLatestState bool
 
-	parsedRoomID, err := spec.NewRoomID(roomID)
+	roomVer, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: spec.InvalidParam("invalid room ID"),
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
 		}
 	}
 
-	// Handle user ID state keys appropriately
-	newStateKey, invalidUserIDOrNoSender, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
-		return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
-	})
-	if err != nil {
-		if invalidUserIDOrNoSender {
-			// Currently treat this as no state found - see comment for FromClientStateKey
+	// Only enable translation logic on pseudo ID rooms
+	// TODO: remove the if check, synctypes.FromClientStateKey handles non-pseudo ID rooms,
+	//       but has some logic to be worked out (see comment in synctypes.FromClientStateKey for details)
+	if roomVer == gomatrixserverlib.RoomVersionPseudoIDs {
+		parsedRoomID, err := spec.NewRoomID(roomID)
+		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
-			}
-		} else {
-			util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.Unknown("internal server error"),
+				JSON: spec.InvalidParam("invalid room ID"),
 			}
 		}
+
+		// Handle user ID state keys appropriately
+		newStateKey, invalidUserIDOrNoSender, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+			return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
+		})
+		if err != nil {
+			if invalidUserIDOrNoSender {
+				// Currently treat this as no state found - see comment for FromClientStateKey
+				return util.JSONResponse{
+					Code: http.StatusNotFound,
+					JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
+				}
+			} else {
+				util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.Unknown("internal server error"),
+				}
+			}
+		}
+		stateKey = *newStateKey
 	}
-	stateKey = *newStateKey
 
 	// Always fetch visibility so that we can work out whether to show
 	// the latest events or the last event from when the user was joined.
