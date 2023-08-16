@@ -210,6 +210,9 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
 // If eventFormat=true, sends the whole event else just the content.
+//
+// TODO: remove this nolint when inner TODO resolved
+// nolint:gocyclo
 func OnIncomingStateTypeRequest(
 	ctx context.Context, device *userapi.Device, rsAPI api.ClientRoomserverAPI,
 	roomID, evType, stateKey string, eventFormat bool,
