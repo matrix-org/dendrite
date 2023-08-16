@@ -226,9 +226,23 @@ func OnIncomingStateTypeRequest(
 	}
 
 	// Handle user ID state keys appropriately
-	newStateKey, errorResp := translateUserStateKey(ctx, rsAPI, stateKey, evType, *parsedRoomID)
-	if errorResp != nil {
-		return *errorResp
+	newStateKey, invalidUserIDOrNoSender, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+		return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
+	})
+	if err != nil {
+		if invalidUserIDOrNoSender {
+			// Currently treat this as no state found - see comment for FromClientStateKey
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
+			}
+		} else {
+			util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
 	}
 	stateKey = *newStateKey
 
@@ -402,43 +416,5 @@ func OnIncomingStateTypeRequest(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
-	}
-}
-
-// If provided state key is a user ID (state keys beginning with @ are reserved for this purpose)
-// fetch it's associated sender ID and use that instead. Otherwise returns the same state key back.
-//
-// This function either returns the state key that should be used, or a JSON error response that should be returned to the user.
-//
-// TODO: if any step of this process fails, should we fail with 404, or silently continue without using sender ID?
-func translateUserStateKey(ctx context.Context, rsAPI api.ClientRoomserverAPI, stateKey string, evType string, roomID spec.RoomID) (*string, *util.JSONResponse) {
-	if len(stateKey) >= 1 && stateKey[0] == '@' {
-		parsedStateKey, err := spec.NewUserID(stateKey, true)
-		if err != nil {
-			// If invalid user ID, then there is no associated state event.
-			return nil, &util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
-			}
-		}
-		senderID, err := rsAPI.QuerySenderIDForUser(ctx, roomID, *parsedStateKey)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("QuerySenderIDForUser failed")
-			return nil, &util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.Unknown("internal server error"),
-			}
-		}
-		if senderID == nil {
-			// If no sender ID, then there is no associated state event.
-			return nil, &util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
-			}
-		}
-		newStateKey := string(*senderID)
-		return &newStateKey, nil
-	} else {
-		return &stateKey, nil
 	}
 }

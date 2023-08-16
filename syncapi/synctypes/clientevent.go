@@ -16,6 +16,8 @@
 package synctypes
 
 import (
+	"fmt"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -117,4 +119,45 @@ func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserver
 		}
 	}
 	return ToClientEvent(event, FormatAll, sender, sk)
+}
+
+// If provided state key is a user ID (state keys beginning with @ are reserved for this purpose)
+// fetch it's associated sender ID and use that instead. Otherwise returns the same state key back.
+//
+// This function either returns the state key that should be used, or a JSON error response that should be returned to the user.
+// A boolean is also returned, which, if true, means the err is a result of either:
+//   - State key begins with @, but does not contain a valid user ID.
+//   - State key contains a valid user ID, but this user ID does not have a sender ID.
+//
+// TODO: it's currently unclear how translation logic should behave in the above two cases - two options for each case:
+//   - Starts with @ but invalid user ID:
+//     -- Reject request (e.g. as 404), but people may have state keys, that, against the spec,
+//     begin with @ and dont contain a valid user ID, which they would be unable to interact with.
+//     -- Silently ignore, and let them use the invalid user ID without any translation attempt. This will probably work
+//     but could cause issues down the line with user ID grammar.
+//   - Valid user ID, but does not have a sender ID
+//     -- Reject reuquest (e.g. as 404), but people may wish to set a state event with a key containing
+//     a user ID for someone who has not yet joined the room - this prevents that.
+//     -- Silently ignore and don't translate - could cause issues where a state event is set with a user ID, then that user joins
+//     and now querying that same state key returns different state event (as the user now has a pseudo ID)
+func FromClientStateKey(roomID spec.RoomID, stateKey string, senderIDQuery spec.SenderIDForUser) (*string, bool, error) {
+	if len(stateKey) >= 1 && stateKey[0] == '@' {
+		parsedStateKey, err := spec.NewUserID(stateKey, true)
+		if err != nil {
+			// If invalid user ID, then there is no associated state event.
+			return nil, true, fmt.Errorf("Provided state key begins with @ but is not a valid user ID: %s", err.Error())
+		}
+		senderID, err := senderIDQuery(roomID, *parsedStateKey)
+		if err != nil {
+			return nil, false, fmt.Errorf("Failed to query sender ID: %s", err.Error())
+		}
+		if senderID == nil {
+			// If no sender ID, then there is no associated state event.
+			return nil, true, fmt.Errorf("No associated sender ID found.")
+		}
+		newStateKey := string(*senderID)
+		return &newStateKey, false, nil
+	} else {
+		return &stateKey, false, nil
+	}
 }
