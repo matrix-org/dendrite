@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -90,6 +91,31 @@ func SendEvent(
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID, req.URL); ok {
 			return *res
 		}
+	}
+
+	// Only enable translation logic on pseudo ID rooms
+	// TODO: remove the if check, synctypes.FromClientStateKey handles non-pseudo ID rooms,
+	//       but has some logic to be worked out (see comment in synctypes.FromClientStateKey for details)
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && stateKey != nil {
+		parsedRoomID, innerErr := spec.NewRoomID(roomID)
+		if innerErr != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam("invalid room ID"),
+			}
+		}
+
+		newStateKey, _, innerErr := synctypes.FromClientStateKey(*parsedRoomID, *stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+			return rsAPI.QuerySenderIDForUser(req.Context(), roomID, userID)
+		})
+		if innerErr != nil {
+			util.GetLogger(req.Context()).WithError(innerErr).Error("synctypes.FromClientStateKey failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
+		stateKey = newStateKey
 	}
 
 	// create a mutex for the specific user in the specific room
