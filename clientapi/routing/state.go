@@ -210,9 +210,6 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
 // If eventFormat=true, sends the whole event else just the content.
-//
-// TODO: remove this nolint when inner TODO resolved
-// nolint:gocyclo
 func OnIncomingStateTypeRequest(
 	ctx context.Context, device *userapi.Device, rsAPI api.ClientRoomserverAPI,
 	roomID, evType, stateKey string, eventFormat bool,
@@ -228,9 +225,7 @@ func OnIncomingStateTypeRequest(
 		}
 	}
 
-	// Only enable translation logic on pseudo ID rooms
-	// TODO: remove the if check, synctypes.FromClientStateKey handles non-pseudo ID rooms,
-	//       but has some logic to be worked out (see comment in synctypes.FromClientStateKey for details)
+	// Translate user ID state keys to room keys in pseudo ID rooms
 	if roomVer == gomatrixserverlib.RoomVersionPseudoIDs {
 		parsedRoomID, err := spec.NewRoomID(roomID)
 		if err != nil {
@@ -239,24 +234,15 @@ func OnIncomingStateTypeRequest(
 				JSON: spec.InvalidParam("invalid room ID"),
 			}
 		}
-
-		// Handle user ID state keys appropriately
-		newStateKey, invalidUserIDOrNoSender, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+		newStateKey, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
 			return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
 		})
 		if err != nil {
-			if invalidUserIDOrNoSender {
-				// Currently treat this as no state found - see comment for FromClientStateKey
-				return util.JSONResponse{
-					Code: http.StatusNotFound,
-					JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
-				}
-			} else {
-				util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
-				return util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.Unknown("internal server error"),
-				}
+			// TODO: work out better logic for failure cases (e.g. sender ID not found)
+			util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
 			}
 		}
 		stateKey = *newStateKey

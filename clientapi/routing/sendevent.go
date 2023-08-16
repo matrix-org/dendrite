@@ -93,9 +93,7 @@ func SendEvent(
 		}
 	}
 
-	// Only enable translation logic on pseudo ID rooms
-	// TODO: remove the if check, synctypes.FromClientStateKey handles non-pseudo ID rooms,
-	//       but has some logic to be worked out (see comment in synctypes.FromClientStateKey for details)
+	// Translate user ID state keys to room keys in pseudo ID rooms
 	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && stateKey != nil {
 		parsedRoomID, innerErr := spec.NewRoomID(roomID)
 		if innerErr != nil {
@@ -105,10 +103,11 @@ func SendEvent(
 			}
 		}
 
-		newStateKey, _, innerErr := synctypes.FromClientStateKey(*parsedRoomID, *stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+		newStateKey, innerErr := synctypes.FromClientStateKey(*parsedRoomID, *stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
 			return rsAPI.QuerySenderIDForUser(req.Context(), roomID, userID)
 		})
 		if innerErr != nil {
+			// TODO: work out better logic for failure cases (e.g. sender ID not found)
 			util.GetLogger(req.Context()).WithError(innerErr).Error("synctypes.FromClientStateKey failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
