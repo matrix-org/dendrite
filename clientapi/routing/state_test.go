@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -27,6 +28,15 @@ type testRoomserverAPI struct {
 	userIDStr   string
 	// userID -> senderID
 	senderMapping map[string]string
+}
+
+func (s testRoomserverAPI) QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
+	if roomID == s.roomIDStr {
+		return s.roomVersion, nil
+	} else {
+		s.t.Logf("room version queried for %s", roomID)
+		return "", fmt.Errorf("unknown room")
+	}
 }
 
 func (s testRoomserverAPI) QueryLatestEventsAndState(
