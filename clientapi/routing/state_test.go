@@ -19,7 +19,7 @@ import (
 
 var ()
 
-type testRoomserverAPI struct {
+type stateTestRoomserverAPI struct {
 	rsapi.RoomserverInternalAPI
 	t           *testing.T
 	roomState   map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent
@@ -30,7 +30,7 @@ type testRoomserverAPI struct {
 	senderMapping map[string]string
 }
 
-func (s testRoomserverAPI) QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
+func (s stateTestRoomserverAPI) QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
 	if roomID == s.roomIDStr {
 		return s.roomVersion, nil
 	} else {
@@ -39,7 +39,7 @@ func (s testRoomserverAPI) QueryRoomVersionForRoom(ctx context.Context, roomID s
 	}
 }
 
-func (s testRoomserverAPI) QueryLatestEventsAndState(
+func (s stateTestRoomserverAPI) QueryLatestEventsAndState(
 	ctx context.Context,
 	req *rsapi.QueryLatestEventsAndStateRequest,
 	res *rsapi.QueryLatestEventsAndStateResponse,
@@ -60,7 +60,7 @@ func (s testRoomserverAPI) QueryLatestEventsAndState(
 	return nil
 }
 
-func (s testRoomserverAPI) QueryMembershipForUser(
+func (s stateTestRoomserverAPI) QueryMembershipForUser(
 	ctx context.Context,
 	req *rsapi.QueryMembershipForUserRequest,
 	res *rsapi.QueryMembershipForUserResponse,
@@ -75,7 +75,7 @@ func (s testRoomserverAPI) QueryMembershipForUser(
 	return nil
 }
 
-func (s testRoomserverAPI) QuerySenderIDForUser(
+func (s stateTestRoomserverAPI) QuerySenderIDForUser(
 	ctx context.Context,
 	roomID spec.RoomID,
 	userID spec.UserID,
@@ -89,7 +89,7 @@ func (s testRoomserverAPI) QuerySenderIDForUser(
 	}
 }
 
-func (s testRoomserverAPI) QueryUserIDForSender(
+func (s stateTestRoomserverAPI) QueryUserIDForSender(
 	ctx context.Context,
 	roomID spec.RoomID,
 	senderID spec.SenderID,
@@ -106,7 +106,7 @@ func (s testRoomserverAPI) QueryUserIDForSender(
 	return nil, nil
 }
 
-func (s testRoomserverAPI) QueryStateAfterEvents(
+func (s stateTestRoomserverAPI) QueryStateAfterEvents(
 	ctx context.Context,
 	req *rsapi.QueryStateAfterEventsRequest,
 	res *rsapi.QueryStateAfterEventsResponse,
@@ -133,7 +133,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	t.Run("request simple state key", func(t *testing.T) {
 		ctx := context.Background()
 
-		rsAPI := testRoomserverAPI{
+		rsAPI := stateTestRoomserverAPI{
 			roomVersion: defaultRoomVersion,
 			roomIDStr:   roomIDStr,
 			roomState: map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent{
@@ -161,7 +161,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 		stateSenderUserID := "@sender:domain"
 		stateSenderRoomKey := "testsenderkey"
 
-		rsAPI := testRoomserverAPI{
+		rsAPI := stateTestRoomserverAPI{
 			roomVersion: pseudoIDRoomVersion,
 			roomIDStr:   roomIDStr,
 			roomState: map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent{
@@ -198,7 +198,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 		stateSenderUserID := "@sender:domain"
 		stateSenderRoomKey := "testsenderkey"
 
-		rsAPI := testRoomserverAPI{
+		rsAPI := stateTestRoomserverAPI{
 			roomVersion: nonPseudoIDRoomVersion,
 			roomIDStr:   roomIDStr,
 			roomState: map[gomatrixserverlib.StateKeyTuple]*types.HeaderedEvent{
