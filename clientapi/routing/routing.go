@@ -44,6 +44,19 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
+type WellKnownClientHomeserver struct {
+	BaseUrl string `json:"base_url"`
+}
+
+type WellKnownSlidingSyncProxy struct {
+	Url string `json:"url"`
+}
+
+type WellKnownClientResponse struct {
+	Homeserver       WellKnownClientHomeserver  `json:"m.homeserver"`
+	SlidingSyncProxy *WellKnownSlidingSyncProxy `json:"org.matrix.msc3575.proxy,omitempty"`
+}
+
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 //
@@ -96,20 +109,22 @@ func Setup(
 
 	if cfg.Matrix.WellKnownClientName != "" {
 		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
+		if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
+		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
+			response := WellKnownClientResponse{
+				Homeserver: WellKnownClientHomeserver{cfg.Matrix.WellKnownClientName},
+			}
+			if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+				response.SlidingSyncProxy = &WellKnownSlidingSyncProxy{
+					Url: cfg.Matrix.WellKnownSlidingSyncProxy,
+				}
+			}
+
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: struct {
-					HomeserverName struct {
-						BaseUrl string `json:"base_url"`
-					} `json:"m.homeserver"`
-				}{
-					HomeserverName: struct {
-						BaseUrl string `json:"base_url"`
-					}{
-						BaseUrl: cfg.Matrix.WellKnownClientName,
-					},
-				},
+				JSON: response,
 			}
 		})).Methods(http.MethodGet, http.MethodOptions)
 	}
