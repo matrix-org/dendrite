@@ -53,7 +53,7 @@ type WellKnownSlidingSyncProxy struct {
 }
 
 type WellKnownClientResponse struct {
-	HomeserverName   WellKnownClientHomeserver  `json:"m.homeserver"`
+	Homeserver       WellKnownClientHomeserver  `json:"m.homeserver"`
 	SlidingSyncProxy *WellKnownSlidingSyncProxy `json:"org.matrix.msc3575.proxy,omitempty"`
 }
 
@@ -114,7 +114,7 @@ func Setup(
 		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			response := WellKnownClientResponse{
-				HomeserverName: WellKnownClientHomeserver{cfg.Matrix.WellKnownClientName},
+				Homeserver: WellKnownClientHomeserver{cfg.Matrix.WellKnownClientName},
 			}
 			if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
 				response.SlidingSyncProxy = &WellKnownSlidingSyncProxy{
