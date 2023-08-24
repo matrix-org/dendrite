@@ -933,12 +933,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			return err
 		}
 
-		userID, err := spec.NewUserID(stateKey, true)
-		if err != nil {
-			return err
-		}
-
-		signingIdentity, err := r.SigningIdentity(ctx, *validRoomID, *userID)
+		signingIdentity, err := r.SigningIdentity(ctx, *validRoomID, *memberUserID)
 		if err != nil {
 			return err
 		}
