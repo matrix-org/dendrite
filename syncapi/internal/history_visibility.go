@@ -163,17 +163,23 @@ func ApplyHistoryVisibilityFilter(
 		// by setting the effective evVis to the least restrictive
 		// of the old vs new.
 		// https://spec.matrix.org/v1.3/client-server-api/#server-behaviour-5
-		if hisVis, err := ev.HistoryVisibility(); err == nil {
-			prevHisVis := gjson.GetBytes(ev.Unsigned(), "prev_content.history_visibility").String()
-			oldPrio, ok := historyVisibilityPriority[gomatrixserverlib.HistoryVisibility(prevHisVis)]
-			// if we can't get the previous history visibility, default to shared.
-			if !ok {
-				oldPrio = historyVisibilityPriority[gomatrixserverlib.HistoryVisibilityShared]
-			}
-			// no OK check, since this should have been validated when setting the value
-			newPrio := historyVisibilityPriority[hisVis]
-			if oldPrio < newPrio {
-				evVis.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
+		if ev.Type() == spec.MRoomHistoryVisibility {
+			hisVis, err := ev.HistoryVisibility()
+
+			if err == nil && hisVis != "" {
+				prevHisVis := gjson.GetBytes(ev.Unsigned(), "prev_content.history_visibility").String()
+				oldPrio, ok := historyVisibilityPriority[gomatrixserverlib.HistoryVisibility(prevHisVis)]
+				// if we can't get the previous history visibility, default to shared.
+				if !ok {
+					oldPrio = historyVisibilityPriority[gomatrixserverlib.HistoryVisibilityShared]
+				}
+				// no OK check, since this should have been validated when setting the value
+				newPrio := historyVisibilityPriority[hisVis]
+				if oldPrio < newPrio {
+					evVis.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
+				} else {
+					evVis.visibility = hisVis
+				}
 			}
 		}
 		// do the actual check
