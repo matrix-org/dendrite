@@ -96,22 +96,50 @@ func Setup(
 
 	if cfg.Matrix.WellKnownClientName != "" {
 		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
-		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: struct {
-					HomeserverName struct {
-						BaseUrl string `json:"base_url"`
-					} `json:"m.homeserver"`
-				}{
-					HomeserverName: struct {
-						BaseUrl string `json:"base_url"`
+		if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
+			wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: struct {
+						HomeserverName struct {
+							BaseUrl string `json:"base_url"`
+						} `json:"m.homeserver"`
+						SlidingSyncProxy struct {
+							Url string `json:"url"`
+						} `json:"org.matrix.msc3575.proxy"`
 					}{
-						BaseUrl: cfg.Matrix.WellKnownClientName,
+						HomeserverName: struct {
+							BaseUrl string `json:"base_url"`
+						}{
+							BaseUrl: cfg.Matrix.WellKnownClientName,
+						},
+						SlidingSyncProxy: struct {
+							Url string `json:"url"`
+						}{
+							Url: cfg.Matrix.WellKnownSlidingSyncProxy,
+						},
 					},
-				},
-			}
-		})).Methods(http.MethodGet, http.MethodOptions)
+				}
+			})).Methods(http.MethodGet, http.MethodOptions)
+		} else {
+			wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: struct {
+						HomeserverName struct {
+							BaseUrl string `json:"base_url"`
+						} `json:"m.homeserver"`
+					}{
+						HomeserverName: struct {
+							BaseUrl string `json:"base_url"`
+						}{
+							BaseUrl: cfg.Matrix.WellKnownClientName,
+						},
+					},
+				}
+			})).Methods(http.MethodGet, http.MethodOptions)
+		}
 	}
 
 	publicAPIMux.Handle("/versions",
