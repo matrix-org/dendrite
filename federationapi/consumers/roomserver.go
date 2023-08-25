@@ -16,7 +16,9 @@ package consumers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -187,7 +189,12 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 		addsStateEvents = append(addsStateEvents, eventsRes.Events...)
 	}
 
-	addsJoinedHosts, err := JoinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(addsStateEvents))
+	evs := make([]gomatrixserverlib.PDU, len(addsStateEvents))
+	for i := range evs {
+		evs[i] = addsStateEvents[i].PDU
+	}
+
+	addsJoinedHosts, err := JoinedHostsFromEvents(s.ctx, evs, s.rsAPI)
 	if err != nil {
 		return err
 	}
@@ -335,12 +342,12 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		ore.AddsStateEventIDs, ore.RemovesStateEventIDs,
 		ore.StateBeforeAddsEventIDs, ore.StateBeforeRemovesEventIDs,
 	)
-	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ore.Event.Event)
+	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ore.Event.PDU)
 	if err != nil {
 		return nil, err
 	}
 
-	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(combinedAddsEvents)
+	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(s.ctx, combinedAddsEvents, s.rsAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +376,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	}
 
 	// handle peeking hosts
-	inboundPeeks, err := s.db.GetInboundPeeks(s.ctx, ore.Event.Event.RoomID())
+	inboundPeeks, err := s.db.GetInboundPeeks(s.ctx, ore.Event.PDU.RoomID())
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +396,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 // JoinedHostsFromEvents turns a list of state events into a list of joined hosts.
 // This errors if one of the events was invalid.
 // It should be impossible for an invalid event to get this far in the pipeline.
-func JoinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, error) {
+func JoinedHostsFromEvents(ctx context.Context, evs []gomatrixserverlib.PDU, rsAPI api.FederationRoomserverAPI) ([]types.JoinedHost, error) {
 	var joinedHosts []types.JoinedHost
 	for _, ev := range evs {
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {
@@ -402,12 +409,30 @@ func JoinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, 
 		if membership != spec.Join {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
 		if err != nil {
 			return nil, err
 		}
+		var domain spec.ServerName
+		userID, err := rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*ev.StateKey()))
+		if err != nil {
+			if errors.As(err, new(base64.CorruptInputError)) {
+				// Fallback to using the "old" way of getting the user domain, avoids
+				// "illegal base64 data at input byte 0" errors
+				// FIXME: we should do this in QueryUserIDForSender instead
+				_, domain, err = gomatrixserverlib.SplitID('@', *ev.StateKey())
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
+		} else {
+			domain = userID.Domain()
+		}
+
 		joinedHosts = append(joinedHosts, types.JoinedHost{
-			MemberEventID: ev.EventID(), ServerName: serverName,
+			MemberEventID: ev.EventID(), ServerName: domain,
 		})
 	}
 	return joinedHosts, nil
@@ -454,8 +479,8 @@ func combineDeltas(adds1, removes1, adds2, removes2 []string) (adds, removes []s
 
 // lookupStateEvents looks up the state events that are added by a new event.
 func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event *gomatrixserverlib.Event,
-) ([]*gomatrixserverlib.Event, error) {
+	addsStateEventIDs []string, event gomatrixserverlib.PDU,
+) ([]gomatrixserverlib.PDU, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
 		return nil, nil
@@ -463,11 +488,11 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []*gomatrixserverlib.Event{event}, nil
+		return []gomatrixserverlib.PDU{event}, nil
 	}
 
 	missing := addsStateEventIDs
-	var result []*gomatrixserverlib.Event
+	var result []gomatrixserverlib.PDU
 
 	// Check if event itself is being added.
 	for _, eventID := range missing {
@@ -492,7 +517,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	}
 
 	for _, headeredEvent := range eventResp.Events {
-		result = append(result, headeredEvent.Event)
+		result = append(result, headeredEvent.PDU)
 	}
 
 	missing = missingEventsFrom(result, addsStateEventIDs)
@@ -506,7 +531,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	return result, nil
 }
 
-func missingEventsFrom(events []*gomatrixserverlib.Event, required []string) []string {
+func missingEventsFrom(events []gomatrixserverlib.PDU, required []string) []string {
 	have := map[string]bool{}
 	for _, event := range events {
 		have[event.EventID()] = true

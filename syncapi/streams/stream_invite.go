@@ -10,6 +10,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -17,6 +18,7 @@ import (
 
 type InviteStreamProvider struct {
 	DefaultStreamProvider
+	rsAPI api.SyncRoomserverAPI
 }
 
 func (p *InviteStreamProvider) Setup(
@@ -62,11 +64,30 @@ func (p *InviteStreamProvider) IncrementalSync(
 	}
 
 	for roomID, inviteEvent := range invites {
-		// skip ignored user events
-		if _, ok := req.IgnoredUsers.List[inviteEvent.Sender()]; ok {
+		user := spec.UserID{}
+		validRoomID, err := spec.NewRoomID(inviteEvent.RoomID())
+		if err != nil {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent)
+		sender, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, inviteEvent.SenderID())
+		if err == nil && sender != nil {
+			user = *sender
+		}
+
+		sk := inviteEvent.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*inviteEvent.StateKey()))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
+
+		// skip ignored user events
+		if _, ok := req.IgnoredUsers.List[user.String()]; ok {
+			continue
+		}
+		ir := types.NewInviteResponse(inviteEvent, user, sk)
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 

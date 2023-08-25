@@ -32,10 +32,10 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
@@ -75,7 +75,7 @@ func (r *stubFederationRoomServerAPI) QueryServerBannedFromRoom(ctx context.Cont
 }
 
 type stubFederationClient struct {
-	api.FederationClient
+	fclient.FederationClient
 	shouldTxSucceed      bool
 	shouldTxRelaySucceed bool
 	txCount              atomic.Uint32
@@ -102,14 +102,14 @@ func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u 
 	return fclient.EmptyResp{}, result
 }
 
-func mustCreatePDU(t *testing.T) *gomatrixserverlib.HeaderedEvent {
+func mustCreatePDU(t *testing.T) *types.HeaderedEvent {
 	t.Helper()
 	content := `{"type":"m.room.message"}`
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(content), false, gomatrixserverlib.RoomVersionV10)
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
-	return ev.Headered(gomatrixserverlib.RoomVersionV10)
+	return &types.HeaderedEvent{PDU: ev}
 }
 
 func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {

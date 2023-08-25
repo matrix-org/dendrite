@@ -130,7 +130,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	if pos == 0 {
 		pos = r.High()
 	}
-	return data, pos, nil
+	return data, pos, rows.Err()
 }
 
 func (s *accountDataStatements) SelectMaxAccountDataID(

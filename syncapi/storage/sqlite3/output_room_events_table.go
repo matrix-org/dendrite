@@ -25,6 +25,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -166,7 +167,7 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 	}.Prepare(db)
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
@@ -249,8 +250,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		}
 
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
 		needSet := stateNeeded[ev.RoomID()]
@@ -296,7 +297,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 // of the inserted event.
 func (s *outputRoomEventsStatements) InsertEvent(
 	ctx context.Context, txn *sql.Tx,
-	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
+	event *rstypes.HeaderedEvent, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (types.StreamPosition, error) {
 	var txnID *string
@@ -347,7 +348,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		event.EventID(),
 		headeredJSON,
 		event.Type(),
-		event.Sender(),
+		event.UserID.String(),
 		containsURL,
 		string(addStateJSON),
 		string(removeStateJSON),
@@ -498,8 +499,8 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		var ev gomatrixserverlib.HeaderedEvent
-		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 
@@ -523,7 +524,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 }
 func (s *outputRoomEventsStatements) SelectContextEvent(
 	ctx context.Context, txn *sql.Tx, roomID, eventID string,
-) (id int, evt gomatrixserverlib.HeaderedEvent, err error) {
+) (id int, evt rstypes.HeaderedEvent, err error) {
 	row := sqlutil.TxStmt(txn, s.selectContextEventStmt).QueryRowContext(ctx, roomID, eventID)
 	var eventAsString string
 	var historyVisibility gomatrixserverlib.HistoryVisibility
@@ -540,7 +541,7 @@ func (s *outputRoomEventsStatements) SelectContextEvent(
 
 func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter,
-) (evts []*gomatrixserverlib.HeaderedEvent, err error) {
+) (evts []*rstypes.HeaderedEvent, err error) {
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectContextBeforeEventSQL,
 		[]interface{}{
@@ -564,7 +565,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 	for rows.Next() {
 		var (
 			eventBytes        []byte
-			evt               *gomatrixserverlib.HeaderedEvent
+			evt               *rstypes.HeaderedEvent
 			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&eventBytes, &historyVisibility); err != nil {
@@ -582,7 +583,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 
 func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter,
-) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
+) (lastID int, evts []*rstypes.HeaderedEvent, err error) {
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectContextAfterEventSQL,
 		[]interface{}{
@@ -606,7 +607,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	for rows.Next() {
 		var (
 			eventBytes        []byte
-			evt               *gomatrixserverlib.HeaderedEvent
+			evt               *rstypes.HeaderedEvent
 			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&lastID, &eventBytes, &historyVisibility); err != nil {
@@ -642,7 +643,7 @@ func (s *outputRoomEventsStatements) PurgeEvents(
 	return err
 }
 
-func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]rstypes.HeaderedEvent, error) {
 	params := make([]interface{}, len(types)+1)
 	params[0] = afterID
 	for i := range types {
@@ -664,14 +665,14 @@ func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, l
 
 	var eventID string
 	var id int64
-	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	result := make(map[int64]rstypes.HeaderedEvent)
 	for rows.Next() {
-		var ev gomatrixserverlib.HeaderedEvent
+		var ev rstypes.HeaderedEvent
 		var eventBytes []byte
 		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
 			return nil, err
 		}
-		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+		if err = json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result[id] = ev

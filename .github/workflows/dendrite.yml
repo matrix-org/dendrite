@@ -67,6 +67,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
@@ -101,6 +103,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
         uses: actions/setup-go@v3
         with:
@@ -119,7 +123,7 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -json -v ./... 2>&1 | gotestfmt
+      - run: go test -json -v ./... 2>&1 | gotestfmt -hide all
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
@@ -232,6 +236,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v3
+      - name: Install libolm
+        run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
         uses: actions/setup-go@v3
         with:
@@ -249,7 +255,7 @@ jobs:
           key: ${{ runner.os }}-go-stable-test-race-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-stable-test-race-
-      - run: go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
+      - run: go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt -hide all
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
@@ -430,7 +436,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests/... 2>&1 | gotestfmt
+          go test -v -json -tags dendrite_blacklist ./tests/... 2>&1 | gotestfmt -hide all
         shell: bash
         name: Run Complement Tests
         env:

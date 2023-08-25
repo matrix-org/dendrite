@@ -69,8 +69,7 @@ global:
   # e.g. localhost:443
   well_known_server_name: ""
 
-  # The server name to delegate client-server communications to, with optional port
-  # e.g. localhost:443
+  # The base URL to delegate client-server communications to e.g. https://localhost
   well_known_client_name: ""
 
   # Lists of domains that the server will trust as identity servers to verify third
@@ -277,7 +276,6 @@ media_api:
 mscs:
   mscs:
   #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
-  #  - msc2946  # (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
 # Configuration for the Sync API.
 sync_api:

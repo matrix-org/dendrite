@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime"
 	"net/http"
 	"net/url"
@@ -30,7 +31,6 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
@@ -127,10 +127,21 @@ func Download(
 		activeRemoteRequests, activeThumbnailGeneration,
 	)
 	if err != nil {
+		// If we bubbled up a os.PathError, e.g. no such file or directory, don't send
+		// it to the client, be more generic.
+		var perr *fs.PathError
+		if errors.As(err, &perr) {
+			dReq.Logger.WithError(err).Error("failed to open file")
+			dReq.jsonErrorResponse(w, util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("File not found"),
+			})
+			return
+		}
 		// TODO: Handle the fact we might have started writing the response
 		dReq.jsonErrorResponse(w, util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Failed to download: " + err.Error()),
+			JSON: spec.NotFound("Failed to download: " + err.Error()),
 		})
 		return
 	}
@@ -138,7 +149,7 @@ func Download(
 	if metadata == nil {
 		dReq.jsonErrorResponse(w, util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("File not found"),
+			JSON: spec.NotFound("File not found"),
 		})
 		return
 	}
@@ -168,7 +179,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 	if !mediaIDRegex.MatchString(string(r.MediaMetadata.MediaID)) {
 		return &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
+			JSON: spec.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
 		}
 	}
 	// Note: the origin will be validated either by comparison to the configured server name of this homeserver
@@ -176,7 +187,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 	if r.MediaMetadata.Origin == "" {
 		return &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("serverName must be a non-empty string"),
+			JSON: spec.NotFound("serverName must be a non-empty string"),
 		}
 	}
 
@@ -184,7 +195,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		if r.ThumbnailSize.Width <= 0 || r.ThumbnailSize.Height <= 0 {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown("width and height must be greater than 0"),
+				JSON: spec.Unknown("width and height must be greater than 0"),
 			}
 		}
 		// Default method to scale if not set
@@ -194,7 +205,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		if r.ThumbnailSize.ResizeMethod != types.Crop && r.ThumbnailSize.ResizeMethod != types.Scale {
 			return &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown("method must be one of crop or scale"),
+				JSON: spec.Unknown("method must be one of crop or scale"),
 			}
 		}
 	}
@@ -342,6 +353,7 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	}
 
 	if len(filename) == 0 {
+		w.Header().Set("Content-Disposition", "attachment")
 		return nil
 	}
 
@@ -377,13 +389,13 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 		// that would otherwise be parsed as a control character in the
 		// Content-Disposition header
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`inline; filename=%s%s%s`,
+			`attachment; filename=%s%s%s`,
 			quote, unescaped, quote,
 		))
 	} else {
 		// For UTF-8 filenames, we quote always, as that's the standard
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`inline; filename*=utf-8''%s`,
+			`attachment; filename*=utf-8''%s`,
 			url.QueryEscape(unescaped),
 		))
 	}

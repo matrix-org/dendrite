@@ -19,9 +19,9 @@ import (
 
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type getJoinedRoomsResponse struct {
@@ -33,20 +33,36 @@ func GetJoinedRooms(
 	device *userapi.Device,
 	rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
-	var res api.QueryRoomsForUserResponse
-	err := rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
-		UserID:         device.UserID,
-		WantMembership: "join",
-	}, &res)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("Invalid device user ID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	rooms, err := rsAPI.QueryRoomsForUser(req.Context(), *deviceUserID, "join")
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
 	}
-	if res.RoomIDs == nil {
-		res.RoomIDs = []string{}
+
+	var roomIDStrs []string
+	if rooms == nil {
+		roomIDStrs = []string{}
+	} else {
+		roomIDStrs = make([]string, len(rooms))
+		for i, roomID := range rooms {
+			roomIDStrs[i] = roomID.String()
+		}
 	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getJoinedRoomsResponse{res.RoomIDs},
+		JSON: getJoinedRoomsResponse{roomIDStrs},
 	}
 }

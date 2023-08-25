@@ -18,18 +18,18 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type RelationsResponse struct {
@@ -43,9 +43,25 @@ func Relations(
 	req *http.Request, device *userapi.Device,
 	syncDB storage.Database,
 	rsAPI api.SyncRoomserverAPI,
-	roomID, eventID, relType, eventType string,
+	rawRoomID, eventID, relType, eventType string,
 ) util.JSONResponse {
-	var err error
+	roomID, err := spec.NewRoomID(rawRoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
+		}
+	}
+
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
 	var from, to types.StreamPosition
 	var limit int
 	dir := req.URL.Query().Get("dir")
@@ -73,14 +89,17 @@ func Relations(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: spec.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to get snapshot for relations")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -90,19 +109,19 @@ func Relations(
 	}
 	var events []types.StreamEvent
 	events, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
-		req.Context(), roomID, eventID, relType, eventType, from, to, dir == "b", limit,
+		req.Context(), roomID.String(), eventID, relType, eventType, from, to, dir == "b", limit,
 	)
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
 
-	headeredEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	headeredEvents := make([]*rstypes.HeaderedEvent, 0, len(events))
 	for _, event := range events {
 		headeredEvents = append(headeredEvents, event.HeaderedEvent)
 	}
 
 	// Apply history visibility to the result events.
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(req.Context(), snapshot, rsAPI, headeredEvents, nil, device.UserID, "relations")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(req.Context(), snapshot, rsAPI, headeredEvents, nil, *userID, "relations")
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
@@ -111,9 +130,23 @@ func Relations(
 	// type if it was specified.
 	res.Chunk = make([]synctypes.ClientEvent, 0, len(filteredEvents))
 	for _, event := range filteredEvents {
+		sender := spec.UserID{}
+		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *roomID, event.SenderID())
+		if err == nil && userID != nil {
+			sender = *userID
+		}
+
+		sk := event.StateKey()
+		if sk != nil && *sk != "" {
+			skUserID, err := rsAPI.QueryUserIDForSender(req.Context(), *roomID, spec.SenderID(*event.StateKey()))
+			if err == nil && skUserID != nil {
+				skString := skUserID.String()
+				sk = &skString
+			}
+		}
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.Event, synctypes.FormatAll),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender, sk),
 		)
 	}
 

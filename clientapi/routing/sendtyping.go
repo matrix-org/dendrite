@@ -18,10 +18,10 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type typingContentJSON struct {
@@ -39,12 +39,20 @@ func SendTyping(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+			JSON: spec.Forbidden("Cannot set another user's typing state"),
+		}
+	}
+
+	deviceUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
 		}
 	}
 
 	// Verify that the user is a member of this room
-	resErr := checkMemberInRoom(req.Context(), rsAPI, userID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
@@ -58,7 +66,10 @@ func SendTyping(
 
 	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

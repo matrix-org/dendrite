@@ -17,10 +17,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -42,8 +42,8 @@ func GetState(
 	}
 
 	return util.JSONResponse{Code: http.StatusOK, JSON: &fclient.RespState{
-		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
-		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
+		AuthEvents:  types.NewEventJSONsFromHeaderedEvents(authChain),
+		StateEvents: types.NewEventJSONsFromHeaderedEvents(stateEvents),
 	}}
 }
 
@@ -88,7 +88,7 @@ func parseEventIDParam(
 	if eventID == "" {
 		resErr = &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("event_id missing"),
+			JSON: spec.MissingParam("event_id missing"),
 		}
 	}
 
@@ -101,7 +101,7 @@ func getState(
 	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
-) (stateEvents, authEvents []*gomatrixserverlib.HeaderedEvent, errRes *util.JSONResponse) {
+) (stateEvents, authEvents []*types.HeaderedEvent, errRes *util.JSONResponse) {
 	// If we don't think we belong to this room then don't waste the effort
 	// responding to expensive requests for it.
 	if err := ErrorIfLocalServerNotInRoom(ctx, rsAPI, roomID); err != nil {
@@ -114,9 +114,9 @@ func getState(
 	}
 
 	if event.RoomID() != roomID {
-		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: spec.NotFound("event does not belong to this room")}
 	}
-	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
+	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID())
 	if resErr != nil {
 		return nil, nil, resErr
 	}
@@ -140,24 +140,24 @@ func getState(
 	case !response.RoomExists:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room not found"),
+			JSON: spec.NotFound("Room not found"),
 		}
 	case !response.StateKnown:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("State not known"),
+			JSON: spec.NotFound("State not known"),
 		}
 	case response.IsRejected:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Event not found"),
+			JSON: spec.NotFound("Event not found"),
 		}
 	}
 
 	return response.StateEvents, response.AuthChainEvents, nil
 }
 
-func getIDsFromEvent(events []*gomatrixserverlib.HeaderedEvent) []string {
+func getIDsFromEvent(events []*types.HeaderedEvent) []string {
 	IDs := make([]string, len(events))
 	for i := range events {
 		IDs[i] = events[i].EventID()

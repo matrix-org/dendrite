@@ -29,11 +29,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
 
@@ -45,7 +45,7 @@ type OutgoingQueues struct {
 	disabled    bool
 	rsAPI       api.FederationRoomserverAPI
 	origin      spec.ServerName
-	client      fedapi.FederationClient
+	client      fclient.FederationClient
 	statistics  *statistics.Statistics
 	signing     map[spec.ServerName]*fclient.SigningIdentity
 	queuesMutex sync.Mutex // protects the below
@@ -89,7 +89,7 @@ func NewOutgoingQueues(
 	process *process.ProcessContext,
 	disabled bool,
 	origin spec.ServerName,
-	client fedapi.FederationClient,
+	client fclient.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
 	signing []*fclient.SigningIdentity,
@@ -141,7 +141,7 @@ func NewOutgoingQueues(
 
 type queuedPDU struct {
 	dbReceipt *receipt.Receipt
-	pdu       *gomatrixserverlib.HeaderedEvent
+	pdu       *types.HeaderedEvent
 }
 
 type queuedEDU struct {
@@ -188,7 +188,7 @@ func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
-	ev *gomatrixserverlib.HeaderedEvent, origin spec.ServerName,
+	ev *types.HeaderedEvent, origin spec.ServerName,
 	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {

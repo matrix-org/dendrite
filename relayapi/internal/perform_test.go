@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"testing"
 
-	fedAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/test"
@@ -30,7 +29,7 @@ import (
 )
 
 type testFedClient struct {
-	fedAPI.FederationClient
+	fclient.FederationClient
 	shouldFail bool
 	queryCount uint
 	queueDepth uint

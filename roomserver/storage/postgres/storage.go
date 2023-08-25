@@ -37,7 +37,7 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
 	db, writer, err := conMan.Connection(dbProperties)
@@ -131,6 +131,9 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateRedactionsTable(db); err != nil {
 		return err
 	}
+	if err := CreateUserRoomKeysTable(db); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -192,6 +195,11 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
+	userRoomKeys, err := PrepareUserRoomKeysTable(db)
+	if err != nil {
+		return err
+	}
+
 	d.Database = shared.Database{
 		DB: db,
 		EventDatabase: shared.EventDatabase{
@@ -215,6 +223,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 		MembershipTable:    membership,
 		PublishedTable:     published,
 		Purge:              purge,
+		UserRoomKeyTable:   userRoomKeys,
 	}
 	return nil
 }

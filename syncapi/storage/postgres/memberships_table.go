@@ -19,9 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -100,7 +99,7 @@ func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 }
 
 func (s *membershipsStatements) UpsertMembership(
-	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent,
 	streamPos, topologicalPos types.StreamPosition,
 ) error {
 	membership, err := event.Membership()
@@ -110,7 +109,7 @@ func (s *membershipsStatements) UpsertMembership(
 	_, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
 		ctx,
 		event.RoomID(),
-		*event.StateKey(),
+		event.StateKeyResolved,
 		membership,
 		event.EventID(),
 		streamPos,

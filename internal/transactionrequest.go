@@ -21,10 +21,10 @@ import (
 	"sync"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -115,14 +115,13 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if v, ok := roomVersions[roomID]; ok {
 			return v
 		}
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := t.rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
-			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", verReq.RoomID)
+		roomVersion, err := t.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
 			return ""
 		}
-		roomVersions[roomID] = verRes.RoomVersion
-		return verRes.RoomVersion
+		roomVersions[roomID] = roomVersion
+		return roomVersion
 	}
 
 	for _, pdu := range t.PDUs {
@@ -137,7 +136,11 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			continue
 		}
 		roomVersion := getRoomVersion(header.RoomID)
-		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+		if err != nil {
+			continue
+		}
+		event, err := verImpl.NewEventFromUntrustedJSON(pdu)
 		if err != nil {
 			if _, ok := err.(gomatrixserverlib.BadJSONError); ok {
 				// Room version 6 states that homeservers should strictly enforce canonical JSON
@@ -149,7 +152,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 				// See https://github.com/matrix-org/synapse/issues/7543
 				return nil, &util.JSONResponse{
 					Code: 400,
-					JSON: jsonerror.BadJSON("PDU contains bad JSON"),
+					JSON: spec.BadJSON("PDU contains bad JSON"),
 				}
 			}
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))
@@ -164,7 +167,9 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			}
 			continue
 		}
-		if err = event.VerifyEventSignatures(ctx, t.keys); err != nil {
+		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
@@ -179,8 +184,8 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			ctx,
 			t.rsAPI,
 			api.KindNew,
-			[]*gomatrixserverlib.HeaderedEvent{
-				event.Headered(roomVersion),
+			[]*rstypes.HeaderedEvent{
+				{PDU: event},
 			},
 			t.Destination,
 			t.Origin,

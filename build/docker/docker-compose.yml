@@ -1,0 +1,52 @@
+version: "3.4"
+
+services:
+  postgres:
+    hostname: postgres
+    image: postgres:15-alpine
+    restart: always
+    volumes:
+      # This will create a docker volume to persist the database files in.
+      # If you prefer those files to be outside of docker, you'll need to change this.
+      - dendrite_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: itsasecret
+      POSTGRES_USER: dendrite
+      POSTGRES_DATABASE: dendrite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dendrite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  monolith:
+    hostname: monolith
+    image: matrixdotorg/dendrite-monolith:latest
+    ports:
+      - 8008:8008
+      - 8448:8448
+    volumes:
+      - ./config:/etc/dendrite
+      # The following volumes use docker volumes, change this
+      # if you prefer to have those files outside of docker.
+      - dendrite_media:/var/dendrite/media
+      - dendrite_jetstream:/var/dendrite/jetstream
+      - dendrite_search_index:/var/dendrite/searchindex
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+
+networks:
+  internal:
+    attachable: true
+
+volumes:
+  dendrite_postgres_data:
+  dendrite_media:
+  dendrite_jetstream:
+  dendrite_search_index:

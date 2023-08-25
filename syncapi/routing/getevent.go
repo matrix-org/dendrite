@@ -20,13 +20,13 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // GetEvent implements
@@ -37,7 +37,7 @@ import (
 func GetEvent(
 	req *http.Request,
 	device *userapi.Device,
-	roomID string,
+	rawRoomID string,
 	eventID string,
 	cfg *config.SyncAPI,
 	syncDB storage.Database,
@@ -47,17 +47,31 @@ func GetEvent(
 	db, err := syncDB.NewDatabaseTransaction(ctx)
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id": eventID,
-		"room_id":  roomID,
+		"room_id":  rawRoomID,
 	})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	roomID, err := spec.NewRoomID(rawRoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
+		}
 	}
 
 	events, err := db.Events(ctx, []string{eventID})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.Events failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// The requested event does not exist in our database
@@ -65,23 +79,32 @@ func GetEvent(
 		logger.Debugf("GetEvent: requested event doesn't exist locally")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
+			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
 
 	// If the request is coming from an appservice, get the user from the request
-	userID := device.UserID
+	rawUserID := device.UserID
 	if asUserID := req.FormValue("user_id"); device.AppserviceID != "" && asUserID != "" {
-		userID = asUserID
+		rawUserID = asUserID
+	}
+
+	userID, err := spec.NewUserID(rawUserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("invalid device.UserID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
 	}
 
 	// Apply history visibility to determine if the user is allowed to view the event
-	events, err = internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, events, nil, userID, "event")
+	events, err = internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, events, nil, *userID, "event")
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: internal.ApplyHistoryVisibilityFilter failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
+			JSON: spec.InternalServerError{},
 		}
 	}
 
@@ -91,12 +114,36 @@ func GetEvent(
 		logger.WithField("event_count", len(events)).Debug("GetEvent: can't return the requested event")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
+			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
 
+	senderUserID, err := rsAPI.QueryUserIDForSender(req.Context(), *roomID, events[0].SenderID())
+	if err != nil || senderUserID == nil {
+		util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("QueryUserIDForSender errored or returned nil-user ID when user should be part of a room")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	sk := events[0].StateKey()
+	if sk != nil && *sk != "" {
+		evRoomID, err := spec.NewRoomID(events[0].RoomID())
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("roomID is invalid"),
+			}
+		}
+		skUserID, err := rsAPI.QueryUserIDForSender(ctx, *evRoomID, spec.SenderID(*events[0].StateKey()))
+		if err == nil && skUserID != nil {
+			skString := skUserID.String()
+			sk = &skString
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: synctypes.HeaderedToClientEvent(events[0], synctypes.FormatAll),
+		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll, *senderUserID, sk),
 	}
 }

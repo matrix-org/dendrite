@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -27,7 +28,7 @@ import (
 // SendEvents to the roomserver The events are written with KindNew.
 func SendEvents(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
-	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
+	kind Kind, events []*types.HeaderedEvent,
 	virtualHost, origin spec.ServerName,
 	sendAsServer spec.ServerName, txnID *TransactionID,
 	async bool,
@@ -51,10 +52,10 @@ func SendEvents(
 func SendEventWithState(
 	ctx context.Context, rsAPI InputRoomEventsAPI,
 	virtualHost spec.ServerName, kind Kind,
-	state gomatrixserverlib.StateResponse, event *gomatrixserverlib.HeaderedEvent,
+	state gomatrixserverlib.StateResponse, event *types.HeaderedEvent,
 	origin spec.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
-	outliers := gomatrixserverlib.LineariseStateResponse(event.RoomVersion, state)
+	outliers := gomatrixserverlib.LineariseStateResponse(event.Version(), state)
 	ires := make([]InputRoomEvent, 0, len(outliers))
 	for _, outlier := range outliers {
 		if haveEventIDs[outlier.EventID()] {
@@ -62,12 +63,12 @@ func SendEventWithState(
 		}
 		ires = append(ires, InputRoomEvent{
 			Kind:   KindOutlier,
-			Event:  outlier.Headered(event.RoomVersion),
+			Event:  &types.HeaderedEvent{PDU: outlier},
 			Origin: origin,
 		})
 	}
 
-	stateEvents := state.GetStateEvents().UntrustedEvents(event.RoomVersion)
+	stateEvents := state.GetStateEvents().UntrustedEvents(event.Version())
 	stateEventIDs := make([]string, len(stateEvents))
 	for i := range stateEvents {
 		stateEventIDs[i] = stateEvents[i].EventID()
@@ -103,14 +104,12 @@ func SendInputRoomEvents(
 		VirtualHost:     virtualHost,
 	}
 	var response InputRoomEventsResponse
-	if err := rsAPI.InputRoomEvents(ctx, &request, &response); err != nil {
-		return err
-	}
+	rsAPI.InputRoomEvents(ctx, &request, &response)
 	return response.Err()
 }
 
 // GetEvent returns the event or nil, even on errors.
-func GetEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID, eventID string) *gomatrixserverlib.HeaderedEvent {
+func GetEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID, eventID string) *types.HeaderedEvent {
 	var res QueryEventsByIDResponse
 	err := rsAPI.QueryEventsByID(ctx, &QueryEventsByIDRequest{
 		RoomID:   roomID,
@@ -127,7 +126,7 @@ func GetEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID, eventID string)
 }
 
 // GetStateEvent returns the current state event in the room or nil.
-func GetStateEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID string, tuple gomatrixserverlib.StateKeyTuple) *gomatrixserverlib.HeaderedEvent {
+func GetStateEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID string, tuple gomatrixserverlib.StateKeyTuple) *types.HeaderedEvent {
 	var res QueryCurrentStateResponse
 	err := rsAPI.QueryCurrentState(ctx, &QueryCurrentStateRequest{
 		RoomID:      roomID,

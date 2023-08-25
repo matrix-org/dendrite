@@ -28,11 +28,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
 
@@ -54,7 +54,7 @@ type destinationQueue struct {
 	process            *process.ProcessContext
 	signing            map[spec.ServerName]*fclient.SigningIdentity
 	rsAPI              api.FederationRoomserverAPI
-	client             fedapi.FederationClient         // federation client
+	client             fclient.FederationClient        // federation client
 	origin             spec.ServerName                 // origin of requests
 	destination        spec.ServerName                 // destination of requests
 	running            atomic.Bool                     // is the queue worker running?
@@ -72,7 +72,7 @@ type destinationQueue struct {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, dbReceipt *receipt.Receipt) {
+func (oq *destinationQueue) sendEvent(event *types.HeaderedEvent, dbReceipt *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return

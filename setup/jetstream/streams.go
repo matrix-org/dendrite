@@ -48,6 +48,7 @@ var streams = []*nats.StreamConfig{
 		Name:      InputRoomEvent,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
+		MaxAge:    time.Hour * 24,
 	},
 	{
 		Name:      InputDeviceListUpdate,

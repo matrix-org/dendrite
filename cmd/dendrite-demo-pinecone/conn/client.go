@@ -99,7 +99,7 @@ func CreateClient(
 
 func CreateFederationClient(
 	cfg *config.Dendrite, s *pineconeSessions.Sessions,
-) *fclient.FederationClient {
+) fclient.FederationClient {
 	return fclient.NewFederationClient(
 		cfg.Global.SigningIdentities(),
 		fclient.WithTransport(createTransport(s)),

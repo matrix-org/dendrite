@@ -34,84 +34,48 @@ type Unpeeker struct {
 	Inputer    *input.Inputer
 }
 
-// PerformPeek handles peeking into matrix rooms, including over federation by talking to the federationapi.
+// PerformUnpeek handles un-peeking matrix rooms, including over federation by talking to the federationapi.
 func (r *Unpeeker) PerformUnpeek(
 	ctx context.Context,
-	req *api.PerformUnpeekRequest,
-	res *api.PerformUnpeekResponse,
-) error {
-	if err := r.performUnpeek(ctx, req); err != nil {
-		perr, ok := err.(*api.PerformError)
-		if ok {
-			res.Error = perr
-		} else {
-			res.Error = &api.PerformError{
-				Msg: err.Error(),
-			}
-		}
-	}
-	return nil
-}
-
-func (r *Unpeeker) performUnpeek(
-	ctx context.Context,
-	req *api.PerformUnpeekRequest,
+	roomID, userID, deviceID string,
 ) error {
 	// FIXME: there's way too much duplication with performJoin
-	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Supplied user ID %q in incorrect format", req.UserID),
-		}
+		return api.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", userID)}
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		return &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("User %q does not belong to this homeserver", req.UserID),
-		}
+		return api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", userID)}
 	}
-	if strings.HasPrefix(req.RoomID, "!") {
-		return r.performUnpeekRoomByID(ctx, req)
+	if strings.HasPrefix(roomID, "!") {
+		return r.performUnpeekRoomByID(ctx, roomID, userID, deviceID)
 	}
-	return &api.PerformError{
-		Code: api.PerformErrorBadRequest,
-		Msg:  fmt.Sprintf("Room ID %q is invalid", req.RoomID),
-	}
+	return api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid", roomID)}
 }
 
 func (r *Unpeeker) performUnpeekRoomByID(
 	_ context.Context,
-	req *api.PerformUnpeekRequest,
+	roomID, userID, deviceID string,
 ) (err error) {
 	// Get the domain part of the room ID.
-	_, _, err = gomatrixserverlib.SplitID('!', req.RoomID)
+	_, _, err = gomatrixserverlib.SplitID('!', roomID)
 	if err != nil {
-		return &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Room ID %q is invalid: %s", req.RoomID, err),
-		}
+		return api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", roomID, err)}
 	}
 
 	// TODO: handle federated peeks
-
-	err = r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
-		{
-			Type: api.OutputTypeRetirePeek,
-			RetirePeek: &api.OutputRetirePeek{
-				RoomID:   req.RoomID,
-				UserID:   req.UserID,
-				DeviceID: req.DeviceID,
-			},
-		},
-	})
-	if err != nil {
-		return
-	}
-
 	// By this point, if req.RoomIDOrAlias contained an alias, then
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return nil
+	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
+		{
+			Type: api.OutputTypeRetirePeek,
+			RetirePeek: &api.OutputRetirePeek{
+				RoomID:   roomID,
+				UserID:   userID,
+				DeviceID: deviceID,
+			},
+		},
+	})
 }

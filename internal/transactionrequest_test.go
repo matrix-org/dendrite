@@ -31,6 +31,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -59,27 +60,28 @@ var (
 	}
 	testEvent       = []byte(`{"auth_events":["$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg","$BcEcbZnlFLB5rxSNSZNBn6fO3jU/TKAJ79wfKyCQLiU"],"content":{"body":"Test Message"},"depth":3917,"hashes":{"sha256":"cNAWtlHIegrji0mMA6x1rhpYCccY8W1NsWZqSpJFhjs"},"origin":"localhost","origin_server_ts":0,"prev_events":["$4GDB0bVjkWwS3G4noUZCq5oLWzpBYpwzdMcf7gj24CI"],"room_id":"!roomid:localhost","sender":"@userid:localhost","signatures":{"localhost":{"ed25519:auto":"NKym6Kcy3u9mGUr21Hjfe3h7DfDilDhN5PqztT0QZ4NTZ+8Y7owseLolQVXp+TvNjecvzdDywsXXVvGiuQiWAQ"}},"type":"m.room.message"}`)
 	testRoomVersion = gomatrixserverlib.RoomVersionV1
-	testEvents      = []*gomatrixserverlib.HeaderedEvent{}
-	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
+	testEvents      = []*rstypes.HeaderedEvent{}
+	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*rstypes.HeaderedEvent)
 )
 
 type FakeRsAPI struct {
 	rsAPI.RoomserverInternalAPI
-	shouldFailQuery  bool
-	bannedFromRoom   bool
-	shouldEventsFail bool
+	shouldFailQuery bool
+	bannedFromRoom  bool
+}
+
+func (r *FakeRsAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
 }
 
 func (r *FakeRsAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
-	req *rsAPI.QueryRoomVersionForRoomRequest,
-	res *rsAPI.QueryRoomVersionForRoomResponse,
-) error {
+	roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
 	if r.shouldFailQuery {
-		return fmt.Errorf("Failure")
+		return "", fmt.Errorf("Failure")
 	}
-	res.RoomVersion = gomatrixserverlib.RoomVersionV10
-	return nil
+	return gomatrixserverlib.RoomVersionV10, nil
 }
 
 func (r *FakeRsAPI) QueryServerBannedFromRoom(
@@ -99,11 +101,7 @@ func (r *FakeRsAPI) InputRoomEvents(
 	ctx context.Context,
 	req *rsAPI.InputRoomEventsRequest,
 	res *rsAPI.InputRoomEventsResponse,
-) error {
-	if r.shouldEventsFail {
-		return fmt.Errorf("Failure")
-	}
-	return nil
+) {
 }
 
 func TestEmptyTransactionRequest(t *testing.T) {
@@ -176,18 +174,6 @@ func TestProcessTransactionRequestPDUBannedFromRoom(t *testing.T) {
 func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{invalidSignatures}, []gomatrixserverlib.EDU{}, "", "", "")
-	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
-
-	assert.Nil(t, jsonRes)
-	assert.Equal(t, 1, len(txnRes.PDUs))
-	for _, result := range txnRes.PDUs {
-		assert.NotEmpty(t, result.Error)
-	}
-}
-
-func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
-	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{shouldEventsFail: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -633,11 +619,11 @@ func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 
 func init() {
 	for _, j := range testData {
-		e, err := gomatrixserverlib.NewEventFromTrustedJSON(j, false, testRoomVersion)
+		e, err := gomatrixserverlib.MustGetRoomVersion(testRoomVersion).NewEventFromTrustedJSON(j, false)
 		if err != nil {
 			panic("cannot load test data: " + err.Error())
 		}
-		h := e.Headered(testRoomVersion)
+		h := &rstypes.HeaderedEvent{PDU: e}
 		testEvents = append(testEvents, h)
 		if e.StateKey() != nil {
 			testStateEvents[gomatrixserverlib.StateKeyTuple{
@@ -656,16 +642,19 @@ type testRoomserverAPI struct {
 	queryLatestEventsAndState func(*rsAPI.QueryLatestEventsAndStateRequest) rsAPI.QueryLatestEventsAndStateResponse
 }
 
+func (t *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
 func (t *testRoomserverAPI) InputRoomEvents(
 	ctx context.Context,
 	request *rsAPI.InputRoomEventsRequest,
 	response *rsAPI.InputRoomEventsResponse,
-) error {
+) {
 	t.inputRoomEvents = append(t.inputRoomEvents, request.InputRoomEvents...)
 	for _, ire := range request.InputRoomEvents {
 		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
 	}
-	return nil
 }
 
 // Query the latest events and state for a room from the room server.
@@ -722,11 +711,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 // Asks for the room version for a given room.
 func (t *testRoomserverAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
-	request *rsAPI.QueryRoomVersionForRoomRequest,
-	response *rsAPI.QueryRoomVersionForRoomResponse,
-) error {
-	response.RoomVersion = testRoomVersion
-	return nil
+	roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	return testRoomVersion, nil
 }
 
 func (t *testRoomserverAPI) QueryServerBannedFromRoom(
@@ -781,7 +768,7 @@ NextPDU:
 	}
 }
 
-func assertInputRoomEvents(t *testing.T, got []rsAPI.InputRoomEvent, want []*gomatrixserverlib.HeaderedEvent) {
+func assertInputRoomEvents(t *testing.T, got []rsAPI.InputRoomEvent, want []*rstypes.HeaderedEvent) {
 	for _, g := range got {
 		fmt.Println("GOT ", g.Event.EventID())
 	}
@@ -805,7 +792,7 @@ func TestBasicTransaction(t *testing.T) {
 	}
 	txn := mustCreateTransaction(rsAPI, pdus)
 	mustProcessTransaction(t, txn, nil)
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*rstypes.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
 
 // The purpose of this test is to check that if the event received fails auth checks the event is still sent to the roomserver
@@ -818,5 +805,5 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 	txn := mustCreateTransaction(rsAPI, pdus)
 	mustProcessTransaction(t, txn, []string{})
 	// expect message to be sent to the roomserver
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*rstypes.HeaderedEvent{testEvents[len(testEvents)-1]})
 }

@@ -29,7 +29,7 @@ import (
 )
 
 // NewUserDatabase creates a new accounts and profiles database
-func NewUserDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+func NewUserDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,10 @@ func NewUserDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperti
 	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
-
+	registationTokensTable, err := NewSQLiteRegistrationTokensTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteRegistrationsTokenTable: %w", err)
+	}
 	accountsTable, err := NewSQLiteAccountsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
@@ -130,10 +133,11 @@ func NewUserDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperti
 		LoginTokenLifetime:    loginTokenLifetime,
 		BcryptCost:            bcryptCost,
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
+		RegistrationTokens:    registationTokensTable,
 	}, nil
 }
 
-func NewKeyDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
 	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err

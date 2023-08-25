@@ -19,6 +19,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/tidwall/gjson"
 
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -37,6 +38,15 @@ import (
 type syncRoomserverAPI struct {
 	rsapi.SyncRoomserverAPI
 	rooms []*test.Room
+}
+
+func (s *syncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (s *syncRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	senderID := spec.SenderID(userID.String())
+	return &senderID, nil
 }
 
 func (s *syncRoomserverAPI) QueryLatestEventsAndState(ctx context.Context, req *rsapi.QueryLatestEventsAndStateRequest, res *rsapi.QueryLatestEventsAndStateResponse) error {
@@ -69,8 +79,13 @@ func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsa
 	return nil
 }
 
-func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembershipAtEventRequest, res *rsapi.QueryMembershipAtEventResponse) error {
-	return nil
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(
+	ctx context.Context,
+	roomID spec.RoomID,
+	eventIDs []string,
+	senderID spec.SenderID,
+) (map[string]*rstypes.HeaderedEvent, error) {
+	return map[string]*rstypes.HeaderedEvent{}, nil
 }
 
 type syncUserAPI struct {
@@ -428,6 +443,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		}
 
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
@@ -490,7 +506,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
 				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
 
-				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
@@ -523,7 +539,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 	}
 }
 
-func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []synctypes.ClientEvent) {
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *rstypes.HeaderedEvent, chunk []synctypes.ClientEvent) {
 	t.Helper()
 	if wantVisible {
 		for _, ev := range chunk {
@@ -1228,7 +1244,7 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
+func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string

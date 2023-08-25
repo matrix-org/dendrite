@@ -33,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
@@ -61,6 +62,37 @@ type UserInternalAPI struct {
 	PgClient    pushgateway.Client
 	FedClient   fedsenderapi.KeyserverFederationAPI
 	Updater     *DeviceListUpdater
+}
+
+func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error) {
+	exists, err := a.DB.RegistrationTokenExists(ctx, *registrationToken.Token)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		return false, fmt.Errorf("token: %s already exists", *registrationToken.Token)
+	}
+	_, err = a.DB.InsertRegistrationToken(ctx, registrationToken)
+	if err != nil {
+		return false, fmt.Errorf("Error creating token: %s"+err.Error(), *registrationToken.Token)
+	}
+	return true, nil
+}
+
+func (a *UserInternalAPI) PerformAdminListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error) {
+	return a.DB.ListRegistrationTokens(ctx, returnAll, valid)
+}
+
+func (a *UserInternalAPI) PerformAdminGetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error) {
+	return a.DB.GetRegistrationToken(ctx, tokenString)
+}
+
+func (a *UserInternalAPI) PerformAdminDeleteRegistrationToken(ctx context.Context, tokenString string) error {
+	return a.DB.DeleteRegistrationToken(ctx, tokenString)
+}
+
+func (a *UserInternalAPI) PerformAdminUpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*clientapi.RegistrationToken, error) {
+	return a.DB.UpdateRegistrationToken(ctx, tokenString, newAttributes)
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -172,8 +204,8 @@ func addUserToRoom(
 		UserID:        userID,
 		Content:       addGroupContent,
 	}
-	joinRes := rsapi.PerformJoinResponse{}
-	return rsAPI.PerformJoin(ctx, &joinReq, &joinRes)
+	_, _, err := rsAPI.PerformJoin(ctx, &joinReq)
+	return err
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -624,33 +656,28 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return fmt.Errorf("server name %q not locally configured", serverName)
 	}
 
-	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
-		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),
-	}
-	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
-	if err := a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes); err != nil {
-		return err
-	}
-	if err := evacuateRes.Error; err != nil {
-		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
+	userID := fmt.Sprintf("@%s:%s", req.Localpart, serverName)
+	_, err := a.RSAPI.PerformAdminEvacuateUser(ctx, userID)
+	if err != nil {
+		logrus.WithError(err).WithField("userID", userID).Errorf("Failed to evacuate user after account deactivation")
 	}
 
 	deviceReq := &api.PerformDeviceDeletionRequest{
 		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),
 	}
 	deviceRes := &api.PerformDeviceDeletionResponse{}
-	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
+	if err = a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
 		return err
 	}
 
 	pusherReq := &api.PerformPusherDeletionRequest{
 		Localpart: req.Localpart,
 	}
-	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+	if err = a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
 		return err
 	}
 
-	err := a.DB.DeactivateAccount(ctx, req.Localpart, serverName)
+	err = a.DB.DeactivateAccount(ctx, req.Localpart, serverName)
 	res.AccountDeactivated = err == nil
 	return err
 }
@@ -683,62 +710,43 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 	return nil
 }
 
-func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) error {
-	// Delete metadata
-	if req.DeleteBackup {
-		if req.Version == "" {
-			res.BadInput = true
-			res.Error = "must specify a version to delete"
-			return nil
-		}
-		exists, err := a.DB.DeleteKeyBackup(ctx, req.UserID, req.Version)
-		if err != nil {
-			res.Error = fmt.Sprintf("failed to delete backup: %s", err)
-		}
-		res.Exists = exists
-		res.Version = req.Version
-		return nil
-	}
+func (a *UserInternalAPI) DeleteKeyBackup(ctx context.Context, userID, version string) (bool, error) {
+	return a.DB.DeleteKeyBackup(ctx, userID, version)
+}
+
+func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest) (string, error) {
 	// Create metadata
-	if req.Version == "" {
-		version, err := a.DB.CreateKeyBackup(ctx, req.UserID, req.Algorithm, req.AuthData)
-		if err != nil {
-			res.Error = fmt.Sprintf("failed to create backup: %s", err)
-		}
-		res.Exists = err == nil
-		res.Version = version
-		return nil
-	}
+	return a.DB.CreateKeyBackup(ctx, req.UserID, req.Algorithm, req.AuthData)
+}
+
+func (a *UserInternalAPI) UpdateBackupKeyAuthData(ctx context.Context, req *api.PerformKeyBackupRequest) (*api.PerformKeyBackupResponse, error) {
+	res := &api.PerformKeyBackupResponse{}
 	// Update metadata
 	if len(req.Keys.Rooms) == 0 {
 		err := a.DB.UpdateKeyBackupAuthData(ctx, req.UserID, req.Version, req.AuthData)
-		if err != nil {
-			res.Error = fmt.Sprintf("failed to update backup: %s", err)
-		}
 		res.Exists = err == nil
 		res.Version = req.Version
-		return nil
+		if err != nil {
+			return res, fmt.Errorf("failed to update backup: %w", err)
+		}
+		return res, nil
 	}
 	// Upload Keys for a specific version metadata
-	a.uploadBackupKeys(ctx, req, res)
-	return nil
+	return a.uploadBackupKeys(ctx, req)
 }
 
-func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.PerformKeyBackupRequest) (*api.PerformKeyBackupResponse, error) {
+	res := &api.PerformKeyBackupResponse{}
 	// you can only upload keys for the CURRENT version
 	version, _, _, _, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, "")
 	if err != nil {
-		res.Error = fmt.Sprintf("failed to query version: %s", err)
-		return
+		return res, fmt.Errorf("failed to query version: %w", err)
 	}
 	if deleted {
-		res.Error = "backup was deleted"
-		return
+		return res, fmt.Errorf("backup was deleted")
 	}
 	if version != req.Version {
-		res.BadInput = true
-		res.Error = fmt.Sprintf("%s isn't the current version, %s is.", req.Version, version)
-		return
+		return res, spec.WrongBackupVersionError(version)
 	}
 	res.Exists = true
 	res.Version = version
@@ -756,23 +764,25 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 	}
 	count, etag, err := a.DB.UpsertBackupKeys(ctx, version, req.UserID, uploads)
 	if err != nil {
-		res.Error = fmt.Sprintf("failed to upsert keys: %s", err)
-		return
+		return res, fmt.Errorf("failed to upsert keys: %w", err)
 	}
 	res.KeyCount = count
 	res.KeyETag = etag
+	return res, nil
 }
 
-func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) error {
+func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest) (*api.QueryKeyBackupResponse, error) {
+	res := &api.QueryKeyBackupResponse{}
 	version, algorithm, authData, etag, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, req.Version)
 	res.Version = version
 	if err != nil {
-		if err == sql.ErrNoRows {
-			res.Exists = false
-			return nil
+		if errors.Is(err, sql.ErrNoRows) {
+			return res, nil
 		}
-		res.Error = fmt.Sprintf("failed to query key backup: %s", err)
-		return nil
+		if errors.Is(err, strconv.ErrSyntax) {
+			return res, nil
+		}
+		return res, fmt.Errorf("failed to query key backup: %s", err)
 	}
 	res.Algorithm = algorithm
 	res.AuthData = authData
@@ -782,18 +792,17 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	if !req.ReturnKeys {
 		res.Count, err = a.DB.CountBackupKeys(ctx, version, req.UserID)
 		if err != nil {
-			res.Error = fmt.Sprintf("failed to count keys: %s", err)
+			return res, fmt.Errorf("failed to count keys: %w", err)
 		}
-		return nil
+		return res, nil
 	}
 
 	result, err := a.DB.GetBackupKeys(ctx, version, req.UserID, req.KeysForRoomID, req.KeysForSessionID)
 	if err != nil {
-		res.Error = fmt.Sprintf("failed to query keys: %s", err)
-		return nil
+		return res, fmt.Errorf("failed to query keys: %s", err)
 	}
 	res.Keys = result
-	return nil
+	return res, nil
 }
 
 func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.QueryNotificationsRequest, res *api.QueryNotificationsResponse) error {

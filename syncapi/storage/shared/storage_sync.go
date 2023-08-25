@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -84,7 +85,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForNotificationData(ctx context.C
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilterPart, excludeEventIDs)
 }
 
@@ -161,7 +162,7 @@ func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID st
 	return d.Topology.SelectPositionInTopology(ctx, d.txn, eventID)
 }
 
-func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
+func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*rstypes.HeaderedEvent, map[string]*rstypes.HeaderedEvent, types.StreamPosition, error) {
 	return d.Invites.SelectInviteEventsInRange(ctx, d.txn, targetUserID, r)
 }
 
@@ -178,7 +179,7 @@ func (d *DatabaseTransaction) RoomReceiptsAfter(ctx context.Context, roomIDs []s
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error) {
 	streamEvents, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
@@ -186,7 +187,7 @@ func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
 }
 
 func (d *DatabaseTransaction) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
@@ -207,13 +208,13 @@ func (d *DatabaseTransaction) SharedUsers(ctx context.Context, userID string, ot
 
 func (d *DatabaseTransaction) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.HeaderedEvent, error) {
+) (*rstypes.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectStateEvent(ctx, d.txn, roomID, evType, stateKey)
 }
 
 func (d *DatabaseTransaction) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *synctypes.StateFilter,
-) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
+) (stateEvents []*rstypes.HeaderedEvent, err error) {
 	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilter, nil)
 	return
 }
@@ -236,7 +237,7 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	roomID string,
 	filter *synctypes.RoomEventFilter,
 	backwardOrdering bool,
-) (events []types.StreamEvent, err error) {
+) (events []types.StreamEvent, start, end types.TopologyToken, err error) {
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
 	if backwardOrdering {
 		// Backward ordering means the 'from' token has a higher depth than the 'to' token
@@ -254,7 +255,7 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 
 	// Select the event IDs from the defined range.
 	var eIDs []string
-	eIDs, err = d.Topology.SelectEventIDsInRange(
+	eIDs, start, end, err = d.Topology.SelectEventIDsInRange(
 		ctx, d.txn, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, filter.Limit, !backwardOrdering,
 	)
 	if err != nil {
@@ -263,6 +264,10 @@ func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 
 	// Retrieve the events' contents using their IDs.
 	events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eIDs, filter, true)
+	if err != nil {
+		return
+	}
+
 	return
 }
 
@@ -302,7 +307,7 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 // oldest event in the room's topology.
 func (d *DatabaseTransaction) GetBackwardTopologyPos(
 	ctx context.Context,
-	events []*gomatrixserverlib.HeaderedEvent,
+	events []*rstypes.HeaderedEvent,
 ) (types.TopologyToken, error) {
 	zeroToken := types.TopologyToken{}
 	if len(events) == 0 {
@@ -325,7 +330,7 @@ func (d *DatabaseTransaction) GetBackwardTopologyPos(
 func (d *DatabaseTransaction) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
-	stateFilter *synctypes.StateFilter,
+	stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI,
 ) (deltas []types.StateDelta, joinedRoomsIDs []string, err error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -417,7 +422,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		if !peek.Deleted {
 			deltas = append(deltas, types.StateDelta{
 				Membership:  spec.Peek,
-				StateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
+				StateEvents: d.StreamEventsToEvents(ctx, device, state[peek.RoomID], rsAPI),
 				RoomID:      peek.RoomID,
 			})
 		}
@@ -429,7 +434,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		for _, ev := range stateStreamEvents {
 			// Look for our membership in the state events and skip over any
 			// membership events that are not related to us.
-			membership, prevMembership := getMembershipFromEvent(ev.Event, userID)
+			membership, prevMembership := getMembershipFromEvent(ctx, ev.PDU, userID, rsAPI)
 			if membership == "" {
 				continue
 			}
@@ -462,7 +467,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 			deltas = append(deltas, types.StateDelta{
 				Membership:    membership,
 				MembershipPos: ev.StreamPosition,
-				StateEvents:   d.StreamEventsToEvents(device, stateFiltered[roomID]),
+				StateEvents:   d.StreamEventsToEvents(ctx, device, stateFiltered[roomID], rsAPI),
 				RoomID:        roomID,
 			})
 			break
@@ -474,7 +479,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  spec.Join,
-			StateEvents: d.StreamEventsToEvents(device, stateFiltered[joinedRoomID]),
+			StateEvents: d.StreamEventsToEvents(ctx, device, stateFiltered[joinedRoomID], rsAPI),
 			RoomID:      joinedRoomID,
 			NewlyJoined: newlyJoinedRooms[joinedRoomID],
 		})
@@ -490,7 +495,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
-	stateFilter *synctypes.StateFilter,
+	stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI,
 ) ([]types.StateDelta, []string, error) {
 	// Look up all memberships for the user. We only care about rooms that a
 	// user has ever interacted with — joined to, kicked/banned from, left.
@@ -531,7 +536,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 			}
 			deltas[peek.RoomID] = types.StateDelta{
 				Membership:  spec.Peek,
-				StateEvents: d.StreamEventsToEvents(device, s),
+				StateEvents: d.StreamEventsToEvents(ctx, device, s, rsAPI),
 				RoomID:      peek.RoomID,
 			}
 		}
@@ -555,12 +560,12 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership, _ := getMembershipFromEvent(ev.Event, userID); membership != "" {
+			if membership, _ := getMembershipFromEvent(ctx, ev.PDU, userID, rsAPI); membership != "" {
 				if membership != spec.Join { // We've already added full state for all joined rooms above.
 					deltas[roomID] = types.StateDelta{
 						Membership:    membership,
 						MembershipPos: ev.StreamPosition,
-						StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
+						StateEvents:   d.StreamEventsToEvents(ctx, device, stateStreamEvents, rsAPI),
 						RoomID:        roomID,
 					}
 				}
@@ -581,7 +586,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 		}
 		deltas[joinedRoomID] = types.StateDelta{
 			Membership:  spec.Join,
-			StateEvents: d.StreamEventsToEvents(device, s),
+			StateEvents: d.StreamEventsToEvents(ctx, device, s, rsAPI),
 			RoomID:      joinedRoomID,
 		}
 	}

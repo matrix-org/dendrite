@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -171,7 +172,7 @@ func TestMSC2836(t *testing.T) {
 			bob:     {roomID},
 			charlie: {roomID},
 		},
-		events: map[string]*gomatrixserverlib.HeaderedEvent{
+		events: map[string]*types.HeaderedEvent{
 			eventA.EventID(): eventA,
 			eventB.EventID(): eventB,
 			eventC.EventID(): eventC,
@@ -182,7 +183,7 @@ func TestMSC2836(t *testing.T) {
 			eventH.EventID(): eventH,
 		},
 	}
-	router := injectEvents(t, nopUserAPI, nopRsAPI, []*gomatrixserverlib.HeaderedEvent{
+	router := injectEvents(t, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
 		eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
 	})
 	cancel := runServer(t, router)
@@ -396,7 +397,7 @@ func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2836.EventRelatio
 func runServer(t *testing.T, router *mux.Router) func() {
 	t.Helper()
 	externalServ := &http.Server{
-		Addr:         string(":8009"),
+		Addr:         string("127.0.0.1:8009"),
 		WriteTimeout: 60 * time.Second,
 		Handler:      router,
 	}
@@ -521,7 +522,16 @@ type testRoomserverAPI struct {
 	// We'll override the functions we care about.
 	roomserver.RoomserverInternalAPI
 	userToJoinedRooms map[string][]string
-	events            map[string]*gomatrixserverlib.HeaderedEvent
+	events            map[string]*types.HeaderedEvent
+}
+
+func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	senderID := spec.SenderID(userID.String())
+	return &senderID, nil
 }
 
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
@@ -535,7 +545,7 @@ func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver
 }
 
 func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roomserver.QueryMembershipForUserRequest, res *roomserver.QueryMembershipForUserResponse) error {
-	rooms := r.userToJoinedRooms[req.UserID]
+	rooms := r.userToJoinedRooms[req.UserID.String()]
 	for _, roomID := range rooms {
 		if roomID == req.RoomID {
 			res.IsInRoom = true
@@ -547,7 +557,7 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 	return nil
 }
 
-func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*gomatrixserverlib.HeaderedEvent) *mux.Router {
+func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
@@ -579,28 +589,28 @@ type fledglingEvent struct {
 	RoomID   string
 }
 
-func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEvent) {
 	t.Helper()
 	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
-	eb := gomatrixserverlib.EventBuilder{
-		Sender:   ev.Sender,
+	eb := gomatrixserverlib.MustGetRoomVersion(roomVer).NewEventBuilderFromProtoEvent(&gomatrixserverlib.ProtoEvent{
+		SenderID: ev.Sender,
 		Depth:    999,
 		Type:     ev.Type,
 		StateKey: ev.StateKey,
 		RoomID:   ev.RoomID,
-	}
+	})
 	err := eb.SetContent(ev.Content)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to marshal event content %+v", ev.Content)
 	}
 	// make sure the origin_server_ts changes so we can test recency
 	time.Sleep(1 * time.Millisecond)
-	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key, roomVer)
+	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
-	h := signedEvent.Headered(roomVer)
+	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h
 }

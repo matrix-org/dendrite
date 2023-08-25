@@ -53,8 +53,8 @@ func AddPublicRoutes(
 
 func NewRelayInternalAPI(
 	dendriteCfg *config.Dendrite,
-	cm sqlutil.Connections,
-	fedClient *fclient.FederationClient,
+	cm *sqlutil.Connections,
+	fedClient fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,

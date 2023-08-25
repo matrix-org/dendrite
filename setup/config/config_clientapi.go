@@ -13,6 +13,10 @@ type ClientAPI struct {
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
 
+	// If set, requires users to submit a token during registration.
+	// Tokens can be managed using admin API.
+	RegistrationRequiresToken bool `yaml:"registration_requires_token"`
+
 	// Enable registration without captcha verification or shared secret.
 	// This option is populated by the -really-enable-open-registration
 	// command line parameter as it is not recommended.
@@ -56,6 +60,7 @@ type ClientAPI struct {
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.RegistrationSharedSecret = ""
+	c.RegistrationRequiresToken = false
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""
 	c.RecaptchaEnabled = false

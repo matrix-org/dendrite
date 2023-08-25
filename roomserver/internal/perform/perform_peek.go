@@ -44,21 +44,8 @@ type Peeker struct {
 func (r *Peeker) PerformPeek(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
-	res *api.PerformPeekResponse,
-) error {
-	roomID, err := r.performPeek(ctx, req)
-	if err != nil {
-		perr, ok := err.(*api.PerformError)
-		if ok {
-			res.Error = perr
-		} else {
-			res.Error = &api.PerformError{
-				Msg: err.Error(),
-			}
-		}
-	}
-	res.RoomID = roomID
-	return nil
+) (roomID string, err error) {
+	return r.performPeek(ctx, req)
 }
 
 func (r *Peeker) performPeek(
@@ -68,16 +55,10 @@ func (r *Peeker) performPeek(
 	// FIXME: there's way too much duplication with performJoin
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		return "", &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Supplied user ID %q in incorrect format", req.UserID),
-		}
+		return "", api.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)}
 	}
 	if !r.Cfg.Matrix.IsLocalServerName(domain) {
-		return "", &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("User %q does not belong to this homeserver", req.UserID),
-		}
+		return "", api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", req.UserID)}
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
 		return r.performPeekRoomByID(ctx, req)
@@ -85,10 +66,7 @@ func (r *Peeker) performPeek(
 	if strings.HasPrefix(req.RoomIDOrAlias, "#") {
 		return r.performPeekRoomByAlias(ctx, req)
 	}
-	return "", &api.PerformError{
-		Code: api.PerformErrorBadRequest,
-		Msg:  fmt.Sprintf("Room ID or alias %q is invalid", req.RoomIDOrAlias),
-	}
+	return "", api.ErrInvalidID{Err: fmt.Errorf("room ID or alias %q is invalid", req.RoomIDOrAlias)}
 }
 
 func (r *Peeker) performPeekRoomByAlias(
@@ -98,7 +76,7 @@ func (r *Peeker) performPeekRoomByAlias(
 	// Get the domain part of the room alias.
 	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
 	if err != nil {
-		return "", fmt.Errorf("alias %q is not in the correct format", req.RoomIDOrAlias)
+		return "", api.ErrInvalidID{Err: fmt.Errorf("alias %q is not in the correct format", req.RoomIDOrAlias)}
 	}
 	req.ServerNames = append(req.ServerNames, domain)
 
@@ -147,10 +125,7 @@ func (r *Peeker) performPeekRoomByID(
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', roomID)
 	if err != nil {
-		return "", &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("Room ID %q is invalid: %s", roomID, err),
-		}
+		return "", api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", roomID, err)}
 	}
 
 	// handle federated peeks
@@ -169,11 +144,7 @@ func (r *Peeker) performPeekRoomByID(
 		fedRes := fsAPI.PerformOutboundPeekResponse{}
 		_ = r.FSAPI.PerformOutboundPeek(ctx, &fedReq, &fedRes)
 		if fedRes.LastError != nil {
-			return "", &api.PerformError{
-				Code:       api.PerformErrRemote,
-				Msg:        fedRes.LastError.Message,
-				RemoteCode: fedRes.LastError.Code,
-			}
+			return "", fedRes.LastError
 		}
 	}
 
@@ -186,7 +157,7 @@ func (r *Peeker) performPeekRoomByID(
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
-			return
+			return "", err
 		}
 		if visibility, ok := content["history_visibility"]; ok {
 			worldReadable = visibility == "world_readable"
@@ -194,17 +165,11 @@ func (r *Peeker) performPeekRoomByID(
 	}
 
 	if !worldReadable {
-		return "", &api.PerformError{
-			Code: api.PerformErrorNotAllowed,
-			Msg:  "Room is not world-readable",
-		}
+		return "", api.ErrNotAllowed{Err: fmt.Errorf("room is not world-readable")}
 	}
 
 	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.encryption", ""); ev != nil {
-		return "", &api.PerformError{
-			Code: api.PerformErrorNotAllowed,
-			Msg:  "Cannot peek into an encrypted room",
-		}
+		return "", api.ErrNotAllowed{Err: fmt.Errorf("Cannot peek into an encrypted room")}
 	}
 
 	// TODO: handle federated peeks
@@ -220,7 +185,7 @@ func (r *Peeker) performPeekRoomByID(
 		},
 	})
 	if err != nil {
-		return
+		return "", err
 	}
 
 	// By this point, if req.RoomIDOrAlias contained an alias, then

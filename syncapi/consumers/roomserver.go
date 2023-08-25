@@ -17,20 +17,16 @@ package consumers
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -38,6 +34,11 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -141,7 +142,14 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		)
 	}
 	if err != nil {
-		log.WithError(err).Error("roomserver output log: failed to process event")
+		if errors.As(err, new(base64.CorruptInputError)) {
+			// no matter how often we retry this event, we will always get this error, discard the event
+			return true
+		}
+		log.WithFields(log.Fields{
+			"type": output.Type,
+		}).WithError(err).Error("roomserver output log: failed to process event")
+		sentry.CaptureException(err)
 		return false
 	}
 
@@ -151,7 +159,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause)
+	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause, s.rsAPI)
 	if err != nil {
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
@@ -237,35 +245,35 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	ev, err := s.updateStateEvent(ev)
 	if err != nil {
-		sentry.CaptureException(err)
 		return err
 	}
 
 	for i := range addsStateEvents {
 		addsStateEvents[i], err = s.updateStateEvent(addsStateEvents[i])
 		if err != nil {
-			sentry.CaptureException(err)
 			return err
 		}
 	}
 
 	if msg.RewritesState {
 		if err = s.db.PurgeRoomState(ctx, ev.RoomID()); err != nil {
-			sentry.CaptureException(err)
 			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
 	}
 
-	pduPos, err := s.db.WriteEvent(
-		ctx,
-		ev,
-		addsStateEvents,
-		msg.AddsStateEventIDs,
-		msg.RemovesStateEventIDs,
-		msg.TransactionID,
-		false,
-		msg.HistoryVisibility,
-	)
+	validRoomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return err
+	}
+
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, ev.SenderID())
+	if err != nil {
+		return err
+	}
+
+	ev.UserID = *userID
+
+	pduPos, err := s.db.WriteEvent(ctx, ev, addsStateEvents, msg.AddsStateEventIDs, msg.RemovesStateEventIDs, msg.TransactionID, false, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -286,7 +294,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
-		sentry.CaptureException(err)
 		return err
 	}
 
@@ -315,16 +322,19 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	// hack but until we have some better strategy for dealing with
 	// old events in the sync API, this should at least prevent us
 	// from confusing clients into thinking they've joined/left rooms.
-	pduPos, err := s.db.WriteEvent(
-		ctx,
-		ev,
-		[]*gomatrixserverlib.HeaderedEvent{},
-		[]string{},           // adds no state
-		[]string{},           // removes no state
-		nil,                  // no transaction
-		ev.StateKey() != nil, // exclude from sync?,
-		msg.HistoryVisibility,
-	)
+
+	validRoomID, err := spec.NewRoomID(ev.RoomID())
+	if err != nil {
+		return err
+	}
+
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, ev.SenderID())
+	if err != nil {
+		return err
+	}
+	ev.UserID = *userID
+
+	pduPos, err := s.db.WriteEvent(ctx, ev, []*rstypes.HeaderedEvent{}, []string{}, []string{}, nil, ev.StateKey() != nil, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -362,7 +372,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
+func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rstypes.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
 	if ev.Type() != spec.MRoomMember {
 		return sp, nil
 	}
@@ -373,7 +383,19 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == spec.Join {
 		// check it's a local join
-		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
+		if ev.StateKey() == nil {
+			return sp, fmt.Errorf("unexpected nil state_key")
+		}
+
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			return sp, err
+		}
+		userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*ev.StateKey()))
+		if err != nil || userID == nil {
+			return sp, fmt.Errorf("failed getting userID for sender: %w", err)
+		}
+		if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
 			return sp, nil
 		}
 
@@ -395,12 +417,23 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if msg.Event.StateKey() == nil {
 		return
 	}
-	if _, _, err := s.cfg.Matrix.SplitLocalID('@', *msg.Event.StateKey()); err != nil {
+
+	validRoomID, err := spec.NewRoomID(msg.Event.RoomID())
+	if err != nil {
 		return
 	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*msg.Event.StateKey()))
+	if err != nil || userID == nil {
+		return
+	}
+	if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		return
+	}
+
+	msg.Event.UserID = *userID
+
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
-		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.Event.EventID(),
@@ -422,7 +455,6 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// It's possible we just haven't heard of this invite yet, so
 	// we should not panic if we try to retire it.
 	if err != nil && err != sql.ErrNoRows {
-		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
@@ -440,7 +472,25 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 
 	// Notify any active sync requests that the invite has been retired.
 	s.inviteStream.Advance(pduPos)
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	validRoomID, err := spec.NewRoomID(msg.RoomID)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"room_id":    msg.RoomID,
+			log.ErrorKey: err,
+		}).Errorf("roomID is invalid")
+		return
+	}
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
+	if err != nil || userID == nil {
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"sender_id":  msg.TargetSenderID,
+			log.ErrorKey: err,
+		}).Errorf("failed to find userID for sender")
+		return
+	}
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, userID.String())
 }
 
 func (s *OutputRoomEventConsumer) onNewPeek(
@@ -448,7 +498,6 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 ) {
 	sp, err := s.db.AddPeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
-		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
@@ -496,7 +545,8 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 	}
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent) (*rstypes.HeaderedEvent, error) {
+	event.StateKeyResolved = event.StateKey()
 	if event.StateKey() == nil {
 		return event, nil
 	}
@@ -509,29 +559,57 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
+	validRoomID, err := spec.NewRoomID(event.RoomID())
+	if err != nil {
+		return event, err
+	}
+
+	sKeyUser := ""
+	if stateKey != "" {
+		var sku *spec.UserID
+		sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, spec.SenderID(stateKey))
+		if err == nil && sku != nil {
+			sKeyUser = sku.String()
+			event.StateKeyResolved = &sKeyUser
+		}
+	}
+
 	prevEvent, err := snapshot.GetStateEvent(
-		s.ctx, event.RoomID(), event.Type(), stateKey,
+		s.ctx, event.RoomID(), event.Type(), sKeyUser,
 	)
 	if err != nil {
 		return event, err
 	}
 
+	userID, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, event.SenderID())
+	if err != nil {
+		return event, err
+	}
+
+	event.UserID = *userID
+
 	if prevEvent == nil || prevEvent.EventID() == event.EventID() {
 		return event, nil
+	}
+
+	prevEventSender := string(prevEvent.SenderID())
+	prevUser, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, prevEvent.SenderID())
+	if err == nil && prevUser != nil {
+		prevEventSender = prevUser.String()
 	}
 
 	prev := types.PrevEventRef{
 		PrevContent:   prevEvent.Content(),
 		ReplacesState: prevEvent.EventID(),
-		PrevSender:    prevEvent.Sender(),
+		PrevSenderID:  prevEventSender,
 	}
 
-	event.Event, err = event.SetUnsigned(prev)
+	event.PDU, err = event.SetUnsigned(prev)
 	succeeded = true
 	return event, err
 }
 
-func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, pduPosition types.StreamPosition) error {
+func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPosition types.StreamPosition) error {
 	if !s.cfg.Fulltext.Enabled {
 		return nil
 	}

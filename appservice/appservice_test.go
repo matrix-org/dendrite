@@ -134,7 +134,6 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		}
 		as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
-
 		t.Cleanup(func() {
 			ctx.ShutdownDendrite()
 			ctx.WaitForShutdown()
@@ -144,6 +143,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
 
@@ -238,6 +238,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	natsInstance := jetstream.NATSInstance{}
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+	rsAPI.SetFederationAPI(nil, nil)
 	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil)
 	asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
 

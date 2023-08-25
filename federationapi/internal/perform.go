@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
@@ -73,12 +75,6 @@ func (r *FederationInternalAPI) PerformJoin(
 	r.joins.Store(j, nil)
 	defer r.joins.Delete(j)
 
-	// Look up the supported room versions.
-	var supportedVersions []gomatrixserverlib.RoomVersion
-	for version := range version.SupportedRoomVersions() {
-		supportedVersions = append(supportedVersions, version)
-	}
-
 	// Deduplicate the server names we were provided but keep the ordering
 	// as this encodes useful information about which servers are most likely
 	// to respond.
@@ -103,7 +99,6 @@ func (r *FederationInternalAPI) PerformJoin(
 			request.UserID,
 			request.Content,
 			serverName,
-			supportedVersions,
 			request.Unsigned,
 		); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
@@ -146,127 +141,69 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	roomID, userID string,
 	content map[string]interface{},
 	serverName spec.ServerName,
-	supportedVersions []gomatrixserverlib.RoomVersion,
 	unsigned map[string]interface{},
 ) error {
 	if !r.shouldAttemptDirectFederation(serverName) {
 		return fmt.Errorf("relay servers have no meaningful response for join.")
 	}
 
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', userID)
+	user, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return err
+	}
+	room, err := spec.NewRoomID(roomID)
 	if err != nil {
 		return err
 	}
 
-	// Try to perform a make_join using the information supplied in the
-	// request.
-	respMakeJoin, err := r.federation.MakeJoin(
-		ctx,
-		origin,
-		serverName,
-		roomID,
-		userID,
-		supportedVersions,
-	)
-	if err != nil {
-		// TODO: Check if the user was not allowed to join the room.
-		r.statistics.ForServer(serverName).Failure()
-		return fmt.Errorf("r.federation.MakeJoin: %w", err)
+	joinInput := gomatrixserverlib.PerformJoinInput{
+		UserID:     user,
+		RoomID:     room,
+		ServerName: serverName,
+		Content:    content,
+		Unsigned:   unsigned,
+		PrivateKey: r.cfg.Matrix.PrivateKey,
+		KeyID:      r.cfg.Matrix.KeyID,
+		KeyRing:    r.keyRing,
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}),
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			// assign a roomNID, otherwise we can't create a private key for the user
+			_, nidErr := r.rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
+			if nidErr != nil {
+				return "", nil, nidErr
+			}
+			key, keyErr := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", nil, keyErr
+			}
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.rsAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
+		},
 	}
-	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	response, joinErr := gomatrixserverlib.PerformJoin(ctx, r, joinInput)
 
-	// Set all the fields to be what they should be, this should be a no-op
-	// but it's possible that the remote server returned us something "odd"
-	respMakeJoin.JoinEvent.Type = spec.MRoomMember
-	respMakeJoin.JoinEvent.Sender = userID
-	respMakeJoin.JoinEvent.StateKey = &userID
-	respMakeJoin.JoinEvent.RoomID = roomID
-	respMakeJoin.JoinEvent.Redacts = ""
-	if content == nil {
-		content = map[string]interface{}{}
-	}
-	_ = json.Unmarshal(respMakeJoin.JoinEvent.Content, &content)
-	content["membership"] = spec.Join
-	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
-		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
-	}
-	if err = respMakeJoin.JoinEvent.SetUnsigned(struct{}{}); err != nil {
-		return fmt.Errorf("respMakeJoin.JoinEvent.SetUnsigned: %w", err)
-	}
-
-	// Work out if we support the room version that has been supplied in
-	// the make_join response.
-	// "If not provided, the room version is assumed to be either "1" or "2"."
-	// https://matrix.org/docs/spec/server_server/unstable#get-matrix-federation-v1-make-join-roomid-userid
-	if respMakeJoin.RoomVersion == "" {
-		respMakeJoin.RoomVersion = setDefaultRoomVersionFromJoinEvent(respMakeJoin.JoinEvent)
-	}
-	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
-		return fmt.Errorf("respMakeJoin.RoomVersion.EventFormat: %w", err)
-	}
-
-	// Build the join event.
-	event, err := respMakeJoin.JoinEvent.Build(
-		time.Now(),
-		origin,
-		r.cfg.Matrix.KeyID,
-		r.cfg.Matrix.PrivateKey,
-		respMakeJoin.RoomVersion,
-	)
-	if err != nil {
-		return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
-	}
-
-	// Try to perform a send_join using the newly built event.
-	respSendJoin, err := r.federation.SendJoin(
-		context.Background(),
-		origin,
-		serverName,
-		event,
-	)
-	if err != nil {
-		r.statistics.ForServer(serverName).Failure()
-		return fmt.Errorf("r.federation.SendJoin: %w", err)
-	}
-	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
-
-	// If the remote server returned an event in the "event" key of
-	// the send_join request then we should use that instead. It may
-	// contain signatures that we don't know about.
-	if len(respSendJoin.Event) > 0 {
-		var remoteEvent *gomatrixserverlib.Event
-		remoteEvent, err = gomatrixserverlib.UntrustedEvent(respSendJoin.Event, respMakeJoin.RoomVersion)
-		if err == nil && isWellFormedMembershipEvent(
-			remoteEvent, roomID, userID,
-		) {
-			event = remoteEvent
+	if joinErr != nil {
+		if !joinErr.Reachable {
+			r.statistics.ForServer(joinErr.ServerName).Failure()
+		} else {
+			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
 		}
+		return joinErr.Err
 	}
-
-	// Sanity-check the join response to ensure that it has a create
-	// event, that the room version is known, etc.
-	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
-	if err = sanityCheckAuthChain(authEvents); err != nil {
-		return fmt.Errorf("sanityCheckAuthChain: %w", err)
-	}
-
-	// Process the join response in a goroutine. The idea here is
-	// that we'll try and wait for as long as possible for the work
-	// to complete, but if the client does give up waiting, we'll
-	// still continue to process the join anyway so that we don't
-	// waste the effort.
-	// TODO: Can we expand Check here to return a list of missing auth
-	// events rather than failing one at a time?
-	var respState gomatrixserverlib.StateResponse
-	respState, err = gomatrixserverlib.CheckSendJoinResponse(
-		context.Background(),
-		respMakeJoin.RoomVersion, &respSendJoin,
-		r.keyRing,
-		event,
-		federatedAuthProvider(ctx, r.federation, r.keyRing, origin, serverName),
-	)
-	if err != nil {
-		return fmt.Errorf("respSendJoin.Check: %w", err)
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	if response == nil {
+		return fmt.Errorf("Received nil response from gomatrixserverlib.PerformJoin")
 	}
 
 	// We need to immediately update our list of joined hosts for this room now as we are technically
@@ -275,58 +212,31 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
 	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
 	// The events are trusted now as we performed auth checks above.
-	joinedHosts, err := consumers.JoinedHostsFromEvents(respState.GetStateEvents().TrustedEvents(respMakeJoin.RoomVersion, false))
+	joinedHosts, err := consumers.JoinedHostsFromEvents(ctx, response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false), r.rsAPI)
 	if err != nil {
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
+
 	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
 	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
 		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
 
-	// If we successfully performed a send_join above then the other
-	// server now thinks we're a part of the room. Send the newly
-	// returned state to the roomserver to update our local view.
-	if unsigned != nil {
-		event, err = event.SetUnsigned(unsigned)
-		if err != nil {
-			// non-fatal, log and continue
-			logrus.WithError(err).Errorf("Failed to set unsigned content")
-		}
-	}
-
+	// TODO: Can I change this to not take respState but instead just take an opaque list of events?
 	if err = roomserverAPI.SendEventWithState(
 		context.Background(),
 		r.rsAPI,
-		origin,
+		user.Domain(),
 		roomserverAPI.KindNew,
-		respState,
-		event.Headered(respMakeJoin.RoomVersion),
+		response.StateSnapshot,
+		&types.HeaderedEvent{PDU: response.JoinEvent},
 		serverName,
 		nil,
 		false,
 	); err != nil {
 		return fmt.Errorf("roomserverAPI.SendEventWithState: %w", err)
 	}
-
 	return nil
-}
-
-// isWellFormedMembershipEvent returns true if the event looks like a legitimate
-// membership event.
-func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string) bool {
-	if membership, err := event.Membership(); err != nil {
-		return false
-	} else if membership != spec.Join {
-		return false
-	}
-	if event.RoomID() != roomID {
-		return false
-	}
-	if !event.StateKeyEquals(userID) {
-		return false
-	}
-	return true
 }
 
 // PerformOutboundPeekRequest implements api.FederationInternalAPI
@@ -464,8 +374,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	if respPeek.RoomVersion == "" {
 		respPeek.RoomVersion = gomatrixserverlib.RoomVersionV1
 	}
-	if _, err = respPeek.RoomVersion.EventFormat(); err != nil {
-		return fmt.Errorf("respPeek.RoomVersion.EventFormat: %w", err)
+	if !gomatrixserverlib.KnownRoomVersion(respPeek.RoomVersion) {
+		return fmt.Errorf("unknown room version: %s", respPeek.RoomVersion)
 	}
 
 	// we have the peek state now so let's process regardless of whether upstream gives up
@@ -473,13 +383,16 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
+	userIDProvider := func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
-		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName),
+		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName, userIDProvider), userIDProvider,
 	)
 	if err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
-	if err = sanityCheckAuthChain(authEvents); err != nil {
+	if err = checkEventsContainCreateEvent(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
 
@@ -504,7 +417,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromEvents(stateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromEvents(authEvents),
 		},
-		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
+		&types.HeaderedEvent{PDU: respPeek.LatestEvent},
 		serverName,
 		nil,
 		false,
@@ -521,7 +434,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) (err error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.UserID)
+	userID, err := spec.NewUserID(request.UserID, true)
 	if err != nil {
 		return err
 	}
@@ -540,7 +453,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// request.
 		respMakeLeave, err := r.federation.MakeLeave(
 			ctx,
-			origin,
+			userID.Domain(),
 			serverName,
 			request.RoomID,
 			request.UserID,
@@ -552,40 +465,53 @@ func (r *FederationInternalAPI) PerformLeave(
 			continue
 		}
 
+		// Work out if we support the room version that has been supplied in
+		// the make_leave response.
+		verImpl, err := gomatrixserverlib.GetRoomVersion(respMakeLeave.RoomVersion)
+		if err != nil {
+			return err
+		}
+
 		// Set all the fields to be what they should be, this should be a no-op
 		// but it's possible that the remote server returned us something "odd"
+		roomID, err := spec.NewRoomID(request.RoomID)
+		if err != nil {
+			return err
+		}
+		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
+		if err != nil {
+			return err
+		} else if senderID == nil {
+			return fmt.Errorf("sender ID not found for %s in %s", *userID, *roomID)
+		}
+		senderIDString := string(*senderID)
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
-		respMakeLeave.LeaveEvent.Sender = request.UserID
-		respMakeLeave.LeaveEvent.StateKey = &request.UserID
+		respMakeLeave.LeaveEvent.SenderID = senderIDString
+		respMakeLeave.LeaveEvent.StateKey = &senderIDString
 		respMakeLeave.LeaveEvent.RoomID = request.RoomID
 		respMakeLeave.LeaveEvent.Redacts = ""
+		leaveEB := verImpl.NewEventBuilderFromProtoEvent(&respMakeLeave.LeaveEvent)
+
 		if respMakeLeave.LeaveEvent.Content == nil {
 			content := map[string]interface{}{
 				"membership": "leave",
 			}
-			if err = respMakeLeave.LeaveEvent.SetContent(content); err != nil {
+			if err = leaveEB.SetContent(content); err != nil {
 				logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetContent failed")
 				continue
 			}
 		}
-		if err = respMakeLeave.LeaveEvent.SetUnsigned(struct{}{}); err != nil {
+		if err = leaveEB.SetUnsigned(struct{}{}); err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetUnsigned failed")
 			continue
 		}
 
-		// Work out if we support the room version that has been supplied in
-		// the make_leave response.
-		if _, err = respMakeLeave.RoomVersion.EventFormat(); err != nil {
-			return gomatrixserverlib.UnsupportedRoomVersionError{}
-		}
-
 		// Build the leave event.
-		event, err := respMakeLeave.LeaveEvent.Build(
+		event, err := leaveEB.Build(
 			time.Now(),
-			origin,
+			userID.Domain(),
 			r.cfg.Matrix.KeyID,
 			r.cfg.Matrix.PrivateKey,
-			respMakeLeave.RoomVersion,
 		)
 		if err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.Build failed")
@@ -595,7 +521,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Try to perform a send_leave using the newly built event.
 		err = r.federation.SendLeave(
 			ctx,
-			origin,
+			userID.Domain(),
 			serverName,
 			event,
 		)
@@ -616,56 +542,115 @@ func (r *FederationInternalAPI) PerformLeave(
 	)
 }
 
-// PerformLeaveRequest implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformInvite(
+// SendInvite implements api.FederationInternalAPI
+func (r *FederationInternalAPI) SendInvite(
 	ctx context.Context,
-	request *api.PerformInviteRequest,
-	response *api.PerformInviteResponse,
-) (err error) {
-	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.Event.Sender())
+	event gomatrixserverlib.PDU,
+	strippedState []gomatrixserverlib.InviteStrippedState,
+) (gomatrixserverlib.PDU, error) {
+	validRoomID, err := spec.NewRoomID(event.RoomID())
 	if err != nil {
-		return err
+		return nil, err
+	}
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	if err != nil {
+		return nil, err
 	}
 
-	if request.Event.StateKey() == nil {
-		return errors.New("invite must be a state event")
+	if event.StateKey() == nil {
+		return nil, errors.New("invite must be a state event")
 	}
 
-	_, destination, err := gomatrixserverlib.SplitID('@', *request.Event.StateKey())
+	_, destination, err := gomatrixserverlib.SplitID('@', *event.StateKey())
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
 
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
 	if !r.shouldAttemptDirectFederation(destination) {
-		return fmt.Errorf("relay servers have no meaningful response for invite.")
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"event_id":     request.Event.EventID(),
-		"user_id":      *request.Event.StateKey(),
-		"room_id":      request.Event.RoomID(),
-		"room_version": request.RoomVersion,
+		"event_id":     event.EventID(),
+		"user_id":      *event.StateKey(),
+		"room_id":      event.RoomID(),
+		"room_version": event.Version(),
 		"destination":  destination,
 	}).Info("Sending invite")
 
-	inviteReq, err := fclient.NewInviteV2Request(request.Event, request.InviteRoomState)
+	inviteReq, err := fclient.NewInviteV2Request(event, strippedState)
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
+		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
-	inviteRes, err := r.federation.SendInviteV2(ctx, origin, destination, inviteReq)
+	inviteRes, err := r.federation.SendInviteV2(ctx, inviter.Domain(), destination, inviteReq)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
+		return nil, fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
+	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(event.Version())
+	if err != nil {
+		return nil, err
 	}
 
-	inviteEvent, err := gomatrixserverlib.UntrustedEvent(inviteRes.Event, request.RoomVersion)
+	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
+		return nil, fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
-	response.Event = inviteEvent.Headered(request.RoomVersion)
-	return nil
+	return inviteEvent, nil
+}
+
+// SendInviteV3 implements api.FederationInternalAPI
+func (r *FederationInternalAPI) SendInviteV3(
+	ctx context.Context,
+	event gomatrixserverlib.ProtoEvent,
+	invitee spec.UserID,
+	version gomatrixserverlib.RoomVersion,
+	strippedState []gomatrixserverlib.InviteStrippedState,
+) (gomatrixserverlib.PDU, error) {
+	validRoomID, err := spec.NewRoomID(event.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(event.SenderID))
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO (devon): This should be allowed via a relay. Currently only transactions
+	// can be sent to relays. Would need to extend relays to handle invites.
+	if !r.shouldAttemptDirectFederation(invitee.Domain()) {
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"user_id":      invitee.String(),
+		"room_id":      event.RoomID,
+		"room_version": version,
+		"destination":  invitee.Domain(),
+	}).Info("Sending invite")
+
+	inviteReq, err := fclient.NewInviteV3Request(event, version, strippedState)
+	if err != nil {
+		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV3Request: %w", err)
+	}
+
+	inviteRes, err := r.federation.SendInviteV3(ctx, inviter.Domain(), invitee.Domain(), inviteReq, invitee)
+	if err != nil {
+		return nil, fmt.Errorf("r.federation.SendInviteV3: failed to send invite: %w", err)
+	}
+
+	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
+	if err != nil {
+		return nil, fmt.Errorf("r.federation.SendInviteV3 failed to decode event response: %w", err)
+	}
+	return inviteEvent, nil
 }
 
 // PerformServersAlive implements api.FederationInternalAPI
@@ -713,9 +698,9 @@ func (r *FederationInternalAPI) MarkServersAlive(destinations []spec.ServerName)
 	}
 }
 
-func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {
+func checkEventsContainCreateEvent(events []gomatrixserverlib.PDU) error {
 	// sanity check we have a create event and it has a known room version
-	for _, ev := range authChain {
+	for _, ev := range events {
 		if ev.Type() == spec.MRoomCreate && ev.StateKeyEquals("") {
 			// make sure the room version is known
 			content := ev.Content()
@@ -733,52 +718,33 @@ func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {
 			}
 			knownVersions := gomatrixserverlib.RoomVersions()
 			if _, ok := knownVersions[gomatrixserverlib.RoomVersion(verBody.Version)]; !ok {
-				return fmt.Errorf("auth chain m.room.create event has an unknown room version: %s", verBody.Version)
+				return fmt.Errorf("m.room.create event has an unknown room version: %s", verBody.Version)
 			}
 			return nil
 		}
 	}
-	return fmt.Errorf("auth chain response is missing m.room.create event")
+	return fmt.Errorf("response is missing m.room.create event")
 }
 
-func setDefaultRoomVersionFromJoinEvent(
-	joinEvent gomatrixserverlib.EventBuilder,
-) gomatrixserverlib.RoomVersion {
-	// if auth events are not event references we know it must be v3+
-	// we have to do these shenanigans to satisfy sytest, specifically for:
-	// "Outbound federation rejects m.room.create events with an unknown room version"
-	hasEventRefs := true
-	authEvents, ok := joinEvent.AuthEvents.([]interface{})
-	if ok {
-		if len(authEvents) > 0 {
-			_, ok = authEvents[0].(string)
-			if ok {
-				// event refs are objects, not strings, so we know we must be dealing with a v3+ room.
-				hasEventRefs = false
-			}
-		}
-	}
-
-	if hasEventRefs {
-		return gomatrixserverlib.RoomVersionV1
-	}
-	return gomatrixserverlib.RoomVersionV4
-}
-
-// FederatedAuthProvider is an auth chain provider which fetches events from the server provided
-func federatedAuthProvider(
-	ctx context.Context, federation api.FederationClient,
+// federatedEventProvider is an event provider which fetches events from the server provided
+func federatedEventProvider(
+	ctx context.Context, federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
-) gomatrixserverlib.AuthChainProvider {
+	userIDForSender spec.UserIDForSender,
+) gomatrixserverlib.EventProvider {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
-	retries := map[string][]*gomatrixserverlib.Event{}
+	retries := map[string][]gomatrixserverlib.PDU{}
 
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
-		returning := []*gomatrixserverlib.Event{}
+	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
+		returning := []gomatrixserverlib.PDU{}
+		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
+		if err != nil {
+			return nil, err
+		}
 
 		// See if we have retry entries for each of the supplied event IDs.
 		for _, eventID := range eventIDs {
@@ -808,13 +774,13 @@ func federatedAuthProvider(
 			// event ID again.
 			for _, pdu := range tx.PDUs {
 				// Try to parse the event.
-				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+				ev, everr := verImpl.NewEventFromUntrustedJSON(pdu)
 				if everr != nil {
 					return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
 				}
 
 				// Check the signatures of the event.
-				if err := ev.VerifyEventSignatures(ctx, keyRing); err != nil {
+				if err := gomatrixserverlib.VerifyEventSignatures(ctx, ev, keyRing, userIDForSender); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
 				}
 

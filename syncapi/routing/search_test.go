@@ -2,6 +2,7 @@ package routing
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -19,6 +22,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
+
+type FakeSyncRoomserverAPI struct{ rsapi.SyncRoomserverAPI }
+
+func (f *FakeSyncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
 
 func TestSearch(t *testing.T) {
 	alice := test.NewUser(t)
@@ -215,12 +224,13 @@ func TestSearch(t *testing.T) {
 		// store the events in the database
 		var sp types.StreamPosition
 		for _, x := range room.Events() {
-			var stateEvents []*gomatrixserverlib.HeaderedEvent
+			var stateEvents []*rstypes.HeaderedEvent
 			var stateEventIDs []string
 			if x.Type() == spec.MRoomMember {
 				stateEvents = append(stateEvents, x)
 				stateEventIDs = append(stateEventIDs, x.EventID())
 			}
+			x.StateKeyResolved = x.StateKey()
 			sp, err = db.WriteEvent(processCtx.Context(), x, stateEvents, stateEventIDs, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 			assert.NoError(t, err)
 			if x.Type() != "m.room.message" {
@@ -246,7 +256,7 @@ func TestSearch(t *testing.T) {
 				assert.NoError(t, err)
 				req := httptest.NewRequest(http.MethodPost, "/", reqBody)
 
-				res := Search(req, tc.device, db, fts, tc.from)
+				res := Search(req, tc.device, db, fts, tc.from, &FakeSyncRoomserverAPI{})
 				if !tc.wantOK && !res.Is2xx() {
 					return
 				}

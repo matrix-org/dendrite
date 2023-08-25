@@ -23,10 +23,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
@@ -56,7 +56,10 @@ func Context(
 ) util.JSONResponse {
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -74,7 +77,7 @@ func Context(
 		}
 		return util.JSONResponse{
 			Code:    http.StatusBadRequest,
-			JSON:    jsonerror.InvalidParam(errMsg),
+			JSON:    spec.InvalidParam(errMsg),
 			Headers: nil,
 		}
 	}
@@ -82,17 +85,27 @@ func Context(
 		*filter.Rooms = append(*filter.Rooms, roomID)
 	}
 
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("Device UserID is invalid"),
+		}
+	}
 	ctx := req.Context()
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
-	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: device.UserID, RoomID: roomID}
+	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: *userID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to query membership")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !membershipRes.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("room does not exist"),
+			JSON: spec.Forbidden("room does not exist"),
 		}
 	}
 
@@ -113,19 +126,25 @@ func Context(
 		if err == sql.ErrNoRows {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound(fmt.Sprintf("Event %s not found", eventID)),
+				JSON: spec.NotFound(fmt.Sprintf("Event %s not found", eventID)),
 			}
 		}
 		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// verify the user is allowed to see the context for this room/event
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, *userID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	logrus.WithFields(logrus.Fields{
 		"duration": time.Since(startTime),
@@ -134,27 +153,36 @@ func Context(
 	if len(filteredEvents) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("User is not allowed to query context"),
+			JSON: spec.Forbidden("User is not allowed to query context"),
 		}
 	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch before events")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch after events")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	startTime = time.Now()
-	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, device.UserID)
+	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, *userID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -166,30 +194,46 @@ func Context(
 	state, err := snapshot.CurrentState(ctx, roomID, &stateFilter, nil)
 	if err != nil {
 		logrus.WithError(err).Error("unable to fetch current room state")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
-	eventsBeforeClient := synctypes.HeaderedToClientEvents(eventsBeforeFiltered, synctypes.FormatAll)
-	eventsAfterClient := synctypes.HeaderedToClientEvents(eventsAfterFiltered, synctypes.FormatAll)
+	eventsBeforeClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBeforeFiltered), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
+	eventsAfterClient := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfterFiltered), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
 
 	newState := state
 	if filter.LazyLoadMembers {
 		allEvents := append(eventsBeforeFiltered, eventsAfterFiltered...)
 		allEvents = append(allEvents, &requestedEvent)
-		evs := synctypes.HeaderedToClientEvents(allEvents, synctypes.FormatAll)
+		evs := synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(allEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		})
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
 			logrus.WithError(err).Error("unable to load membership events")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
-	ev := synctypes.HeaderedToClientEvent(&requestedEvent, synctypes.FormatAll)
+	ev := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}, requestedEvent)
 	response := ContextRespsonse{
 		Event:        &ev,
 		EventsAfter:  eventsAfterClient,
 		EventsBefore: eventsBeforeClient,
-		State:        synctypes.HeaderedToClientEvents(newState, synctypes.FormatAll),
+		State: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(newState), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}),
 	}
 
 	if len(response.State) > filter.Limit {
@@ -212,9 +256,9 @@ func Context(
 // and an error, if any.
 func applyHistoryVisibilityOnContextEvents(
 	ctx context.Context, snapshot storage.DatabaseTransaction, rsAPI roomserver.SyncRoomserverAPI,
-	eventsBefore, eventsAfter []*gomatrixserverlib.HeaderedEvent,
-	userID string,
-) (filteredBefore, filteredAfter []*gomatrixserverlib.HeaderedEvent, err error) {
+	eventsBefore, eventsAfter []*rstypes.HeaderedEvent,
+	userID spec.UserID,
+) (filteredBefore, filteredAfter []*rstypes.HeaderedEvent, err error) {
 	eventIDsBefore := make(map[string]struct{}, len(eventsBefore))
 	eventIDsAfter := make(map[string]struct{}, len(eventsAfter))
 
@@ -245,7 +289,7 @@ func applyHistoryVisibilityOnContextEvents(
 	return filteredBefore, filteredAfter, nil
 }
 
-func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, startEvents, endEvents []*rstypes.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if len(startEvents) > 0 {
 		start, err = snapshot.EventPositionInTopology(ctx, startEvents[0].EventID())
 		if err != nil {
@@ -265,7 +309,7 @@ func applyLazyLoadMembers(
 	roomID string,
 	events []synctypes.ClientEvent,
 	lazyLoadCache caching.LazyLoadCache,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
+) ([]*rstypes.HeaderedEvent, error) {
 	eventSenders := make(map[string]struct{})
 	// get members who actually send an event
 	for _, e := range events {

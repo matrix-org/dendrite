@@ -23,12 +23,22 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
 )
+
+type RegistrationTokens interface {
+	RegistrationTokenExists(ctx context.Context, token string) (bool, error)
+	InsertRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error)
+	ListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error)
+	GetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error)
+	DeleteRegistrationToken(ctx context.Context, tokenString string) error
+	UpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*clientapi.RegistrationToken, error)
+}
 
 type Profile interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) (*authtypes.Profile, error)
@@ -144,6 +154,7 @@ type UserDatabase interface {
 	Pusher
 	Statistics
 	ThreePID
+	RegistrationTokens
 }
 
 type KeyChangeDatabase interface {

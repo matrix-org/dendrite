@@ -100,10 +100,7 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		UserID:           updatePayload.UserID,
 	}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
-	if err := t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes); err != nil {
-		logrus.WithError(err).Error("failed to upload device keys")
-		return false
-	}
+	t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	if uploadRes.Error != nil {
 		logrus.WithError(uploadRes.Error).Error("failed to upload device keys")
 		return true

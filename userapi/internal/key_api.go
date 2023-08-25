@@ -63,7 +63,7 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 	return nil
 }
 
-func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) error {
+func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) {
 	res.OneTimeKeys = make(map[string]map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})
 	// wrap request map in a top-level by-domain map
@@ -110,7 +110,6 @@ func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.Perform
 	if len(domainToDeviceKeys) > 0 {
 		a.claimRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
 	}
-	return nil
 }
 
 func (a *UserInternalAPI) claimRemoteKeys(
@@ -228,7 +227,7 @@ func (a *UserInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *a
 }
 
 // nolint:gocyclo
-func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) error {
+func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	var respMu sync.Mutex
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.MasterKeys = make(map[string]fclient.CrossSigningKey)
@@ -252,7 +251,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("failed to query local device keys: %s", err),
 				}
-				return nil
+				return
 			}
 
 			// pull out display names after we have the keys so we handle wildcards correctly
@@ -330,7 +329,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				// Stop executing the function if the context was canceled/the deadline was exceeded,
 				// as we can't continue without a valid context.
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					return nil
+					return
 				}
 				logrus.WithError(err).Errorf("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
@@ -356,7 +355,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				// Stop executing the function if the context was canceled/the deadline was exceeded,
 				// as we can't continue without a valid context.
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					return nil
+					return
 				}
 				logrus.WithError(err).Errorf("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
@@ -384,7 +383,6 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 			}
 		}
 	}
-	return nil
 }
 
 func (a *UserInternalAPI) remoteKeysFromDatabase(

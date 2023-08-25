@@ -27,10 +27,10 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -50,9 +50,11 @@ type messagesReq struct {
 	from             *types.TopologyToken
 	to               *types.TopologyToken
 	device           *userapi.Device
+	deviceUserID     spec.UserID
 	wasToProvided    bool
 	backwardOrdering bool
 	filter           *synctypes.RoomEventFilter
+	didBackfill      bool
 }
 
 type messagesResp struct {
@@ -76,12 +78,24 @@ func OnIncomingMessagesRequest(
 ) util.JSONResponse {
 	var err error
 
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
 	// NewDatabaseTransaction is used here instead of NewDatabaseSnapshot as we
 	// expect to be able to write to the database in response to a /messages
 	// request that requires backfilling from the roomserver or federation.
 	snapshot, err := db.NewDatabaseTransaction(req.Context())
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
@@ -89,19 +103,22 @@ func OnIncomingMessagesRequest(
 	// check if the user has already forgotten about this room
 	membershipResp, err := getMembershipForUser(req.Context(), roomID, device.UserID, rsAPI)
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !membershipResp.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("room does not exist"),
+			JSON: spec.Forbidden("room does not exist"),
 		}
 	}
 
 	if membershipResp.IsRoomForgotten {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("user already forgot about this room"),
+			JSON: spec.Forbidden("user already forgot about this room"),
 		}
 	}
 
@@ -109,7 +126,7 @@ func OnIncomingMessagesRequest(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("unable to parse filter"),
+			JSON: spec.InvalidParam("unable to parse filter"),
 		}
 	}
 
@@ -131,7 +148,7 @@ func OnIncomingMessagesRequest(
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
+			JSON: spec.MissingParam("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
 	// A boolean is easier to handle in this case, especially since dir is sure
@@ -144,14 +161,17 @@ func OnIncomingMessagesRequest(
 		if streamToken, err = types.NewStreamTokenFromString(fromQuery); err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
+				JSON: spec.InvalidParam("Invalid from parameter: " + err.Error()),
 			}
 		} else {
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 		}
 	}
@@ -167,13 +187,16 @@ func OnIncomingMessagesRequest(
 			if streamToken, err = types.NewStreamTokenFromString(toQuery); err != nil {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidArgumentValue("Invalid to parameter: " + err.Error()),
+					JSON: spec.InvalidParam("Invalid to parameter: " + err.Error()),
 				}
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
 					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-					return jsonerror.InternalServerError()
+					return util.JSONResponse{
+						Code: http.StatusInternalServerError,
+						JSON: spec.InternalServerError{},
+					}
 				}
 			}
 		}
@@ -196,7 +219,7 @@ func OnIncomingMessagesRequest(
 	if _, _, err = gomatrixserverlib.SplitID('!', roomID); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Bad room ID: " + err.Error()),
+			JSON: spec.MissingParam("Bad room ID: " + err.Error()),
 		}
 	}
 
@@ -227,21 +250,32 @@ func OnIncomingMessagesRequest(
 		filter:           filter,
 		backwardOrdering: backwardOrdering,
 		device:           device,
+		deviceUserID:     *deviceUserID,
 	}
 
-	clientEvents, start, end, err := mReq.retrieveEvents()
+	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	// If start and end are equal, we either reached the beginning or something else
+	// is wrong. If we have nothing to return set end to 0.
+	if start == end || len(clientEvents) == 0 {
+		end = types.TopologyToken{}
 	}
 
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"from":         from.String(),
-		"to":           to.String(),
-		"limit":        filter.Limit,
-		"backwards":    backwardOrdering,
-		"return_start": start.String(),
-		"return_end":   end.String(),
+		"request_from":   from.String(),
+		"request_to":     to.String(),
+		"limit":          filter.Limit,
+		"backwards":      backwardOrdering,
+		"response_start": start.String(),
+		"response_end":   end.String(),
+		"backfilled":     mReq.didBackfill,
 	}).Info("Responding")
 
 	res := messagesResp{
@@ -253,16 +287,16 @@ func OnIncomingMessagesRequest(
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
-		res.State = append(res.State, synctypes.HeaderedToClientEvents(membershipEvents, synctypes.FormatAll)...)
+		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		})...)
 	}
 
-	// If we didn't return any events, set the end to an empty string, so it will be omitted
-	// in the response JSON.
-	if len(res.Chunk) == 0 {
-		res.End = ""
-	}
 	if fromStream != nil {
 		res.StartStream = fromStream.String()
 	}
@@ -276,9 +310,13 @@ func OnIncomingMessagesRequest(
 }
 
 func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (resp api.QueryMembershipForUserResponse, err error) {
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return resp, err
+	}
 	req := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		UserID: userID,
+		UserID: *fullUserID,
 	}
 	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
 		return api.QueryMembershipForUserResponse{}, err
@@ -292,18 +330,20 @@ func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.
 // homeserver in the room for older events.
 // Returns an error if there was an issue talking to the database or with the
 // remote homeserver.
-func (r *messagesReq) retrieveEvents() (
+func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserverAPI) (
 	clientEvents []synctypes.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
+	emptyToken := types.TopologyToken{}
 	// Retrieve the events from the local database.
-	streamEvents, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
+	streamEvents, _, end, err := r.snapshot.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
-		return
+		return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 	}
+	end.Decrement()
 
-	var events []*gomatrixserverlib.HeaderedEvent
+	var events []*rstypes.HeaderedEvent
 	util.GetLogger(r.ctx).WithFields(logrus.Fields{
 		"start":     r.from,
 		"end":       r.to,
@@ -315,59 +355,73 @@ func (r *messagesReq) retrieveEvents() (
 	// on the ordering), or we've reached a backward extremity.
 	if len(streamEvents) == 0 {
 		if events, err = r.handleEmptyEventsSlice(); err != nil {
-			return
+			return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 		}
 	} else {
 		if events, err = r.handleNonEmptyEventsSlice(streamEvents); err != nil {
-			return
+			return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 		}
 	}
 
 	// If we didn't get any event, we don't need to proceed any further.
 	if len(events) == 0 {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
-	}
-
-	// Get the position of the first and the last event in the room's topology.
-	// This position is currently determined by the event's depth, so we could
-	// also use it instead of retrieving from the database. However, if we ever
-	// change the way topological positions are defined (as depth isn't the most
-	// reliable way to define it), it would be easier and less troublesome to
-	// only have to change it in one place, i.e. the database.
-	start, end, err = r.getStartEnd(events)
-	if err != nil {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, err
-	}
-
-	// Sort the events to ensure we send them in the right order.
-	if r.backwardOrdering {
-		// This reverses the array from old->new to new->old
-		reversed := func(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
-			out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
-			for i := 0; i < len(in); i++ {
-				out[i] = in[len(in)-i-1]
-			}
-			return out
-		}
-		events = reversed(events)
-	}
-	if len(events) == 0 {
-		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+		return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
 	}
 
 	// Apply room history visibility filter
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.device.UserID, "messages")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.deviceUserID, "messages")
+	if err != nil {
+		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
+	}
 	logrus.WithFields(logrus.Fields{
 		"duration":      time.Since(startTime),
 		"room_id":       r.roomID,
 		"events_before": len(events),
 		"events_after":  len(filteredEvents),
 	}).Debug("applied history visibility (messages)")
-	return synctypes.HeaderedToClientEvents(filteredEvents, synctypes.FormatAll), start, end, err
+
+	// No events left after applying history visibility
+	if len(filteredEvents) == 0 {
+		return []synctypes.ClientEvent{}, *r.from, emptyToken, nil
+	}
+
+	// If we backfilled in the process of getting events, we need
+	// to re-fetch the start/end positions
+	if r.didBackfill {
+		_, end, err = r.getStartEnd(filteredEvents)
+		if err != nil {
+			return []synctypes.ClientEvent{}, *r.from, *r.to, err
+		}
+	}
+
+	// Sort the events to ensure we send them in the right order.
+	if r.backwardOrdering {
+		if events[len(events)-1].Type() == spec.MRoomCreate {
+			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
+			// else to go. This seems to fix Element iOS from looping on /messages endlessly.
+			end = types.TopologyToken{}
+		}
+
+		// This reverses the array from old->new to new->old
+		reversed := func(in []*rstypes.HeaderedEvent) []*rstypes.HeaderedEvent {
+			out := make([]*rstypes.HeaderedEvent, len(in))
+			for i := 0; i < len(in); i++ {
+				out[i] = in[len(in)-i-1]
+			}
+			return out
+		}
+		filteredEvents = reversed(filteredEvents)
+	}
+
+	start = *r.from
+
+	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	}), start, end, nil
 }
 
-func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+func (r *messagesReq) getStartEnd(events []*rstypes.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if r.backwardOrdering {
 		start = *r.from
 		if events[len(events)-1].Type() == spec.MRoomCreate {
@@ -406,7 +460,7 @@ func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (st
 // Returns an error if there was an issue talking with the database or
 // backfilling.
 func (r *messagesReq) handleEmptyEventsSlice() (
-	events []*gomatrixserverlib.HeaderedEvent, err error,
+	events []*rstypes.HeaderedEvent, err error,
 ) {
 	backwardExtremities, err := r.snapshot.BackwardExtremitiesForRoom(r.ctx, r.roomID)
 
@@ -417,10 +471,11 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 		if err != nil {
 			return
 		}
+		r.didBackfill = true
 	} else {
 		// If not, it means the slice was empty because we reached the room's
 		// creation, so return an empty slice.
-		events = []*gomatrixserverlib.HeaderedEvent{}
+		events = []*rstypes.HeaderedEvent{}
 	}
 
 	return
@@ -432,7 +487,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 // through backfilling if needed.
 // Returns an error if there was an issue while backfilling.
 func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
-	events []*gomatrixserverlib.HeaderedEvent, err error,
+	events []*rstypes.HeaderedEvent, err error,
 ) {
 	// Check if we have enough events.
 	isSetLargeEnough := len(streamEvents) >= r.filter.Limit
@@ -460,25 +515,25 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	// Backfill is needed if we've reached a backward extremity and need more
 	// events. It's only needed if the direction is backward.
 	if len(backwardExtremities) > 0 && !isSetLargeEnough && r.backwardOrdering {
-		var pdus []*gomatrixserverlib.HeaderedEvent
+		var pdus []*rstypes.HeaderedEvent
 		// Only ask the remote server for enough events to reach the limit.
 		pdus, err = r.backfill(r.roomID, backwardExtremities, r.filter.Limit-len(streamEvents))
 		if err != nil {
 			return
 		}
-
+		r.didBackfill = true
 		// Append the PDUs to the list to send back to the client.
 		events = append(events, pdus...)
 	}
 
 	// Append the events ve previously retrieved locally.
-	events = append(events, r.snapshot.StreamEventsToEvents(nil, streamEvents)...)
+	events = append(events, r.snapshot.StreamEventsToEvents(r.ctx, nil, streamEvents, r.rsAPI)...)
 	sort.Sort(eventsByDepth(events))
 
 	return
 }
 
-type eventsByDepth []*gomatrixserverlib.HeaderedEvent
+type eventsByDepth []*rstypes.HeaderedEvent
 
 func (e eventsByDepth) Len() int {
 	return len(e)
@@ -499,7 +554,7 @@ func (e eventsByDepth) Less(i, j int) bool {
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]*rstypes.HeaderedEvent, error) {
 	var res api.PerformBackfillResponse
 	err := r.rsAPI.PerformBackfill(context.Background(), &api.PerformBackfillRequest{
 		RoomID:               roomID,
@@ -528,15 +583,17 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	if res.HistoryVisibility == "" {
 		res.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
 	}
-	for i := range res.Events {
+	events := res.Events
+	for i := range events {
+		events[i].Visibility = res.HistoryVisibility
 		_, err = r.db.WriteEvent(
 			context.Background(),
-			res.Events[i],
-			[]*gomatrixserverlib.HeaderedEvent{},
+			events[i],
+			[]*rstypes.HeaderedEvent{},
 			[]string{},
 			[]string{},
 			nil, true,
-			res.HistoryVisibility,
+			events[i].Visibility,
 		)
 		if err != nil {
 			return nil, err
@@ -544,13 +601,9 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	}
 
 	// we may have got more than the requested limit so resize now
-	events := res.Events
 	if len(events) > limit {
 		// last `limit` events
 		events = events[len(events)-limit:]
-	}
-	for _, ev := range events {
-		ev.Visibility = res.HistoryVisibility
 	}
 
 	return events, nil

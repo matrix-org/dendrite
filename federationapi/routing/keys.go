@@ -20,7 +20,6 @@ import (
 	"time"
 
 	clienthttputil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -46,7 +45,7 @@ func QueryDeviceKeys(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// make sure we only query users on our domain
@@ -63,14 +62,15 @@ func QueryDeviceKeys(
 	}
 
 	var queryRes api.QueryKeysResponse
-	if err := keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
+	keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
 		UserToDevices: qkr.DeviceKeys,
-	}, &queryRes); err != nil {
-		return jsonerror.InternalAPIError(httpReq.Context(), err)
-	}
+	}, &queryRes)
 	if queryRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -100,7 +100,7 @@ func ClaimOneTimeKeys(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// make sure we only claim users on our domain
@@ -117,14 +117,15 @@ func ClaimOneTimeKeys(
 	}
 
 	var claimRes api.PerformClaimKeysResponse
-	if err := keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
+	keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: cor.OneTimeKeys,
-	}, &claimRes); err != nil {
-		return jsonerror.InternalAPIError(httpReq.Context(), err)
-	}
+	}, &claimRes)
 	if claimRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	return util.JSONResponse{
 		Code: 200,
@@ -205,7 +206,7 @@ func NotaryKeys(
 	if !cfg.Matrix.IsLocalServerName(serverName) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Server name not known"),
+			JSON: spec.NotFound("Server name not known"),
 		}
 	}
 
@@ -248,7 +249,10 @@ func NotaryKeys(
 			j, err := json.Marshal(keys)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			js, err := gomatrixserverlib.SignJSON(
@@ -256,7 +260,10 @@ func NotaryKeys(
 			)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 
 			response.ServerKeys = append(response.ServerKeys, js)

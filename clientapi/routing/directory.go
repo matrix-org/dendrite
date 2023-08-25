@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -47,7 +46,7 @@ func (r *roomDirectoryResponse) fillServers(servers []spec.ServerName) {
 func DirectoryRoom(
 	req *http.Request,
 	roomAlias string,
-	federation *fclient.FederationClient,
+	federation fclient.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	fedSenderAPI federationAPI.ClientFederationAPI,
@@ -56,7 +55,7 @@ func DirectoryRoom(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
+			JSON: spec.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
 
@@ -70,7 +69,10 @@ func DirectoryRoom(
 	queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 	if err = rsAPI.GetRoomIDForAlias(req.Context(), queryReq, queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.GetRoomIDForAlias failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	res.RoomID = queryRes.RoomID
@@ -84,7 +86,10 @@ func DirectoryRoom(
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
 				util.GetLogger(req.Context()).WithError(fedErr).Error("federation.LookupRoomAlias failed")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			res.RoomID = fedRes.RoomID
 			res.fillServers(fedRes.Servers)
@@ -93,7 +98,7 @@ func DirectoryRoom(
 		if res.RoomID == "" {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound(
+				JSON: spec.NotFound(
 					fmt.Sprintf("Room alias %s not found", roomAlias),
 				),
 			}
@@ -103,7 +108,10 @@ func DirectoryRoom(
 		var joinedHostsRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 		if err = fedSenderAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &joinedHostsReq, &joinedHostsRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("fedSenderAPI.QueryJoinedHostServerNamesInRoom failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		res.fillServers(joinedHostsRes.ServerNames)
 	}
@@ -126,14 +134,14 @@ func SetLocalAlias(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
+			JSON: spec.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Alias must be on local homeserver"),
+			JSON: spec.Forbidden("Alias must be on local homeserver"),
 		}
 	}
 
@@ -146,7 +154,7 @@ func SetLocalAlias(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("User ID must be in the form '@localpart:domain'"),
+			JSON: spec.BadJSON("User ID must be in the form '@localpart:domain'"),
 		}
 	}
 	for _, appservice := range cfg.Derived.ApplicationServices {
@@ -158,7 +166,7 @@ func SetLocalAlias(
 					if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
 						return util.JSONResponse{
 							Code: http.StatusBadRequest,
-							JSON: jsonerror.ASExclusive("Alias is reserved by an application service"),
+							JSON: spec.ASExclusive("Alias is reserved by an application service"),
 						}
 					}
 				}
@@ -173,21 +181,50 @@ func SetLocalAlias(
 		return *resErr
 	}
 
-	queryReq := roomserverAPI.SetRoomAliasRequest{
-		UserID: device.UserID,
-		RoomID: r.RoomID,
-		Alias:  alias,
-	}
-	var queryRes roomserverAPI.SetRoomAliasResponse
-	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
-		return jsonerror.InternalServerError()
+	roomID, err := spec.NewRoomID(r.RoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
+		}
 	}
 
-	if queryRes.AliasExists {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *roomID, *userID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("QuerySenderIDForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	} else if senderID == nil {
+		util.GetLogger(req.Context()).WithField("roomID", *roomID).WithField("userID", *userID).Error("Sender ID not found")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	aliasAlreadyExists, err := rsAPI.SetRoomAlias(req.Context(), *senderID, *roomID, alias)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	if aliasAlreadyExists {
 		return util.JSONResponse{
 			Code: http.StatusConflict,
-			JSON: jsonerror.Unknown("The alias " + alias + " already exists."),
+			JSON: spec.Unknown("The alias " + alias + " already exists."),
 		}
 	}
 
@@ -204,27 +241,91 @@ func RemoveLocalAlias(
 	alias string,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
-	queryReq := roomserverAPI.RemoveRoomAliasRequest{
-		Alias:  alias,
-		UserID: device.UserID,
-	}
-	var queryRes roomserverAPI.RemoveRoomAliasResponse
-	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
-		return jsonerror.InternalServerError()
-	}
-
-	if !queryRes.Found {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The alias does not exist."),
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: "UserID for device is invalid"},
 		}
 	}
 
-	if !queryRes.Removed {
+	roomIDReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: alias}
+	roomIDRes := roomserverAPI.GetRoomIDForAliasResponse{}
+	err = rsAPI.GetRoomIDForAlias(req.Context(), &roomIDReq, &roomIDRes)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+
+	validRoomID, err := spec.NewRoomID(roomIDRes.RoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+
+	// This seems like the kind of auth check that should be done in the roomserver, but
+	// if this check fails (user is not in the room), then there will be no SenderID for the user
+	// for pseudo-ID rooms - it will just return "". However, we can't use lack of a sender ID
+	// as meaning they are not in the room, since lacking a sender ID could be caused by other bugs.
+	// TODO: maybe have QuerySenderIDForUser return richer errors?
+	var queryResp roomserverAPI.QueryMembershipForUserResponse
+	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+		RoomID: validRoomID.String(),
+		UserID: *userID,
+	}, &queryResp)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.QueryMembershipForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+	if !queryResp.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You do not have permission to remove this alias."),
+			JSON: spec.Forbidden("You do not have permission to remove this alias."),
+		}
+	}
+
+	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+	// TODO: how to handle this case? missing user/room keys seem to be a whole new class of errors
+	if deviceSenderID == nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	aliasFound, aliasRemoved, err := rsAPI.RemoveRoomAlias(req.Context(), *deviceSenderID, alias)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	if !aliasFound {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: spec.NotFound("The alias does not exist."),
+		}
+	}
+
+	if !aliasRemoved {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You do not have permission to remove this alias."),
 		}
 	}
 
@@ -249,7 +350,10 @@ func GetVisibility(
 	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryPublishedRooms failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var v roomVisibility
@@ -271,7 +375,30 @@ func SetVisibility(
 	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
-	resErr := checkMemberInRoom(req.Context(), rsAPI, dev.UserID, roomID)
+	deviceUserID, err := spec.NewUserID(dev.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("userID for this device is invalid"),
+		}
+	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("roomID is invalid")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
+	if err != nil || senderID == nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("failed to find senderID for this user"),
+		}
+	}
+
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
@@ -284,18 +411,21 @@ func SetVisibility(
 		}},
 	}
 	var queryEventsRes roomserverAPI.QueryLatestEventsAndStateResponse
-	err := rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	err = rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
 	if err != nil || len(queryEventsRes.StateEvents) == 0 {
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
-	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
-	if power.UserLevel(dev.UserID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
+	if power.UserLevel(*senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),
+			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
 		}
 	}
 
@@ -304,16 +434,15 @@ func SetVisibility(
 		return *reqErr
 	}
 
-	var publishRes roomserverAPI.PerformPublishResponse
-	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+	if err = rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
 		RoomID:     roomID,
 		Visibility: v.Visibility,
-	}, &publishRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if publishRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
-		return publishRes.Error.JSONResponse()
+	}); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("failed to publish room")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -329,7 +458,7 @@ func SetVisibilityAS(
 	if dev.AccountType != userapi.AccountTypeAppService {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Only appservice may use this endpoint"),
+			JSON: spec.Forbidden("Only appservice may use this endpoint"),
 		}
 	}
 	var v roomVisibility
@@ -342,18 +471,17 @@ func SetVisibilityAS(
 			return *reqErr
 		}
 	}
-	var publishRes roomserverAPI.PerformPublishResponse
 	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
 		RoomID:       roomID,
 		Visibility:   v.Visibility,
 		NetworkID:    networkID,
 		AppserviceID: dev.AppserviceID,
-	}, &publishRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
-	if publishRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
-		return publishRes.Error.JSONResponse()
+	}); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("failed to publish room")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

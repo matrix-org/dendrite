@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 )
 
@@ -16,9 +17,11 @@ var build string
 
 const (
 	VersionMajor = 0
-	VersionMinor = 12
-	VersionPatch = 0
+	VersionMinor = 13
+	VersionPatch = 2
 	VersionTag   = "" // example: "rc1"
+
+	gitRevLen = 7 // 7 matches the displayed characters on github.com
 )
 
 func VersionString() string {
@@ -37,7 +40,30 @@ func init() {
 	if branch != "" {
 		parts = append(parts, branch)
 	}
-	if len(parts) > 0 {
-		version += "+" + strings.Join(parts, ".")
+
+	defer func() {
+		if len(parts) > 0 {
+			version += "+" + strings.Join(parts, ".")
+		}
+	}()
+
+	// Try to get the revision Dendrite was build from.
+	// If we can't, e.g. Dendrite wasn't built (go run) or no VCS version is present,
+	// we just use the provided version above.
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+
+	for _, setting := range info.Settings {
+		if setting.Key == "vcs.revision" {
+			revLen := len(setting.Value)
+			if revLen >= gitRevLen {
+				parts = append(parts, setting.Value[:gitRevLen])
+			} else {
+				parts = append(parts, setting.Value[:revLen])
+			}
+			break
+		}
 	}
 }
