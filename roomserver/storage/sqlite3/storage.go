@@ -36,7 +36,7 @@ type Database struct {
 }
 
 // Open a sqlite database.
-func Open(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
 	db, writer, err := conMan.Connection(dbProperties)

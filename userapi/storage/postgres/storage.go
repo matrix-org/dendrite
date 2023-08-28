@@ -31,7 +31,7 @@ import (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func NewDatabase(ctx context.Context, conMan sqlutil.Connections, dbProperties *
 	}, nil
 }
 
-func NewKeyDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
 	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err

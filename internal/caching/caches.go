@@ -35,7 +35,7 @@ type Caches struct {
 	RoomServerEventTypes    Cache[types.EventTypeNID, string]                      // eventType NID -> eventType
 	FederationPDUs          Cache[int64, *types.HeaderedEvent]                     // queue NID -> PDU
 	FederationEDUs          Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
-	SpaceSummaryRooms       Cache[string, fclient.MSC2946SpacesResponse]           // room ID -> space response
+	RoomHierarchies         Cache[string, fclient.RoomHierarchyResponse]           // room ID -> space response
 	LazyLoading             Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
 }
 

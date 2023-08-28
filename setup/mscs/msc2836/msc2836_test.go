@@ -529,8 +529,9 @@ func (r *testRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spe
 	return spec.NewUserID(string(senderID), true)
 }
 
-func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
-	return spec.SenderID(userID.String()), nil
+func (r *testRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	senderID := spec.SenderID(userID.String())
+	return &senderID, nil
 }
 
 func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {

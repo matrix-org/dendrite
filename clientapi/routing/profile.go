@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -250,17 +251,26 @@ func updateProfile(
 	profile *authtypes.Profile,
 	userID string, evTime time.Time,
 ) (util.JSONResponse, error) {
-	var res api.QueryRoomsForUserResponse
-	err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         device.UserID,
-		WantMembership: "join",
-	}, &res)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}, err
+	}
+
+	rooms, err := rsAPI.QueryRoomsForUser(ctx, *deviceUserID, "join")
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}, err
+	}
+
+	roomIDStrs := make([]string, len(rooms))
+	for i, room := range rooms {
+		roomIDStrs[i] = room.String()
 	}
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
@@ -273,7 +283,7 @@ func updateProfile(
 	}
 
 	events, err := buildMembershipEvents(
-		ctx, res.RoomIDs, *profile, userID, evTime, rsAPI,
+		ctx, roomIDStrs, *profile, userID, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -362,8 +372,10 @@ func buildMembershipEvents(
 		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 		if err != nil {
 			return nil, err
+		} else if senderID == nil {
+			return nil, fmt.Errorf("sender ID not found for %s in %s", *fullUserID, *validRoomID)
 		}
-		senderIDString := string(senderID)
+		senderIDString := string(*senderID)
 		proto := gomatrixserverlib.ProtoEvent{
 			SenderID: senderIDString,
 			RoomID:   roomID,

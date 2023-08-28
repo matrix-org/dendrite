@@ -16,6 +16,8 @@
 package synctypes
 
 import (
+	"fmt"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -117,4 +119,32 @@ func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserver
 		}
 	}
 	return ToClientEvent(event, FormatAll, sender, sk)
+}
+
+// If provided state key is a user ID (state keys beginning with @ are reserved for this purpose)
+// fetch it's associated sender ID and use that instead. Otherwise returns the same state key back.
+//
+// # This function either returns the state key that should be used, or an error
+//
+// TODO: handle failure cases better (e.g. no sender ID)
+func FromClientStateKey(roomID spec.RoomID, stateKey string, senderIDQuery spec.SenderIDForUser) (*string, error) {
+	if len(stateKey) >= 1 && stateKey[0] == '@' {
+		parsedStateKey, err := spec.NewUserID(stateKey, true)
+		if err != nil {
+			// If invalid user ID, then there is no associated state event.
+			return nil, fmt.Errorf("Provided state key begins with @ but is not a valid user ID: %s", err.Error())
+		}
+		senderID, err := senderIDQuery(roomID, *parsedStateKey)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to query sender ID: %s", err.Error())
+		}
+		if senderID == nil {
+			// If no sender ID, then there is no associated state event.
+			return nil, fmt.Errorf("No associated sender ID found.")
+		}
+		newStateKey := string(*senderID)
+		return &newStateKey, nil
+	} else {
+		return &stateKey, nil
+	}
 }

@@ -75,6 +75,16 @@ strategy:
     # -- Maximum number of pods that can be scheduled above the desired number of pods
     maxSurge: 25%
 
+strategy:
+  # -- Strategy to use for rolling updates (e.g. Recreate, RollingUpdate)
+  # If you are using ReadWriteOnce volumes, you should probably use Recreate
+  type: RollingUpdate
+  rollingUpdate:
+    # -- Maximum number of pods that can be unavailable during the update process
+    maxUnavailable: 25%
+    # -- Maximum number of pods that can be scheduled above the desired number of pods
+    maxSurge: 25%
+
 dendrite_config:
   version: 2
   global:
@@ -211,14 +221,12 @@ dendrite_config:
       # -- pprof port, if enabled
       port: 65432
 
-  # -- Configuration for experimental MSC's. (Valid values are: msc2836 and msc2946)
+  # -- Configuration for experimental MSC's. (Valid values are: msc2836)
   mscs:
-    mscs:
-      - msc2946
+    mscs: []
       # A list of enabled MSC's
       # Currently valid values are:
       # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
-      # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
   app_service_api:
     # -- Disable the validation of TLS certificates of appservices. This is

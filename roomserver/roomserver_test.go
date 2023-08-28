@@ -11,7 +11,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -227,6 +226,11 @@ func TestPurgeRoom(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
+	roomID, err := spec.NewRoomID(room.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Invite Bob
 	inviteEvent := room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 		"membership": "invite",
@@ -249,12 +253,13 @@ func TestPurgeRoom(t *testing.T) {
 		defer jetstream.DeleteAllStreams(jsCtx, &cfg.Global.JetStream)
 
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
 		fsAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(fsAPI, nil)
+
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
 
 		// Create the room
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -273,9 +278,7 @@ func TestPurgeRoom(t *testing.T) {
 		if !isPublished {
 			t.Fatalf("room should be published before purging")
 		}
-
-		aliasResp := &api.SetRoomAliasResponse{}
-		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", UserID: alice.ID}, aliasResp); err != nil {
+		if _, err = rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID), *roomID, "myalias"); err != nil {
 			t.Fatal(err)
 		}
 		// check the alias is actually there
@@ -929,14 +932,17 @@ func TestUpgrade(t *testing.T) {
 			upgradeUser: alice.ID,
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
+				roomID, err := spec.NewRoomID(r.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
 				}
 
-				if err := rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{
-					RoomID: r.ID,
-					Alias:  "#myroomalias:test",
-				}, &api.SetRoomAliasResponse{}); err != nil {
+				if _, err := rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID),
+					*roomID,
+					"#myroomalias:test"); err != nil {
 					t.Fatal(err)
 				}
 
@@ -1035,8 +1041,8 @@ func TestUpgrade(t *testing.T) {
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		rsAPI.SetUserAPI(userAPI)
 
 		for _, tc := range testCases {
@@ -1053,7 +1059,7 @@ func TestUpgrade(t *testing.T) {
 				if err != nil {
 					t.Fatalf("upgrade userID is invalid")
 				}
-				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, version.DefaultRoomVersion())
+				newRoomID, err := rsAPI.PerformRoomUpgrade(processCtx.Context(), roomID, *userID, rsAPI.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
 					t.Fatal(err)
 				}

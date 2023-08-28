@@ -519,7 +519,7 @@ func (p *PDUStreamProvider) updatePowerLevelEvent(ctx context.Context, ev *rstyp
 	}
 
 	var evNew gomatrixserverlib.PDU
-	evNew, err = gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON(newEv, false)
+	evNew, err = gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSONWithEventID(ev.EventID(), newEv, false)
 	if err != nil {
 		return nil, err
 	}
@@ -562,8 +562,13 @@ func applyHistoryVisibilityFilter(
 		}
 	}
 
+	parsedUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, err
+	}
+
 	startTime := time.Now()
-	events, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
+	events, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, recentEvents, alwaysIncludeIDs, *parsedUserID, "sync")
 	if err != nil {
 		return nil, err
 	}

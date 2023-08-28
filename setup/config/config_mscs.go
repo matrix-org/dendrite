@@ -7,7 +7,6 @@ type MSCs struct {
 	// 'msc2444': Peeking over federation - https://github.com/matrix-org/matrix-doc/pull/2444
 	// 'msc2753': Peeking via /sync - https://github.com/matrix-org/matrix-doc/pull/2753
 	// 'msc2836': Threading - https://github.com/matrix-org/matrix-doc/pull/2836
-	// 'msc2946': Spaces Summary - https://github.com/matrix-org/matrix-doc/pull/2946
 	MSCs []string `yaml:"mscs"`
 
 	Database DatabaseOptions `yaml:"database,omitempty"`

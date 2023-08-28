@@ -29,7 +29,7 @@ func (a *FederationInternalAPI) MakeJoin(
 func (a *FederationInternalAPI) SendJoin(
 	ctx context.Context, origin, s spec.ServerName, event gomatrixserverlib.PDU,
 ) (res gomatrixserverlib.SendJoinResponse, err error) {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 	ires, err := a.federation.SendJoin(ctx, origin, s, event)
 	if err != nil {
@@ -194,16 +194,16 @@ func (a *FederationInternalAPI) MSC2836EventRelationships(
 	return ires.(fclient.MSC2836EventRelationshipsResponse), nil
 }
 
-func (a *FederationInternalAPI) MSC2946Spaces(
+func (a *FederationInternalAPI) RoomHierarchies(
 	ctx context.Context, origin, s spec.ServerName, roomID string, suggestedOnly bool,
-) (res fclient.MSC2946SpacesResponse, err error) {
+) (res fclient.RoomHierarchyResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
-		return a.federation.MSC2946Spaces(ctx, origin, s, roomID, suggestedOnly)
+		return a.federation.RoomHierarchy(ctx, origin, s, roomID, suggestedOnly)
 	})
 	if err != nil {
 		return res, err
 	}
-	return ires.(fclient.MSC2946SpacesResponse), nil
+	return ires.(fclient.RoomHierarchyResponse), nil
 }

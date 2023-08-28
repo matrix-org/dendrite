@@ -161,12 +161,12 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
-	roomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Join)
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Join)
 	if err != nil {
 		return nil, err
 	}
 
-	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, userID, spec.Invite)
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Invite)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -203,18 +203,6 @@ func (r *Admin) PerformAdminPurgeRoom(
 	if _, _, err := gomatrixserverlib.SplitID('!', roomID); err != nil {
 		return err
 	}
-
-	// Evacuate the room before purging it from the database
-	evacAffected, err := r.PerformAdminEvacuateRoom(ctx, roomID)
-	if err != nil {
-		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to evacuate room before purging")
-		return err
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"room_id":         roomID,
-		"evacuated_users": len(evacAffected),
-	}).Warn("Evacuated room, purging room from roomserver now")
 
 	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
@@ -304,10 +292,12 @@ func (r *Admin) PerformAdminDownloadState(
 	senderID, err := r.Queryer.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
 	if err != nil {
 		return err
+	} else if senderID == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", *fullUserID, *validRoomID)
 	}
 	proto := &gomatrixserverlib.ProtoEvent{
 		Type:     "org.matrix.dendrite.state_download",
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   roomID,
 		Content:  spec.RawJSON("{}"),
 	}

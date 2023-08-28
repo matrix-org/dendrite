@@ -448,6 +448,24 @@ func (r *Inputer) processRoomEvent(
 		return nil
 	}
 
+	// TODO: Revist this to ensure we don't replace a current state mxid_mapping with an older one.
+	if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && event.Type() == spec.MRoomMember {
+		mapping := gomatrixserverlib.MemberContent{}
+		if err = json.Unmarshal(event.Content(), &mapping); err != nil {
+			return err
+		}
+		if mapping.MXIDMapping != nil {
+			storeUserID, userErr := spec.NewUserID(mapping.MXIDMapping.UserID, true)
+			if userErr != nil {
+				return userErr
+			}
+			err = r.RSAPI.StoreUserRoomPublicKey(ctx, mapping.MXIDMapping.UserRoomKey, *storeUserID, *validRoomID)
+			if err != nil {
+				return fmt.Errorf("failed storing user room public key: %w", err)
+			}
+		}
+	}
+
 	switch input.Kind {
 	case api.KindNew:
 		if err = r.updateLatestEvents(
@@ -915,12 +933,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			return err
 		}
 
-		userID, err := spec.NewUserID(stateKey, true)
-		if err != nil {
-			return err
-		}
-
-		signingIdentity, err := r.SigningIdentity(ctx, *validRoomID, *userID)
+		signingIdentity, err := r.SigningIdentity(ctx, *validRoomID, *memberUserID)
 		if err != nil {
 			return err
 		}

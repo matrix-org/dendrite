@@ -59,22 +59,22 @@ func (k *mockKeyAPI) QueryDeviceMessages(ctx context.Context, req *userapi.Query
 func (k *mockKeyAPI) QuerySignatures(ctx context.Context, req *userapi.QuerySignaturesRequest, res *userapi.QuerySignaturesResponse) {
 }
 
-type mockRoomserverAPI struct {
+type keyChangeMockRoomserverAPI struct {
 	api.RoomserverInternalAPI
 	roomIDToJoinedMembers map[string][]string
 }
 
-func (s *mockRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+func (s *keyChangeMockRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	return spec.NewUserID(string(senderID), true)
 }
 
 // QueryRoomsForUser retrieves a list of room IDs matching the given query.
-func (s *mockRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
-	return nil
+func (s *keyChangeMockRoomserverAPI) QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error) {
+	return nil, nil
 }
 
 // QueryBulkStateContent does a bulk query for state event content in the given rooms.
-func (s *mockRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
+func (s *keyChangeMockRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
 	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
 	if req.AllowWildcards && len(req.StateTuples) == 1 && req.StateTuples[0].EventType == spec.MRoomMember && req.StateTuples[0].StateKey == "*" {
 		for _, roomID := range req.RoomIDs {
@@ -91,7 +91,7 @@ func (s *mockRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *api.
 }
 
 // QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
-func (s *mockRoomserverAPI) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
+func (s *keyChangeMockRoomserverAPI) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
 	roomsToQuery := req.IncludeRoomIDs
 	for roomID, members := range s.roomIDToJoinedMembers {
 		exclude := false
@@ -123,7 +123,7 @@ func (s *mockRoomserverAPI) QuerySharedUsers(ctx context.Context, req *api.Query
 
 // This is actually a database function, but seeing as we track the state inside the
 // *mockRoomserverAPI, we'll just comply with the interface here instead.
-func (s *mockRoomserverAPI) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+func (s *keyChangeMockRoomserverAPI) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
 	commonUsers := []string{}
 	for _, members := range s.roomIDToJoinedMembers {
 		for _, member := range members {
@@ -211,7 +211,7 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser},
 			"!another:room": {syncingUser},
@@ -234,7 +234,7 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {removeUser},
 			"!another:room": {syncingUser},
@@ -257,7 +257,7 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, existingUser},
 			"!another:room": {syncingUser, existingUser},
@@ -279,7 +279,7 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {existingUser},
 			"!another:room": {syncingUser, existingUser},
@@ -343,7 +343,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	jr.Timeline = &types.Timeline{Events: roomTimelineEvents}
 	syncResponse.Rooms.Join[roomID] = jr
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID: {syncingUser, existingUser},
 		},
@@ -369,7 +369,7 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser, newShareUser2},
 			newlyLeftRoom:   {newlyLeftUser, newlyLeftUser2},
@@ -459,7 +459,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	lr.Timeline = &types.Timeline{Events: roomEvents}
 	syncResponse.Rooms.Leave[roomID] = lr
 
-	rsAPI := &mockRoomserverAPI{
+	rsAPI := &keyChangeMockRoomserverAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID:          {newShareUser, newShareUser2},
 			"!another:room": {syncingUser},

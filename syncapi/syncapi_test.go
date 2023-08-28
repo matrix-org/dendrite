@@ -44,6 +44,11 @@ func (s *syncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spe
 	return spec.NewUserID(string(senderID), true)
 }
 
+func (s *syncRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	senderID := spec.SenderID(userID.String())
+	return &senderID, nil
+}
+
 func (s *syncRoomserverAPI) QueryLatestEventsAndState(ctx context.Context, req *rsapi.QueryLatestEventsAndStateRequest, res *rsapi.QueryLatestEventsAndStateResponse) error {
 	var room *test.Room
 	for _, r := range s.rooms {
@@ -74,8 +79,13 @@ func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsa
 	return nil
 }
 
-func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembershipAtEventRequest, res *rsapi.QueryMembershipAtEventResponse) error {
-	return nil
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(
+	ctx context.Context,
+	roomID spec.RoomID,
+	eventIDs []string,
+	senderID spec.SenderID,
+) (map[string]*rstypes.HeaderedEvent, error) {
+	return map[string]*rstypes.HeaderedEvent{}, nil
 }
 
 type syncUserAPI struct {
@@ -433,6 +443,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		}
 
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)

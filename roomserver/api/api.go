@@ -34,6 +34,17 @@ func (e ErrNotAllowed) Error() string {
 	return e.Err.Error()
 }
 
+// ErrRoomUnknownOrNotAllowed is an error return if either the provided
+// room ID does not exist, or points to a room that the requester does
+// not have access to.
+type ErrRoomUnknownOrNotAllowed struct {
+	Err error
+}
+
+func (e ErrRoomUnknownOrNotAllowed) Error() string {
+	return e.Err.Error()
+}
+
 type RestrictedJoinAPI interface {
 	CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error)
 	InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error)
@@ -42,6 +53,11 @@ type RestrictedJoinAPI interface {
 	QueryServerJoinedToRoom(ctx context.Context, req *QueryServerJoinedToRoomRequest, res *QueryServerJoinedToRoomResponse) error
 	UserJoinedToRoom(ctx context.Context, roomID types.RoomNID, senderID spec.SenderID) (bool, error)
 	LocallyJoinedUsers(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomNID types.RoomNID) ([]gomatrixserverlib.PDU, error)
+}
+
+type DefaultRoomVersionAPI interface {
+	// Returns the default room version used.
+	DefaultRoomVersion() gomatrixserverlib.RoomVersion
 }
 
 // RoomserverInputAPI is used to write events to the room server.
@@ -53,6 +69,7 @@ type RoomserverInternalAPI interface {
 	FederationRoomserverAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
+	DefaultRoomVersionAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -86,7 +103,7 @@ type InputRoomEventsAPI interface {
 }
 
 type QuerySenderIDAPI interface {
-	QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error)
+	QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error)
 	QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error)
 }
 
@@ -113,11 +130,39 @@ type QueryEventsAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 }
 
+type QueryRoomHierarchyAPI interface {
+	// Traverse the room hierarchy using the provided walker up to the provided limit,
+	// returning a new walker which can be used to fetch the next page.
+	//
+	// If limit is -1, this is treated as no limit, and the entire hierarchy will be traversed.
+	//
+	// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
+	// can be cached.
+	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *RoomHierarchyWalker, error)
+}
+
+type QueryMembershipAPI interface {
+	QueryMembershipForSenderID(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, res *QueryMembershipForUserResponse) error
+	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
+	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+	QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
+
+	// QueryMembershipAtEvent queries the memberships at the given events.
+	// Returns a map from eventID to *types.HeaderedEvent of membership events.
+	QueryMembershipAtEvent(
+		ctx context.Context,
+		roomID spec.RoomID,
+		eventIDs []string,
+		senderID spec.SenderID,
+	) (map[string]*types.HeaderedEvent, error)
+}
+
 // API functions required by the syncapi
 type SyncRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
+	QueryMembershipAPI
 	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
@@ -126,12 +171,6 @@ type SyncRoomserverAPI interface {
 		ctx context.Context,
 		req *QueryEventsByIDRequest,
 		res *QueryEventsByIDResponse,
-	) error
-	// Query the membership event for an user for a room.
-	QueryMembershipForUser(
-		ctx context.Context,
-		req *QueryMembershipForUserRequest,
-		res *QueryMembershipForUserResponse,
 	) error
 
 	// Query the state after a list of events in a room from the room server.
@@ -146,14 +185,6 @@ type SyncRoomserverAPI interface {
 		ctx context.Context,
 		req *PerformBackfillRequest,
 		res *PerformBackfillResponse,
-	) error
-
-	// QueryMembershipAtEvent queries the memberships at the given events.
-	// Returns a map from eventID to a slice of types.HeaderedEvent.
-	QueryMembershipAtEvent(
-		ctx context.Context,
-		request *QueryMembershipAtEventRequest,
-		response *QueryMembershipAtEventResponse,
 	) error
 }
 
@@ -187,9 +218,11 @@ type ClientRoomserverAPI interface {
 	QueryEventsAPI
 	QuerySenderIDAPI
 	UserRoomPrivateKeyCreator
+	QueryRoomHierarchyAPI
+	DefaultRoomVersionAPI
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
-	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
+	QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error)
 	QueryStateAfterEvents(ctx context.Context, req *QueryStateAfterEventsRequest, res *QueryStateAfterEventsResponse) error
 	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
 	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
@@ -214,8 +247,19 @@ type ClientRoomserverAPI interface {
 	PerformPublish(ctx context.Context, req *PerformPublishRequest) error
 	// PerformForget forgets a rooms history for a specific user
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
-	SetRoomAlias(ctx context.Context, req *SetRoomAliasRequest, res *SetRoomAliasResponse) error
-	RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
+
+	// Sets a room alias, as provided sender, pointing to the provided room ID.
+	//
+	// If err is nil, then the returned boolean indicates if the alias is already in use.
+	// If true, then the alias has not been set to the provided room, as it already in use.
+	SetRoomAlias(ctx context.Context, senderID spec.SenderID, roomID spec.RoomID, alias string) (aliasAlreadyExists bool, err error)
+
+	//RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
+	// Removes a room alias, as provided sender.
+	//
+	// Returns whether the alias was found, whether it was removed, and an error (if any occurred)
+	RemoveRoomAlias(ctx context.Context, senderID spec.SenderID, alias string) (aliasFound bool, aliasRemoved bool, err error)
+
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 }
 
@@ -227,6 +271,7 @@ type UserRoomserverAPI interface {
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, userID string) (affected []string, err error)
 	PerformJoin(ctx context.Context, req *PerformJoinRequest) (roomID string, joinedVia spec.ServerName, err error)
+	JoinedUserCount(ctx context.Context, roomID string) (int, error)
 }
 
 type FederationRoomserverAPI interface {
@@ -235,15 +280,13 @@ type FederationRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryBulkStateContentAPI
 	QuerySenderIDAPI
+	QueryRoomHierarchyAPI
+	QueryMembershipAPI
 	UserRoomPrivateKeyCreator
 	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
-	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
-	QueryMembershipForSenderID(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, res *QueryMembershipForUserResponse) error
-	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
-	QueryRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
 	// QueryEventsByID queries a list of events by event ID for one room. If no room is specified, it will try to determine
 	// which room to use by querying the first events roomID.
@@ -257,7 +300,7 @@ type FederationRoomserverAPI interface {
 	QueryMissingEvents(ctx context.Context, req *QueryMissingEventsRequest, res *QueryMissingEventsResponse) error
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(ctx context.Context, serverName spec.ServerName, eventID string, roomID string) (allowed bool, err error)
-	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
+	QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error)
 	QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error)
 	PerformInboundPeek(ctx context.Context, req *PerformInboundPeekRequest, res *PerformInboundPeekResponse) error
 	HandleInvite(ctx context.Context, event *types.HeaderedEvent) error

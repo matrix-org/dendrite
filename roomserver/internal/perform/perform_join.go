@@ -201,11 +201,11 @@ func (r *Joiner) performJoinRoomByID(
 	if err == nil && info != nil {
 		switch info.RoomVersion {
 		case gomatrixserverlib.RoomVersionPseudoIDs:
-			senderID, err = r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
-			if err == nil {
+			senderIDPtr, queryErr := r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
+			if queryErr == nil {
 				checkInvitePending = true
 			}
-			if senderID == "" {
+			if senderIDPtr == nil {
 				// create user room key if needed
 				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 				if keyErr != nil {
@@ -213,6 +213,8 @@ func (r *Joiner) performJoinRoomByID(
 					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
 				senderID = spec.SenderIDFromPseudoIDKey(key)
+			} else {
+				senderID = *senderIDPtr
 			}
 		default:
 			checkInvitePending = true
@@ -274,7 +276,6 @@ func (r *Joiner) performJoinRoomByID(
 	// If we should do a forced federated join then do that.
 	var joinedVia spec.ServerName
 	if forceFederatedJoin {
-		// TODO : pseudoIDs - pass through userID here since we don't know what the senderID should be yet
 		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
 		return req.RoomIDOrAlias, joinedVia, err
 	}
@@ -286,10 +287,7 @@ func (r *Joiner) performJoinRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity, err := r.RSAPI.SigningIdentityFor(ctx, *roomID, *userID)
-	if err != nil {
-		return "", "", fmt.Errorf("error joining local room: %q", err)
-	}
+	identity := r.Cfg.Matrix.SigningIdentity
 
 	// at this point we know we have an existing room
 	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
