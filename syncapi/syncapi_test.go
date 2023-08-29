@@ -209,6 +209,156 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 	}
 }
 
+func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testSyncEventFormatPowerLevels(t, dbType)
+	})
+}
+
+func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
+	user := test.NewUser(t)
+	setRoomVersion := func(t *testing.T, r *test.Room) { r.Version = gomatrixserverlib.RoomVersionPseudoIDs }
+	room := test.NewRoom(t, user, setRoomVersion)
+	alice := userapi.Device{
+		ID:          "ALICEID",
+		UserID:      user.ID,
+		AccessToken: "ALICE_BEARER_TOKEN",
+		DisplayName: "Alice",
+		AccountType: userapi.AccountTypeUser,
+	}
+
+	room.CreateAndInsert(t, user, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
+		Users: map[string]int64{
+			user.ID: 100,
+		},
+	}, test.WithStateKey(""))
+
+	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	routers := httputil.NewRouters()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	natsInstance := jetstream.NATSInstance{}
+	defer close()
+
+	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+	msgs := toNATSMsgs(t, cfg, room.Events()...)
+	AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+	testrig.MustPublishMsgs(t, jsctx, msgs...)
+
+	testCases := []struct {
+		name            string
+		wantCode        int
+		wantJoinedRooms []string
+		eventFormat     synctypes.ClientEventFormat
+	}{
+		{
+			name:            "Client format",
+			wantCode:        200,
+			wantJoinedRooms: []string{room.ID},
+			eventFormat:     synctypes.FormatSync,
+		},
+		{
+			name:            "Federation format",
+			wantCode:        200,
+			wantJoinedRooms: []string{room.ID},
+			eventFormat:     synctypes.FormatSyncFederation,
+		},
+	}
+
+	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+		// wait for the last sent eventID to come down sync
+		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+		return gjson.Get(syncBody, path).Exists()
+	})
+
+	for _, tc := range testCases {
+		format := ""
+		if tc.eventFormat == synctypes.FormatSyncFederation {
+			format = "federation"
+		}
+
+		w := httptest.NewRecorder()
+		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+			"access_token": alice.AccessToken,
+			"timeout":      "0",
+			"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
+		})))
+		if w.Code != tc.wantCode {
+			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+		}
+		if tc.wantJoinedRooms != nil {
+			var res types.Response
+			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+			}
+			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
+				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+			}
+			t.Logf("res: %+v", res.Rooms.Join[room.ID])
+
+			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+				gotEventIDs[i] = ev.EventID
+			}
+			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+
+			event := room.CreateAndInsert(t, user, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
+				Users: map[string]int64{
+					user.ID:                100,
+					"@otheruser:localhost": 50,
+				},
+			}, test.WithStateKey(""))
+
+			msgs := toNATSMsgs(t, cfg, event)
+			testrig.MustPublishMsgs(t, jsctx, msgs...)
+
+			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+				// wait for the last sent eventID to come down sync
+				path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+				return gjson.Get(syncBody, path).Exists()
+			})
+
+			since := res.NextBatch.String()
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"timeout":      "0",
+				"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
+				"since":        since,
+			})))
+			if w.Code != 200 {
+				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			}
+
+			res = *types.NewResponse()
+			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Errorf("failed to decode response body: %s", err)
+			}
+			if len(res.Rooms.Join) != 1 {
+				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
+			}
+			gotEventIDs = make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+				gotEventIDs[j] = ev.EventID
+				if ev.Type == spec.MRoomPowerLevels {
+					content := gomatrixserverlib.PowerLevelContent{}
+					err := json.Unmarshal(ev.Content, &content)
+					if err != nil {
+						t.Errorf("failed to unmarshal power level content: %s", err)
+					}
+					otherUserLevel := content.UserLevel("@otheruser:localhost")
+					if otherUserLevel != 50 {
+						t.Errorf("Expected user PL of %d but got %d", 50, otherUserLevel)
+					}
+				}
+			}
+			events := []*rstypes.HeaderedEvent{room.Events()[len(room.Events())-1]}
+			test.AssertEventIDsEqual(t, gotEventIDs, events)
+		}
+	}
+}
+
 // Tests what happens when we create a room and then /sync before all events from /createRoom have
 // been sent to the syncapi
 func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
