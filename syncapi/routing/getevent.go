@@ -144,6 +144,6 @@ func GetEvent(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll, *senderUserID, sk),
+		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll, senderUserID.String(), sk),
 	}
 }

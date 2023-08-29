@@ -267,7 +267,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				ProfileInfo: profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk),
+			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender.String(), sk),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())

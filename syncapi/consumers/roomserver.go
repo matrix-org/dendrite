@@ -592,6 +592,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 		return event, nil
 	}
 
+	// TODO: don't change this to userID if event_format == federation
 	prevEventSender := string(prevEvent.SenderID())
 	prevUser, err := s.rsAPI.QueryUserIDForSender(s.ctx, *validRoomID, prevEvent.SenderID())
 	if err == nil && prevUser != nil {

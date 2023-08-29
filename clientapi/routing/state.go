@@ -193,7 +193,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender, sk),
+				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender.String(), sk),
 			)
 		}
 	}

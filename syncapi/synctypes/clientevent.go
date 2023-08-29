@@ -30,7 +30,20 @@ const (
 	// FormatSync will include only the event keys required by the /sync API. Notably, this
 	// means the 'room_id' will be missing from the events.
 	FormatSync
+	// FormatSyncFederation will include all event keys normally included in federated events.
+	// This allows clients to request federated formatted events via the /sync API.
+	FormatSyncFederation
 )
+
+// ClientFederationEvent extends a ClientEvent to contain the additional fields present in a
+// federation event. Used when the client requests `event_format` of type `federation`.
+type ClientFederationEvent struct {
+	Depth      int64        `json:"depth,omitempty"`
+	PrevEvents []string     `json:"prev_events,omitempty"`
+	AuthEvents []string     `json:"auth_events,omitempty"`
+	Signatures spec.RawJSON `json:"signatures,omitempty"`
+	Hashes     spec.RawJSON `json:"hashes,omitempty"`
+}
 
 // ClientEvent is an event which is fit for consumption by clients, in accordance with the specification.
 type ClientEvent struct {
@@ -44,6 +57,9 @@ type ClientEvent struct {
 	Type           string         `json:"type"`
 	Unsigned       spec.RawJSON   `json:"unsigned,omitempty"`
 	Redacts        string         `json:"redacts,omitempty"`
+
+	// Federation Event Fields. Only sent to clients when `event_format` == `federation`.
+	ClientFederationEvent
 }
 
 // ToClientEvents converts server events to client events.
@@ -53,6 +69,11 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		if se == nil {
 			continue // TODO: shouldn't happen?
 		}
+		if format == FormatSyncFederation {
+			evs = append(evs, ToClientEvent(se, format, string(se.SenderID()), se.StateKey()))
+			continue
+		}
+
 		sender := spec.UserID{}
 		validRoomID, err := spec.NewRoomID(se.RoomID())
 		if err != nil {
@@ -71,16 +92,16 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 				sk = &skString
 			}
 		}
-		evs = append(evs, ToClientEvent(se, format, sender, sk))
+		evs = append(evs, ToClientEvent(se, format, sender.String(), sk))
 	}
 	return evs
 }
 
 // ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender spec.UserID, stateKey *string) ClientEvent {
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender string, stateKey *string) ClientEvent {
 	ce := ClientEvent{
 		Content:        spec.RawJSON(se.Content()),
-		Sender:         sender.String(),
+		Sender:         sender,
 		Type:           se.Type(),
 		StateKey:       stateKey,
 		Unsigned:       spec.RawJSON(se.Unsigned()),
@@ -88,11 +109,23 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender sp
 		EventID:        se.EventID(),
 		Redacts:        se.Redacts(),
 	}
-	if format == FormatAll {
+
+	switch format {
+	case FormatAll:
 		ce.RoomID = se.RoomID()
+	case FormatSync:
+	case FormatSyncFederation:
+		ce.RoomID = se.RoomID()
+		ce.AuthEvents = se.AuthEventIDs()
+		ce.PrevEvents = se.PrevEventIDs()
+		ce.Depth = se.Depth()
+		// TODO: Set Signatures & Hashes fields
 	}
-	if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
-		ce.SenderKey = se.SenderID()
+
+	if format != FormatSyncFederation {
+		if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+			ce.SenderKey = se.SenderID()
+		}
 	}
 	return ce
 }
@@ -118,7 +151,7 @@ func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserver
 			sk = &skString
 		}
 	}
-	return ToClientEvent(event, FormatAll, sender, sk)
+	return ToClientEvent(event, FormatAll, sender.String(), sk)
 }
 
 // If provided state key is a user ID (state keys beginning with @ are reserved for this purpose)

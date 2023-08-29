@@ -146,7 +146,7 @@ func Relations(
 		}
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender, sk),
+			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender.String(), sk),
 		)
 	}
 

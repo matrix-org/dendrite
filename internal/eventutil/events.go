@@ -184,7 +184,7 @@ func RedactEvent(ctx context.Context, redactionEvent, redactedEvent gomatrixserv
 	if err != nil {
 		return err
 	}
-	redactedBecause := synctypes.ToClientEvent(redactionEvent, synctypes.FormatSync, *senderID, redactionEvent.StateKey())
+	redactedBecause := synctypes.ToClientEvent(redactionEvent, synctypes.FormatSync, senderID.String(), redactionEvent.StateKey())
 	if err := redactedEvent.SetUnsignedField("redacted_because", redactedBecause); err != nil {
 		return err
 	}

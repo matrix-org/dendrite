@@ -78,9 +78,14 @@ type RoomEventFilter struct {
 	ContainsURL               *bool     `json:"contains_url,omitempty"`
 }
 
+const (
+	EventFormatClient     = "client"
+	EventFormatFederation = "federation"
+)
+
 // Validate checks if the filter contains valid property values
 func (filter *Filter) Validate() error {
-	if filter.EventFormat != "" && filter.EventFormat != "client" && filter.EventFormat != "federation" {
+	if filter.EventFormat != "" && filter.EventFormat != EventFormatClient && filter.EventFormat != EventFormatFederation {
 		return errors.New("Bad event_format value. Must be one of [\"client\", \"federation\"]")
 	}
 	return nil
