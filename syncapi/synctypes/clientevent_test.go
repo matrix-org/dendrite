@@ -18,6 +18,7 @@ package synctypes
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -187,6 +188,9 @@ func TestToClientEventFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 }
 
 func userIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if senderID == "unknownSenderID" {
+		return nil, fmt.Errorf("Cannot find userID")
+	}
 	return spec.NewUserID(testUserID, true)
 }
 
@@ -384,6 +388,101 @@ func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
 	var prev PrevEventRef
 	prev.PrevContent = []byte(`{"name": "Goodbye World 2"}`)
 	prev.PrevSenderID = testUserID
+	expectedUnsigned, _ := json.Marshal(prev)
+
+	ce2 := clientEvents[1]
+	if ce2.EventID != ev2.EventID() {
+		t.Errorf("ClientEvent.EventID: wanted %s, got %s", ev2.EventID(), ce2.EventID)
+	}
+	if ce2.OriginServerTS != ev2.OriginServerTS() {
+		t.Errorf("ClientEvent.OriginServerTS: wanted %d, got %d", ev2.OriginServerTS(), ce2.OriginServerTS)
+	}
+	if ce2.StateKey == nil || *ce.StateKey != testUserID {
+		t.Errorf("ClientEvent.StateKey: wanted %s, got %v", testUserID, ce2.StateKey)
+	}
+	if ce2.Type != ev2.Type() {
+		t.Errorf("ClientEvent.Type: wanted %s, got %s", ev2.Type(), ce2.Type)
+	}
+	if !bytes.Equal(ce2.Content, ev2.Content()) {
+		t.Errorf("ClientEvent.Content: wanted %s, got %s", string(ev2.Content()), string(ce2.Content))
+	}
+	if !bytes.Equal(ce2.Unsigned, expectedUnsigned) {
+		t.Errorf("ClientEvent.Unsigned: wanted %s, got %s", string(expectedUnsigned), string(ce2.Unsigned))
+	}
+	if ce2.Sender != testUserID {
+		t.Errorf("ClientEvent.Sender: wanted %s, got %s", testUserID, ce2.Sender)
+	}
+}
+
+func TestToClientEventsFormatSyncUnknownPrevSender(t *testing.T) { // nolint: gocyclo
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		}
+    }`), false)
+	if err != nil {
+		t.Fatalf("failed to create Event: %s", err)
+	}
+	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test2:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World 2"
+		},
+		"origin_server_ts": 1234567,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World 2"
+			},
+            "prev_sender": "unknownSenderID"
+		},
+        "depth": 9	
+    }`), false)
+	if err != nil {
+		t.Fatalf("failed to create Event: %s", err)
+	}
+
+	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)
+	ce := clientEvents[0]
+	if ce.EventID != ev.EventID() {
+		t.Errorf("ClientEvent.EventID: wanted %s, got %s", ev.EventID(), ce.EventID)
+	}
+	if ce.OriginServerTS != ev.OriginServerTS() {
+		t.Errorf("ClientEvent.OriginServerTS: wanted %d, got %d", ev.OriginServerTS(), ce.OriginServerTS)
+	}
+	if ce.StateKey == nil || *ce.StateKey != testUserID {
+		t.Errorf("ClientEvent.StateKey: wanted %s, got %v", testUserID, ce.StateKey)
+	}
+	if ce.Type != ev.Type() {
+		t.Errorf("ClientEvent.Type: wanted %s, got %s", ev.Type(), ce.Type)
+	}
+	if !bytes.Equal(ce.Content, ev.Content()) {
+		t.Errorf("ClientEvent.Content: wanted %s, got %s", string(ev.Content()), string(ce.Content))
+	}
+	if !bytes.Equal(ce.Unsigned, ev.Unsigned()) {
+		t.Errorf("ClientEvent.Unsigned: wanted %s, got %s", string(ev.Unsigned()), string(ce.Unsigned))
+	}
+	if ce.Sender != testUserID {
+		t.Errorf("ClientEvent.Sender: wanted %s, got %s", testUserID, ce.Sender)
+	}
+
+	var prev PrevEventRef
+	prev.PrevContent = []byte(`{"name": "Goodbye World 2"}`)
+	prev.PrevSenderID = "unknownSenderID"
 	expectedUnsigned, _ := json.Marshal(prev)
 
 	ce2 := clientEvents[1]
