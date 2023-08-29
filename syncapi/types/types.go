@@ -339,13 +339,6 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	return token, nil
 }
 
-// PrevEventRef represents a reference to a previous event in a state event upgrade
-type PrevEventRef struct {
-	PrevContent   json.RawMessage `json:"prev_content"`
-	ReplacesState string          `json:"replaces_state"`
-	PrevSenderID  string          `json:"prev_sender"`
-}
-
 type DeviceLists struct {
 	Changed []string `json:"changed,omitempty"`
 	Left    []string `json:"left,omitempty"`
@@ -552,7 +545,7 @@ func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID, stateKey 
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := synctypes.ToClientEvent(event.PDU, eventFormat, userID.String(), stateKey)
+	inviteEvent := synctypes.ToClientEvent(event.PDU, eventFormat, userID.String(), stateKey, event.Unsigned())
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)

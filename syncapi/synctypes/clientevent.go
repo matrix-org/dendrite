@@ -16,11 +16,20 @@
 package synctypes
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/sirupsen/logrus"
 )
+
+// PrevEventRef represents a reference to a previous event in a state event upgrade
+type PrevEventRef struct {
+	PrevContent   json.RawMessage `json:"prev_content"`
+	ReplacesState string          `json:"replaces_state"`
+	PrevSenderID  string          `json:"prev_sender"`
+}
 
 type ClientEventFormat int
 
@@ -70,7 +79,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 			continue // TODO: shouldn't happen?
 		}
 		if format == FormatSyncFederation {
-			evs = append(evs, ToClientEvent(se, format, string(se.SenderID()), se.StateKey()))
+			evs = append(evs, ToClientEvent(se, format, string(se.SenderID()), se.StateKey(), spec.RawJSON(se.Unsigned())))
 			continue
 		}
 
@@ -92,19 +101,36 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 				sk = &skString
 			}
 		}
-		evs = append(evs, ToClientEvent(se, format, sender.String(), sk))
+
+		unsigned := se.Unsigned()
+		var prev PrevEventRef
+		if err := json.Unmarshal(se.Unsigned(), &prev); err == nil && prev.PrevSenderID != "" {
+			prevUserID, err := userIDForSender(*validRoomID, spec.SenderID(prev.PrevSenderID))
+			if err == nil && userID != nil {
+				prev.PrevSenderID = prevUserID.String()
+			} else {
+				logrus.Warnf("Failed to find userID for prev_sender in ClientEvent")
+				// NOTE: Not much can be done here, so leave the previous value in place.
+			}
+			unsigned, err = json.Marshal(prev)
+			if err != nil {
+				logrus.Errorf("Failed to marshal unsigned content for ClientEvent: %s", err.Error())
+				continue
+			}
+		}
+		evs = append(evs, ToClientEvent(se, format, sender.String(), sk, spec.RawJSON(unsigned)))
 	}
 	return evs
 }
 
 // ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender string, stateKey *string) ClientEvent {
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender string, stateKey *string, unsigned spec.RawJSON) ClientEvent {
 	ce := ClientEvent{
 		Content:        spec.RawJSON(se.Content()),
 		Sender:         sender,
 		Type:           se.Type(),
 		StateKey:       stateKey,
-		Unsigned:       spec.RawJSON(se.Unsigned()),
+		Unsigned:       unsigned,
 		OriginServerTS: se.OriginServerTS(),
 		EventID:        se.EventID(),
 		Redacts:        se.Redacts(),
@@ -151,7 +177,7 @@ func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserver
 			sk = &skString
 		}
 	}
-	return ToClientEvent(event, FormatAll, sender.String(), sk)
+	return ToClientEvent(event, FormatAll, sender.String(), sk, event.Unsigned())
 }
 
 // If provided state key is a user ID (state keys beginning with @ are reserved for this purpose)

@@ -106,7 +106,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 		sk := ""
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
-			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, sender.String(), &sk),
+			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, sender.String(), &sk, dummyEvent.Unsigned()),
 		}); err != nil {
 			t.Error(err)
 		}
