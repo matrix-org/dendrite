@@ -500,7 +500,7 @@ func (p *PDUStreamProvider) updatePowerLevelEvent(ctx context.Context, ev *rstyp
 	prevContent := gjson.GetBytes(ev.JSON(), "unsigned.prev_content")
 	if !prevContent.Exists() {
 		var evNew gomatrixserverlib.PDU
-		evNew, err = gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON(newEv, false)
+		evNew, err = gomatrixserverlib.MustGetRoomVersion(ev.Version()).NewEventFromTrustedJSON(newEv, false)
 		if err != nil {
 			return nil, err
 		}
@@ -535,7 +535,7 @@ func (p *PDUStreamProvider) updatePowerLevelEvent(ctx context.Context, ev *rstyp
 	}
 
 	var evNew gomatrixserverlib.PDU
-	evNew, err = gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSONWithEventID(ev.EventID(), newEv, false)
+	evNew, err = gomatrixserverlib.MustGetRoomVersion(ev.Version()).NewEventFromTrustedJSONWithEventID(ev.EventID(), newEv, false)
 	if err != nil {
 		return nil, err
 	}
