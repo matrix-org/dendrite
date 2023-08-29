@@ -38,6 +38,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -101,7 +102,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	var output api.OutputEvent
 	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		logrus.WithError(err).Errorf("roomserver output log: message parse failure")
+		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return true
 	}
 
@@ -137,7 +138,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 			return true // non-fatal, as otherwise we end up in a loop of trying to purge the room
 		}
 	default:
-		logrus.WithField("type", output.Type).Debug(
+		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
 	}
@@ -146,7 +147,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 			// no matter how often we retry this event, we will always get this error, discard the event
 			return true
 		}
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"type": output.Type,
 		}).WithError(err).Error("roomserver output log: failed to process event")
 		sentry.CaptureException(err)
@@ -161,12 +162,12 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 ) error {
 	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause, s.rsAPI)
 	if err != nil {
-		logrus.WithError(err).Error("RedactEvent error'd")
+		log.WithError(err).Error("RedactEvent error'd")
 		return err
 	}
 
 	if err = s.db.RedactRelations(ctx, msg.RedactedBecause.RoomID(), msg.RedactedEventID); err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"room_id":           msg.RedactedBecause.RoomID(),
 			"event_id":          msg.RedactedBecause.EventID(),
 			"redacted_event_id": msg.RedactedEventID,
@@ -276,29 +277,29 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	pduPos, err := s.db.WriteEvent(ctx, ev, addsStateEvents, msg.AddsStateEventIDs, msg.RemovesStateEventIDs, msg.TransactionID, false, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		logrus.WithFields(logrus.Fields{
-			"event_id":      ev.EventID(),
-			"event":         string(ev.JSON()),
-			logrus.ErrorKey: err,
-			"add":           msg.AddsStateEventIDs,
-			"del":           msg.RemovesStateEventIDs,
+		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
+			"event":      string(ev.JSON()),
+			log.ErrorKey: err,
+			"add":        msg.AddsStateEventIDs,
+			"del":        msg.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
 	}
 	if err = s.writeFTS(ev, pduPos); err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
 	if err = s.db.UpdateRelations(ctx, ev); err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("Failed to update relations")
@@ -337,23 +338,23 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	pduPos, err := s.db.WriteEvent(ctx, ev, []*rstypes.HeaderedEvent{}, []string{}, []string{}, nil, ev.StateKey() != nil, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		logrus.WithFields(logrus.Fields{
-			"event_id":      ev.EventID(),
-			"event":         string(ev.JSON()),
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
+			"event":      string(ev.JSON()),
+			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
 		return nil
 	}
 
 	if err = s.writeFTS(ev, pduPos); err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
 	if err = s.db.UpdateRelations(ctx, ev); err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"room_id":  ev.RoomID(),
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
@@ -362,7 +363,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
@@ -435,11 +436,11 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		logrus.WithFields(logrus.Fields{
-			"event_id":      msg.Event.EventID(),
-			"event":         string(msg.Event.JSON()),
-			"pdupos":        pduPos,
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			"event_id":   msg.Event.EventID(),
+			"event":      string(msg.Event.JSON()),
+			"pdupos":     pduPos,
+			log.ErrorKey: err,
 		}).Errorf("roomserver output log: write invite failure")
 		return
 	}
@@ -456,9 +457,9 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// we should not panic if we try to retire it.
 	if err != nil && err != sql.ErrNoRows {
 		// panic rather than continue with an inconsistent database
-		logrus.WithFields(logrus.Fields{
-			"event_id":      msg.EventID,
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			log.ErrorKey: err,
 		}).Errorf("roomserver output log: remove invite failure")
 		return
 	}
@@ -474,19 +475,19 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	s.inviteStream.Advance(pduPos)
 	validRoomID, err := spec.NewRoomID(msg.RoomID)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"event_id":      msg.EventID,
-			"room_id":       msg.RoomID,
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"room_id":    msg.RoomID,
+			log.ErrorKey: err,
 		}).Errorf("roomID is invalid")
 		return
 	}
 	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
 	if err != nil || userID == nil {
-		logrus.WithFields(logrus.Fields{
-			"event_id":      msg.EventID,
-			"sender_id":     msg.TargetSenderID,
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			"sender_id":  msg.TargetSenderID,
+			log.ErrorKey: err,
 		}).Errorf("failed to find userID for sender")
 		return
 	}
@@ -499,8 +500,8 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	sp, err := s.db.AddPeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		logrus.WithFields(logrus.Fields{
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
 		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
@@ -518,8 +519,8 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		logrus.WithFields(logrus.Fields{
-			logrus.ErrorKey: err,
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
 		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
@@ -622,7 +623,7 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 	case spec.MRoomTopic:
 		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
 	case spec.MRoomRedaction:
-		logrus.Tracef("Redacting event: %s", ev.Redacts())
+		log.Tracef("Redacting event: %s", ev.Redacts())
 		if err := s.fts.Delete(ev.Redacts()); err != nil {
 			return fmt.Errorf("failed to delete entry from fulltext index: %w", err)
 		}
@@ -631,7 +632,7 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 		return nil
 	}
 	if e.Content != "" {
-		logrus.Tracef("Indexing element: %+v", e)
+		log.Tracef("Indexing element: %+v", e)
 		if err := s.fts.Index(e); err != nil {
 			return err
 		}
