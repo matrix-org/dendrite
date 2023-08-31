@@ -44,9 +44,9 @@ const (
 	FormatSyncFederation
 )
 
-// ClientFederationEvent extends a ClientEvent to contain the additional fields present in a
+// ClientFederationFields extends a ClientEvent to contain the additional fields present in a
 // federation event. Used when the client requests `event_format` of type `federation`.
-type ClientFederationEvent struct {
+type ClientFederationFields struct {
 	Depth      int64        `json:"depth,omitempty"`
 	PrevEvents []string     `json:"prev_events,omitempty"`
 	AuthEvents []string     `json:"auth_events,omitempty"`
@@ -67,8 +67,8 @@ type ClientEvent struct {
 	Unsigned       spec.RawJSON   `json:"unsigned,omitempty"`
 	Redacts        string         `json:"redacts,omitempty"`
 
-	// Federation Event Fields. Only sent to clients when `event_format` == `federation`.
-	ClientFederationEvent
+	// Only sent to clients when `event_format` == `federation`.
+	ClientFederationFields
 }
 
 // ToClientEvents converts server events to client events.
