@@ -109,7 +109,11 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 			if err == nil && userID != nil {
 				prev.PrevSenderID = prevUserID.String()
 			} else {
-				logrus.Warnf("Failed to find userID for prev_sender in ClientEvent")
+				errString := "userID unknown"
+				if err != nil {
+					errString = err.Error()
+				}
+				logrus.Warnf("Failed to find userID for prev_sender in ClientEvent: %s", errString)
 				// NOTE: Not much can be done here, so leave the previous value in place.
 			}
 			unsigned, err = json.Marshal(prev)
