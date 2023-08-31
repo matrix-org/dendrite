@@ -63,6 +63,11 @@ func (p *InviteStreamProvider) IncrementalSync(
 		return from
 	}
 
+	eventFormat := synctypes.FormatSync
+	if req.Filter.EventFormat == synctypes.EventFormatFederation {
+		eventFormat = synctypes.FormatSyncFederation
+	}
+
 	for roomID, inviteEvent := range invites {
 		user := spec.UserID{}
 		validRoomID, err := spec.NewRoomID(inviteEvent.RoomID())
@@ -87,7 +92,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		if _, ok := req.IgnoredUsers.List[user.String()]; ok {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent, user, sk)
+		ir := types.NewInviteResponse(inviteEvent, user, sk, eventFormat)
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 
