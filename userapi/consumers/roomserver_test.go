@@ -2,16 +2,22 @@ package consumers
 
 import (
 	"context"
+	"crypto/ed25519"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -139,6 +145,42 @@ func Test_evaluatePushRules(t *testing.T) {
 	})
 }
 
+func TestLocalRoomMembers(t *testing.T) {
+	alice := test.NewUser(t)
+	_, sk, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
+	bob := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
+	charlie := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
+
+	room := test.NewRoom(t, alice)
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(bob.ID))
+	room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(charlie.ID))
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		defer close()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+		caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+		assert.NoError(t, err)
+
+		err = rsapi.SendEvents(processCtx.Context(), rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
+		assert.NoError(t, err)
+
+		consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}
+		members, count, err := consumer.localRoomMembers(processCtx.Context(), room.ID)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, count)
+		expectedLocalMember := &localMembership{UserID: alice.ID, Localpart: alice.Localpart, Domain: "test", MemberContent: gomatrixserverlib.MemberContent{Membership: spec.Join}}
+		assert.Equal(t, expectedLocalMember, members[0])
+	})
+
+}
+
 func TestMessageStats(t *testing.T) {
 	type args struct {
 		eventType   string
@@ -256,4 +298,43 @@ func TestMessageStats(t *testing.T) {
 			})
 		}
 	})
+}
+
+func BenchmarkLocalRoomMembers(b *testing.B) {
+	t := &testing.T{}
+
+	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer close()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	natsInstance := &jetstream.NATSInstance{}
+	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+	rsAPI.SetFederationAPI(nil, nil)
+	db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	assert.NoError(b, err)
+
+	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}
+	_, sk, err := ed25519.GenerateKey(nil)
+	assert.NoError(b, err)
+
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	for i := 0; i < 100; i++ {
+		user := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
+		room.CreateAndInsert(t, user, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(user.ID))
+	}
+
+	err = rsapi.SendEvents(processCtx.Context(), rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
+	assert.NoError(b, err)
+
+	expectedLocalMember := &localMembership{UserID: alice.ID, Localpart: alice.Localpart, Domain: "test", MemberContent: gomatrixserverlib.MemberContent{Membership: spec.Join}}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		members, count, err := consumer.localRoomMembers(processCtx.Context(), room.ID)
+		assert.NoError(b, err)
+		assert.Equal(b, 101, count)
+		assert.Equal(b, expectedLocalMember, members[0])
+	}
 }

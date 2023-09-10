@@ -134,7 +134,7 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", filepath.Join(*instanceDir, *instanceName)))
-		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+		cfg.MSCs.MSCs = []string{"msc2836"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true

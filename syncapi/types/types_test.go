@@ -72,7 +72,7 @@ func TestNewInviteResponse(t *testing.T) {
 	skString := skUserID.String()
 	sk := &skString
 
-	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, *sender, sk)
+	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, *sender, sk, synctypes.FormatSync)
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)

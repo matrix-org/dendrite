@@ -115,7 +115,7 @@ func (n *Notifier) OnNewEvent(
 		// If this is an invite, also add in the invitee to this list.
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), *validRoomID, spec.SenderID(*ev.StateKey()))
-			if err != nil {
+			if err != nil || targetUserID == nil {
 				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
 					"Notifier.OnNewEvent: Failed to find the userID for this event",
 				)

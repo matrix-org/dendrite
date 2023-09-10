@@ -23,7 +23,7 @@ import (
 )
 
 // NewDatabase opens a SQLIte database.
-func NewDatabase(conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+func NewDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
 	db, writer, err := conMan.Connection(dbProperties)
 	if err != nil {
 		return nil, err

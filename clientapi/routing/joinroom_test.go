@@ -35,9 +35,9 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
 
 		// Create the users in the userapi
 		for _, u := range []*test.User{alice, bob, charlie} {

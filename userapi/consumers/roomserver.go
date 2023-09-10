@@ -313,13 +313,15 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 		sk := event.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
+			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*sk))
 			if queryErr == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString
+			} else {
+				return fmt.Errorf("queryUserIDForSender: userID unknown for %s", *sk)
 			}
 		}
-		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk)
+		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender.String(), sk, event.Unsigned())
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
@@ -403,15 +405,22 @@ func newLocalMembership(event *synctypes.ClientEvent) (*localMembership, error) 
 // localRoomMembers fetches the current local members of a room, and
 // the total number of members.
 func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
+	// Get only locally joined users to avoid unmarshalling and caching
+	// membership events we only use to calculate the room size.
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
+		LocalOnly:  true,
 	}
 	var res rsapi.QueryMembershipsForRoomResponse
-
-	// XXX: This could potentially race if the state for the event is not known yet
-	// e.g. the event came over federation but we do not have the full state persisted.
 	if err := s.rsAPI.QueryMembershipsForRoom(ctx, req, &res); err != nil {
+		return nil, 0, err
+	}
+
+	// Since we only queried locally joined users above,
+	// we also need to ask the roomserver about the joined user count.
+	totalCount, err := s.rsAPI.JoinedUserCount(ctx, roomID)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -424,31 +433,18 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 		if *event.StateKey == "" {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.SplitID('@', *event.StateKey)
-		if err != nil {
-			log.WithError(err).Error("failed to get servername from statekey")
-			continue
-		}
-		// Only get memberships for our server
-		if serverName != s.serverName {
-			continue
-		}
+		// We're going to trust the Query from above to really just return
+		// local users
 		member, err := newLocalMembership(&event)
 		if err != nil {
 			log.WithError(err).Errorf("Parsing MemberContent")
-			continue
-		}
-		if member.Membership != spec.Join {
-			continue
-		}
-		if member.Domain != s.cfg.Matrix.ServerName {
 			continue
 		}
 
 		members = append(members, member)
 	}
 
-	return members, len(res.JoinEvents), nil
+	return members, totalCount, nil
 }
 
 // roomName returns the name in the event (if type==m.room.name), or
@@ -570,7 +566,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender, sk),
+		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender.String(), sk, event.Unsigned()),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it
@@ -844,8 +840,11 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
 			return nil, err
+		} else if localSender == nil {
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
+			return nil, fmt.Errorf("no sender ID for user %s in %s", userID.String(), roomID.String())
 		}
-		if event.StateKey() != nil && *event.StateKey() == string(localSender) {
+		if event.StateKey() != nil && *event.StateKey() == string(*localSender) {
 			req.Notification.UserIsTarget = true
 		}
 	}

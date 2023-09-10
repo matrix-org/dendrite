@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime"
 	"net/http"
 	"net/url"
@@ -126,6 +127,17 @@ func Download(
 		activeRemoteRequests, activeThumbnailGeneration,
 	)
 	if err != nil {
+		// If we bubbled up a os.PathError, e.g. no such file or directory, don't send
+		// it to the client, be more generic.
+		var perr *fs.PathError
+		if errors.As(err, &perr) {
+			dReq.Logger.WithError(err).Error("failed to open file")
+			dReq.jsonErrorResponse(w, util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("File not found"),
+			})
+			return
+		}
 		// TODO: Handle the fact we might have started writing the response
 		dReq.jsonErrorResponse(w, util.JSONResponse{
 			Code: http.StatusNotFound,

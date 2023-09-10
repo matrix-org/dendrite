@@ -94,11 +94,17 @@ func MakeLeave(
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
+	} else if senderID == nil {
+		util.GetLogger(httpReq.Context()).WithField("roomID", roomID).WithField("userID", userID).Error("rsAPI.QuerySenderIDForUser returned nil sender ID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	input := gomatrixserverlib.HandleMakeLeaveInput{
 		UserID:             userID,
-		SenderID:           senderID,
+		SenderID:           *senderID,
 		RoomID:             roomID,
 		RoomVersion:        roomVersion,
 		RequestOrigin:      request.Origin(),

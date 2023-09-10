@@ -105,7 +105,7 @@ func toClientResponse(ctx context.Context, res *MSC2836EventRelationshipsRespons
 
 // Enable this MSC
 func Enable(
-	cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
 	db, err := NewDatabase(cm, &cfg.MSCs.Database)

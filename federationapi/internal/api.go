@@ -54,11 +54,14 @@ func NewFederationInternalAPI(
 			KeyDatabase: serverKeyDB,
 		}
 
+		pubKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		addDirectFetcher := func() {
 			keyRing.KeyFetchers = append(
 				keyRing.KeyFetchers,
 				&gomatrixserverlib.DirectKeyFetcher{
-					Client: federation,
+					Client:            federation,
+					IsLocalServerName: cfg.Matrix.IsLocalServerName,
+					LocalPublicKey:    []byte(pubKey),
 				},
 			)
 		}

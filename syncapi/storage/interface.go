@@ -81,8 +81,11 @@ type DatabaseTransaction interface {
 	// If no data is retrieved, returns an empty map
 	// If there was an issue with the retrieval, returns an error
 	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *synctypes.EventFilter) (map[string][]string, types.StreamPosition, error)
-	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit. If backwardsOrdering is true, the most recent event must be first, else last.
-	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *synctypes.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
+	// If backwardsOrdering is true, the most recent event must be first, else last.
+	// Returns the filtered StreamEvents on success. Returns **unfiltered** StreamEvents and ErrNoEventsForFilter if
+	// the provided filter removed all events, this can be used to still calculate the start/end position. (e.g for `/messages`)
+	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *synctypes.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, start, end types.TopologyToken, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
 	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
