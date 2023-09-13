@@ -144,9 +144,17 @@ func Relations(
 				sk = &skString
 			}
 		}
+
+		clientEvent, err := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		}, sender.String(), sk)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+			continue
+		}
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, sender.String(), sk, event.Unsigned()),
+			*clientEvent,
 		)
 	}
 

@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
@@ -78,86 +80,14 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		if se == nil {
 			continue // TODO: shouldn't happen?
 		}
-		if format == FormatSyncFederation {
-			evs = append(evs, ToClientEvent(se, format, string(se.SenderID()), se.StateKey(), spec.RawJSON(se.Unsigned())))
-			continue
-		}
-
-		sender := spec.UserID{}
-		validRoomID, err := spec.NewRoomID(se.RoomID())
+		ev, err := ToClientEvent(se, format, userIDForSender, string(se.SenderID()), se.StateKey())
 		if err != nil {
+			logrus.Errorf("Failed converting event to ClientEvent: %s", err.Error())
 			continue
 		}
-		userID, err := userIDForSender(*validRoomID, se.SenderID())
-		if err == nil && userID != nil {
-			sender = *userID
-		}
-
-		sk := se.StateKey()
-		if sk != nil && *sk != "" {
-			skUserID, err := userIDForSender(*validRoomID, spec.SenderID(*sk))
-			if err == nil && skUserID != nil {
-				skString := skUserID.String()
-				sk = &skString
-			}
-		}
-
-		unsigned := se.Unsigned()
-		var prev PrevEventRef
-		if err := json.Unmarshal(se.Unsigned(), &prev); err == nil && prev.PrevSenderID != "" {
-			prevUserID, err := userIDForSender(*validRoomID, spec.SenderID(prev.PrevSenderID))
-			if err == nil && userID != nil {
-				prev.PrevSenderID = prevUserID.String()
-			} else {
-				errString := "userID unknown"
-				if err != nil {
-					errString = err.Error()
-				}
-				logrus.Warnf("Failed to find userID for prev_sender in ClientEvent: %s", errString)
-				// NOTE: Not much can be done here, so leave the previous value in place.
-			}
-			unsigned, err = json.Marshal(prev)
-			if err != nil {
-				logrus.Errorf("Failed to marshal unsigned content for ClientEvent: %s", err.Error())
-				continue
-			}
-		}
-		evs = append(evs, ToClientEvent(se, format, sender.String(), sk, spec.RawJSON(unsigned)))
+		evs = append(evs, *ev)
 	}
 	return evs
-}
-
-// ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, sender string, stateKey *string, unsigned spec.RawJSON) ClientEvent {
-	ce := ClientEvent{
-		Content:        spec.RawJSON(se.Content()),
-		Sender:         sender,
-		Type:           se.Type(),
-		StateKey:       stateKey,
-		Unsigned:       unsigned,
-		OriginServerTS: se.OriginServerTS(),
-		EventID:        se.EventID(),
-		Redacts:        se.Redacts(),
-	}
-
-	switch format {
-	case FormatAll:
-		ce.RoomID = se.RoomID()
-	case FormatSync:
-	case FormatSyncFederation:
-		ce.RoomID = se.RoomID()
-		ce.AuthEvents = se.AuthEventIDs()
-		ce.PrevEvents = se.PrevEventIDs()
-		ce.Depth = se.Depth()
-		// TODO: Set Signatures & Hashes fields
-	}
-
-	if format != FormatSyncFederation {
-		if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
-			ce.SenderKey = se.SenderID()
-		}
-	}
-	return ce
 }
 
 // ToClientEvent converts a single server event to a client event.
@@ -181,7 +111,11 @@ func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserver
 			sk = &skString
 		}
 	}
-	return ToClientEvent(event, FormatAll, sender.String(), sk, event.Unsigned())
+	ev, err := ToClientEvent(event, FormatAll, userIDQuery, sender.String(), sk)
+	if err != nil {
+		return ClientEvent{}
+	}
+	return *ev
 }
 
 // If provided state key is a user ID (state keys beginning with @ are reserved for this purpose)
@@ -210,4 +144,300 @@ func FromClientStateKey(roomID spec.RoomID, stateKey string, senderIDQuery spec.
 	} else {
 		return &stateKey, nil
 	}
+}
+
+// ToClientEvent converts a single server event to a client event.
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDForSender spec.UserIDForSender, sender string, stateKey *string) (*ClientEvent, error) {
+	ce := ClientEvent{
+		Content:        se.Content(),
+		Sender:         sender,
+		Type:           se.Type(),
+		StateKey:       stateKey,
+		Unsigned:       se.Unsigned(),
+		OriginServerTS: se.OriginServerTS(),
+		EventID:        se.EventID(),
+		Redacts:        se.Redacts(),
+	}
+
+	switch format {
+	case FormatAll:
+		ce.RoomID = se.RoomID()
+	case FormatSync:
+	case FormatSyncFederation:
+		ce.RoomID = se.RoomID()
+		ce.AuthEvents = se.AuthEventIDs()
+		ce.PrevEvents = se.PrevEventIDs()
+		ce.Depth = se.Depth()
+		// TODO: Set Signatures & Hashes fields
+	}
+
+	if format != FormatSyncFederation {
+		if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+			ce.SenderKey = se.SenderID()
+
+			validRoomID, err := spec.NewRoomID(se.RoomID())
+			if err != nil {
+				return nil, err
+			}
+			userID, err := userIDForSender(*validRoomID, se.SenderID())
+			if err == nil && userID != nil {
+				ce.Sender = userID.String()
+			}
+
+			sk := se.StateKey()
+			if sk != nil && *sk != "" {
+				skUserID, err := userIDForSender(*validRoomID, spec.SenderID(*sk))
+				if err == nil && skUserID != nil {
+					skString := skUserID.String()
+					ce.StateKey = &skString
+				}
+			}
+
+			var prev PrevEventRef
+			if err := json.Unmarshal(se.Unsigned(), &prev); err == nil && prev.PrevSenderID != "" {
+				prevUserID, err := userIDForSender(*validRoomID, spec.SenderID(prev.PrevSenderID))
+				if err == nil && userID != nil {
+					prev.PrevSenderID = prevUserID.String()
+				} else {
+					errString := "userID unknown"
+					if err != nil {
+						errString = err.Error()
+					}
+					logrus.Warnf("Failed to find userID for prev_sender in ClientEvent: %s", errString)
+					// NOTE: Not much can be done here, so leave the previous value in place.
+				}
+				ce.Unsigned, err = json.Marshal(prev)
+				if err != nil {
+					err = fmt.Errorf("Failed to marshal unsigned content for ClientEvent: %s", err.Error())
+					return nil, err
+				}
+			}
+
+			// TODO: Refactor all this stuff
+			if se.Type() == spec.MRoomCreate {
+				if creator := gjson.GetBytes(se.Content(), "creator"); creator.Exists() {
+					oldCreator := creator.Str
+					userID, err := userIDForSender(*validRoomID, spec.SenderID(oldCreator))
+					if err != nil {
+						err = fmt.Errorf("Failed to find userID for creator in ClientEvent: %s", err.Error())
+						return nil, err
+					}
+
+					if userID != nil {
+						var newCreatorBytes, newContent []byte
+						newCreatorBytes, err = json.Marshal(userID.String())
+						if err != nil {
+							err = fmt.Errorf("Failed to marshal new creator for ClientEvent: %s", err.Error())
+							return nil, err
+						}
+						newContent, err = sjson.SetRawBytes([]byte(se.Content()), "creator", newCreatorBytes)
+						if err != nil {
+							err = fmt.Errorf("Failed to set new creator for ClientEvent: %s", err.Error())
+							return nil, err
+						}
+
+						ce.Content = newContent
+					}
+				}
+			}
+
+			if se.Type() == spec.MRoomMember {
+				updatedEvent, err := updateInviteRoomState(userIDForSender, se, format)
+				if err != nil {
+					err = fmt.Errorf("Failed to update m.room.member event for ClientEvent: %s", err.Error())
+					return nil, err
+				}
+				ce.Unsigned = updatedEvent.Unsigned()
+			}
+
+			if se.Type() == spec.MRoomPowerLevels && se.StateKeyEquals("") {
+				se, err = updatePowerLevelEvent(userIDForSender, se, format)
+				if err != nil {
+					err = fmt.Errorf("Failed update power levels for ClientEvent: %s", err.Error())
+					return nil, err
+				}
+				ce.Content = se.Content()
+				ce.Unsigned = se.Unsigned()
+			}
+		}
+	}
+
+	return &ce, nil
+}
+
+func updateInviteRoomState(userIDForSender spec.UserIDForSender, ev gomatrixserverlib.PDU, eventFormat ClientEventFormat) (gomatrixserverlib.PDU, error) {
+	if inviteRoomState := gjson.GetBytes(ev.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
+		validRoomID, err := spec.NewRoomID(ev.RoomID())
+		if err != nil {
+			return nil, err
+		}
+		userID, err := userIDForSender(*validRoomID, ev.SenderID())
+		if err != nil || userID == nil {
+			if err != nil {
+				logrus.WithError(err).Error("userID is invalid")
+			}
+			return nil, err
+		}
+
+		newState, err := getUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, *userID, ev.StateKey(), eventFormat)
+		if err != nil {
+			return nil, err
+		}
+
+		var newEv []byte
+		newEv, err = sjson.SetRawBytes(ev.JSON(), "unsigned.invite_room_state", newState)
+		if err != nil {
+			return nil, err
+		}
+
+		return gomatrixserverlib.MustGetRoomVersion(ev.Version()).NewEventFromTrustedJSON(newEv, false)
+	}
+
+	return ev, nil
+}
+
+type InviteRoomStateEvent struct {
+	Content  spec.RawJSON `json:"content"`
+	SenderID string       `json:"sender"`
+	StateKey *string      `json:"state_key"`
+	Type     string       `json:"type"`
+}
+
+func getUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, inviterUserID spec.UserID, stateKey *string, eventFormat ClientEventFormat) (spec.RawJSON, error) {
+	var res spec.RawJSON
+	inviteStateEvents := []InviteRoomStateEvent{}
+	err := json.Unmarshal([]byte(inviteRoomState.Raw), &inviteStateEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != FormatSyncFederation {
+		validRoomID, err := spec.NewRoomID(event.RoomID())
+		if err != nil {
+			return nil, err
+		}
+
+		for i, ev := range inviteStateEvents {
+			userID, err := userIDForSender(*validRoomID, spec.SenderID(ev.SenderID))
+			if err != nil {
+				return nil, err
+			}
+			inviteStateEvents[i].SenderID = userID.String()
+
+			if ev.StateKey != nil && *ev.StateKey != "" {
+				userID, err := userIDForSender(*validRoomID, spec.SenderID(*ev.StateKey))
+				if err != nil {
+					return nil, err
+				}
+				if userID != nil {
+					user := userID.String()
+					inviteStateEvents[i].StateKey = &user
+				}
+			}
+
+			if creator := gjson.GetBytes(ev.Content, "creator"); creator.Exists() {
+				oldCreator := creator.Str
+				userID, err := userIDForSender(*validRoomID, spec.SenderID(oldCreator))
+				if err != nil {
+					return nil, err
+				}
+
+				if userID != nil {
+					var newCreatorBytes, newContent []byte
+					newCreatorBytes, err = json.Marshal(userID.String())
+					if err != nil {
+						return nil, err
+					}
+					newContent, err = sjson.SetRawBytes([]byte(ev.Content), "creator", newCreatorBytes)
+					if err != nil {
+						return nil, err
+					}
+
+					inviteStateEvents[i].Content = newContent
+				}
+			}
+		}
+	}
+
+	res, err = json.Marshal(inviteStateEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserverlib.PDU, eventFormat ClientEventFormat) (gomatrixserverlib.PDU, error) {
+	pls, err := gomatrixserverlib.NewPowerLevelContentFromEvent(se)
+	if err != nil {
+		return nil, err
+	}
+	newPls := make(map[string]int64)
+	var userID *spec.UserID
+	for user, level := range pls.Users {
+		validRoomID, _ := spec.NewRoomID(se.RoomID())
+		if eventFormat != FormatSyncFederation {
+			userID, err = userIDForSender(*validRoomID, spec.SenderID(user))
+			if err != nil {
+				return nil, err
+			}
+			user = userID.String()
+		}
+		newPls[user] = level
+	}
+	var newPlBytes, newEv []byte
+	newPlBytes, err = json.Marshal(newPls)
+	if err != nil {
+		return nil, err
+	}
+	newEv, err = sjson.SetRawBytes(se.JSON(), "content.users", newPlBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// do the same for prev content
+	prevContent := gjson.GetBytes(se.JSON(), "unsigned.prev_content")
+	if !prevContent.Exists() {
+		var evNew gomatrixserverlib.PDU
+		evNew, err = gomatrixserverlib.MustGetRoomVersion(se.Version()).NewEventFromTrustedJSON(newEv, false)
+		if err != nil {
+			return nil, err
+		}
+
+		return evNew, err
+	}
+	pls = gomatrixserverlib.PowerLevelContent{}
+	err = json.Unmarshal([]byte(prevContent.Raw), &pls)
+	if err != nil {
+		return nil, err
+	}
+
+	newPls = make(map[string]int64)
+	for user, level := range pls.Users {
+		validRoomID, _ := spec.NewRoomID(se.RoomID())
+		if eventFormat != FormatSyncFederation {
+			userID, err = userIDForSender(*validRoomID, spec.SenderID(user))
+			if err != nil {
+				return nil, err
+			}
+			user = userID.String()
+		}
+		newPls[user] = level
+	}
+	newPlBytes, err = json.Marshal(newPls)
+	if err != nil {
+		return nil, err
+	}
+	newEv, err = sjson.SetRawBytes(newEv, "unsigned.prev_content.users", newPlBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	var evNew gomatrixserverlib.PDU
+	evNew, err = gomatrixserverlib.MustGetRoomVersion(se.Version()).NewEventFromTrustedJSONWithEventID(se.EventID(), newEv, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return evNew, err
 }

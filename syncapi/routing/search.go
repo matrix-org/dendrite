@@ -254,6 +254,15 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				sk = &skString
 			}
 		}
+
+		clientEvent, err := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}, sender.String(), sk)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).WithField("senderID", event.SenderID()).WithField("roomID", *validRoomID).Error("Failed converting to ClientEvent")
+			continue
+		}
+
 		results = append(results, Result{
 			Context: SearchContextResponse{
 				Start: startToken.String(),
@@ -267,7 +276,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				ProfileInfo: profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender.String(), sk, event.Unsigned()),
+			Result: *clientEvent,
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())

@@ -92,7 +92,11 @@ func (p *InviteStreamProvider) IncrementalSync(
 		if _, ok := req.IgnoredUsers.List[user.String()]; ok {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent, user, sk, eventFormat)
+		ir, err := types.NewInviteResponse(ctx, p.rsAPI, inviteEvent, user, sk, eventFormat)
+		if err != nil {
+			req.Log.WithError(err).Error("failed creating invite response")
+			continue
+		}
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 

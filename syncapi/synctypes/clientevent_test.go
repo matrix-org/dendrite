@@ -17,6 +17,7 @@ package synctypes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -25,6 +26,14 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+func queryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if senderID == "" {
+		return nil, nil
+	}
+
+	return spec.NewUserID(string(senderID), true)
+}
 
 const testSenderID = "testSenderID"
 const testUserID = "@test:localhost"
@@ -106,7 +115,12 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 		t.Fatalf("failed to create userID: %s", err)
 	}
 	sk := ""
-	ce := ToClientEvent(ev, FormatAll, userID.String(), &sk, ev.Unsigned())
+	ce, err := ToClientEvent(ev, FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return queryUserIDForSender(context.Background(), roomID, senderID)
+	}, userID.String(), &sk)
+	if err != nil {
+		t.Fatalf("failed to create ClientEvent: %s", err)
+	}
 
 	verifyEventFields(t,
 		EventFieldsToVerify{
@@ -166,7 +180,12 @@ func TestToClientFormatSync(t *testing.T) {
 		t.Fatalf("failed to create userID: %s", err)
 	}
 	sk := ""
-	ce := ToClientEvent(ev, FormatSync, userID.String(), &sk, ev.Unsigned())
+	ce, err := ToClientEvent(ev, FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return queryUserIDForSender(context.Background(), roomID, senderID)
+	}, userID.String(), &sk)
+	if err != nil {
+		t.Fatalf("failed to create ClientEvent: %s", err)
+	}
 	if ce.RoomID != "" {
 		t.Errorf("ClientEvent.RoomID: wanted '', got %s", ce.RoomID)
 	}
@@ -206,7 +225,12 @@ func TestToClientEventFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 		t.Fatalf("failed to create userID: %s", err)
 	}
 	sk := ""
-	ce := ToClientEvent(ev, FormatSyncFederation, userID.String(), &sk, ev.Unsigned())
+	ce, err := ToClientEvent(ev, FormatSyncFederation, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return queryUserIDForSender(context.Background(), roomID, senderID)
+	}, userID.String(), &sk)
+	if err != nil {
+		t.Fatalf("failed to create ClientEvent: %s", err)
+	}
 
 	verifyEventFields(t,
 		EventFieldsToVerify{

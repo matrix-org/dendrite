@@ -191,9 +191,16 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 					sk = &skString
 				}
 			}
+			clientEvent, err := synctypes.ToClientEvent(ev, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			}, sender.String(), sk)
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed converting to ClientEvent")
+				continue
+			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender.String(), sk, ev.Unsigned()),
+				*clientEvent,
 			)
 		}
 	}
