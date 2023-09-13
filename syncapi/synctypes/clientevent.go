@@ -295,7 +295,7 @@ func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverli
 		userID, err := userIDForSender(*validRoomID, ev.SenderID())
 		if err != nil || userID == nil {
 			if err != nil {
-				logrus.WithError(err).Error("userID is invalid")
+				err = fmt.Errorf("invalid userID found when updating invite_room_state: %s", err)
 			}
 			return nil, err
 		}
