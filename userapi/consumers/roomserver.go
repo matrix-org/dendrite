@@ -301,31 +301,11 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 	switch {
 	case event.Type() == spec.MRoomMember:
-		sender := spec.UserID{}
-		validRoomID, roomErr := spec.NewRoomID(event.RoomID())
-		if roomErr != nil {
-			return roomErr
-		}
-		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
-		if queryErr == nil && userID != nil {
-			sender = *userID
-		}
-
-		sk := event.StateKey()
-		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*sk))
-			if queryErr == nil && skUserID != nil {
-				skString := skUserID.String()
-				sk = &skString
-			} else {
-				return fmt.Errorf("queryUserIDForSender: userID unknown for %s", *sk)
-			}
-		}
-		cevent, err := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		cevent, clientEvErr := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-		}, sender.String(), sk)
-		if err != nil {
-			return err
+		})
+		if clientEvErr != nil {
+			return clientEvErr
 		}
 		var member *localMembership
 		member, err = newLocalMembership(cevent)
@@ -547,28 +527,9 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if err != nil {
 		return fmt.Errorf("s.localPushDevices: %w", err)
 	}
-
-	sender := spec.UserID{}
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return err
-	}
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
-
-	sk := event.StateKey()
-	if sk != nil && *sk != "" {
-		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
-		if queryErr == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
 	clientEvent, err := synctypes.ToClientEvent(event, synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-	}, sender.String(), sk)
+	})
 	if err != nil {
 		return err
 	}

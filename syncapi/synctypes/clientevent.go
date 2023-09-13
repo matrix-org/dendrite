@@ -80,7 +80,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		if se == nil {
 			continue // TODO: shouldn't happen?
 		}
-		ev, err := ToClientEvent(se, format, userIDForSender, string(se.SenderID()), se.StateKey())
+		ev, err := ToClientEvent(se, format, userIDForSender)
 		if err != nil {
 			logrus.Errorf("Failed converting event to ClientEvent: %s", err.Error())
 			continue
@@ -93,25 +93,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 // ToClientEvent converts a single server event to a client event.
 // It provides default logic for event.SenderID & event.StateKey -> userID conversions.
 func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserverlib.PDU) ClientEvent {
-	sender := spec.UserID{}
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return ClientEvent{}
-	}
-	userID, err := userIDQuery(*validRoomID, event.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
-
-	sk := event.StateKey()
-	if sk != nil && *sk != "" {
-		skUserID, err := userIDQuery(*validRoomID, spec.SenderID(*event.StateKey()))
-		if err == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
-	ev, err := ToClientEvent(event, FormatAll, userIDQuery, sender.String(), sk)
+	ev, err := ToClientEvent(event, FormatAll, userIDQuery)
 	if err != nil {
 		return ClientEvent{}
 	}
@@ -147,12 +129,12 @@ func FromClientStateKey(roomID spec.RoomID, stateKey string, senderIDQuery spec.
 }
 
 // ToClientEvent converts a single server event to a client event.
-func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDForSender spec.UserIDForSender, sender string, stateKey *string) (*ClientEvent, error) {
+func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDForSender spec.UserIDForSender) (*ClientEvent, error) {
 	ce := ClientEvent{
 		Content:        se.Content(),
-		Sender:         sender,
+		Sender:         string(se.SenderID()),
 		Type:           se.Type(),
-		StateKey:       stateKey,
+		StateKey:       se.StateKey(),
 		Unsigned:       se.Unsigned(),
 		OriginServerTS: se.OriginServerTS(),
 		EventID:        se.EventID(),
@@ -300,7 +282,7 @@ func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverli
 			return nil, err
 		}
 
-		newState, err := getUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, *userID, ev.StateKey(), eventFormat)
+		newState, err := getUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, *validRoomID, eventFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -324,7 +306,7 @@ type InviteRoomStateEvent struct {
 	Type     string       `json:"type"`
 }
 
-func getUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, inviterUserID spec.UserID, stateKey *string, eventFormat ClientEventFormat) (spec.RawJSON, error) {
+func getUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, roomID spec.RoomID, eventFormat ClientEventFormat) (spec.RawJSON, error) {
 	var res spec.RawJSON
 	inviteStateEvents := []InviteRoomStateEvent{}
 	err := json.Unmarshal([]byte(inviteRoomState.Raw), &inviteStateEvents)
@@ -333,22 +315,17 @@ func getUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomS
 	}
 
 	if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != FormatSyncFederation {
-		validRoomID, err := spec.NewRoomID(event.RoomID())
-		if err != nil {
-			return nil, err
-		}
-
 		for i, ev := range inviteStateEvents {
-			userID, err := userIDForSender(*validRoomID, spec.SenderID(ev.SenderID))
-			if err != nil {
-				return nil, err
+			userID, userIDErr := userIDForSender(roomID, spec.SenderID(ev.SenderID))
+			if userIDErr != nil {
+				return nil, userIDErr
 			}
 			inviteStateEvents[i].SenderID = userID.String()
 
 			if ev.StateKey != nil && *ev.StateKey != "" {
-				userID, err := userIDForSender(*validRoomID, spec.SenderID(*ev.StateKey))
-				if err != nil {
-					return nil, err
+				userID, senderErr := userIDForSender(roomID, spec.SenderID(*ev.StateKey))
+				if senderErr != nil {
+					return nil, senderErr
 				}
 				if userID != nil {
 					user := userID.String()
@@ -356,10 +333,10 @@ func getUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomS
 				}
 			}
 
-			updatedContent, err := updateCreateEvent(ev.Content, userIDForSender, *validRoomID)
-			if err != nil {
-				err = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %s", err.Error())
-				return nil, err
+			updatedContent, updateErr := updateCreateEvent(ev.Content, userIDForSender, roomID)
+			if updateErr != nil {
+				updateErr = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %s", userIDErr.Error())
+				return nil, updateErr
 			}
 			inviteStateEvents[i].Content = updatedContent
 		}

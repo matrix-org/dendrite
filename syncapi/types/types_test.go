@@ -73,19 +73,8 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender, err := spec.NewUserID("@neilalexander:matrix.org", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	skUserID, err := spec.NewUserID("@neilalexander:dendrite.neilalexander.dev", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	skString := skUserID.String()
-	sk := &skString
-
 	rsAPI := FakeRoomserverAPI{}
-	res, err := NewInviteResponse(context.Background(), &rsAPI, &types.HeaderedEvent{PDU: ev}, *sender, sk, synctypes.FormatSync)
+	res, err := NewInviteResponse(context.Background(), &rsAPI, &types.HeaderedEvent{PDU: ev}, synctypes.FormatSync)
 	if err != nil {
 		t.Fatal(err)
 	}

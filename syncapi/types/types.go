@@ -533,7 +533,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *types.HeaderedEvent, userID spec.UserID, stateKey *string, eventFormat synctypes.ClientEventFormat) (*InviteResponse, error) {
+func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *types.HeaderedEvent, eventFormat synctypes.ClientEventFormat) (*InviteResponse, error) {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -554,7 +554,7 @@ func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *t
 	// This is needed for clients to work out *who* sent the invite.
 	inviteEvent, err := synctypes.ToClientEvent(eventNoUnsigned, eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-	}, userID.String(), stateKey)
+	})
 	if err != nil {
 		return nil, err
 	}

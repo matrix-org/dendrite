@@ -23,7 +23,7 @@ import (
 	userUtil "github.com/matrix-org/dendrite/userapi/util"
 )
 
-func queryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+func queryUserIDForSender(senderID spec.SenderID) (*spec.UserID, error) {
 	if senderID == "" {
 		return nil, nil
 	}
@@ -108,14 +108,12 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Insert a dummy event
-		sender, err := spec.NewUserID(alice.ID, true)
+		ev, err := synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return queryUserIDForSender(senderID)
+		})
 		if err != nil {
 			t.Error(err)
 		}
-		sk := ""
-		ev, err := synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-			return queryUserIDForSender(context.Background(), roomID, senderID)
-		}, sender.String(), &sk)
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
 			Event: *ev,
 		}); err != nil {

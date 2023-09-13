@@ -17,7 +17,6 @@ package synctypes
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -27,7 +26,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func queryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+func queryUserIDForSender(senderID spec.SenderID) (*spec.UserID, error) {
 	if senderID == "" {
 		return nil, nil
 	}
@@ -116,8 +115,8 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	}
 	sk := ""
 	ce, err := ToClientEvent(ev, FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-		return queryUserIDForSender(context.Background(), roomID, senderID)
-	}, userID.String(), &sk)
+		return queryUserIDForSender(senderID)
+	})
 	if err != nil {
 		t.Fatalf("failed to create ClientEvent: %s", err)
 	}
@@ -175,14 +174,9 @@ func TestToClientFormatSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
-	userID, err := spec.NewUserID("@test:localhost", true)
-	if err != nil {
-		t.Fatalf("failed to create userID: %s", err)
-	}
-	sk := ""
 	ce, err := ToClientEvent(ev, FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-		return queryUserIDForSender(context.Background(), roomID, senderID)
-	}, userID.String(), &sk)
+		return queryUserIDForSender(senderID)
+	})
 	if err != nil {
 		t.Fatalf("failed to create ClientEvent: %s", err)
 	}
@@ -226,8 +220,8 @@ func TestToClientEventFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 	}
 	sk := ""
 	ce, err := ToClientEvent(ev, FormatSyncFederation, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-		return queryUserIDForSender(context.Background(), roomID, senderID)
-	}, userID.String(), &sk)
+		return queryUserIDForSender(senderID)
+	})
 	if err != nil {
 		t.Fatalf("failed to create ClientEvent: %s", err)
 	}
