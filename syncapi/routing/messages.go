@@ -416,17 +416,6 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 
 	start = *r.from
 
-	for _, ev := range filteredEvents {
-		if ev.Version() != gomatrixserverlib.RoomVersionPseudoIDs {
-			continue
-		}
-		if ev.Type() != spec.MRoomPowerLevels || !ev.StateKeyEquals("") {
-			continue
-		}
-		// TODO: update power levels
-		// TODO: same thing for /event endpoint?
-	}
-
 	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}), start, end, nil
