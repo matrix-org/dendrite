@@ -82,7 +82,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		}
 		ev, err := ToClientEvent(se, format, userIDForSender)
 		if err != nil {
-			logrus.Errorf("Failed converting event to ClientEvent: %s", err.Error())
+			logrus.WithError(err).Warn("Failed converting event to ClientEvent")
 			continue
 		}
 		evs = append(evs, *ev)
@@ -111,11 +111,11 @@ func FromClientStateKey(roomID spec.RoomID, stateKey string, senderIDQuery spec.
 		parsedStateKey, err := spec.NewUserID(stateKey, true)
 		if err != nil {
 			// If invalid user ID, then there is no associated state event.
-			return nil, fmt.Errorf("Provided state key begins with @ but is not a valid user ID: %s", err.Error())
+			return nil, fmt.Errorf("Provided state key begins with @ but is not a valid user ID: %w", err)
 		}
 		senderID, err := senderIDQuery(roomID, *parsedStateKey)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to query sender ID: %s", err.Error())
+			return nil, fmt.Errorf("Failed to query sender ID: %w", err)
 		}
 		if senderID == nil {
 			// If no sender ID, then there is no associated state event.
@@ -199,7 +199,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 		}
 		ce.Unsigned, err = json.Marshal(prev)
 		if err != nil {
-			err = fmt.Errorf("Failed to marshal unsigned content for ClientEvent: %s", err.Error())
+			err = fmt.Errorf("Failed to marshal unsigned content for ClientEvent: %w", err)
 			return err
 		}
 	}
@@ -208,14 +208,14 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 	case spec.MRoomCreate:
 		updatedContent, err := updateCreateEvent(se.Content(), userIDForSender, *validRoomID)
 		if err != nil {
-			err = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %s", err.Error())
+			err = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %w", err)
 			return err
 		}
 		ce.Content = updatedContent
 	case spec.MRoomMember:
 		updatedEvent, err := updateInviteEvent(userIDForSender, se, format)
 		if err != nil {
-			err = fmt.Errorf("Failed to update m.room.member event for ClientEvent: %s", err.Error())
+			err = fmt.Errorf("Failed to update m.room.member event for ClientEvent: %w", err)
 			return err
 		}
 		if updatedEvent != nil {
@@ -224,7 +224,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 	case spec.MRoomPowerLevels:
 		updatedEvent, err := updatePowerLevelEvent(userIDForSender, se, format)
 		if err != nil {
-			err = fmt.Errorf("Failed update m.room.power_levels event for ClientEvent: %s", err.Error())
+			err = fmt.Errorf("Failed update m.room.power_levels event for ClientEvent: %w", err)
 			return err
 		}
 		if updatedEvent != nil {
@@ -241,7 +241,7 @@ func updateCreateEvent(content spec.RawJSON, userIDForSender spec.UserIDForSende
 		oldCreator := creator.Str
 		userID, err := userIDForSender(roomID, spec.SenderID(oldCreator))
 		if err != nil {
-			err = fmt.Errorf("Failed to find userID for creator in ClientEvent: %s", err.Error())
+			err = fmt.Errorf("Failed to find userID for creator in ClientEvent: %w", err)
 			return nil, err
 		}
 
@@ -249,13 +249,13 @@ func updateCreateEvent(content spec.RawJSON, userIDForSender spec.UserIDForSende
 			var newCreatorBytes, newContent []byte
 			newCreatorBytes, err = json.Marshal(userID.String())
 			if err != nil {
-				err = fmt.Errorf("Failed to marshal new creator for ClientEvent: %s", err.Error())
+				err = fmt.Errorf("Failed to marshal new creator for ClientEvent: %w", err)
 				return nil, err
 			}
 
 			newContent, err = sjson.SetRawBytes([]byte(content), "creator", newCreatorBytes)
 			if err != nil {
-				err = fmt.Errorf("Failed to set new creator for ClientEvent: %s", err.Error())
+				err = fmt.Errorf("Failed to set new creator for ClientEvent: %w", err)
 				return nil, err
 			}
 
@@ -275,7 +275,7 @@ func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverli
 		userID, err := userIDForSender(*validRoomID, ev.SenderID())
 		if err != nil || userID == nil {
 			if err != nil {
-				err = fmt.Errorf("invalid userID found when updating invite_room_state: %s", err)
+				err = fmt.Errorf("invalid userID found when updating invite_room_state: %w", err)
 			}
 			return nil, err
 		}
@@ -335,7 +335,7 @@ func GetUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomS
 
 			updatedContent, updateErr := updateCreateEvent(ev.Content, userIDForSender, roomID)
 			if updateErr != nil {
-				updateErr = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %s", userIDErr.Error())
+				updateErr = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %w", userIDErr)
 				return nil, updateErr
 			}
 			inviteStateEvents[i].Content = updatedContent
