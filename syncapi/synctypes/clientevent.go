@@ -90,7 +90,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 	return evs
 }
 
-// ToClientEvent converts a single server event to a client event.
+// ToClientEventDefault converts a single server event to a client event.
 // It provides default logic for event.SenderID & event.StateKey -> userID conversions.
 func ToClientEventDefault(userIDQuery spec.UserIDForSender, event gomatrixserverlib.PDU) ClientEvent {
 	ev, err := ToClientEvent(event, FormatAll, userIDQuery)
