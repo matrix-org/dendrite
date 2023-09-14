@@ -1401,7 +1401,7 @@ func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEv
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID(), api.OutputEvent{
+		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID().String(), api.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

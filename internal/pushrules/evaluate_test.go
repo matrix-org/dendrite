@@ -13,7 +13,7 @@ func UserIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, 
 }
 
 func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
-	ev := mustEventFromJSON(t, `{}`)
+	ev := mustEventFromJSON(t, `{"room_id":"!room:a"}`)
 	defaultEnabled := &Rule{
 		RuleID:  ".default.enabled",
 		Default: true,
@@ -44,8 +44,8 @@ func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 		{"overrideRoom", RuleSet{Override: []*Rule{userEnabled}, Room: []*Rule{userEnabled2}}, userEnabled, ev},
 		{"overrideSender", RuleSet{Override: []*Rule{userEnabled}, Sender: []*Rule{userEnabled2}}, userEnabled, ev},
 		{"overrideUnderride", RuleSet{Override: []*Rule{userEnabled}, Underride: []*Rule{userEnabled2}}, userEnabled, ev},
-		{"reactions don't notify", *defaultRuleset, &mRuleReactionDefinition, mustEventFromJSON(t, `{"type":"m.reaction"}`)},
-		{"receipts don't notify", *defaultRuleset, nil, mustEventFromJSON(t, `{"type":"m.receipt"}`)},
+		{"reactions don't notify", *defaultRuleset, &mRuleReactionDefinition, mustEventFromJSON(t, `{"room_id":"!room:a","type":"m.reaction"}`)},
+		{"receipts don't notify", *defaultRuleset, nil, mustEventFromJSON(t, `{"room_id":"!room:a","type":"m.receipt"}`)},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
@@ -70,28 +70,27 @@ func TestRuleMatches(t *testing.T) {
 		EventJSON string
 		Want      bool
 	}{
-		{"emptyOverride", OverrideKind, emptyRule, `{}`, true},
-		{"emptyContent", ContentKind, emptyRule, `{}`, false},
-		{"emptyRoom", RoomKind, emptyRule, `{}`, true},
+		{"emptyOverride", OverrideKind, emptyRule, `{"room_id":"!room:example.com"}`, true},
+		{"emptyContent", ContentKind, emptyRule, `{"room_id":"!room:example.com"}`, false},
 		{"emptySender", SenderKind, emptyRule, `{"room_id":"!room:example.com"}`, true},
-		{"emptyUnderride", UnderrideKind, emptyRule, `{}`, true},
+		{"emptyUnderride", UnderrideKind, emptyRule, `{"room_id":"!room:example.com"}`, true},
 
-		{"disabled", OverrideKind, Rule{}, `{}`, false},
+		{"disabled", OverrideKind, Rule{}, `{"room_id":"!room:example.com"}`, false},
 
-		{"overrideConditionMatch", OverrideKind, Rule{Enabled: true}, `{}`, true},
-		{"overrideConditionNoMatch", OverrideKind, Rule{Enabled: true, Conditions: []*Condition{{}}}, `{}`, false},
+		{"overrideConditionMatch", OverrideKind, Rule{Enabled: true}, `{"room_id":"!room:example.com"}`, true},
+		{"overrideConditionNoMatch", OverrideKind, Rule{Enabled: true, Conditions: []*Condition{{}}}, `{"room_id":"!room:example.com"}`, false},
 
-		{"underrideConditionMatch", UnderrideKind, Rule{Enabled: true}, `{}`, true},
-		{"underrideConditionNoMatch", UnderrideKind, Rule{Enabled: true, Conditions: []*Condition{{}}}, `{}`, false},
+		{"underrideConditionMatch", UnderrideKind, Rule{Enabled: true}, `{"room_id":"!room:example.com"}`, true},
+		{"underrideConditionNoMatch", UnderrideKind, Rule{Enabled: true, Conditions: []*Condition{{}}}, `{"room_id":"!room:example.com"}`, false},
 
-		{"contentMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("b")}, `{"content":{"body":"abc"}}`, true},
-		{"contentNoMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("d")}, `{"content":{"body":"abc"}}`, false},
+		{"contentMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("b")}, `{"room_id":"!room:example.com","content":{"body":"abc"}}`, true},
+		{"contentNoMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("d")}, `{"room_id":"!room:example.com","content":{"body":"abc"}}`, false},
 
 		{"roomMatch", RoomKind, Rule{Enabled: true, RuleID: "!room:example.com"}, `{"room_id":"!room:example.com"}`, true},
 		{"roomNoMatch", RoomKind, Rule{Enabled: true, RuleID: "!room:example.com"}, `{"room_id":"!otherroom:example.com"}`, false},
 
-		{"senderMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@user:example.com","room_id":"!room:example.com"}`, true},
-		{"senderNoMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"sender":"@otheruser:example.com","room_id":"!room:example.com"}`, false},
+		{"senderMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"room_id":"!room:example.com","sender":"@user:example.com","room_id":"!room:example.com"}`, true},
+		{"senderNoMatch", SenderKind, Rule{Enabled: true, RuleID: "@user:example.com"}, `{"room_id":"!room:example.com","sender":"@otheruser:example.com","room_id":"!room:example.com"}`, false},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
@@ -114,32 +113,32 @@ func TestConditionMatches(t *testing.T) {
 		WantMatch bool
 		WantErr   bool
 	}{
-		{Name: "empty", Cond: Condition{}, EventJSON: `{}`, WantMatch: false, WantErr: false},
-		{Name: "empty", Cond: Condition{Kind: "unknownstring"}, EventJSON: `{}`, WantMatch: false, WantErr: false},
+		{Name: "empty", Cond: Condition{}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "empty", Cond: Condition{Kind: "unknownstring"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
 
 		// Neither of these should match because `content` is not a full string match,
 		// and `content.body` is not a string value.
-		{Name: "eventMatch", Cond: Condition{Kind: EventMatchCondition, Key: "content", Pattern: pointer("")}, EventJSON: `{"content":{}}`, WantMatch: false, WantErr: false},
-		{Name: "eventBodyMatch", Cond: Condition{Kind: EventMatchCondition, Key: "content.body", Is: "3", Pattern: pointer("")}, EventJSON: `{"content":{"body": "3"}}`, WantMatch: false, WantErr: false},
-		{Name: "eventBodyMatch matches", Cond: Condition{Kind: EventMatchCondition, Key: "content.body", Pattern: pointer("world")}, EventJSON: `{"content":{"body": "hello world!"}}`, WantMatch: true, WantErr: false},
-		{Name: "EventMatch missing pattern", Cond: Condition{Kind: EventMatchCondition, Key: "content.body"}, EventJSON: `{"content":{"body": "hello world!"}}`, WantMatch: false, WantErr: true},
+		{Name: "eventMatch", Cond: Condition{Kind: EventMatchCondition, Key: "content", Pattern: pointer("")}, EventJSON: `{"room_id":"!room:example.com","content":{}}`, WantMatch: false, WantErr: false},
+		{Name: "eventBodyMatch", Cond: Condition{Kind: EventMatchCondition, Key: "content.body", Is: "3", Pattern: pointer("")}, EventJSON: `{"room_id":"!room:example.com","content":{"body": "3"}}`, WantMatch: false, WantErr: false},
+		{Name: "eventBodyMatch matches", Cond: Condition{Kind: EventMatchCondition, Key: "content.body", Pattern: pointer("world")}, EventJSON: `{"room_id":"!room:example.com","content":{"body": "hello world!"}}`, WantMatch: true, WantErr: false},
+		{Name: "EventMatch missing pattern", Cond: Condition{Kind: EventMatchCondition, Key: "content.body"}, EventJSON: `{"room_id":"!room:example.com","content":{"body": "hello world!"}}`, WantMatch: false, WantErr: true},
 
-		{Name: "displayNameNoMatch", Cond: Condition{Kind: ContainsDisplayNameCondition}, EventJSON: `{"content":{"body":"something without displayname"}}`, WantMatch: false, WantErr: false},
-		{Name: "displayNameMatch", Cond: Condition{Kind: ContainsDisplayNameCondition}, EventJSON: `{"content":{"body":"hello Dear User, how are you?"}}`, WantMatch: true, WantErr: false},
+		{Name: "displayNameNoMatch", Cond: Condition{Kind: ContainsDisplayNameCondition}, EventJSON: `{"room_id":"!room:example.com","content":{"body":"something without displayname"}}`, WantMatch: false, WantErr: false},
+		{Name: "displayNameMatch", Cond: Condition{Kind: ContainsDisplayNameCondition}, EventJSON: `{"room_id":"!room:example.com","content":{"body":"hello Dear User, how are you?"}}`, WantMatch: true, WantErr: false},
 
-		{Name: "roomMemberCountLessNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<2"}, EventJSON: `{}`, WantMatch: false, WantErr: false},
-		{Name: "roomMemberCountLessMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<3"}, EventJSON: `{}`, WantMatch: true, WantErr: false},
-		{Name: "roomMemberCountLessEqualNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<=1"}, EventJSON: `{}`, WantMatch: false, WantErr: false},
-		{Name: "roomMemberCountLessEqualMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<=2"}, EventJSON: `{}`, WantMatch: true, WantErr: false},
-		{Name: "roomMemberCountEqualNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "==1"}, EventJSON: `{}`, WantMatch: false, WantErr: false},
-		{Name: "roomMemberCountEqualMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "==2"}, EventJSON: `{}`, WantMatch: true, WantErr: false},
-		{Name: "roomMemberCountGreaterEqualNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">=3"}, EventJSON: `{}`, WantMatch: false, WantErr: false},
-		{Name: "roomMemberCountGreaterEqualMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">=2"}, EventJSON: `{}`, WantMatch: true, WantErr: false},
-		{Name: "roomMemberCountGreaterNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">2"}, EventJSON: `{}`, WantMatch: false, WantErr: false},
-		{Name: "roomMemberCountGreaterMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">1"}, EventJSON: `{}`, WantMatch: true, WantErr: false},
+		{Name: "roomMemberCountLessNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<2"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "roomMemberCountLessMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<3"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: true, WantErr: false},
+		{Name: "roomMemberCountLessEqualNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<=1"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "roomMemberCountLessEqualMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "<=2"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: true, WantErr: false},
+		{Name: "roomMemberCountEqualNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "==1"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "roomMemberCountEqualMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: "==2"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: true, WantErr: false},
+		{Name: "roomMemberCountGreaterEqualNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">=3"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "roomMemberCountGreaterEqualMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">=2"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: true, WantErr: false},
+		{Name: "roomMemberCountGreaterNoMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">2"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "roomMemberCountGreaterMatch", Cond: Condition{Kind: RoomMemberCountCondition, Is: ">1"}, EventJSON: `{"room_id":"!room:example.com"}`, WantMatch: true, WantErr: false},
 
-		{Name: "senderNotificationPermissionMatch", Cond: Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, EventJSON: `{"sender":"@poweruser:example.com"}`, WantMatch: true, WantErr: false},
-		{Name: "senderNotificationPermissionNoMatch", Cond: Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, EventJSON: `{"sender":"@nobody:example.com"}`, WantMatch: false, WantErr: false},
+		{Name: "senderNotificationPermissionMatch", Cond: Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, EventJSON: `{"room_id":"!room:example.com","sender":"@poweruser:example.com"}`, WantMatch: true, WantErr: false},
+		{Name: "senderNotificationPermissionNoMatch", Cond: Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, EventJSON: `{"room_id":"!room:example.com","sender":"@nobody:example.com"}`, WantMatch: false, WantErr: false},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
@@ -170,15 +169,15 @@ func TestPatternMatches(t *testing.T) {
 		EventJSON string
 		Want      bool
 	}{
-		{"empty", "", "", `{}`, false},
+		{"empty", "", "", `{"room_id":"!room:a"}`, false},
 
-		{"patternEmpty", "content", "", `{"content":{}}`, false},
+		{"patternEmpty", "content", "", `{"room_id":"!room:a","content":{}}`, false},
 
-		{"literal", "content.creator", "acreator", `{"content":{"creator":"acreator"}}`, true},
-		{"substring", "content.creator", "reat", `{"content":{"creator":"acreator"}}`, true},
-		{"singlePattern", "content.creator", "acr?ator", `{"content":{"creator":"acreator"}}`, true},
-		{"multiPattern", "content.creator", "a*ea*r", `{"content":{"creator":"acreator"}}`, true},
-		{"patternNoSubstring", "content.creator", "r*t", `{"content":{"creator":"acreator"}}`, false},
+		{"literal", "content.creator", "acreator", `{"room_id":"!room:a","content":{"creator":"acreator"}}`, true},
+		{"substring", "content.creator", "reat", `{"room_id":"!room:a","content":{"creator":"acreator"}}`, true},
+		{"singlePattern", "content.creator", "acr?ator", `{"room_id":"!room:a","content":{"creator":"acreator"}}`, true},
+		{"multiPattern", "content.creator", "a*ea*r", `{"room_id":"!room:a","content":{"creator":"acreator"}}`, true},
+		{"patternNoSubstring", "content.creator", "r*t", `{"room_id":"!room:a","content":{"creator":"acreator"}}`, false},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {

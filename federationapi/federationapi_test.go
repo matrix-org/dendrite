@@ -146,7 +146,7 @@ func (f *fedClient) SendJoin(ctx context.Context, origin, s spec.ServerName, eve
 	f.fedClientMutex.Lock()
 	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
-		if r.ID == event.RoomID() {
+		if r.ID == event.RoomID().String() {
 			r.InsertEvent(f.t, &types.HeaderedEvent{PDU: event})
 			f.t.Logf("Join event: %v", event.EventID())
 			res.StateEvents = types.NewEventJSONsFromHeaderedEvents(r.CurrentState())

@@ -189,7 +189,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID sp
 
 			proto := &gomatrixserverlib.ProtoEvent{
 				SenderID: string(canonicalSenderID),
-				RoomID:   ev.RoomID(),
+				RoomID:   ev.RoomID().String(),
 				Type:     ev.Type(),
 				StateKey: ev.StateKey(),
 				Content:  res,

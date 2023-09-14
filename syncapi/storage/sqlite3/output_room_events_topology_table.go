@@ -106,7 +106,7 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent, pos types.StreamPosition,
 ) (types.StreamPosition, error) {
 	_, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
-		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
+		ctx, event.EventID(), event.Depth(), event.RoomID().String(), pos,
 	)
 	return types.StreamPosition(event.Depth()), err
 }

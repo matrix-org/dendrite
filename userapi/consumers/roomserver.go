@@ -108,7 +108,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	}
 
 	if s.cfg.Matrix.ReportStats.Enabled {
-		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID())
+		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
 
 	log.WithFields(log.Fields{
@@ -294,7 +294,7 @@ func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRo
 }
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rstypes.HeaderedEvent, streamPos uint64) error {
-	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
+	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID().String())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
 	}
@@ -302,18 +302,14 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 	switch {
 	case event.Type() == spec.MRoomMember:
 		sender := spec.UserID{}
-		validRoomID, roomErr := spec.NewRoomID(event.RoomID())
-		if roomErr != nil {
-			return roomErr
-		}
-		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 		if queryErr == nil && userID != nil {
 			sender = *userID
 		}
 
 		sk := event.StateKey()
 		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*sk))
+			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*sk))
 			if queryErr == nil && skUserID != nil {
 				skString := skUserID.String()
 				sk = &skString
@@ -334,7 +330,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		}
 	case event.Type() == "m.room.tombstone" && event.StateKeyEquals(""):
 		// Handle room upgrades
-		oldRoomID := event.RoomID()
+		oldRoomID := event.RoomID().String()
 		newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
 		if err = s.handleRoomUpgrade(ctx, oldRoomID, newRoomID, members, roomSize); err != nil {
 			// while inconvenient, this shouldn't stop us from sending push notifications
@@ -351,7 +347,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 	log.WithFields(log.Fields{
 		"event_id":    event.EventID(),
-		"room_id":     event.RoomID(),
+		"room_id":     event.RoomID().String(),
 		"num_members": len(members),
 		"room_size":   roomSize,
 	}).Tracef("Notifying members")
@@ -464,7 +460,7 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *rstypes.H
 	}
 
 	req := &rsapi.QueryCurrentStateRequest{
-		RoomID:      event.RoomID(),
+		RoomID:      event.RoomID().String(),
 		StateTuples: []gomatrixserverlib.StateKeyTuple{roomNameTuple, canonicalAliasTuple},
 	}
 	var res rsapi.QueryCurrentStateResponse
@@ -532,7 +528,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if a != pushrules.NotifyAction && a != pushrules.CoalesceAction {
 		log.WithFields(log.Fields{
 			"event_id":  event.EventID(),
-			"room_id":   event.RoomID(),
+			"room_id":   event.RoomID().String(),
 			"localpart": mem.Localpart,
 		}).Tracef("Push rule evaluation rejected the event")
 		return nil
@@ -544,18 +540,14 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	}
 
 	sender := spec.UserID{}
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return err
-	}
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil && userID != nil {
 		sender = *userID
 	}
 
 	sk := event.StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
+		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
 		if queryErr == nil && skUserID != nil {
 			skString := skUserID.String()
 			sk = &skString
@@ -572,14 +564,14 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 		// make sense. What is this supposed to be? Sytests require it
 		// to "work", but they only use a single device.
 		ProfileTag: profileTag,
-		RoomID:     event.RoomID(),
+		RoomID:     event.RoomID().String(),
 		TS:         spec.AsTimestamp(time.Now()),
 	}
 	if err = s.db.InsertNotification(ctx, mem.Localpart, mem.Domain, event.EventID(), streamPos, tweaks, n); err != nil {
 		return fmt.Errorf("s.db.InsertNotification: %w", err)
 	}
 
-	if err = s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID()); err != nil {
+	if err = s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID().String()); err != nil {
 		return fmt.Errorf("s.syncProducer.GetAndSendNotificationData: %w", err)
 	}
 
@@ -591,7 +583,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 
 	log.WithFields(log.Fields{
 		"event_id":   event.EventID(),
-		"room_id":    event.RoomID(),
+		"room_id":    event.RoomID().String(),
 		"localpart":  mem.Localpart,
 		"num_urls":   len(devicesByURLAndFormat),
 		"num_unread": userNumUnreadNotifs,
@@ -648,11 +640,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
 	user := ""
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return nil, err
-	}
-	sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
 		user = sender.String()
 	}
@@ -686,7 +674,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		ctx:      ctx,
 		rsAPI:    s.rsAPI,
 		mem:      mem,
-		roomID:   event.RoomID(),
+		roomID:   event.RoomID().String(),
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
@@ -704,7 +692,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 
 	log.WithFields(log.Fields{
 		"event_id":  event.EventID(),
-		"room_id":   event.RoomID(),
+		"room_id":   event.RoomID().String(),
 		"localpart": mem.Localpart,
 		"rule_id":   rule.RuleID,
 	}).Trace("Matched a push rule")
@@ -793,16 +781,12 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				},
 				Devices: devices,
 				EventID: event.EventID(),
-				RoomID:  event.RoomID(),
+				RoomID:  event.RoomID().String(),
 			},
 		}
 
 	default:
-		validRoomID, err := spec.NewRoomID(event.RoomID())
-		if err != nil {
-			return nil, err
-		}
-		sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+		sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get userID for sender %s", event.SenderID())
 			return nil, err
@@ -816,7 +800,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				Devices:  devices,
 				EventID:  event.EventID(),
 				ID:       event.EventID(),
-				RoomID:   event.RoomID(),
+				RoomID:   event.RoomID().String(),
 				RoomName: roomName,
 				Sender:   sender.String(),
 				Type:     event.Type(),
@@ -830,19 +814,13 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
 			return nil, err
 		}
-		roomID, err := spec.NewRoomID(event.RoomID())
+		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, event.RoomID(), *userID)
 		if err != nil {
-			logger.WithError(err).Errorf("event roomID is invalid %s", event.RoomID())
-			return nil, err
-		}
-
-		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
-		if err != nil {
-			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
 			return nil, err
 		} else if localSender == nil {
-			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
-			return nil, fmt.Errorf("no sender ID for user %s in %s", userID.String(), roomID.String())
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
+			return nil, fmt.Errorf("no sender ID for user %s in %s", userID.String(), event.RoomID().String())
 		}
 		if event.StateKey() != nil && *event.StateKey() == string(*localSender) {
 			req.Notification.UserIsTarget = true

@@ -42,10 +42,10 @@ func GetEventAuth(
 		return *resErr
 	}
 
-	if event.RoomID() != roomID {
+	if event.RoomID().String() != roomID {
 		return util.JSONResponse{Code: http.StatusNotFound, JSON: spec.NotFound("event does not belong to this room")}
 	}
-	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID())
+	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID().String())
 	if resErr != nil {
 		return *resErr
 	}

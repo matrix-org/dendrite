@@ -476,9 +476,8 @@ func (p *PDUStreamProvider) updatePowerLevelEvent(ctx context.Context, ev *rstyp
 	newPls := make(map[string]int64)
 	var userID *spec.UserID
 	for user, level := range pls.Users {
-		validRoomID, _ := spec.NewRoomID(ev.RoomID())
 		if eventFormat != synctypes.FormatSyncFederation {
-			userID, err = p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
+			userID, err = p.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(user))
 			if err != nil {
 				return nil, err
 			}
@@ -515,9 +514,8 @@ func (p *PDUStreamProvider) updatePowerLevelEvent(ctx context.Context, ev *rstyp
 
 	newPls = make(map[string]int64)
 	for user, level := range pls.Users {
-		validRoomID, _ := spec.NewRoomID(ev.RoomID())
 		if eventFormat != synctypes.FormatSyncFederation {
-			userID, err = p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(user))
+			userID, err = p.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(user))
 			if err != nil {
 				return nil, err
 			}

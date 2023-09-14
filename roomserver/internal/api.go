@@ -239,7 +239,7 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID().String(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(

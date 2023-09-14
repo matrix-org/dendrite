@@ -119,7 +119,7 @@ func (s *ServerACLs) OnServerACLUpdate(state gomatrixserverlib.PDU) {
 	}).Debugf("Updating server ACLs for %q", state.RoomID())
 	s.aclsMutex.Lock()
 	defer s.aclsMutex.Unlock()
-	s.acls[state.RoomID()] = acls
+	s.acls[state.RoomID().String()] = acls
 }
 
 func (s *ServerACLs) IsServerBannedFromRoom(serverName spec.ServerName, roomID string) bool {

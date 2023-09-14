@@ -118,26 +118,23 @@ func ApplyHistoryVisibilityFilter(
 	start := time.Now()
 
 	// try to get the current membership of the user
-	membershipCurrent, _, err := syncDB.SelectMembershipForUser(ctx, events[0].RoomID(), userID.String(), math.MaxInt64)
+	membershipCurrent, _, err := syncDB.SelectMembershipForUser(ctx, events[0].RoomID().String(), userID.String(), math.MaxInt64)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the mapping from eventID -> eventVisibility
 	eventsFiltered := make([]*types.HeaderedEvent, 0, len(events))
-	firstEvRoomID, err := spec.NewRoomID(events[0].RoomID())
+	firstEvRoomID := events[0].RoomID()
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, firstEvRoomID, userID)
 	if err != nil {
 		return nil, err
 	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *firstEvRoomID, userID)
-	if err != nil {
-		return nil, err
-	}
-	visibilities := visibilityForEvents(ctx, rsAPI, events, senderID, *firstEvRoomID)
+	visibilities := visibilityForEvents(ctx, rsAPI, events, senderID, firstEvRoomID)
 
 	for _, ev := range events {
 		// Validate same room assumption
-		if ev.RoomID() != firstEvRoomID.String() {
+		if ev.RoomID().String() != firstEvRoomID.String() {
 			return nil, fmt.Errorf("events from different rooms supplied to ApplyHistoryVisibilityFilter")
 		}
 

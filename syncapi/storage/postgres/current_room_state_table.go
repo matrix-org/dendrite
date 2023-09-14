@@ -340,7 +340,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err = stmt.ExecContext(
 		ctx,
-		event.RoomID(),
+		event.RoomID().String(),
 		event.EventID(),
 		event.Type(),
 		event.UserID.String(),

@@ -87,7 +87,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	trace, ctx := internal.StartRegion(ctx, "processRoomEvent")
-	trace.SetTag("room_id", input.Event.RoomID())
+	trace.SetTag("room_id", input.Event.RoomID().String())
 	trace.SetTag("event_id", input.Event.EventID())
 	defer trace.EndRegion()
 
@@ -96,7 +96,7 @@ func (r *Inputer) processRoomEvent(
 	defer func() {
 		timetaken := time.Since(started)
 		processRoomEventDuration.With(prometheus.Labels{
-			"room_id": input.Event.RoomID(),
+			"room_id": input.Event.RoomID().String(),
 		}).Observe(float64(timetaken.Milliseconds()))
 	}()
 
@@ -105,7 +105,7 @@ func (r *Inputer) processRoomEvent(
 	event := headered.PDU
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id": event.EventID(),
-		"room_id":  event.RoomID(),
+		"room_id":  event.RoomID().String(),
 		"kind":     input.Kind,
 		"origin":   input.Origin,
 		"type":     event.Type(),
@@ -120,19 +120,15 @@ func (r *Inputer) processRoomEvent(
 	// Don't waste time processing the event if the room doesn't exist.
 	// A room entry locally will only be created in response to a create
 	// event.
-	roomInfo, rerr := r.DB.RoomInfo(ctx, event.RoomID())
+	roomInfo, rerr := r.DB.RoomInfo(ctx, event.RoomID().String())
 	if rerr != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", rerr)
 	}
 	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
-		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
+		return fmt.Errorf("room %s does not exist for event %s", event.RoomID().String(), event.EventID())
 	}
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return err
-	}
-	sender, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	sender, err := r.Queryer.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return fmt.Errorf("failed getting userID for sender %q. %w", event.SenderID(), err)
 	}
@@ -179,7 +175,7 @@ func (r *Inputer) processRoomEvent(
 	// If we have missing events (auth or prev), we build a list of servers to ask
 	if missingAuth || missingPrev {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
-			RoomID:             event.RoomID(),
+			RoomID:             event.RoomID().String(),
 			ExcludeSelf:        true,
 			ExcludeBlacklisted: true,
 		}
@@ -395,12 +391,12 @@ func (r *Inputer) processRoomEvent(
 
 	// Request the room info again — it's possible that the room has been
 	// created by now if it didn't exist already.
-	roomInfo, err = r.DB.RoomInfo(ctx, event.RoomID())
+	roomInfo, err = r.DB.RoomInfo(ctx, event.RoomID().String())
 	if err != nil {
 		return fmt.Errorf("updater.RoomInfo: %w", err)
 	}
 	if roomInfo == nil {
-		return fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
+		return fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID().String())
 	}
 
 	if input.HasState || (!missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0) {
@@ -459,7 +455,7 @@ func (r *Inputer) processRoomEvent(
 			if userErr != nil {
 				return userErr
 			}
-			err = r.RSAPI.StoreUserRoomPublicKey(ctx, mapping.MXIDMapping.UserRoomKey, *storeUserID, *validRoomID)
+			err = r.RSAPI.StoreUserRoomPublicKey(ctx, mapping.MXIDMapping.UserRoomKey, *storeUserID, event.RoomID())
 			if err != nil {
 				return fmt.Errorf("failed storing user room public key: %w", err)
 			}
@@ -481,7 +477,7 @@ func (r *Inputer) processRoomEvent(
 			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
-		err = r.OutputProducer.ProduceRoomEvents(event.RoomID(), []api.OutputEvent{
+		err = r.OutputProducer.ProduceRoomEvents(event.RoomID().String(), []api.OutputEvent{
 			{
 				Type: api.OutputTypeOldRoomEvent,
 				OldRoomEvent: &api.OutputOldRoomEvent{
@@ -507,7 +503,7 @@ func (r *Inputer) processRoomEvent(
 	// so notify downstream components to redact this event - they should have it if they've
 	// been tracking our output log.
 	if redactedEventID != "" {
-		err = r.OutputProducer.ProduceRoomEvents(event.RoomID(), []api.OutputEvent{
+		err = r.OutputProducer.ProduceRoomEvents(event.RoomID().String(), []api.OutputEvent{
 			{
 				Type: api.OutputTypeRedactedEvent,
 				RedactedEvent: &api.OutputRedactedEvent{
@@ -536,7 +532,7 @@ func (r *Inputer) processRoomEvent(
 
 // handleRemoteRoomUpgrade updates published rooms and room aliases
 func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event gomatrixserverlib.PDU) error {
-	oldRoomID := event.RoomID()
+	oldRoomID := event.RoomID().String()
 	newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
 	return r.DB.UpgradeRoom(ctx, oldRoomID, newRoomID, string(event.SenderID()))
 }
@@ -596,7 +592,7 @@ func (r *Inputer) processStateBefore(
 			StateKey:  "",
 		})
 		stateBeforeReq := &api.QueryStateAfterEventsRequest{
-			RoomID:       event.RoomID(),
+			RoomID:       event.RoomID().String(),
 			PrevEventIDs: event.PrevEventIDs(),
 			StateToFetch: tuplesNeeded,
 		}
@@ -606,7 +602,7 @@ func (r *Inputer) processStateBefore(
 		}
 		switch {
 		case !stateBeforeRes.RoomExists:
-			rejectionErr = fmt.Errorf("room %q does not exist", event.RoomID())
+			rejectionErr = fmt.Errorf("room %q does not exist", event.RoomID().String())
 			return
 		case !stateBeforeRes.PrevEventsExist:
 			rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
@@ -707,7 +703,7 @@ func (r *Inputer) fetchAuthEvents(
 		// Request the entire auth chain for the event in question. This should
 		// contain all of the auth events — including ones that we already know —
 		// so we'll need to filter through those in the next section.
-		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.Version(), event.RoomID(), event.EventID())
+		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.Version(), event.RoomID().String(), event.EventID())
 		if err != nil {
 			logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 			continue
@@ -866,15 +862,10 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 
 	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
 	latestReq := &api.QueryLatestEventsAndStateRequest{
-		RoomID: event.RoomID(),
+		RoomID: event.RoomID().String(),
 	}
 	latestRes := &api.QueryLatestEventsAndStateResponse{}
 	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
-		return err
-	}
-
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
 		return err
 	}
 
@@ -884,7 +875,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			continue
 		}
 
-		memberUserID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*memberEvent.StateKey()))
+		memberUserID, err := r.Queryer.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*memberEvent.StateKey()))
 		if err != nil {
 			continue
 		}
@@ -912,7 +903,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.ProtoEvent{
-			RoomID:     event.RoomID(),
+			RoomID:     event.RoomID().String(),
 			Type:       spec.MRoomMember,
 			StateKey:   &stateKey,
 			SenderID:   stateKey,
@@ -928,12 +919,7 @@ func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, r
 			return err
 		}
 
-		validRoomID, err := spec.NewRoomID(event.RoomID())
-		if err != nil {
-			return err
-		}
-
-		signingIdentity, err := r.SigningIdentity(ctx, *validRoomID, *memberUserID)
+		signingIdentity, err := r.SigningIdentity(ctx, event.RoomID(), *memberUserID)
 		if err != nil {
 			return err
 		}
