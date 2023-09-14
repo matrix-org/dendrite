@@ -318,7 +318,9 @@ func GetUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomS
 			if userIDErr != nil {
 				return nil, userIDErr
 			}
-			inviteStateEvents[i].SenderID = userID.String()
+			if userID != nil {
+				inviteStateEvents[i].SenderID = userID.String()
+			}
 
 			if ev.StateKey != nil && *ev.StateKey != "" {
 				userID, senderErr := userIDForSender(roomID, spec.SenderID(*ev.StateKey))
