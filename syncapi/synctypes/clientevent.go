@@ -153,12 +153,10 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDFor
 		// TODO: Set Signatures & Hashes fields
 	}
 
-	if format != FormatSyncFederation {
-		if se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
-			err := updatePseudoIDs(&ce, se, userIDForSender, format)
-			if err != nil {
-				return nil, err
-			}
+	if format != FormatSyncFederation && se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+		err := updatePseudoIDs(&ce, se, userIDForSender, format)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -282,7 +280,7 @@ func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverli
 			return nil, err
 		}
 
-		newState, err := getUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, *validRoomID, eventFormat)
+		newState, err := GetUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, *validRoomID, eventFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -306,7 +304,7 @@ type InviteRoomStateEvent struct {
 	Type     string       `json:"type"`
 }
 
-func getUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, roomID spec.RoomID, eventFormat ClientEventFormat) (spec.RawJSON, error) {
+func GetUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, roomID spec.RoomID, eventFormat ClientEventFormat) (spec.RawJSON, error) {
 	var res spec.RawJSON
 	inviteStateEvents := []InviteRoomStateEvent{}
 	err := json.Unmarshal([]byte(inviteRoomState.Raw), &inviteStateEvents)

@@ -541,7 +541,22 @@ func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *t
 	// If there is then unmarshal it into the response. This will contain the
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != synctypes.FormatSyncFederation {
+			roomID, err := spec.NewRoomID(event.RoomID())
+			if err != nil {
+				return nil, err
+			}
+
+			updatedInvite, err := synctypes.GetUpdatedInviteRoomState(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			}, inviteRoomState, event.PDU, *roomID, eventFormat)
+			if err != nil {
+				return nil, err
+			}
+			_ = json.Unmarshal(updatedInvite, &res.InviteState.Events)
+		} else {
+			_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		}
 	}
 
 	// Clear unsigned so it doesn't have pseudoIDs converted during ToClientEvent
