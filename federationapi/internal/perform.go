@@ -548,11 +548,7 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return nil, err
-	}
-	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +571,7 @@ func (r *FederationInternalAPI) SendInvite(
 	logrus.WithFields(logrus.Fields{
 		"event_id":     event.EventID(),
 		"user_id":      *event.StateKey(),
-		"room_id":      event.RoomID(),
+		"room_id":      event.RoomID().String(),
 		"room_version": event.Version(),
 		"destination":  destination,
 	}).Info("Sending invite")

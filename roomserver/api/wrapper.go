@@ -75,7 +75,7 @@ func SendEventWithState(
 	}
 
 	logrus.WithContext(ctx).WithFields(logrus.Fields{
-		"room_id":   event.RoomID(),
+		"room_id":   event.RoomID().String(),
 		"event_id":  event.EventID(),
 		"outliers":  len(ires),
 		"state_ids": len(stateEventIDs),

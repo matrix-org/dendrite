@@ -437,7 +437,7 @@ func generateSendEvent(
 				JSON: spec.BadJSON("Cannot unmarshal the event content."),
 			}
 		}
-		if content["replacement_room"] == e.RoomID() {
+		if content["replacement_room"] == e.RoomID().String() {
 			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam("Cannot send tombstone event that points to the same room."),

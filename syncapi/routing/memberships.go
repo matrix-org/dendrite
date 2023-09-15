@@ -152,15 +152,7 @@ func GetMemberships(
 				}
 			}
 
-			validRoomID, err := spec.NewRoomID(ev.RoomID())
-			if err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("roomID is invalid")
-				return util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-			userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, ev.SenderID())
+			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
 			if err != nil || userID == nil {
 				util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
 				return util.JSONResponse{

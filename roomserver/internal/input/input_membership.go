@@ -139,11 +139,7 @@ func (r *Inputer) updateMembership(
 func (r *Inputer) isLocalTarget(ctx context.Context, event *types.Event) bool {
 	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
-		validRoomID, err := spec.NewRoomID(event.RoomID())
-		if err != nil {
-			return isTargetLocalUser
-		}
-		userID, err := r.Queryer.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*statekey))
+		userID, err := r.Queryer.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*statekey))
 		if err != nil || userID == nil {
 			return isTargetLocalUser
 		}
@@ -168,7 +164,7 @@ func updateToJoinMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				RoomID:           add.RoomID(),
+				RoomID:           add.RoomID().String(),
 				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetSenderID:   spec.SenderID(*add.StateKey()),
@@ -195,7 +191,7 @@ func updateToLeaveMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				RoomID:           add.RoomID(),
+				RoomID:           add.RoomID().String(),
 				Membership:       newMembership,
 				RetiredByEventID: add.EventID(),
 				TargetSenderID:   spec.SenderID(*add.StateKey()),

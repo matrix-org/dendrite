@@ -358,7 +358,7 @@ func (r *Inputer) queueInputRoomEvents(
 	// For each event, marshal the input room event and then
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
-		roomID := e.Event.RoomID()
+		roomID := e.Event.RoomID().String()
 		subj := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
 		msg := &nats.Msg{
 			Subject: subj,

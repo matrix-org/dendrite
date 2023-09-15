@@ -128,7 +128,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 			if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
 				newEventID := output.NewRoomEvent.Event.EventID()
 				eventsReq := &api.QueryEventsByIDRequest{
-					RoomID:   output.NewRoomEvent.Event.RoomID(),
+					RoomID:   output.NewRoomEvent.Event.RoomID().String(),
 					EventIDs: make([]string, 0, len(output.NewRoomEvent.AddsStateEventIDs)),
 				}
 				eventsRes := &api.QueryEventsByIDResponse{}
@@ -236,11 +236,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
 	user := ""
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return false
-	}
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
 		user = userID.String()
 	}
@@ -250,7 +246,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return false
 	case appservice.IsInterestedInUserID(user):
 		return true
-	case appservice.IsInterestedInRoomID(event.RoomID()):
+	case appservice.IsInterestedInRoomID(event.RoomID().String()):
 		return true
 	}
 
@@ -261,7 +257,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	}
 
 	// Check all known room aliases of the room the event came from
-	queryReq := api.GetAliasesForRoomIDRequest{RoomID: event.RoomID()}
+	queryReq := api.GetAliasesForRoomIDRequest{RoomID: event.RoomID().String()}
 	var queryRes api.GetAliasesForRoomIDResponse
 	if err := s.rsAPI.GetAliasesForRoomID(ctx, &queryReq, &queryRes); err == nil {
 		for _, alias := range queryRes.Aliases {
@@ -272,7 +268,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	} else {
 		log.WithFields(log.Fields{
 			"appservice": appservice.ID,
-			"room_id":    event.RoomID(),
+			"room_id":    event.RoomID().String(),
 		}).WithError(err).Errorf("Unable to get aliases for room")
 	}
 
@@ -288,7 +284,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 	// until we have a lighter way of checking the state before the event that
 	// doesn't involve state res, then this is probably OK.
 	membershipReq := &api.QueryMembershipsForRoomRequest{
-		RoomID:     event.RoomID(),
+		RoomID:     event.RoomID().String(),
 		JoinedOnly: true,
 	}
 	membershipRes := &api.QueryMembershipsForRoomResponse{}
@@ -317,7 +313,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 	} else {
 		log.WithFields(log.Fields{
 			"appservice": appservice.ID,
-			"room_id":    event.RoomID(),
+			"room_id":    event.RoomID().String(),
 		}).WithError(err).Errorf("Unable to get membership for room")
 	}
 	return false

@@ -176,11 +176,7 @@ func RedactEvent(ctx context.Context, redactionEvent, redactedEvent gomatrixserv
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
 	redactedEvent.Redact()
-	validRoomID, err := spec.NewRoomID(redactionEvent.RoomID())
-	if err != nil {
-		return err
-	}
-	senderID, err := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
+	senderID, err := querier.QueryUserIDForSender(ctx, redactedEvent.RoomID(), redactionEvent.SenderID())
 	if err != nil {
 		return err
 	}
