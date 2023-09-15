@@ -143,10 +143,10 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDFor
 
 	switch format {
 	case FormatAll:
-		ce.RoomID = se.RoomID()
+		ce.RoomID = se.RoomID().String()
 	case FormatSync:
 	case FormatSyncFederation:
-		ce.RoomID = se.RoomID()
+		ce.RoomID = se.RoomID().String()
 		ce.AuthEvents = se.AuthEventIDs()
 		ce.PrevEvents = se.PrevEventIDs()
 		ce.Depth = se.Depth()
@@ -166,18 +166,14 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDFor
 func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender spec.UserIDForSender, format ClientEventFormat) error {
 	ce.SenderKey = se.SenderID()
 
-	validRoomID, err := spec.NewRoomID(se.RoomID())
-	if err != nil {
-		return err
-	}
-	userID, err := userIDForSender(*validRoomID, se.SenderID())
+	userID, err := userIDForSender(se.RoomID(), se.SenderID())
 	if err == nil && userID != nil {
 		ce.Sender = userID.String()
 	}
 
 	sk := se.StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, err := userIDForSender(*validRoomID, spec.SenderID(*sk))
+		skUserID, err := userIDForSender(se.RoomID(), spec.SenderID(*sk))
 		if err == nil && skUserID != nil {
 			skString := skUserID.String()
 			ce.StateKey = &skString
@@ -186,7 +182,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 
 	var prev PrevEventRef
 	if err := json.Unmarshal(se.Unsigned(), &prev); err == nil && prev.PrevSenderID != "" {
-		prevUserID, err := userIDForSender(*validRoomID, spec.SenderID(prev.PrevSenderID))
+		prevUserID, err := userIDForSender(se.RoomID(), spec.SenderID(prev.PrevSenderID))
 		if err == nil && userID != nil {
 			prev.PrevSenderID = prevUserID.String()
 		} else {
@@ -206,7 +202,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 
 	switch se.Type() {
 	case spec.MRoomCreate:
-		updatedContent, err := updateCreateEvent(se.Content(), userIDForSender, *validRoomID)
+		updatedContent, err := updateCreateEvent(se.Content(), userIDForSender, se.RoomID())
 		if err != nil {
 			err = fmt.Errorf("Failed to update m.room.create event for ClientEvent: %w", err)
 			return err
@@ -268,11 +264,7 @@ func updateCreateEvent(content spec.RawJSON, userIDForSender spec.UserIDForSende
 
 func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverlib.PDU, eventFormat ClientEventFormat) (gomatrixserverlib.PDU, error) {
 	if inviteRoomState := gjson.GetBytes(ev.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		validRoomID, err := spec.NewRoomID(ev.RoomID())
-		if err != nil {
-			return nil, err
-		}
-		userID, err := userIDForSender(*validRoomID, ev.SenderID())
+		userID, err := userIDForSender(ev.RoomID(), ev.SenderID())
 		if err != nil || userID == nil {
 			if err != nil {
 				err = fmt.Errorf("invalid userID found when updating invite_room_state: %w", err)
@@ -280,7 +272,7 @@ func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverli
 			return nil, err
 		}
 
-		newState, err := GetUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, *validRoomID, eventFormat)
+		newState, err := GetUpdatedInviteRoomState(userIDForSender, inviteRoomState, ev, ev.RoomID(), eventFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -362,9 +354,8 @@ func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserv
 	newPls := make(map[string]int64)
 	var userID *spec.UserID
 	for user, level := range pls.Users {
-		validRoomID, _ := spec.NewRoomID(se.RoomID())
 		if eventFormat != FormatSyncFederation {
-			userID, err = userIDForSender(*validRoomID, spec.SenderID(user))
+			userID, err = userIDForSender(se.RoomID(), spec.SenderID(user))
 			if err != nil {
 				return nil, err
 			}
@@ -401,9 +392,8 @@ func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserv
 
 	newPls = make(map[string]int64)
 	for user, level := range pls.Users {
-		validRoomID, _ := spec.NewRoomID(se.RoomID())
 		if eventFormat != FormatSyncFederation {
-			userID, err = userIDForSender(*validRoomID, spec.SenderID(user))
+			userID, err = userIDForSender(se.RoomID(), spec.SenderID(user))
 			if err != nil {
 				return nil, err
 			}

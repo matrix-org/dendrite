@@ -70,11 +70,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 
 	for roomID, inviteEvent := range invites {
 		user := spec.UserID{}
-		validRoomID, err := spec.NewRoomID(inviteEvent.RoomID())
-		if err != nil {
-			continue
-		}
-		sender, err := p.rsAPI.QueryUserIDForSender(ctx, *validRoomID, inviteEvent.SenderID())
+		sender, err := p.rsAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), inviteEvent.SenderID())
 		if err == nil && sender != nil {
 			user = *sender
 		}

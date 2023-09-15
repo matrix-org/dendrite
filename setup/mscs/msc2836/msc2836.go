@@ -271,7 +271,7 @@ func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONRespo
 		event = rc.fetchUnknownEvent(rc.req.EventID, rc.req.RoomID)
 	}
 	if rc.req.RoomID == "" && event != nil {
-		rc.req.RoomID = event.RoomID()
+		rc.req.RoomID = event.RoomID().String()
 	}
 	if event == nil || !rc.authorisedToSeeEvent(event) {
 		return nil, &util.JSONResponse{
@@ -526,7 +526,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 		// make sure the server is in this room
 		var res fs.QueryJoinedHostServerNamesInRoomResponse
 		err := rc.fsAPI.QueryJoinedHostServerNamesInRoom(rc.ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
-			RoomID: event.RoomID(),
+			RoomID: event.RoomID().String(),
 		}, &res)
 		if err != nil {
 			util.GetLogger(rc.ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryJoinedHostServerNamesInRoom")
@@ -545,7 +545,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 	// TODO: This does not honour m.room.create content
 	var queryMembershipRes roomserver.QueryMembershipForUserResponse
 	err := rc.rsAPI.QueryMembershipForUser(rc.ctx, &roomserver.QueryMembershipForUserRequest{
-		RoomID: event.RoomID(),
+		RoomID: event.RoomID().String(),
 		UserID: rc.userID,
 	}, &queryMembershipRes)
 	if err != nil {
@@ -612,7 +612,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *types.HeaderedEvent {
 			// inject all the events into the roomserver then return the event in question
 			rc.injectResponseToRoomserver(queryRes)
 			for _, ev := range queryRes.ParsedEvents {
-				if ev.EventID() == eventID && rc.req.RoomID == ev.RoomID() {
+				if ev.EventID() == eventID && rc.req.RoomID == ev.RoomID().String() {
 					return &types.HeaderedEvent{PDU: ev}
 				}
 			}
@@ -629,7 +629,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *types.HeaderedEvent {
 			}
 		}
 	}
-	if rc.req.RoomID == event.RoomID() {
+	if rc.req.RoomID == event.RoomID().String() {
 		return event
 	}
 	return nil

@@ -161,7 +161,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if event.Type() == spec.MRoomCreate && event.StateKeyEquals("") {
 			continue
 		}
-		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID(), t.Origin) {
+		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID().String(), t.Origin) {
 			results[event.EventID()] = fclient.PDUResult{
 				Error: "Forbidden by server ACLs",
 			}

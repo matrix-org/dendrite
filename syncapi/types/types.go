@@ -542,14 +542,9 @@ func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *t
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
 		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != synctypes.FormatSyncFederation {
-			roomID, err := spec.NewRoomID(event.RoomID())
-			if err != nil {
-				return nil, err
-			}
-
 			updatedInvite, err := synctypes.GetUpdatedInviteRoomState(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
-			}, inviteRoomState, event.PDU, *roomID, eventFormat)
+			}, inviteRoomState, event.PDU, event.RoomID(), eventFormat)
 			if err != nil {
 				return nil, err
 			}
