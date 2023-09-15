@@ -301,25 +301,14 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 	switch {
 	case event.Type() == spec.MRoomMember:
-		sender := spec.UserID{}
-		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
-		if queryErr == nil && userID != nil {
-			sender = *userID
+		cevent, clientEvErr := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		})
+		if clientEvErr != nil {
+			return clientEvErr
 		}
-
-		sk := event.StateKey()
-		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*sk))
-			if queryErr == nil && skUserID != nil {
-				skString := skUserID.String()
-				sk = &skString
-			} else {
-				return fmt.Errorf("queryUserIDForSender: userID unknown for %s", *sk)
-			}
-		}
-		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender.String(), sk, event.Unsigned())
 		var member *localMembership
-		member, err = newLocalMembership(&cevent)
+		member, err = newLocalMembership(cevent)
 		if err != nil {
 			return fmt.Errorf("newLocalMembership: %w", err)
 		}
@@ -538,27 +527,19 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if err != nil {
 		return fmt.Errorf("s.localPushDevices: %w", err)
 	}
-
-	sender := spec.UserID{}
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
+	clientEvent, err := synctypes.ToClientEvent(event, synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
+	if err != nil {
+		return err
 	}
 
-	sk := event.StateKey()
-	if sk != nil && *sk != "" {
-		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(*event.StateKey()))
-		if queryErr == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
 	n := &api.Notification{
 		Actions: actions,
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender.String(), sk, event.Unsigned()),
+		Event: *clientEvent,
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it

@@ -176,11 +176,13 @@ func RedactEvent(ctx context.Context, redactionEvent, redactedEvent gomatrixserv
 		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
 	redactedEvent.Redact()
-	senderID, err := querier.QueryUserIDForSender(ctx, redactedEvent.RoomID(), redactionEvent.SenderID())
+	clientEvent, err := synctypes.ToClientEvent(redactionEvent, synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return querier.QueryUserIDForSender(ctx, roomID, senderID)
+	})
 	if err != nil {
 		return err
 	}
-	redactedBecause := synctypes.ToClientEvent(redactionEvent, synctypes.FormatSync, senderID.String(), redactionEvent.StateKey(), redactionEvent.Unsigned())
+	redactedBecause := clientEvent
 	if err := redactedEvent.SetUnsignedField("redacted_because", redactedBecause); err != nil {
 		return err
 	}

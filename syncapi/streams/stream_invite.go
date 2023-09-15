@@ -75,20 +75,15 @@ func (p *InviteStreamProvider) IncrementalSync(
 			user = *sender
 		}
 
-		sk := inviteEvent.StateKey()
-		if sk != nil && *sk != "" {
-			skUserID, err := p.rsAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), spec.SenderID(*inviteEvent.StateKey()))
-			if err == nil && skUserID != nil {
-				skString := skUserID.String()
-				sk = &skString
-			}
-		}
-
 		// skip ignored user events
 		if _, ok := req.IgnoredUsers.List[user.String()]; ok {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent, user, sk, eventFormat)
+		ir, err := types.NewInviteResponse(ctx, p.rsAPI, inviteEvent, eventFormat)
+		if err != nil {
+			req.Log.WithError(err).Error("failed creating invite response")
+			continue
+		}
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 

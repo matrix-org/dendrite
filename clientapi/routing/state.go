@@ -172,23 +172,16 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			}
 		}
 		for _, ev := range stateAfterRes.StateEvents {
-			sender := spec.UserID{}
-			userID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), ev.SenderID())
-			if err == nil && userID != nil {
-				sender = *userID
-			}
-
-			sk := ev.StateKey()
-			if sk != nil && *sk != "" {
-				skUserID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
-				if err == nil && skUserID != nil {
-					skString := skUserID.String()
-					sk = &skString
-				}
+			clientEvent, err := synctypes.ToClientEvent(ev, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			})
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed converting to ClientEvent")
+				continue
 			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender.String(), sk, ev.Unsigned()),
+				*clientEvent,
 			)
 		}
 	}
