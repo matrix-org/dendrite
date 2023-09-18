@@ -296,6 +296,12 @@ type QueryAccountDataResponse struct {
 	RoomAccountData   map[string]map[string]json.RawMessage // room -> type -> data
 }
 
+// Custom Connnect AccountData information
+type AccountData struct {
+	IsProfileFilled    bool  `json:"isProfileFilled"`
+	LatestKeysUploadTs int64 `json:"latestKeysUploadTs"`
+}
+
 // QueryDevicesRequest is the request for QueryDevices
 type QueryDevicesRequest struct {
 	UserID string
