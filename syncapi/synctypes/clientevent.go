@@ -141,6 +141,18 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDFor
 		Redacts:        se.Redacts(),
 	}
 
+	// RoomVersion V11 moved the "redacts" field to "content", so add it there as well
+	// For compatibility with older clients, we keep the "redacts" top-level field.
+	// TODO: At which point do we remove "redacts" from the top-level?
+	if se.Type() == spec.MRoomRedaction && se.Version() == gomatrixserverlib.RoomVersionV11 && ce.Redacts != "" {
+		v11content, err := sjson.SetBytes(ce.Content, "content.redacts", ce.Redacts)
+		if err != nil {
+			logrus.WithError(err).Warn("failed to set content.redacts")
+		} else {
+			ce.Content = v11content
+		}
+	}
+
 	switch format {
 	case FormatAll:
 		ce.RoomID = se.RoomID().String()
