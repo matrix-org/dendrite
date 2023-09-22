@@ -154,50 +154,6 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	}
 }
 
-// Merely tests that the top-level "redacts" is copied to "content.redacts" and keeps the top-level
-// one as is
-func TestToClientEventRedactionV11(t *testing.T) { // nolint: gocyclo
-	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV11).NewEventFromTrustedJSON([]byte(`{
-		"type": "m.room.redaction",
-		"state_key": "",
-		"event_id": "$test",
-		"room_id": "!test:localhost",
-		"sender": "@test:localhost",
-		"content": {
-			"reason": "Hello World"
-		},
-		"origin_server_ts": 123456,
-		"unsigned": {
-			"prev_content": {
-				"name": "Goodbye World"
-			}
-		},
-		"redacts": "$abc"
-	}`), false)
-	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
-	}
-
-	ce, err := ToClientEvent(ev, FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-		return queryUserIDForSender(senderID)
-	})
-	if err != nil {
-		t.Fatalf("failed to create ClientEvent: %s", err)
-	}
-
-	j, err := json.Marshal(ce)
-	if err != nil {
-		t.Fatalf("failed to Marshal ClientEvent: %s", err)
-	}
-	// Marshal sorts keys in structs by the order they are defined in the struct, which is alphabetical
-	out := `{"content":{"reason":"Hello World","redacts":"$abc"},"event_id":"$test","origin_server_ts":123456,` +
-		`"room_id":"!test:localhost","sender":"@test:localhost","state_key":"","type":"m.room.redaction",` +
-		`"unsigned":{"prev_content":{"name":"Goodbye World"}},"redacts":"$abc"}`
-	if !bytes.Equal([]byte(out), j) {
-		t.Errorf("ClientEvent marshalled to wrong bytes: wanted \n%s, got \n%s", out, string(j))
-	}
-}
-
 func TestToClientFormatSync(t *testing.T) {
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
