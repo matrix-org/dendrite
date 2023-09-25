@@ -124,7 +124,7 @@ func Setup(
 		).Methods(http.MethodGet, http.MethodOptions)
 	}
 
-	if !strings.HasPrefix(string(cfg.Matrix.ServerName), "http://") && !strings.HasPrefix(string(cfg.Matrix.ServerName), "https://") {
+	if !strings.HasPrefix(string(cfg.Matrix.ServerName), "http://") || !strings.HasPrefix(string(cfg.Matrix.ServerName), "https://") {
 		logrus.Warn("The well_known_server_name does not start with http:// or https:// does not start with 'http://' or 'https://'. Some clients may fail to connect.")
 	}
 
