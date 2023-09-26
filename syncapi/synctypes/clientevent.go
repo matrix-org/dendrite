@@ -347,71 +347,81 @@ func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserv
 		return se, nil
 	}
 
-	pls, err := gomatrixserverlib.NewPowerLevelContentFromEvent(se)
-	if err != nil {
-		return nil, err
-	}
-	newPls := make(map[string]int64)
-	var userID *spec.UserID
-	for user, level := range pls.Users {
-		if eventFormat != FormatSyncFederation {
-			userID, err = userIDForSender(se.RoomID(), spec.SenderID(user))
-			if err != nil {
-				return nil, err
-			}
-			user = userID.String()
-		}
-		newPls[user] = level
-	}
-	var newPlBytes, newEv []byte
-	newPlBytes, err = json.Marshal(newPls)
-	if err != nil {
-		return nil, err
-	}
-	newEv, err = sjson.SetRawBytes(se.JSON(), "content.users", newPlBytes)
-	if err != nil {
-		return nil, err
-	}
+	newEv := se.JSON()
 
-	// do the same for prev content
-	prevContent := gjson.GetBytes(se.JSON(), "unsigned.prev_content")
-	if !prevContent.Exists() {
-		var evNew gomatrixserverlib.PDU
-		evNew, err = gomatrixserverlib.MustGetRoomVersion(se.Version()).NewEventFromTrustedJSON(newEv, false)
+	usersField := gjson.GetBytes(se.JSON(), "content.users")
+	if usersField.Exists() {
+		pls, err := gomatrixserverlib.NewPowerLevelContentFromEvent(se)
 		if err != nil {
 			return nil, err
 		}
 
-		return evNew, err
-	}
-	pls = gomatrixserverlib.PowerLevelContent{}
-	err = json.Unmarshal([]byte(prevContent.Raw), &pls)
-	if err != nil {
-		return nil, err
+		newPls := make(map[string]int64)
+		var userID *spec.UserID
+		for user, level := range pls.Users {
+			if eventFormat != FormatSyncFederation {
+				userID, err = userIDForSender(se.RoomID(), spec.SenderID(user))
+				if err != nil {
+					return nil, err
+				}
+				user = userID.String()
+			}
+			newPls[user] = level
+		}
+
+		var newPlBytes []byte
+		newPlBytes, err = json.Marshal(newPls)
+		if err != nil {
+			return nil, err
+		}
+		newEv, err = sjson.SetRawBytes(se.JSON(), "content.users", newPlBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	newPls = make(map[string]int64)
-	for user, level := range pls.Users {
-		if eventFormat != FormatSyncFederation {
-			userID, err = userIDForSender(se.RoomID(), spec.SenderID(user))
+	// do the same for prev content
+	prevUsersField := gjson.GetBytes(se.JSON(), "unsigned.prev_content.users")
+	if prevUsersField.Exists() {
+		prevContent := gjson.GetBytes(se.JSON(), "unsigned.prev_content")
+		if !prevContent.Exists() {
+			evNew, err := gomatrixserverlib.MustGetRoomVersion(se.Version()).NewEventFromTrustedJSON(newEv, false)
 			if err != nil {
 				return nil, err
 			}
-			user = userID.String()
+
+			return evNew, err
 		}
-		newPls[user] = level
-	}
-	newPlBytes, err = json.Marshal(newPls)
-	if err != nil {
-		return nil, err
-	}
-	newEv, err = sjson.SetRawBytes(newEv, "unsigned.prev_content.users", newPlBytes)
-	if err != nil {
-		return nil, err
+		pls := gomatrixserverlib.PowerLevelContent{}
+		err := json.Unmarshal([]byte(prevContent.Raw), &pls)
+		if err != nil {
+			return nil, err
+		}
+
+		newPls := make(map[string]int64)
+		for user, level := range pls.Users {
+			if eventFormat != FormatSyncFederation {
+				userID, userErr := userIDForSender(se.RoomID(), spec.SenderID(user))
+				if userErr != nil {
+					return nil, userErr
+				}
+				user = userID.String()
+			}
+			newPls[user] = level
+		}
+
+		var newPlBytes []byte
+		newPlBytes, err = json.Marshal(newPls)
+		if err != nil {
+			return nil, err
+		}
+		newEv, err = sjson.SetRawBytes(newEv, "unsigned.prev_content.users", newPlBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	var evNew gomatrixserverlib.PDU
-	evNew, err = gomatrixserverlib.MustGetRoomVersion(se.Version()).NewEventFromTrustedJSONWithEventID(se.EventID(), newEv, false)
+	evNew, err := gomatrixserverlib.MustGetRoomVersion(se.Version()).NewEventFromTrustedJSONWithEventID(se.EventID(), newEv, false)
 	if err != nil {
 		return nil, err
 	}
