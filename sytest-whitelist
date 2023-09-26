@@ -784,3 +784,7 @@ Invited user can reject local invite after originator leaves
 Guest users can join guest_access rooms
 Forgotten room messages cannot be paginated
 Local device key changes get to remote servers with correct prev_id
+HS provides query metadata
+HS can provide query metadata on a single protocol
+Invites over federation are correctly pushed
+Invites over federation are correctly pushed with name
