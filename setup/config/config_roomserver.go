@@ -16,8 +16,7 @@ type RoomServer struct {
 }
 
 func (c *RoomServer) Defaults(opts DefaultOpts) {
-	//c.DefaultRoomVersion = gomatrixserverlib.RoomVersionV10
-	c.DefaultRoomVersion = gomatrixserverlib.RoomVersionPseudoIDs
+	c.DefaultRoomVersion = gomatrixserverlib.RoomVersionV10
 	if opts.Generate {
 		if !opts.SingleDatabase {
 			c.Database.ConnectionString = "file:roomserver.db"
