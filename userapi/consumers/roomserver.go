@@ -92,29 +92,42 @@ func (s *OutputRoomEventConsumer) Start() error {
 func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Only handle events we care about
-	if rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) != rsapi.OutputTypeNewRoomEvent {
-		return true
-	}
-	var output rsapi.OutputEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return true
-	}
-	event := output.NewRoomEvent.Event
-	if event == nil {
-		log.Errorf("userapi consumer: expected event")
+
+	var event *rstypes.HeaderedEvent
+	var isNewRoomEvent bool
+	switch rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) {
+	case rsapi.OutputTypeNewRoomEvent:
+		isNewRoomEvent = true
+		fallthrough
+	case rsapi.OutputTypeNewInviteEvent:
+		var output rsapi.OutputEvent
+		if err := json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return true
+		}
+		if isNewRoomEvent {
+			event = output.NewRoomEvent.Event
+		} else {
+			event = output.NewInviteEvent.Event
+		}
+
+		if event == nil {
+			log.Errorf("userapi consumer: expected event")
+			return true
+		}
+
+		log.WithFields(log.Fields{
+			"event_id":   event.EventID(),
+			"event_type": event.Type(),
+		}).Tracef("Received message from roomserver: %#v", output)
+	default:
 		return true
 	}
 
 	if s.cfg.Matrix.ReportStats.Enabled {
 		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
-
-	log.WithFields(log.Fields{
-		"event_id":   event.EventID(),
-		"event_type": event.Type(),
-	}).Tracef("Received message from roomserver: %#v", output)
 
 	metadata, err := msg.Metadata()
 	if err != nil {
@@ -445,6 +458,19 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *rstypes.H
 
 		if name != "" {
 			return name, nil
+		}
+	}
+
+	// Special case for invites, as we don't store any "current state" for these events,
+	// we need to make sure that, if present, the m.room.name is sent as well.
+	if event.Type() == spec.MRoomMember &&
+		gjson.GetBytes(event.Content(), "membership").Str == "invite" {
+		invState := gjson.GetBytes(event.JSON(), "unsigned.invite_room_state")
+		for _, ev := range invState.Array() {
+			if ev.Get("type").Str == spec.MRoomName {
+				name := ev.Get("content.name").Str
+				return name, nil
+			}
 		}
 	}
 
