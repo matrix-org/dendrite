@@ -363,14 +363,17 @@ func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserv
 		}
 		newPls[user] = level
 	}
-	var newPlBytes, newEv []byte
-	newPlBytes, err = json.Marshal(newPls)
-	if err != nil {
-		return nil, err
-	}
-	newEv, err = sjson.SetRawBytes(se.JSON(), "content.users", newPlBytes)
-	if err != nil {
-		return nil, err
+	var newPlBytes []byte
+	newEv := se.JSON()
+	if len(pls.Users) > 0 {
+		newPlBytes, err = json.Marshal(newPls)
+		if err != nil {
+			return nil, err
+		}
+		newEv, err = sjson.SetRawBytes(se.JSON(), "content.users", newPlBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// do the same for prev content
@@ -401,13 +404,15 @@ func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserv
 		}
 		newPls[user] = level
 	}
-	newPlBytes, err = json.Marshal(newPls)
-	if err != nil {
-		return nil, err
-	}
-	newEv, err = sjson.SetRawBytes(newEv, "unsigned.prev_content.users", newPlBytes)
-	if err != nil {
-		return nil, err
+	if len(pls.Users) > 0 {
+		newPlBytes, err = json.Marshal(newPls)
+		if err != nil {
+			return nil, err
+		}
+		newEv, err = sjson.SetRawBytes(newEv, "unsigned.prev_content.users", newPlBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var evNew gomatrixserverlib.PDU
