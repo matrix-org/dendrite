@@ -463,7 +463,8 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *rstypes.H
 
 	// Special case for invites, as we don't store any "current state" for these events,
 	// we need to make sure that, if present, the m.room.name is sent as well.
-	if event.Type() == spec.MRoomMember {
+	if event.Type() == spec.MRoomMember &&
+		gjson.GetBytes(event.Content(), "membership").Str == "invite" {
 		invState := gjson.GetBytes(event.JSON(), "unsigned.invite_room_state")
 		for _, ev := range invState.Array() {
 			if ev.Get("type").Str == spec.MRoomName {
