@@ -112,16 +112,16 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 			event = output.NewInviteEvent.Event
 		}
 
+		if event == nil {
+			log.Errorf("userapi consumer: expected event")
+			return true
+		}
+
 		log.WithFields(log.Fields{
 			"event_id":   event.EventID(),
 			"event_type": event.Type(),
 		}).Tracef("Received message from roomserver: %#v", output)
 	default:
-		return true
-	}
-
-	if event == nil {
-		log.Errorf("userapi consumer: expected event")
 		return true
 	}
 
