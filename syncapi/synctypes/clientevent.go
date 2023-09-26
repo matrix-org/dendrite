@@ -401,9 +401,9 @@ func updatePowerLevelEvent(userIDForSender spec.UserIDForSender, se gomatrixserv
 		newPls := make(map[string]int64)
 		for user, level := range pls.Users {
 			if eventFormat != FormatSyncFederation {
-				userID, err := userIDForSender(se.RoomID(), spec.SenderID(user))
-				if err != nil {
-					return nil, err
+				userID, userErr := userIDForSender(se.RoomID(), spec.SenderID(user))
+				if userErr != nil {
+					return nil, userErr
 				}
 				user = userID.String()
 			}
