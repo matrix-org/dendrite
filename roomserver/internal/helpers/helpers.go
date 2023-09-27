@@ -54,7 +54,7 @@ func UpdateToInviteMembership(
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
 				EventID:          eventID,
-				RoomID:           add.RoomID(),
+				RoomID:           add.RoomID().String(),
 				Membership:       spec.Join,
 				RetiredByEventID: add.EventID(),
 				TargetSenderID:   spec.SenderID(*add.StateKey()),
@@ -396,7 +396,7 @@ BFSLoop:
 			// It's nasty that we have to extract the room ID from an event, but many federation requests
 			// only talk in event IDs, no room IDs at all (!!!)
 			ev := events[0]
-			isServerInRoom, err = IsServerCurrentlyInRoom(ctx, db, querier, serverName, ev.RoomID())
+			isServerInRoom, err = IsServerCurrentlyInRoom(ctx, db, querier, serverName, ev.RoomID().String())
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to check if server is currently in room, assuming not.")
 			}
@@ -419,7 +419,7 @@ BFSLoop:
 				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, ev.RoomID(), pre, serverName, isServerInRoom, querier)
+					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, ev.RoomID().String(), pre, serverName, isServerInRoom, querier)
 					if err != nil {
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",

@@ -87,7 +87,7 @@ func filterEvents(
 ) []*types.HeaderedEvent {
 	ref := events[:0]
 	for _, ev := range events {
-		if ev.RoomID() == roomID {
+		if ev.RoomID().String() == roomID {
 			ref = append(ref, ev)
 		}
 	}

@@ -98,7 +98,7 @@ func SendRedaction(
 			JSON: spec.NotFound("unknown event ID"), // TODO: is it ok to leak existence?
 		}
 	}
-	if ev.RoomID() != roomID {
+	if ev.RoomID().String() != roomID {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: spec.NotFound("cannot redact event in another room"),

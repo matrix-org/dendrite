@@ -211,7 +211,7 @@ func SendLeave(
 	}
 
 	// Check that the room ID is correct.
-	if event.RoomID() != roomID {
+	if event.RoomID().String() != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the leave event JSON"),
@@ -242,14 +242,7 @@ func SendLeave(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("Room ID is invalid."),
-		}
-	}
-	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), *validRoomID, event.SenderID())
+	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), event.RoomID(), event.SenderID())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
