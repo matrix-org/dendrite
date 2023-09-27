@@ -1667,6 +1667,24 @@ func TestKeys(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		dataReq := uapi.QueryAccountDataRequest{
+			UserID:   alice.ID,
+			DataType: "account_data",
+			RoomID:   "",
+		}
+		res := uapi.QueryAccountDataResponse{}
+		if err = userAPI.QueryAccountData(processCtx.Context(), &dataReq, &res); err != nil {
+			t.Fatal(err)
+		}
+		var accoundData uapi.AccountData
+		err = json.Unmarshal(res.GlobalAccountData["account_data"], &accoundData)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if accoundData.LatestKeysUploadTs == 0 ||
+			time.Now().UnixMilli()-accoundData.LatestKeysUploadTs > 5*time.Second.Milliseconds() {
+			t.Fatal(err)
+		}
 
 		// tests `/keys/query`
 		dev, err := oc.GetOrFetchDevice(ctx, id.UserID(alice.ID), id.DeviceID(accessTokens[alice].deviceID))
