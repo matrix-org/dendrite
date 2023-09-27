@@ -266,8 +266,8 @@ func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, 
 	directChats := gjson.ParseBytes(directChatsRaw)
 	newDirectChats := make(map[string][]string)
 	// iterate over all userID -> roomIDs
+	var found bool
 	directChats.ForEach(func(userID, roomIDs gjson.Result) bool {
-		var found bool
 		for _, roomID := range roomIDs.Array() {
 			newDirectChats[userID.Str] = append(newDirectChats[userID.Str], roomID.Str)
 			// add the new roomID to m.direct
@@ -276,22 +276,21 @@ func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, 
 				newDirectChats[userID.Str] = append(newDirectChats[userID.Str], newRoomID)
 			}
 		}
-		// Only hit the database if we found the old room as a DM for this user
-		if found {
-			var data []byte
-			data, err = json.Marshal(newDirectChats)
-			if err != nil {
-				return true
-			}
-			if err = s.db.SaveAccountData(ctx, localpart, serverName, "", "m.direct", data); err != nil {
-				return true
-			}
-		}
 		return true
 	})
-	if err != nil {
-		return fmt.Errorf("failed to update m.direct state")
+
+	// Only hit the database if we found the old room as a DM for this user
+	if found {
+		var data []byte
+		data, err = json.Marshal(newDirectChats)
+		if err != nil {
+			return err
+		}
+		if err = s.db.SaveAccountData(ctx, localpart, serverName, "", "m.direct", data); err != nil {
+			return fmt.Errorf("failed to update m.direct state: %w", err)
+		}
 	}
+
 	return nil
 }
 
