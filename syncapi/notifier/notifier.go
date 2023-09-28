@@ -101,20 +101,13 @@ func (n *Notifier) OnNewEvent(
 	n._removeEmptyUserStreams()
 
 	if ev != nil {
-		validRoomID, err := spec.NewRoomID(ev.RoomID())
-		if err != nil {
-			log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
-				"Notifier.OnNewEvent: RoomID is invalid",
-			)
-			return
-		}
 		// Map this event's room_id to a list of joined users, and wake them up.
-		usersToNotify := n._joinedUsers(ev.RoomID())
+		usersToNotify := n._joinedUsers(ev.RoomID().String())
 		// Map this event's room_id to a list of peeking devices, and wake them up.
-		peekingDevicesToNotify := n._peekingDevices(ev.RoomID())
+		peekingDevicesToNotify := n._peekingDevices(ev.RoomID().String())
 		// If this is an invite, also add in the invitee to this list.
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), *validRoomID, spec.SenderID(*ev.StateKey()))
+			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), ev.RoomID(), spec.SenderID(*ev.StateKey()))
 			if err != nil || targetUserID == nil {
 				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
 					"Notifier.OnNewEvent: Failed to find the userID for this event",
@@ -134,11 +127,11 @@ func (n *Notifier) OnNewEvent(
 						// Manually append the new user's ID so they get notified
 						// along all members in the room
 						usersToNotify = append(usersToNotify, targetUserID.String())
-						n._addJoinedUser(ev.RoomID(), targetUserID.String())
+						n._addJoinedUser(ev.RoomID().String(), targetUserID.String())
 					case spec.Leave:
 						fallthrough
 					case spec.Ban:
-						n._removeJoinedUser(ev.RoomID(), targetUserID.String())
+						n._removeJoinedUser(ev.RoomID().String(), targetUserID.String())
 					}
 				}
 			}

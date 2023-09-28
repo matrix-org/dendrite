@@ -563,12 +563,15 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAccessTokenRequest, res *api.QueryAccessTokenResponse) error {
 	if req.AppServiceUserID != "" {
 		appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)
-		if err != nil {
-			res.Err = err.Error()
-		}
-		res.Device = appServiceDevice
+		if err != nil || appServiceDevice != nil {
+			if err != nil {
+				res.Err = err.Error()
+			}
+			res.Device = appServiceDevice
 
-		return nil
+			return nil
+		}
+		// If the provided token wasn't an as_token (both err and appServiceDevice are nil), continue with normal auth.
 	}
 	device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {

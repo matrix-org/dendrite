@@ -334,7 +334,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
-		needSet := stateNeeded[ev.RoomID()]
+		needSet := stateNeeded[ev.RoomID().String()]
 		if needSet == nil { // make set if required
 			needSet = make(map[string]bool)
 		}
@@ -344,7 +344,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		for _, id := range addIDs {
 			needSet[id] = true
 		}
-		stateNeeded[ev.RoomID()] = needSet
+		stateNeeded[ev.RoomID().String()] = needSet
 		ev.Visibility = historyVisibility
 
 		eventIDToEvent[eventID] = types.StreamEvent{
@@ -403,7 +403,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	stmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(
 		ctx,
-		event.RoomID(),
+		event.RoomID().String(),
 		event.EventID(),
 		headeredJSON,
 		event.Type(),

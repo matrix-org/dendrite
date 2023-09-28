@@ -93,11 +93,21 @@ func (r *Leaver) performLeaveRoomByID(
 	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, *leaver)
 	if err == nil && isInvitePending {
 		sender, serr := r.RSAPI.QueryUserIDForSender(ctx, *roomID, senderUser)
-		if serr != nil || sender == nil {
-			return nil, fmt.Errorf("sender %q has no matching userID", senderUser)
+		if serr != nil {
+			return nil, fmt.Errorf("failed looking up userID for sender %q: %w", senderUser, serr)
 		}
-		if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
-			return r.performFederatedRejectInvite(ctx, req, res, *sender, eventID, *leaver)
+
+		var domain spec.ServerName
+		if sender == nil {
+			// TODO: Currently a federated invite has no way of knowing the mxid_mapping of the inviter.
+			// Should we add the inviter's m.room.member event (with mxid_mapping) to invite_room_state to allow
+			// the invited user to leave via the inviter's server?
+			domain = roomID.Domain()
+		} else {
+			domain = sender.Domain()
+		}
+		if !r.Cfg.Matrix.IsLocalServerName(domain) {
+			return r.performFederatedRejectInvite(ctx, req, res, domain, eventID, *leaver)
 		}
 		// check that this is not a "server notice room"
 		accData := &userapi.QueryAccountDataResponse{}
@@ -219,14 +229,14 @@ func (r *Leaver) performFederatedRejectInvite(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
-	inviteSender spec.UserID, eventID string,
+	inviteDomain spec.ServerName, eventID string,
 	leaver spec.SenderID,
 ) ([]api.OutputEvent, error) {
 	// Ask the federation sender to perform a federated leave for us.
 	leaveReq := fsAPI.PerformLeaveRequest{
 		RoomID:      req.RoomID,
 		UserID:      req.Leaver.String(),
-		ServerNames: []spec.ServerName{inviteSender.Domain()},
+		ServerNames: []spec.ServerName{inviteDomain},
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {

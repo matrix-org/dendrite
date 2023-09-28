@@ -106,7 +106,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	_, err = stmt.ExecContext(
 		ctx,
 		streamPos,
-		inviteEvent.RoomID(),
+		inviteEvent.RoomID().String(),
 		inviteEvent.EventID(),
 		inviteEvent.UserID.String(),
 		headeredJSON,

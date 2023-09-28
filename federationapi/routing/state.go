@@ -113,10 +113,10 @@ func getState(
 		return nil, nil, resErr
 	}
 
-	if event.RoomID() != roomID {
+	if event.RoomID().String() != roomID {
 		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: spec.NotFound("event does not belong to this room")}
 	}
-	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID())
+	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID().String())
 	if resErr != nil {
 		return nil, nil, resErr
 	}

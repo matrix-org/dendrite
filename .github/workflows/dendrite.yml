@@ -280,6 +280,8 @@ jobs:
         with:
           go-version: "stable"
           cache: true
+      - name: Docker version
+        run: docker version
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade (PostgreSQL)
@@ -300,6 +302,8 @@ jobs:
         with:
           go-version: "stable"
           cache: true
+      - name: Docker version
+        run: docker version
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade (PostgreSQL)

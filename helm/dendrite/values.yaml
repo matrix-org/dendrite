@@ -75,16 +75,6 @@ strategy:
     # -- Maximum number of pods that can be scheduled above the desired number of pods
     maxSurge: 25%
 
-strategy:
-  # -- Strategy to use for rolling updates (e.g. Recreate, RollingUpdate)
-  # If you are using ReadWriteOnce volumes, you should probably use Recreate
-  type: RollingUpdate
-  rollingUpdate:
-    # -- Maximum number of pods that can be unavailable during the update process
-    maxUnavailable: 25%
-    # -- Maximum number of pods that can be scheduled above the desired number of pods
-    maxSurge: 25%
-
 dendrite_config:
   version: 2
   global:
