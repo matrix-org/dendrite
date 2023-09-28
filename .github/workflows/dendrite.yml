@@ -81,11 +81,6 @@ jobs:
     timeout-minutes: 10
     name: Unit tests
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        goos: [ "linux" ]
-        goarch: [ "amd64", "386" ]
     # Service containers to run with `container-job`
     services:
       # Label used to access the service container
@@ -115,16 +110,14 @@ jobs:
         with:
           go-version: "stable"
       - uses: actions/cache@v3
+        # manually set up caches, as they otherwise clash with different steps using setup-go with cache=true
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-stable-unit-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-stable-unit-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            key: ${{ runner.os }}-go-stable-unit-${{ matrix.goos }}-${{ matrix.goarch }}-
-      - name: Install dependencies x86
-        if: ${{ matrix.goarch == '386' }}
-        run: sudo apt update && sudo apt-get install -y gcc-multilib
+            ${{ runner.os }}-go-stable-unit-
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
         with:
@@ -132,8 +125,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - run: go test -json -v ./... 2>&1 | gotestfmt -hide all
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
