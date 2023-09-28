@@ -32,7 +32,7 @@ jobs:
           version: v3.10.0
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.4.1
+        uses: helm/chart-releaser-action@ed43eb303604cbc0eeec8390544f7748dc6c790d # specific commit, since `mark_as_latest` is not yet in a release
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
