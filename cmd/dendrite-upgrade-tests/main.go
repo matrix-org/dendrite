@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -515,7 +514,7 @@ func testCreateAccount(dockerClient *client.Client, version *semver.Version, con
 	}
 	defer response.Close()
 
-	data, err := ioutil.ReadAll(response.Reader)
+	data, err := io.ReadAll(response.Reader)
 	if err != nil {
 		return err
 	}
