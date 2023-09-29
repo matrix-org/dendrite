@@ -22,7 +22,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.13.4.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.13.4/dendrite-0.13.4.tgz
     version: 0.13.4
   - apiVersion: v2
     appVersion: 0.13.2
