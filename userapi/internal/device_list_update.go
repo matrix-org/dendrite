@@ -183,7 +183,7 @@ func (u *DeviceListUpdater) Start() error {
 
 	// Filter out dupe domains, as processServer is going to get all users anyway
 	seenDomains := make(map[spec.ServerName]struct{})
-	newStateLists := make([]string, 0, len(staleLists))
+	newStaleLists := make([]string, 0, len(staleLists))
 	for _, userID := range staleLists {
 		_, domain, err := gomatrixserverlib.SplitID('@', userID)
 		if err != nil {
@@ -193,14 +193,14 @@ func (u *DeviceListUpdater) Start() error {
 		if _, ok := seenDomains[domain]; ok {
 			continue
 		}
-		newStateLists = append(newStateLists, userID)
+		newStaleLists = append(newStaleLists, userID)
 		seenDomains[domain] = struct{}{}
 	}
 	offset, step := time.Second*10, time.Second
-	if max := len(newStateLists); max > 120 {
+	if max := len(newStaleLists); max > 120 {
 		step = (time.Second * 120) / time.Duration(max)
 	}
-	for _, userID := range newStateLists {
+	for _, userID := range newStaleLists {
 		userID := userID // otherwise we are only sending the last entry
 		time.AfterFunc(offset, func() {
 			u.notifyWorkers(userID)
