@@ -416,6 +416,12 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName) {
 
 func (u *DeviceListUpdater) processServer(serverName spec.ServerName) (time.Duration, bool) {
 	ctx := u.process.Context()
+	// If the process.Context is canceled, there is no need to go further.
+	// This avoids spamming the logs when shutting down
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return defaultWaitTime, false
+	}
+
 	logger := util.GetLogger(ctx).WithField("server_name", serverName)
 	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
 
