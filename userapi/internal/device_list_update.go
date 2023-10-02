@@ -450,13 +450,6 @@ func (u *DeviceListUpdater) processServer(serverName spec.ServerName) (time.Dura
 		return waitTime, true
 	}
 
-	defer func() {
-		for _, userID := range userIDs {
-			// always clear the channel to unblock Update calls regardless of success/failure
-			u.clearChannel(userID)
-		}
-	}()
-
 	for _, userID := range userIDs {
 		userWait, err := u.processServerUser(ctx, serverName, userID)
 		if err != nil {
