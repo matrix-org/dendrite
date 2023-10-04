@@ -48,6 +48,7 @@ type createRoomRequest struct {
 	RoomVersion               gomatrixserverlib.RoomVersion      `json:"room_version"`
 	PowerLevelContentOverride json.RawMessage                    `json:"power_level_content_override"`
 	IsDirect                  bool                               `json:"is_direct"`
+	SenderID                  string                             `json:"sender_id"`
 }
 
 func (r createRoomRequest) Validate() *util.JSONResponse {
@@ -107,6 +108,208 @@ type createRoomResponse struct {
 	RoomAlias string `json:"room_alias,omitempty"` // in synapse not spec
 }
 
+// CreateRoomCryptoIDs implements /createRoom
+func CreateRoomCryptoIDs(
+	req *http.Request, device *api.Device,
+	cfg *config.ClientAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
+) util.JSONResponse {
+	var createRequest createRoomRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &createRequest)
+	if resErr != nil {
+		return *resErr
+	}
+	if resErr = createRequest.Validate(); resErr != nil {
+		return *resErr
+	}
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam(err.Error()),
+		}
+	}
+
+	return makeCreateRoomEvents(req.Context(), createRequest, device, cfg, profileAPI, rsAPI, asAPI, evTime)
+}
+
+func makeCreateRoomEvents(
+	ctx context.Context,
+	createRequest createRoomRequest, device *api.Device,
+	cfg *config.ClientAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
+	evTime time.Time,
+) util.JSONResponse {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("invalid userID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	if !cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userID.Domain())),
+		}
+	}
+
+	logger := util.GetLogger(ctx)
+
+	// TODO: Check room ID doesn't clash with an existing one, and we
+	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
+	roomID, err := spec.NewRoomID(fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain()))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("invalid roomID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	// Clobber keys: creator, room_version
+
+	roomVersion := rsAPI.DefaultRoomVersion()
+	if createRequest.RoomVersion != "" {
+		candidateVersion := gomatrixserverlib.RoomVersion(createRequest.RoomVersion)
+		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
+		if roomVersionError != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.UnsupportedRoomVersion(roomVersionError.Error()),
+			}
+		}
+		roomVersion = candidateVersion
+	}
+
+	logger.WithFields(log.Fields{
+		"userID":      userID.String(),
+		"roomID":      roomID.String(),
+		"roomVersion": roomVersion,
+	}).Info("Creating new room")
+
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	userDisplayName := profile.DisplayName
+	userAvatarURL := profile.AvatarURL
+
+	keyID := cfg.Matrix.KeyID
+	privateKey := cfg.Matrix.PrivateKey
+
+	req := roomserverAPI.PerformCreateRoomRequest{
+		InvitedUsers:              createRequest.Invite,
+		RoomName:                  createRequest.Name,
+		Visibility:                createRequest.Visibility,
+		Topic:                     createRequest.Topic,
+		StatePreset:               createRequest.Preset,
+		CreationContent:           createRequest.CreationContent,
+		InitialState:              createRequest.InitialState,
+		RoomAliasName:             createRequest.RoomAliasName,
+		RoomVersion:               roomVersion,
+		PowerLevelContentOverride: createRequest.PowerLevelContentOverride,
+		IsDirect:                  createRequest.IsDirect,
+
+		UserDisplayName: userDisplayName,
+		UserAvatarURL:   userAvatarURL,
+		KeyID:           keyID,
+		PrivateKey:      privateKey,
+		EventTime:       evTime,
+
+		SenderID: createRequest.SenderID,
+	}
+
+	createEvents, err := rsAPI.PerformCreateRoomCryptoIDs(ctx, *userID, *roomID, &req)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("MakeCreateRoomEvents failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: err.Error()},
+		}
+	}
+
+	response := createRoomCryptoIDsResponse{
+		RoomID:  roomID.String(),
+		Version: string(roomVersion),
+		PDUs:    ToProtoEvents(ctx, createEvents, rsAPI),
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: response,
+	}
+}
+
+type createRoomCryptoIDsResponse struct {
+	RoomID  string            `json:"room_id"`
+	Version string            `json:"room_version"`
+	PDUs    []json.RawMessage `json:"pdus"`
+}
+
+func ToProtoEvents(ctx context.Context, events []gomatrixserverlib.PDU, rsAPI roomserverAPI.ClientRoomserverAPI) []json.RawMessage {
+	result := make([]json.RawMessage, len(events))
+	for i, event := range events {
+		result[i] = json.RawMessage(event.JSON())
+		//fmt.Printf("\nProcessing %s event (%s)\n", events[i].Type(), events[i].EventID())
+		//var rawJson interface{}
+		//json.Unmarshal(events[i].JSON(), &rawJson)
+		//fmt.Printf("JSON: %+v\n", rawJson)
+		//result[i] = gomatrixserverlib.ProtoEvent{
+		//	SenderID:              string(events[i].SenderID()),
+		//	RoomID:                events[i].RoomID().String(),
+		//	Type:                  events[i].Type(),
+		//	StateKey:              events[i].StateKey(),
+		//	PrevEvents:            events[i].PrevEventIDs(),
+		//	AuthEvents:            events[i].AuthEventIDs(),
+		//	Redacts:               events[i].Redacts(),
+		//	Depth:                 events[i].Depth(),
+		//	Content:               events[i].Content(),
+		//	Unsigned:              events[i].Unsigned(),
+		//	Hashes:                events[i].Hashes(),
+		//	OriginServerTimestamp: events[i].OriginServerTS(),
+		//}
+
+		//roomVersion, _ := rsAPI.QueryRoomVersionForRoom(ctx, events[i].RoomID().String())
+		//verImpl, _ := gomatrixserverlib.GetRoomVersion(roomVersion)
+		//eventJSON, err := json.Marshal(result[i])
+		//if err != nil {
+		//	util.GetLogger(ctx).WithError(err).Error("failed marshalling event")
+		//	continue
+		//}
+		//pdu, err := verImpl.NewEventFromUntrustedJSON(eventJSON)
+		//if err != nil {
+		//	util.GetLogger(ctx).WithError(err).Error("failed making event from json")
+		//	continue
+		//}
+		//fmt.Printf("\nProcessing %s event (%s) - PDU\n", result[i].Type, pdu.EventID())
+		//fmt.Printf("  EventID: %v - %v\n", events[i].EventID(), pdu.EventID())
+		//fmt.Printf("  SenderID: %s - %s\n", events[i].SenderID(), pdu.SenderID())
+		//fmt.Printf("  RoomID: %s - %s\n", events[i].RoomID().String(), pdu.RoomID().String())
+		//fmt.Printf("  Type: %s - %s\n", events[i].Type(), pdu.Type())
+		//fmt.Printf("  StateKey: %s - %s\n", *events[i].StateKey(), *pdu.StateKey())
+		//fmt.Printf("  PrevEvents: %v - %v\n", events[i].PrevEventIDs(), pdu.PrevEventIDs())
+		//fmt.Printf("  AuthEvents: %v - %v\n", events[i].AuthEventIDs(), pdu.AuthEventIDs())
+		//fmt.Printf("  Redacts: %s - %s\n", events[i].Redacts(), pdu.Redacts())
+		//fmt.Printf("  Depth: %d - %d\n", events[i].Depth(), pdu.Depth())
+		//fmt.Printf("  Content: %v - %v\n", events[i].Content(), pdu.Content())
+		//fmt.Printf("  Unsigned: %v - %v\n", events[i].Unsigned(), pdu.Unsigned())
+		//fmt.Printf("  Hashes: %v - %v\n", events[i].Hashes(), pdu.Hashes())
+		//fmt.Printf("  OriginServerTS: %d - %d\n", events[i].OriginServerTS(), pdu.OriginServerTS())
+		//json.Unmarshal(eventJSON, &rawJson)
+		//fmt.Printf("JSON: %+v\n", rawJson)
+	}
+	return result
+}
+
 // CreateRoom implements /createRoom
 func CreateRoom(
 	req *http.Request, device *api.Device,
@@ -132,7 +335,6 @@ func CreateRoom(
 	return createRoom(req.Context(), createRequest, device, cfg, profileAPI, rsAPI, asAPI, evTime)
 }
 
-// createRoom implements /createRoom
 func createRoom(
 	ctx context.Context,
 	createRequest createRoomRequest, device *api.Device,

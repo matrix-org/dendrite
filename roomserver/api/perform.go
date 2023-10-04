@@ -29,6 +29,8 @@ type PerformCreateRoomRequest struct {
 	KeyID           gomatrixserverlib.KeyID
 	PrivateKey      ed25519.PrivateKey
 	EventTime       time.Time
+
+	SenderID string
 }
 
 type PerformJoinRequest struct {
