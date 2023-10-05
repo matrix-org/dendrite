@@ -78,7 +78,7 @@ func main() {
 	fmt.Println("Opening database")
 	roomserverDB, err := storage.Open(
 		processCtx.Context(), cm, &dbOpts,
-		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, false),
+		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, caching.DisableMetrics),
 	)
 	if err != nil {
 		panic(err)
