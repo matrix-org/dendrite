@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,7 +58,7 @@ func main() {
 
 	args := flag.Args()
 
-	log.Println("Room version", *roomVersion)
+	fmt.Println("Room version", *roomVersion)
 
 	snapshotNIDs := []types.StateSnapshotNID{}
 	for _, arg := range args {
@@ -75,7 +75,7 @@ func main() {
 		dbOpts = cfg.Global.DatabaseOptions
 	}
 
-	log.Println("Opening database")
+	fmt.Println("Opening database")
 	roomserverDB, err := storage.Open(
 		processCtx.Context(), cm, &dbOpts,
 		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, false),
@@ -91,7 +91,7 @@ func main() {
 	}
 	stateres := state.NewStateResolution(roomserverDB, roomInfo, rsAPI)
 
-	log.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
+	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
 	if *difference {
 		if len(snapshotNIDs) != 2 {
@@ -125,26 +125,26 @@ func main() {
 		}
 
 		if len(removed) > 0 {
-			log.Println("Removed:")
+			fmt.Println("Removed:")
 			for _, r := range removed {
 				event := events[r.EventNID]
-				log.Println()
-				log.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-				log.Printf("  %s\n", string(event.Content()))
+				fmt.Println()
+				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				fmt.Printf("  %s\n", string(event.Content()))
 			}
 		}
 
 		if len(removed) > 0 && len(added) > 0 {
-			log.Println()
+			fmt.Println()
 		}
 
 		if len(added) > 0 {
-			log.Println("Added:")
+			fmt.Println("Added:")
 			for _, a := range added {
 				event := events[a.EventNID]
-				log.Println()
-				log.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-				log.Printf("  %s\n", string(event.Content()))
+				fmt.Println()
+				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				fmt.Printf("  %s\n", string(event.Content()))
 			}
 		}
 
@@ -171,7 +171,7 @@ func main() {
 		eventNIDs = append(eventNIDs, eventNID)
 	}
 
-	log.Println("Fetching", len(eventNIDMap), "state events")
+	fmt.Println("Fetching", len(eventNIDMap), "state events")
 	eventEntries, err := roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		panic(err)
@@ -191,7 +191,7 @@ func main() {
 		authEventIDs = append(authEventIDs, authEventID)
 	}
 
-	log.Println("Fetching", len(authEventIDs), "auth events")
+	fmt.Println("Fetching", len(authEventIDs), "auth events")
 	authEventEntries, err := roomserverDB.EventsFromIDs(ctx, roomInfo, authEventIDs)
 	if err != nil {
 		panic(err)
@@ -202,7 +202,7 @@ func main() {
 		authEvents[i] = authEventEntries[i].PDU
 	}
 
-	log.Println("Resolving state")
+	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -213,7 +213,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Println("Resolved state contains", len(resolved), "events")
+	fmt.Println("Resolved state contains", len(resolved), "events")
 	sort.Sort(resolved)
 	filteringEventType := *filterType
 	count := 0
@@ -222,13 +222,13 @@ func main() {
 			continue
 		}
 		count++
-		log.Println()
-		log.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-		log.Printf("  %s\n", string(event.Content()))
+		fmt.Println()
+		fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+		fmt.Printf("  %s\n", string(event.Content()))
 	}
 
-	log.Println()
-	log.Println("Returned", count, "state events after filtering")
+	fmt.Println()
+	fmt.Println("Returned", count, "state events after filtering")
 }
 
 type Events []gomatrixserverlib.PDU
