@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,13 +11,11 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -35,6 +33,19 @@ var roomVersion = flag.String("roomversion", "5", "the room version to parse eve
 var filterType = flag.String("filtertype", "", "the event types to filter on")
 var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
 
+// dummyQuerier implements QuerySenderIDAPI. Does **NOT** do any "magic" for pseudoID rooms
+// to avoid having to "start" a full roomserver API.
+type dummyQuerier struct{}
+
+func (d dummyQuerier) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	s := spec.SenderIDFromUserID(userID)
+	return &s, nil
+}
+
+func (d dummyQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return senderID.ToUserID(), nil
+}
+
 // nolint:gocyclo
 func main() {
 	ctx := context.Background()
@@ -47,7 +58,7 @@ func main() {
 
 	args := flag.Args()
 
-	fmt.Println("Room version", *roomVersion)
+	log.Println("Room version", *roomVersion)
 
 	snapshotNIDs := []types.StateSnapshotNID{}
 	for _, arg := range args {
@@ -56,26 +67,31 @@ func main() {
 		}
 	}
 
-	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
-
 	processCtx := process.NewProcessContext()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+	dbOpts := cfg.RoomServer.Database
+	if dbOpts.ConnectionString == "" {
+		dbOpts = cfg.Global.DatabaseOptions
+	}
+
+	log.Println("Opening database")
 	roomserverDB, err := storage.Open(
-		processCtx.Context(), cm, &cfg.RoomServer.Database,
-		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
+		processCtx.Context(), cm, &dbOpts,
+		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, false),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	natsInstance := &jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm,
-		natsInstance, caching.NewRistrettoCache(128*1024*1024, time.Hour, true), false)
+	rsAPI := dummyQuerier{}
 
 	roomInfo := &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	}
 	stateres := state.NewStateResolution(roomserverDB, roomInfo, rsAPI)
+
+	log.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
 	if *difference {
 		if len(snapshotNIDs) != 2 {
@@ -109,26 +125,26 @@ func main() {
 		}
 
 		if len(removed) > 0 {
-			fmt.Println("Removed:")
+			log.Println("Removed:")
 			for _, r := range removed {
 				event := events[r.EventNID]
-				fmt.Println()
-				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-				fmt.Printf("  %s\n", string(event.Content()))
+				log.Println()
+				log.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				log.Printf("  %s\n", string(event.Content()))
 			}
 		}
 
 		if len(removed) > 0 && len(added) > 0 {
-			fmt.Println()
+			log.Println()
 		}
 
 		if len(added) > 0 {
-			fmt.Println("Added:")
+			log.Println("Added:")
 			for _, a := range added {
 				event := events[a.EventNID]
-				fmt.Println()
-				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-				fmt.Printf("  %s\n", string(event.Content()))
+				log.Println()
+				log.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				log.Printf("  %s\n", string(event.Content()))
 			}
 		}
 
@@ -155,7 +171,7 @@ func main() {
 		eventNIDs = append(eventNIDs, eventNID)
 	}
 
-	fmt.Println("Fetching", len(eventNIDMap), "state events")
+	log.Println("Fetching", len(eventNIDMap), "state events")
 	eventEntries, err := roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		panic(err)
@@ -175,7 +191,7 @@ func main() {
 		authEventIDs = append(authEventIDs, authEventID)
 	}
 
-	fmt.Println("Fetching", len(authEventIDs), "auth events")
+	log.Println("Fetching", len(authEventIDs), "auth events")
 	authEventEntries, err := roomserverDB.EventsFromIDs(ctx, roomInfo, authEventIDs)
 	if err != nil {
 		panic(err)
@@ -186,7 +202,7 @@ func main() {
 		authEvents[i] = authEventEntries[i].PDU
 	}
 
-	fmt.Println("Resolving state")
+	log.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -197,7 +213,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Resolved state contains", len(resolved), "events")
+	log.Println("Resolved state contains", len(resolved), "events")
 	sort.Sort(resolved)
 	filteringEventType := *filterType
 	count := 0
@@ -206,13 +222,13 @@ func main() {
 			continue
 		}
 		count++
-		fmt.Println()
-		fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-		fmt.Printf("  %s\n", string(event.Content()))
+		log.Println()
+		log.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+		log.Printf("  %s\n", string(event.Content()))
 	}
 
-	fmt.Println()
-	fmt.Println("Returned", count, "state events after filtering")
+	log.Println()
+	log.Println("Returned", count, "state events after filtering")
 }
 
 type Events []gomatrixserverlib.PDU
