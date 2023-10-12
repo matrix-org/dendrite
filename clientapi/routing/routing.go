@@ -329,7 +329,7 @@ func Setup(
 			return SendPDUs(req, device, cfg, userAPI, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
+
 	v3mux.Handle("/join/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(spec.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req, device); r != nil {
@@ -343,6 +343,28 @@ func Setup(
 			// it waits for it to complete and returns that result for subsequent requests.
 			resp, _, _ := sf.Do(vars["roomIDOrAlias"]+device.UserID, func() (any, error) {
 				return JoinRoomByIDOrAlias(
+					req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
+				), nil
+			})
+			// once all joins are processed, drop them from the cache. Further requests
+			// will be processed as usual.
+			sf.Forget(vars["roomIDOrAlias"] + device.UserID)
+			return resp.(util.JSONResponse)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/join/{roomIDOrAlias}",
+		httputil.MakeAuthAPI(spec.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.Limit(req, device); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			// Only execute a join for roomIDOrAlias and UserID once. If there is a join in progress
+			// it waits for it to complete and returns that result for subsequent requests.
+			resp, _, _ := sf.Do(vars["roomIDOrAlias"]+device.UserID, func() (any, error) {
+				return JoinRoomByIDOrAliasCryptoIDs(
 					req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
 				), nil
 			})
@@ -620,7 +642,6 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/directory/list/room/{roomID}",
 		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -630,7 +651,6 @@ func Setup(
 			return SetVisibility(req, rsAPI, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/directory/list/appservice/{networkID}/{roomID}",
 		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -642,7 +662,6 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	// Undocumented endpoint
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/directory/list/appservice/{networkID}/{roomID}",
 		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -671,6 +690,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/typing/{userID}",
 		httputil.MakeAuthAPI("rooms_typing", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req, device); r != nil {
@@ -1156,6 +1176,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/read_markers",
 		httputil.MakeAuthAPI("rooms_read_markers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req, device); r != nil {
@@ -1534,6 +1555,7 @@ func Setup(
 			return SetReceipt(req, userAPI, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	// TODO: update for cryptoIDs
 	v3mux.Handle("/presence/{userId}/status",
 		httputil.MakeAuthAPI("set_presence", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))

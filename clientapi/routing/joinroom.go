@@ -144,3 +144,128 @@ func JoinRoomByIDOrAlias(
 		return result
 	}
 }
+
+type joinRoomCryptoIDsResponse struct {
+	RoomID    string          `json:"room_id"`
+	Version   string          `json:"room_version"`
+	ViaServer string          `json:"via_server"`
+	PDU       json.RawMessage `json:"pdu"`
+}
+
+func JoinRoomByIDOrAliasCryptoIDs(
+	req *http.Request,
+	device *api.Device,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	profileAPI api.ClientUserAPI,
+	roomIDOrAlias string,
+) util.JSONResponse {
+	// Prepare to ask the roomserver to perform the room join.
+	joinReq := roomserverAPI.PerformJoinRequest{
+		RoomIDOrAlias: roomIDOrAlias,
+		UserID:        device.UserID,
+		IsGuest:       device.AccountType == api.AccountTypeGuest,
+		Content:       map[string]interface{}{},
+	}
+
+	// Check to see if any ?server_name= query parameters were
+	// given in the request.
+	if serverNames, ok := req.URL.Query()["server_name"]; ok {
+		for _, serverName := range serverNames {
+			joinReq.ServerNames = append(
+				joinReq.ServerNames,
+				spec.ServerName(serverName),
+			)
+		}
+	}
+
+	// If content was provided in the request then include that
+	// in the request. It'll get used as a part of the membership
+	// event content.
+	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)
+
+	// Work out our localpart for the client profile request.
+
+	// Request our profile content to populate the request content with.
+	profile, err := profileAPI.QueryProfile(req.Context(), device.UserID)
+
+	switch err {
+	case nil:
+		joinReq.Content["displayname"] = profile.DisplayName
+		joinReq.Content["avatar_url"] = profile.AvatarURL
+	case appserviceAPI.ErrProfileNotExists:
+		util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("Unable to query user profile, no profile found."),
+		}
+	default:
+	}
+
+	// Ask the roomserver to perform the join.
+	done := make(chan util.JSONResponse, 1)
+	go func() {
+		defer close(done)
+		joinEvent, roomID, version, serverName, err := rsAPI.PerformJoinCryptoIDs(req.Context(), &joinReq)
+		var response util.JSONResponse
+
+		switch e := err.(type) {
+		case nil: // success case
+			response = util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: joinRoomCryptoIDsResponse{
+					RoomID:    roomID,
+					Version:   string(version),
+					ViaServer: string(serverName),
+					PDU:       json.RawMessage(joinEvent.JSON()),
+				},
+			}
+		case roomserverAPI.ErrInvalidID:
+			response = util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown(e.Error()),
+			}
+		case roomserverAPI.ErrNotAllowed:
+			jsonErr := spec.Forbidden(e.Error())
+			if device.AccountType == api.AccountTypeGuest {
+				jsonErr = spec.GuestAccessForbidden(e.Error())
+			}
+			response = util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonErr,
+			}
+		case *gomatrix.HTTPError: // this ensures we proxy responses over federation to the client
+			response = util.JSONResponse{
+				Code: e.Code,
+				JSON: json.RawMessage(e.Message),
+			}
+		case eventutil.ErrRoomNoExists:
+			response = util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound(e.Error()),
+			}
+		default:
+			response = util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+		done <- response
+	}()
+
+	// Wait either for the join to finish, or for us to hit a reasonable
+	// timeout, at which point we'll just return a 200 to placate clients.
+	timer := time.NewTimer(time.Second * 20)
+	select {
+	case <-timer.C:
+		return util.JSONResponse{
+			Code: http.StatusRequestTimeout,
+			JSON: spec.Unknown("Failed creating join event with the remote server."),
+		}
+	case result := <-done:
+		// Stop and drain the timer
+		if !timer.Stop() {
+			<-timer.C
+		}
+		return result
+	}
+}

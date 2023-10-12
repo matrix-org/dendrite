@@ -30,8 +30,9 @@ import (
 )
 
 type sendPDUsRequest struct {
-	Version string            `json:"room_version"`
-	PDUs    []json.RawMessage `json:"pdus"`
+	Version   string            `json:"room_version"`
+	ViaServer string            `json:"via_server,omitempty"`
+	PDUs      []json.RawMessage `json:"pdus"`
 }
 
 // SendPDUs implements /sendPDUs
@@ -106,8 +107,53 @@ func SendPDUs(
 		}
 		pdu = pdu.Sign(string(pdu.SenderID()), "ed25519:1", key)
 		util.GetLogger(req.Context()).Infof("Processing %s event (%s)", pdu.Type(), pdu.EventID())
+
 		switch pdu.Type() {
 		case spec.MRoomCreate:
+		case spec.MRoomMember:
+			var membership gomatrixserverlib.MemberContent
+			err = json.Unmarshal(pdu.Content(), &membership)
+			switch {
+			case err != nil:
+				util.GetLogger(req.Context()).Errorf("m.room.member event content invalid", pdu.Content(), pdu.EventID())
+				continue
+			case membership.Membership == spec.Join:
+				deviceUserID, err := spec.NewUserID(device.UserID, true)
+				if err != nil {
+					return util.JSONResponse{
+						Code: http.StatusForbidden,
+						JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+					}
+				}
+				queryReq := roomserverAPI.QueryMembershipForUserRequest{
+					RoomID: pdu.RoomID().String(),
+					UserID: *deviceUserID,
+				}
+				var queryRes roomserverAPI.QueryMembershipForUserResponse
+				if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
+					util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
+					return util.JSONResponse{
+						Code: http.StatusInternalServerError,
+						JSON: spec.InternalServerError{},
+					}
+				}
+				if !queryRes.IsInRoom {
+					// This is a join event to a remote room
+					// TODO: cryptoIDs - figure out how to obtain unsigned contents for outstanding federated invites
+					joinReq := roomserverAPI.PerformJoinRequestCryptoIDs{
+						RoomID:      pdu.RoomID().String(),
+						UserID:      device.UserID,
+						IsGuest:     device.AccountType == api.AccountTypeGuest,
+						ServerNames: []spec.ServerName{spec.ServerName(pdus.ViaServer)},
+						JoinEvent:   pdu,
+					}
+					err := rsAPI.PerformSendJoinCryptoIDs(req.Context(), &joinReq)
+					if err != nil {
+						util.GetLogger(req.Context()).Errorf("Failed processing %s event (%s): %v", pdu.Type(), pdu.EventID(), err)
+					}
+					continue // NOTE: don't send this event on to the roomserver
+				}
+			}
 		}
 
 		// TODO: cryptoIDs - does it matter which order these are added?
@@ -118,10 +164,11 @@ func SendPDUs(
 		// We should be doing this already as part of `SendInputRoomEvents`, but how should we pass this
 		// failure back to the client?
 		inputs = append(inputs, roomserverAPI.InputRoomEvent{
-			Kind:         roomserverAPI.KindNew,
-			Event:        &types.HeaderedEvent{PDU: pdu},
-			Origin:       userID.Domain(),
-			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
+			Kind:   roomserverAPI.KindNew,
+			Event:  &types.HeaderedEvent{PDU: pdu},
+			Origin: userID.Domain(),
+			// TODO: cryptoIDs - what to do with this field?
+			//SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
 

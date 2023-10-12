@@ -259,53 +259,6 @@ func ToProtoEvents(ctx context.Context, events []gomatrixserverlib.PDU, rsAPI ro
 	result := make([]json.RawMessage, len(events))
 	for i, event := range events {
 		result[i] = json.RawMessage(event.JSON())
-		//fmt.Printf("\nProcessing %s event (%s)\n", events[i].Type(), events[i].EventID())
-		//var rawJson interface{}
-		//json.Unmarshal(events[i].JSON(), &rawJson)
-		//fmt.Printf("JSON: %+v\n", rawJson)
-		//result[i] = gomatrixserverlib.ProtoEvent{
-		//	SenderID:              string(events[i].SenderID()),
-		//	RoomID:                events[i].RoomID().String(),
-		//	Type:                  events[i].Type(),
-		//	StateKey:              events[i].StateKey(),
-		//	PrevEvents:            events[i].PrevEventIDs(),
-		//	AuthEvents:            events[i].AuthEventIDs(),
-		//	Redacts:               events[i].Redacts(),
-		//	Depth:                 events[i].Depth(),
-		//	Content:               events[i].Content(),
-		//	Unsigned:              events[i].Unsigned(),
-		//	Hashes:                events[i].Hashes(),
-		//	OriginServerTimestamp: events[i].OriginServerTS(),
-		//}
-
-		//roomVersion, _ := rsAPI.QueryRoomVersionForRoom(ctx, events[i].RoomID().String())
-		//verImpl, _ := gomatrixserverlib.GetRoomVersion(roomVersion)
-		//eventJSON, err := json.Marshal(result[i])
-		//if err != nil {
-		//	util.GetLogger(ctx).WithError(err).Error("failed marshalling event")
-		//	continue
-		//}
-		//pdu, err := verImpl.NewEventFromUntrustedJSON(eventJSON)
-		//if err != nil {
-		//	util.GetLogger(ctx).WithError(err).Error("failed making event from json")
-		//	continue
-		//}
-		//fmt.Printf("\nProcessing %s event (%s) - PDU\n", result[i].Type, pdu.EventID())
-		//fmt.Printf("  EventID: %v - %v\n", events[i].EventID(), pdu.EventID())
-		//fmt.Printf("  SenderID: %s - %s\n", events[i].SenderID(), pdu.SenderID())
-		//fmt.Printf("  RoomID: %s - %s\n", events[i].RoomID().String(), pdu.RoomID().String())
-		//fmt.Printf("  Type: %s - %s\n", events[i].Type(), pdu.Type())
-		//fmt.Printf("  StateKey: %s - %s\n", *events[i].StateKey(), *pdu.StateKey())
-		//fmt.Printf("  PrevEvents: %v - %v\n", events[i].PrevEventIDs(), pdu.PrevEventIDs())
-		//fmt.Printf("  AuthEvents: %v - %v\n", events[i].AuthEventIDs(), pdu.AuthEventIDs())
-		//fmt.Printf("  Redacts: %s - %s\n", events[i].Redacts(), pdu.Redacts())
-		//fmt.Printf("  Depth: %d - %d\n", events[i].Depth(), pdu.Depth())
-		//fmt.Printf("  Content: %v - %v\n", events[i].Content(), pdu.Content())
-		//fmt.Printf("  Unsigned: %v - %v\n", events[i].Unsigned(), pdu.Unsigned())
-		//fmt.Printf("  Hashes: %v - %v\n", events[i].Hashes(), pdu.Hashes())
-		//fmt.Printf("  OriginServerTS: %d - %d\n", events[i].OriginServerTS(), pdu.OriginServerTS())
-		//json.Unmarshal(eventJSON, &rawJson)
-		//fmt.Printf("JSON: %+v\n", rawJson)
 	}
 	return result
 }

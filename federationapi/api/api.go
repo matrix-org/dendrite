@@ -58,6 +58,8 @@ type RoomserverFederationAPI interface {
 	PerformDirectoryLookup(ctx context.Context, request *PerformDirectoryLookupRequest, response *PerformDirectoryLookupResponse) error
 	// Handle an instruction to make_join & send_join with a remote server.
 	PerformJoin(ctx context.Context, request *PerformJoinRequest, response *PerformJoinResponse)
+	PerformMakeJoin(ctx context.Context, request *PerformJoinRequest) (gomatrixserverlib.PDU, gomatrixserverlib.RoomVersion, spec.ServerName, error)
+	PerformSendJoin(ctx context.Context, request *PerformSendJoinRequestCryptoIDs, response *PerformJoinResponse)
 	// Handle an instruction to make_leave & send_leave with a remote server.
 	PerformLeave(ctx context.Context, request *PerformLeaveRequest, response *PerformLeaveResponse) error
 	// Handle sending an invite to a remote server.
@@ -166,6 +168,15 @@ type PerformJoinRequest struct {
 	ServerNames types.ServerNames      `json:"server_names"`
 	Content     map[string]interface{} `json:"content"`
 	Unsigned    map[string]interface{} `json:"unsigned"`
+}
+
+type PerformSendJoinRequestCryptoIDs struct {
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
+	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
+	ServerNames types.ServerNames      `json:"server_names"`
+	Unsigned    map[string]interface{} `json:"unsigned"`
+	Event       gomatrixserverlib.PDU
 }
 
 type PerformJoinResponse struct {

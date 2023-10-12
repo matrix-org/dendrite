@@ -239,6 +239,320 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	return nil
 }
 
+// PerformMakeJoin implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformMakeJoin(
+	ctx context.Context,
+	request *api.PerformJoinRequest,
+) (gomatrixserverlib.PDU, gomatrixserverlib.RoomVersion, spec.ServerName, error) {
+	// Check that a join isn't already in progress for this user/room.
+	j := federatedJoin{request.UserID, request.RoomID}
+	if _, found := r.joins.Load(j); found {
+		return nil, "", "", &gomatrix.HTTPError{
+			Code: 429,
+			Message: `{
+				"errcode": "M_LIMIT_EXCEEDED",
+				"error": "There is already a federated join to this room in progress. Please wait for it to finish."
+			}`, // TODO: Why do none of our error types play nicely with each other?
+		}
+	}
+	r.joins.Store(j, nil)
+	defer r.joins.Delete(j)
+
+	// Deduplicate the server names we were provided but keep the ordering
+	// as this encodes useful information about which servers are most likely
+	// to respond.
+	seenSet := make(map[spec.ServerName]bool)
+	var uniqueList []spec.ServerName
+	for _, srv := range request.ServerNames {
+		if seenSet[srv] || r.cfg.Matrix.IsLocalServerName(srv) {
+			continue
+		}
+		seenSet[srv] = true
+		uniqueList = append(uniqueList, srv)
+	}
+	request.ServerNames = uniqueList
+
+	// Try each server that we were provided until we land on one that
+	// successfully completes the make-join send-join dance.
+	var lastErr error
+	for _, serverName := range request.ServerNames {
+		var joinEvent gomatrixserverlib.PDU
+		var roomVersion gomatrixserverlib.RoomVersion
+		var err error
+		if joinEvent, roomVersion, _, err = r.performMakeJoinUsingServer(
+			ctx,
+			request.RoomID,
+			request.UserID,
+			request.Content,
+			serverName,
+		); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"server_name": serverName,
+				"room_id":     request.RoomID,
+			}).Warnf("Failed to join room through server")
+			lastErr = err
+			continue
+		}
+
+		// We're all good.
+		return joinEvent, roomVersion, serverName, err
+	}
+
+	// If we reach here then we didn't complete a join for some reason.
+	var httpErr gomatrix.HTTPError
+	var lastError *gomatrix.HTTPError
+	if ok := errors.As(lastErr, &httpErr); ok {
+		httpErr.Message = string(httpErr.Contents)
+		lastError = &httpErr
+	} else {
+		lastError = &gomatrix.HTTPError{
+			Code:         0,
+			WrappedError: nil,
+			Message:      "Unknown HTTP error",
+		}
+		if lastError != nil {
+			lastError.Message = lastErr.Error()
+		}
+	}
+
+	logrus.Errorf(
+		"failed to join user %q to room %q through %d server(s): last error %s",
+		request.UserID, request.RoomID, len(request.ServerNames), lastError,
+	)
+	return nil, "", "", lastError
+}
+
+func (r *FederationInternalAPI) performMakeJoinUsingServer(
+	ctx context.Context,
+	roomID, userID string,
+	content map[string]interface{},
+	serverName spec.ServerName,
+) (gomatrixserverlib.PDU, gomatrixserverlib.RoomVersion, spec.SenderID, error) {
+	if !r.shouldAttemptDirectFederation(serverName) {
+		return nil, "", "", fmt.Errorf("relay servers have no meaningful response for join.")
+	}
+
+	user, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, "", "", err
+	}
+	room, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	joinInput := gomatrixserverlib.PerformMakeJoinInput{
+		UserID:     user,
+		RoomID:     room,
+		ServerName: serverName,
+		Content:    content,
+		PrivateKey: r.cfg.Matrix.PrivateKey,
+		KeyID:      r.cfg.Matrix.KeyID,
+		KeyRing:    r.keyRing,
+		GetOrCreateSenderID: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			// assign a roomNID, otherwise we can't create a private key for the user
+			_, nidErr := r.rsAPI.AssignRoomNID(ctx, roomID, gomatrixserverlib.RoomVersion(roomVersion))
+			if nidErr != nil {
+				return "", nil, nidErr
+			}
+			key, keyErr := r.rsAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", nil, keyErr
+			}
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+	}
+	joinEvent, version, senderID, joinErr := gomatrixserverlib.PerformMakeJoin(ctx, r, joinInput)
+
+	if joinErr != nil {
+		if !joinErr.Reachable {
+			r.statistics.ForServer(joinErr.ServerName).Failure()
+		} else {
+			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
+		}
+		return nil, "", "", joinErr.Err
+	}
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	if joinEvent == nil {
+		return nil, "", "", fmt.Errorf("Received nil joinEvent response from gomatrixserverlib.PerformJoin")
+	}
+
+	return joinEvent, version, senderID, nil
+}
+
+// PerformSendJoin implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformSendJoin(
+	ctx context.Context,
+	request *api.PerformSendJoinRequestCryptoIDs,
+	response *api.PerformJoinResponse,
+) {
+	// Check that a join isn't already in progress for this user/room.
+	j := federatedJoin{request.UserID, request.RoomID}
+	if _, found := r.joins.Load(j); found {
+		response.LastError = &gomatrix.HTTPError{
+			Code: 429,
+			Message: `{
+				"errcode": "M_LIMIT_EXCEEDED",
+				"error": "There is already a federated join to this room in progress. Please wait for it to finish."
+			}`,
+		}
+		return
+	}
+	r.joins.Store(j, nil)
+	defer r.joins.Delete(j)
+
+	// Deduplicate the server names we were provided but keep the ordering
+	// as this encodes useful information about which servers are most likely
+	// to respond.
+	seenSet := make(map[spec.ServerName]bool)
+	var uniqueList []spec.ServerName
+	for _, srv := range request.ServerNames {
+		if seenSet[srv] || r.cfg.Matrix.IsLocalServerName(srv) {
+			continue
+		}
+		seenSet[srv] = true
+		uniqueList = append(uniqueList, srv)
+	}
+	request.ServerNames = uniqueList
+
+	// Try each server that we were provided until we land on one that
+	// successfully completes the make-join send-join dance.
+	var lastErr error
+	for _, serverName := range request.ServerNames {
+		if err := r.performSendJoinUsingServer(
+			ctx,
+			request.RoomID,
+			request.UserID,
+			request.Unsigned,
+			request.Event,
+			serverName,
+		); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"server_name": serverName,
+				"room_id":     request.RoomID,
+			}).Warnf("Failed to join room through server")
+			lastErr = err
+			continue
+		}
+
+		// We're all good.
+		return
+	}
+
+	// If we reach here then we didn't complete a join for some reason.
+	var httpErr gomatrix.HTTPError
+	var lastError *gomatrix.HTTPError
+	if ok := errors.As(lastErr, &httpErr); ok {
+		httpErr.Message = string(httpErr.Contents)
+		lastError = &httpErr
+	} else {
+		lastError = &gomatrix.HTTPError{
+			Code:         0,
+			WrappedError: nil,
+			Message:      "Unknown HTTP error",
+		}
+		if lastError != nil {
+			lastError.Message = lastErr.Error()
+		}
+	}
+
+	logrus.Errorf(
+		"failed to join user %q to room %q through %d server(s): last error %s",
+		request.UserID, request.RoomID, len(request.ServerNames), lastError,
+	)
+	return
+}
+
+func (r *FederationInternalAPI) performSendJoinUsingServer(
+	ctx context.Context,
+	roomID, userID string,
+	unsigned map[string]interface{},
+	event gomatrixserverlib.PDU,
+	serverName spec.ServerName,
+) error {
+	user, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return err
+	}
+	room, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *room, *user)
+	if err != nil {
+		return err
+	}
+
+	joinInput := gomatrixserverlib.PerformSendJoinInput{
+		RoomID:      room,
+		ServerName:  serverName,
+		Unsigned:    unsigned,
+		Origin:      user.Domain(),
+		SenderID:    *senderID,
+		KeyRing:     r.keyRing,
+		Event:       event,
+		RoomVersion: event.Version(),
+		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}),
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.rsAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
+		},
+	}
+	response, joinErr := gomatrixserverlib.PerformSendJoin(ctx, r, joinInput)
+	if joinErr != nil {
+		if !joinErr.Reachable {
+			r.statistics.ForServer(joinErr.ServerName).Failure()
+		} else {
+			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
+		}
+		return joinErr.Err
+	}
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	if response == nil {
+		return fmt.Errorf("Received nil response from gomatrixserverlib.PerformSendJoin")
+	}
+
+	// We need to immediately update our list of joined hosts for this room now as we are technically
+	// joined. We must do this synchronously: we cannot rely on the roomserver output events as they
+	// will happen asyncly. If we don't update this table, you can end up with bad failure modes like
+	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
+	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
+	// The events are trusted now as we performed auth checks above.
+	joinedHosts, err := consumers.JoinedHostsFromEvents(ctx, response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false), r.rsAPI)
+	if err != nil {
+		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
+	}
+
+	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
+	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
+		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
+	}
+
+	// TODO: Can I change this to not take respState but instead just take an opaque list of events?
+	if err = roomserverAPI.SendEventWithState(
+		context.Background(),
+		r.rsAPI,
+		user.Domain(),
+		roomserverAPI.KindNew,
+		response.StateSnapshot,
+		&types.HeaderedEvent{PDU: response.JoinEvent},
+		serverName,
+		nil,
+		false,
+	); err != nil {
+		return fmt.Errorf("roomserverAPI.SendEventWithState: %w", err)
+	}
+	return nil
+}
+
 // PerformOutboundPeekRequest implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformOutboundPeek(
 	ctx context.Context,

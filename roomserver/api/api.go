@@ -222,6 +222,7 @@ type ClientRoomserverAPI interface {
 	DefaultRoomVersionAPI
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+	InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error)
 	QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error)
 	QueryStateAfterEvents(ctx context.Context, req *QueryStateAfterEventsRequest, res *QueryStateAfterEventsResponse) error
 	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
@@ -244,6 +245,8 @@ type ClientRoomserverAPI interface {
 	PerformUnpeek(ctx context.Context, roomID, userID, deviceID string) error
 	PerformInvite(ctx context.Context, req *PerformInviteRequest) error
 	PerformJoin(ctx context.Context, req *PerformJoinRequest) (roomID string, joinedVia spec.ServerName, err error)
+	PerformSendJoinCryptoIDs(ctx context.Context, req *PerformJoinRequestCryptoIDs) error
+	PerformJoinCryptoIDs(ctx context.Context, req *PerformJoinRequest) (join gomatrixserverlib.PDU, roomID string, version gomatrixserverlib.RoomVersion, serverName spec.ServerName, err error)
 	PerformLeave(ctx context.Context, req *PerformLeaveRequest, res *PerformLeaveResponse) error
 	PerformPublish(ctx context.Context, req *PerformPublishRequest) error
 	// PerformForget forgets a rooms history for a specific user
