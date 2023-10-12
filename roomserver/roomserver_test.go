@@ -429,7 +429,9 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	if ev.Content == nil {
 		ev.Content = map[string]any{}
 	}
-	eb.AuthEvents = ev.AuthEvents
+	if ev.AuthEvents != nil {
+		eb.AuthEvents = ev.AuthEvents
+	}
 	err := eb.SetContent(ev.Content)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to marshal event content %v", err)
@@ -1094,7 +1096,7 @@ func TestStateReset(t *testing.T) {
 		// Prepare APIs
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
-		_ = close
+
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := jetstream.NATSInstance{}
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
@@ -1122,7 +1124,8 @@ func TestStateReset(t *testing.T) {
 		}
 
 		// Bob changes his name
-		bobDisplayname := room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]any{"membership": "join", "displayname": "Bob!"}, test.WithStateKey(bob.ID))
+		expectedDisplayname := "Bob!"
+		bobDisplayname := room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]any{"membership": "join", "displayname": expectedDisplayname}, test.WithStateKey(bob.ID))
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobDisplayname}, "test", "test", "test", nil, false); err != nil {
 			t.Errorf("failed to send events: %v", err)
@@ -1130,7 +1133,6 @@ func TestStateReset(t *testing.T) {
 
 		// Change another state event
 		jrEv := room.CreateAndInsert(t, alice, spec.MRoomJoinRules, gomatrixserverlib.JoinRuleContent{JoinRule: "invite"}, test.WithStateKey(""))
-
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{jrEv}, "test", "test", "test", nil, false); err != nil {
 			t.Errorf("failed to send events: %v", err)
 		}
@@ -1167,7 +1169,7 @@ func TestStateReset(t *testing.T) {
 			t.Errorf("failed to send events: %v", err)
 		}
 
-		// Validate that there is membership event for Bob
+		// Validate that there is a membership event for Bob
 		bobMembershipEv := api.GetStateEvent(ctx, rsAPI, room.ID, gomatrixserverlib.StateKeyTuple{
 			EventType: spec.MRoomMember,
 			StateKey:  bob.ID,
@@ -1176,7 +1178,10 @@ func TestStateReset(t *testing.T) {
 		if bobMembershipEv == nil {
 			t.Fatalf("Membership event for Bob does not exist. State reset?")
 		} else {
-			t.Logf("Membership: %s", bobMembershipEv.JSON())
+			// Validate it's the correct membership event
+			if dn := gjson.GetBytes(bobMembershipEv.Content(), "displayname").Str; dn != expectedDisplayname {
+				t.Fatalf("Expected displayname to be %q, got %q", expectedDisplayname, dn)
+			}
 		}
 	})
 }
