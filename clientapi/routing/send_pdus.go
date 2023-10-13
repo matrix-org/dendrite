@@ -17,6 +17,8 @@ package routing
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
+	"time"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -27,11 +29,13 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type sendPDUsRequest struct {
 	Version   string            `json:"room_version"`
 	ViaServer string            `json:"via_server,omitempty"`
+	TxnID     string            `json:"txn_id,omitempty"`
 	PDUs      []json.RawMessage `json:"pdus"`
 }
 
@@ -66,6 +70,19 @@ func SendPDUs(
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam(err.Error()),
 		}
+	}
+
+	// create a mutex for the specific user in the specific room
+	// this avoids a situation where events that are received in quick succession are sent to the roomserver in a jumbled order
+	// TODO: cryptoIDs - where to get roomID from?
+	mutex, _ := userRoomSendMutexes.LoadOrStore("roomID"+userID.String(), &sync.Mutex{})
+	mutex.(*sync.Mutex).Lock()
+	defer mutex.(*sync.Mutex).Unlock()
+
+	var txnID *roomserverAPI.TransactionID
+	if pdus.TxnID != "" {
+		txnID.TransactionID = pdus.TxnID
+		txnID.SessionID = device.SessionID
 	}
 
 	inputs := make([]roomserverAPI.InputRoomEvent, 0, len(pdus.PDUs))
@@ -165,15 +182,19 @@ func SendPDUs(
 		// ie. what if the client changes power levels that disallow further events they sent?
 		// We should be doing this already as part of `SendInputRoomEvents`, but how should we pass this
 		// failure back to the client?
+
 		inputs = append(inputs, roomserverAPI.InputRoomEvent{
 			Kind:   roomserverAPI.KindNew,
 			Event:  &types.HeaderedEvent{PDU: pdu},
 			Origin: userID.Domain(),
 			// TODO: cryptoIDs - what to do with this field?
+			// should probably generate this based on the event type being sent?
 			//SendAsServer: roomserverAPI.DoNotSendToOtherServers,
+			TransactionID: txnID,
 		})
 	}
 
+	startedSubmittingEvents := time.Now()
 	// send the events to the roomserver
 	if err := roomserverAPI.SendInputRoomEvents(req.Context(), rsAPI, userID.Domain(), inputs, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
@@ -181,6 +202,18 @@ func SendPDUs(
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{Err: err.Error()},
 		}
+	}
+	timeToSubmitEvents := time.Since(startedSubmittingEvents)
+	sendEventDuration.With(prometheus.Labels{"action": "submit"}).Observe(float64(timeToSubmitEvents.Milliseconds()))
+
+	// Add response to transactionsCache
+	if txnID != nil {
+		// TODO : cryptoIDs - fix this
+		//res := util.JSONResponse{
+		//	Code: http.StatusOK,
+		//	JSON: sendEventResponse{e.EventID()},
+		//}
+		//txnCache.AddTransaction(device.AccessToken, *txnID, req.URL, &res)
 	}
 
 	return util.JSONResponse{

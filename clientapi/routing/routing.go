@@ -354,6 +354,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc_cryptoids/join/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(spec.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/join/{roomIDOrAlias}")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -421,6 +422,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/join",
 		httputil.MakeAuthAPI(spec.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/join")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -511,7 +513,6 @@ func Setup(
 			return SendUnban(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -521,7 +522,16 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
+	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}",
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}")
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendEventCryptoIDs(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, nil)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -530,6 +540,18 @@ func Setup(
 			}
 			txnID := vars["txnID"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID,
+				nil, cfg, rsAPI, transactionsCache)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPut, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}/{txnID}",
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}/{txnID}")
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			txnID := vars["txnID"]
+			return SendEventCryptoIDs(req, device, vars["roomID"], vars["eventType"], &txnID,
 				nil, cfg, rsAPI, transactionsCache)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
@@ -570,7 +592,6 @@ func Setup(
 		return OnIncomingStateTypeRequest(req.Context(), device, rsAPI, vars["roomID"], vars["type"], vars["stateKey"], eventFormat)
 	}, httputil.WithAllowGuests())).Methods(http.MethodGet, http.MethodOptions)
 
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -582,8 +603,19 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType:[^/]+/?}",
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType:[^/]+/?}")
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			emptyString := ""
+			eventType := strings.TrimSuffix(vars["eventType"], "/")
+			return SendEventCryptoIDs(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPut, http.MethodOptions)
 
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -592,6 +624,17 @@ func Setup(
 			}
 			stateKey := vars["stateKey"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPut, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType}/{stateKey}",
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType}/{stateKey}")
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			stateKey := vars["stateKey"]
+			return SendEventCryptoIDs(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
 

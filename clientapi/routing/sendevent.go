@@ -44,6 +44,11 @@ type sendEventResponse struct {
 	EventID string `json:"event_id"`
 }
 
+type sendEventResponseCryptoIDs struct {
+	EventID string          `json:"event_id"`
+	PDU     json.RawMessage `json:"pdu"`
+}
+
 var (
 	userRoomSendMutexes sync.Map // (roomID+userID) -> mutex. mutexes to ensure correct ordering of sendEvents
 )
@@ -258,6 +263,156 @@ func SendEvent(
 	// it to the roomserver.
 	sendEventDuration.With(prometheus.Labels{"action": "build"}).Observe(float64(timeToGenerateEvent.Milliseconds()))
 	sendEventDuration.With(prometheus.Labels{"action": "submit"}).Observe(float64(timeToSubmitEvent.Milliseconds()))
+
+	return res
+}
+
+// SendEventCryptoIDs implements:
+//
+//	/rooms/{roomID}/send/{eventType}
+//	/rooms/{roomID}/send/{eventType}/{txnID}
+//	/rooms/{roomID}/state/{eventType}/{stateKey}
+//
+// nolint: gocyclo
+func SendEventCryptoIDs(
+	req *http.Request,
+	device *userapi.Device,
+	roomID, eventType string, txnID, stateKey *string,
+	cfg *config.ClientAPI,
+	rsAPI api.ClientRoomserverAPI,
+	txnCache *transactions.Cache,
+) util.JSONResponse {
+	roomVersion, err := rsAPI.QueryRoomVersionForRoom(req.Context(), roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
+	if txnID != nil {
+		// Try to fetch response from transactionsCache
+		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID, req.URL); ok {
+			return *res
+		}
+	}
+
+	// Translate user ID state keys to room keys in pseudo ID rooms
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && stateKey != nil {
+		parsedRoomID, innerErr := spec.NewRoomID(roomID)
+		if innerErr != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam("invalid room ID"),
+			}
+		}
+
+		newStateKey, innerErr := synctypes.FromClientStateKey(*parsedRoomID, *stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+			return rsAPI.QuerySenderIDForUser(req.Context(), roomID, userID)
+		})
+		if innerErr != nil {
+			// TODO: work out better logic for failure cases (e.g. sender ID not found)
+			util.GetLogger(req.Context()).WithError(innerErr).Error("synctypes.FromClientStateKey failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
+		stateKey = newStateKey
+	}
+
+	var r map[string]interface{} // must be a JSON object
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+
+	if stateKey != nil {
+		// If the existing/new state content are equal, return the existing event_id, making the request idempotent.
+		if resp := stateEqual(req.Context(), rsAPI, eventType, *stateKey, roomID, r); resp != nil {
+			return *resp
+		}
+	}
+
+	startedGeneratingEvent := time.Now()
+
+	// If we're sending a membership update, make sure to strip the authorised
+	// via key if it is present, otherwise other servers won't be able to auth
+	// the event if the room is set to the "restricted" join rule.
+	if eventType == spec.MRoomMember {
+		delete(r, "join_authorised_via_users_server")
+	}
+
+	// for power level events we need to replace the userID with the pseudoID
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && eventType == spec.MRoomPowerLevels {
+		err = updatePowerLevels(req, r, roomID, rsAPI)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{Err: err.Error()},
+			}
+		}
+	}
+
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam(err.Error()),
+		}
+	}
+
+	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, rsAPI, evTime)
+	if resErr != nil {
+		return *resErr
+	}
+	timeToGenerateEvent := time.Since(startedGeneratingEvent)
+
+	// validate that the aliases exists
+	if eventType == spec.MRoomCanonicalAlias && stateKey != nil && *stateKey == "" {
+		aliasReq := api.AliasEvent{}
+		if err = json.Unmarshal(e.Content(), &aliasReq); err != nil {
+			return util.ErrorResponse(fmt.Errorf("unable to parse alias event: %w", err))
+		}
+		if !aliasReq.Valid() {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidParam("Request contains invalid aliases."),
+			}
+		}
+		aliasRes := &api.GetAliasesForRoomIDResponse{}
+		if err = rsAPI.GetAliasesForRoomID(req.Context(), &api.GetAliasesForRoomIDRequest{RoomID: roomID}, aliasRes); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+		var found int
+		requestAliases := append(aliasReq.AltAliases, aliasReq.Alias)
+		for _, alias := range aliasRes.Aliases {
+			for _, altAlias := range requestAliases {
+				if altAlias == alias {
+					found++
+				}
+			}
+		}
+		// check that we found at least the same amount of existing aliases as are in the request
+		if aliasReq.Alias != "" && found < len(requestAliases) {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadAlias("No matching alias found."),
+			}
+		}
+	}
+	sendEventDuration.With(prometheus.Labels{"action": "build"}).Observe(float64(timeToGenerateEvent.Milliseconds()))
+
+	res := util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: sendEventResponseCryptoIDs{
+			EventID: e.EventID(),
+			PDU:     json.RawMessage(e.JSON()),
+		},
+	}
 
 	return res
 }
