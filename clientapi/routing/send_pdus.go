@@ -125,33 +125,35 @@ func SendPDUs(
 						JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
 					}
 				}
-				queryReq := roomserverAPI.QueryMembershipForUserRequest{
-					RoomID: pdu.RoomID().String(),
-					UserID: *deviceUserID,
-				}
-				var queryRes roomserverAPI.QueryMembershipForUserResponse
-				if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
-					util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-					return util.JSONResponse{
-						Code: http.StatusInternalServerError,
-						JSON: spec.InternalServerError{},
+				if !cfg.Matrix.IsLocalServerName(pdu.RoomID().Domain()) {
+					queryReq := roomserverAPI.QueryMembershipForUserRequest{
+						RoomID: pdu.RoomID().String(),
+						UserID: *deviceUserID,
 					}
-				}
-				if !queryRes.IsInRoom {
-					// This is a join event to a remote room
-					// TODO: cryptoIDs - figure out how to obtain unsigned contents for outstanding federated invites
-					joinReq := roomserverAPI.PerformJoinRequestCryptoIDs{
-						RoomID:      pdu.RoomID().String(),
-						UserID:      device.UserID,
-						IsGuest:     device.AccountType == api.AccountTypeGuest,
-						ServerNames: []spec.ServerName{spec.ServerName(pdus.ViaServer)},
-						JoinEvent:   pdu,
+					var queryRes roomserverAPI.QueryMembershipForUserResponse
+					if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
+						util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
+						return util.JSONResponse{
+							Code: http.StatusInternalServerError,
+							JSON: spec.InternalServerError{},
+						}
 					}
-					err := rsAPI.PerformSendJoinCryptoIDs(req.Context(), &joinReq)
-					if err != nil {
-						util.GetLogger(req.Context()).Errorf("Failed processing %s event (%s): %v", pdu.Type(), pdu.EventID(), err)
+					if !queryRes.IsInRoom {
+						// This is a join event to a remote room
+						// TODO: cryptoIDs - figure out how to obtain unsigned contents for outstanding federated invites
+						joinReq := roomserverAPI.PerformJoinRequestCryptoIDs{
+							RoomID:      pdu.RoomID().String(),
+							UserID:      device.UserID,
+							IsGuest:     device.AccountType == api.AccountTypeGuest,
+							ServerNames: []spec.ServerName{spec.ServerName(pdus.ViaServer)},
+							JoinEvent:   pdu,
+						}
+						err := rsAPI.PerformSendJoinCryptoIDs(req.Context(), &joinReq)
+						if err != nil {
+							util.GetLogger(req.Context()).Errorf("Failed processing %s event (%s): %v", pdu.Type(), pdu.EventID(), err)
+						}
+						continue // NOTE: don't send this event on to the roomserver
 					}
-					continue // NOTE: don't send this event on to the roomserver
 				}
 			}
 		}
