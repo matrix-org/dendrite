@@ -132,7 +132,7 @@ func SendPDUs(
 			err = json.Unmarshal(pdu.Content(), &membership)
 			switch {
 			case err != nil:
-				util.GetLogger(req.Context()).Errorf("m.room.member event content invalid", pdu.Content(), pdu.EventID())
+				util.GetLogger(req.Context()).Errorf("m.room.member event (%s) content invalid: %v", pdu.EventID(), pdu.Content())
 				continue
 			case membership.Membership == spec.Join:
 				deviceUserID, err := spec.NewUserID(device.UserID, true)

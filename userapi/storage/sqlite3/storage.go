@@ -146,6 +146,10 @@ func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOp
 	if err != nil {
 		return nil, err
 	}
+	otpid, err := NewSqliteOneTimePseudoIDsTable(db)
+	if err != nil {
+		return nil, err
+	}
 	dk, err := NewSqliteDeviceKeysTable(db)
 	if err != nil {
 		return nil, err
@@ -169,6 +173,7 @@ func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOp
 
 	return &shared.KeyDatabase{
 		OneTimeKeysTable:      otk,
+		OneTimePseudoIDsTable: otpid,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,
 		StaleDeviceListsTable: sdl,

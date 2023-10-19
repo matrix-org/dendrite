@@ -365,6 +365,7 @@ type Response struct {
 	ToDevice            *ToDeviceResponse `json:"to_device,omitempty"`
 	DeviceLists         *DeviceLists      `json:"device_lists,omitempty"`
 	DeviceListsOTKCount map[string]int    `json:"device_one_time_keys_count,omitempty"`
+	OTPseudoIDsCount    map[string]int    `json:"one_time_pseudoIDs_count,omitempty"`
 }
 
 func (r Response) MarshalJSON() ([]byte, error) {
@@ -427,6 +428,7 @@ func NewResponse() *Response {
 	res.DeviceLists = &DeviceLists{}
 	res.ToDevice = &ToDeviceResponse{}
 	res.DeviceListsOTKCount = map[string]int{}
+	res.OTPseudoIDsCount = map[string]int{}
 
 	return &res
 }

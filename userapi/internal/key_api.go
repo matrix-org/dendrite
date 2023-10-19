@@ -55,11 +55,19 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
+	if len(req.OneTimePseudoIDs) > 0 {
+		a.uploadOneTimePseudoIDs(ctx, req, res)
+	}
 	otks, err := a.KeyDatabase.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
 		return err
 	}
 	res.OneTimeKeyCounts = []api.OneTimeKeysCount{*otks}
+	otpIDs, err := a.KeyDatabase.OneTimePseudoIDsCount(ctx, req.UserID)
+	if err != nil {
+		return err
+	}
+	res.OneTimePseudoIDCounts = []api.OneTimePseudoIDsCount{*otpIDs}
 	return nil
 }
 
@@ -179,6 +187,17 @@ func (a *UserInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOn
 	}
 	res.Count = *count
 	return nil
+}
+
+func (a *UserInternalAPI) QueryOneTimePseudoIDs(ctx context.Context, userID string) (api.OneTimePseudoIDsCount, *api.KeyError) {
+	count, err := a.KeyDatabase.OneTimePseudoIDsCount(ctx, userID)
+	if err != nil {
+		return api.OneTimePseudoIDsCount{}, &api.KeyError{
+			Err: fmt.Sprintf("Failed to query OTK counts: %s", err),
+		}
+	}
+	return *count, nil
+
 }
 
 func (a *UserInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.QueryDeviceMessagesRequest, res *api.QueryDeviceMessagesResponse) error {
@@ -771,6 +790,61 @@ func (a *UserInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perfor
 		res.OneTimeKeyCounts = append(res.OneTimeKeyCounts, *counts)
 	}
 
+}
+
+func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
+	if req.UserID == "" {
+		res.Error = &api.KeyError{
+			Err: "user ID  missing",
+		}
+	}
+	if len(req.OneTimePseudoIDs) == 0 {
+		counts, err := a.KeyDatabase.OneTimePseudoIDsCount(ctx, req.UserID)
+		if err != nil {
+			res.Error = &api.KeyError{
+				Err: fmt.Sprintf("a.KeyDatabase.OneTimePseudoIDsCount: %s", err),
+			}
+		}
+		if counts != nil {
+			res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
+		}
+		return
+	}
+	for _, key := range req.OneTimePseudoIDs {
+		// grab existing keys based on (user/algorithm/key ID)
+		keyIDsWithAlgorithms := make([]string, len(key.KeyJSON))
+		i := 0
+		for keyIDWithAlgo := range key.KeyJSON {
+			keyIDsWithAlgorithms[i] = keyIDWithAlgo
+			i++
+		}
+		existingKeys, err := a.KeyDatabase.ExistingOneTimePseudoIDs(ctx, req.UserID, keyIDsWithAlgorithms)
+		if err != nil {
+			res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
+				Err: "failed to query existing one-time pseudoIDs: " + err.Error(),
+			})
+			continue
+		}
+		for keyIDWithAlgo := range existingKeys {
+			// if keys exist and the JSON doesn't match, error out as the key already exists
+			if !bytes.Equal(existingKeys[keyIDWithAlgo], key.KeyJSON[keyIDWithAlgo]) {
+				res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
+					Err: fmt.Sprintf("%s device %s: algorithm / key ID %s one-time pseudoID already exists", req.UserID, req.DeviceID, keyIDWithAlgo),
+				})
+				continue
+			}
+		}
+		// store one-time keys
+		counts, err := a.KeyDatabase.StoreOneTimePseudoIDs(ctx, key)
+		if err != nil {
+			res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
+				Err: fmt.Sprintf("%s device %s : failed to store one-time pseudoIDs: %s", req.UserID, req.DeviceID, err.Error()),
+			})
+			continue
+		}
+		// collect counts
+		res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
+	}
 }
 
 func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage, onlyUpdateDisplayName bool) error {

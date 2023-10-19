@@ -1596,6 +1596,11 @@ func Setup(
 			return UploadKeys(req, userAPI, device)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/keys/upload",
+		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return UploadKeysCryptoIDs(req, userAPI, device)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/keys/query",
 		httputil.MakeAuthAPI("keys_query", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return QueryKeys(req, userAPI, device)

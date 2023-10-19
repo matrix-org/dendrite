@@ -97,6 +97,86 @@ type queryKeysRequest struct {
 	DeviceKeys map[string][]string `json:"device_keys"`
 }
 
+type uploadKeysCryptoIDsRequest struct {
+	DeviceKeys       json.RawMessage            `json:"device_keys"`
+	OneTimeKeys      map[string]json.RawMessage `json:"one_time_keys"`
+	OneTimePseudoIDs map[string]json.RawMessage `json:"one_time_pseudoids"`
+}
+
+func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api.Device) util.JSONResponse {
+	var r uploadKeysCryptoIDsRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+
+	uploadReq := &api.PerformUploadKeysRequest{
+		DeviceID: device.ID,
+		UserID:   device.UserID,
+	}
+	if r.DeviceKeys != nil {
+		uploadReq.DeviceKeys = []api.DeviceKeys{
+			{
+				DeviceID: device.ID,
+				UserID:   device.UserID,
+				KeyJSON:  r.DeviceKeys,
+			},
+		}
+	}
+	if r.OneTimeKeys != nil {
+		uploadReq.OneTimeKeys = []api.OneTimeKeys{
+			{
+				DeviceID: device.ID,
+				UserID:   device.UserID,
+				KeyJSON:  r.OneTimeKeys,
+			},
+		}
+	}
+	if r.OneTimePseudoIDs != nil {
+		uploadReq.OneTimePseudoIDs = []api.OneTimePseudoIDs{
+			{
+				UserID:  device.UserID,
+				KeyJSON: r.OneTimePseudoIDs,
+			},
+		}
+	}
+
+	var uploadRes api.PerformUploadKeysResponse
+	if err := keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes); err != nil {
+		return util.ErrorResponse(err)
+	}
+	if uploadRes.Error != nil {
+		util.GetLogger(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	if len(uploadRes.KeyErrors) > 0 {
+		util.GetLogger(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
+		return util.JSONResponse{
+			Code: 400,
+			JSON: uploadRes.KeyErrors,
+		}
+	}
+
+	keyCount := make(map[string]int)
+	if len(uploadRes.OneTimeKeyCounts) > 0 {
+		keyCount = uploadRes.OneTimeKeyCounts[0].KeyCount
+	}
+	pseudoIDCount := make(map[string]int)
+	if len(uploadRes.OneTimePseudoIDCounts) > 0 {
+		keyCount = uploadRes.OneTimePseudoIDCounts[0].KeyCount
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct {
+			OTKCounts   interface{} `json:"one_time_key_counts"`
+			OTPIDCounts interface{} `json:"one_time_pseudoid_counts"`
+		}{keyCount, pseudoIDCount},
+	}
+}
+
 func (r *queryKeysRequest) GetTimeout() time.Duration {
 	if r.Timeout == 0 {
 		return 10 * time.Second

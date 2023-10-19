@@ -46,6 +46,16 @@ func DeviceOTKCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID, deviceI
 	return nil
 }
 
+// OTPseudoIDCounts adds one-time pseudoID counts to the /sync response
+func OTPseudoIDCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID string, res *types.Response) error {
+	count, err := keyAPI.QueryOneTimePseudoIDs(ctx, userID)
+	if err != nil {
+		return err
+	}
+	res.OTPseudoIDsCount = count.KeyCount
+	return nil
+}
+
 // DeviceListCatchup fills in the given response for the given user ID to bring it up-to-date with device lists. hasNew=true if the response
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
