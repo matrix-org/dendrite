@@ -513,14 +513,14 @@ func restrictedJoinRuleAllowedRooms(ctx context.Context, joinRuleEv *types.Heade
 	}
 	var jrContent gomatrixserverlib.JoinRuleContent
 	if err := json.Unmarshal(joinRuleEv.Content(), &jrContent); err != nil {
-		util.GetLogger(ctx).Warnf("failed to check join_rule on room %s: %s", joinRuleEv.RoomID(), err)
+		util.GetLogger(ctx).Warnf("failed to check join_rule on room %s: %s", joinRuleEv.RoomID().String(), err)
 		return nil
 	}
 	for _, allow := range jrContent.Allow {
 		if allow.Type == spec.MRoomMembership {
 			allowedRoomID, err := spec.NewRoomID(allow.RoomID)
 			if err != nil {
-				util.GetLogger(ctx).Warnf("invalid room ID '%s' found in join_rule on room %s: %s", allow.RoomID, joinRuleEv.RoomID(), err)
+				util.GetLogger(ctx).Warnf("invalid room ID '%s' found in join_rule on room %s: %s", allow.RoomID, joinRuleEv.RoomID().String(), err)
 			} else {
 				allows = append(allows, *allowedRoomID)
 			}

@@ -205,12 +205,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 		profileInfos := make(map[string]ProfileInfoResponse)
 		for _, ev := range append(eventsBefore, eventsAfter...) {
-			validRoomID, roomErr := spec.NewRoomID(ev.RoomID())
-			if err != nil {
-				logrus.WithError(roomErr).WithField("room_id", ev.RoomID()).Warn("failed to query userprofile")
-				continue
-			}
-			userID, queryErr := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, ev.SenderID())
+			userID, queryErr := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
 			if queryErr != nil {
 				logrus.WithError(queryErr).WithField("sender_id", ev.SenderID()).Warn("failed to query userprofile")
 				continue
@@ -218,7 +213,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 			profile, ok := knownUsersProfiles[userID.String()]
 			if !ok {
-				stateEvent, stateErr := snapshot.GetStateEvent(ctx, ev.RoomID(), spec.MRoomMember, string(ev.SenderID()))
+				stateEvent, stateErr := snapshot.GetStateEvent(ctx, ev.RoomID().String(), spec.MRoomMember, string(ev.SenderID()))
 				if stateErr != nil {
 					logrus.WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
@@ -235,25 +230,14 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			profileInfos[userID.String()] = profile
 		}
 
-		sender := spec.UserID{}
-		validRoomID, roomErr := spec.NewRoomID(event.RoomID())
+		clientEvent, err := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		})
 		if err != nil {
-			logrus.WithError(roomErr).WithField("room_id", event.RoomID()).Warn("failed to query userprofile")
+			util.GetLogger(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
 			continue
 		}
-		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, event.SenderID())
-		if err == nil && userID != nil {
-			sender = *userID
-		}
 
-		sk := event.StateKey()
-		if sk != nil && *sk != "" {
-			skUserID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, spec.SenderID(*event.StateKey()))
-			if err == nil && skUserID != nil {
-				skString := skUserID.String()
-				sk = &skString
-			}
-		}
 		results = append(results, Result{
 			Context: SearchContextResponse{
 				Start: startToken.String(),
@@ -267,14 +251,14 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				ProfileInfo: profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: synctypes.ToClientEvent(event, synctypes.FormatAll, sender.String(), sk, event.Unsigned()),
+			Result: *clientEvent,
 		})
-		roomGroup := groups[event.RoomID()]
+		roomGroup := groups[event.RoomID().String()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
-		groups[event.RoomID()] = roomGroup
-		if _, ok := stateForRooms[event.RoomID()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
+		groups[event.RoomID().String()] = roomGroup
+		if _, ok := stateForRooms[event.RoomID().String()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
 			stateFilter := synctypes.DefaultStateFilter()
-			state, err := snapshot.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
+			state, err := snapshot.CurrentState(ctx, event.RoomID().String(), &stateFilter, nil)
 			if err != nil {
 				logrus.WithError(err).Error("unable to get current state")
 				return util.JSONResponse{
@@ -282,7 +266,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 					JSON: spec.InternalServerError{},
 				}
 			}
-			stateForRooms[event.RoomID()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			stateForRooms[event.RoomID().String()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 			})
 		}
@@ -328,19 +312,19 @@ func contextEvents(
 	roomFilter *synctypes.RoomEventFilter,
 	searchReq SearchRequest,
 ) ([]*types.HeaderedEvent, []*types.HeaderedEvent, error) {
-	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID(), event.EventID())
+	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID().String(), event.EventID())
 	if err != nil {
 		logrus.WithError(err).Error("failed to query context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
-	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, event.RoomID(), roomFilter)
+	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
 		logrus.WithError(err).Error("failed to query before context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
-	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, event.RoomID(), roomFilter)
+	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
 		logrus.WithError(err).Error("failed to query after context event")
 		return nil, nil, err

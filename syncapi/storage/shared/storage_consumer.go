@@ -114,14 +114,7 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 				}).WithError(err).Warnf("Failed to add transaction ID to event")
 				continue
 			}
-			roomID, err := spec.NewRoomID(in[i].RoomID())
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"event_id": out[i].EventID(),
-				}).WithError(err).Warnf("Room ID is invalid")
-				continue
-			}
-			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
+			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, in[i].RoomID(), *userID)
 			if err != nil || deviceSenderID == nil {
 				logrus.WithFields(logrus.Fields{
 					"event_id": out[i].EventID(),
@@ -236,7 +229,7 @@ func (d *Database) UpsertAccountData(
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 // This function should always be called within a sqlutil.Writer for safety in SQLite.
 func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *rstypes.HeaderedEvent) error {
-	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
+	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID().String(), ev.EventID()); err != nil {
 		return err
 	}
 
@@ -257,7 +250,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.BackwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
+			if err = d.BackwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID().String(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -426,7 +419,7 @@ func (d *Database) fetchStateEvents(
 		}
 		// we know we got them all otherwise an error would've been returned, so just loop the events
 		for _, ev := range evs {
-			roomID := ev.RoomID()
+			roomID := ev.RoomID().String()
 			stateBetween[roomID] = append(stateBetween[roomID], ev)
 		}
 	}
@@ -522,11 +515,7 @@ func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userI
 	if err != nil {
 		return "", ""
 	}
-	roomID, err := spec.NewRoomID(ev.RoomID())
-	if err != nil {
-		return "", ""
-	}
-	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *roomID, *fullUser)
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, ev.RoomID(), *fullUser)
 	if err != nil || senderID == nil {
 		return "", ""
 	}
@@ -594,7 +583,7 @@ func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types
 	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
 }
 
-func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
+func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
 
@@ -626,7 +615,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 	default:
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 			return d.Relations.InsertRelation(
-				ctx, txn, event.RoomID(), content.Relations.EventID,
+				ctx, txn, event.RoomID().String(), content.Relations.EventID,
 				event.EventID(), event.Type(), content.Relations.RelationType,
 			)
 		})

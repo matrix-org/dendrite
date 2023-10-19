@@ -263,7 +263,11 @@ func SendEvent(
 }
 
 func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID string, rsAPI api.ClientRoomserverAPI) error {
-	userMap := r["users"].(map[string]interface{})
+	users, ok := r["users"]
+	if !ok {
+		return nil
+	}
+	userMap := users.(map[string]interface{})
 	validRoomID, err := spec.NewRoomID(roomID)
 	if err != nil {
 		return err
@@ -277,7 +281,8 @@ func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID strin
 		if err != nil {
 			return err
 		} else if senderID == nil {
-			return fmt.Errorf("sender ID not found for %s in %s", uID, *validRoomID)
+			util.GetLogger(req.Context()).Warnf("sender ID not found for %s in %s", uID, *validRoomID)
+			continue
 		}
 		userMap[string(*senderID)] = level
 		delete(userMap, user)
@@ -437,7 +442,7 @@ func generateSendEvent(
 				JSON: spec.BadJSON("Cannot unmarshal the event content."),
 			}
 		}
-		if content["replacement_room"] == e.RoomID() {
+		if content["replacement_room"] == e.RoomID().String() {
 			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam("Cannot send tombstone event that points to the same room."),

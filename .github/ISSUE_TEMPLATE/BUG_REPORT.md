@@ -62,6 +62,6 @@ If you can identify any relevant log snippets from server logs, please include
 those (please be careful to remove any personal or private data). Please surround them with
 ``` (three backticks, on a line on their own), so that they are formatted legibly.
 
-Alternatively, please send logs to @kegan:matrix.org or @neilalexander:matrix.org
+Alternatively, please send logs to @kegan:matrix.org, @s7evink:matrix.org or @devonh:one.ems.host
 with a link to the respective Github issue, thanks!
 -->

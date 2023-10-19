@@ -15,6 +15,7 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -532,7 +533,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID, stateKey *string, eventFormat synctypes.ClientEventFormat) *InviteResponse {
+func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *types.HeaderedEvent, eventFormat synctypes.ClientEventFormat) (*InviteResponse, error) {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -540,18 +541,42 @@ func NewInviteResponse(event *types.HeaderedEvent, userID spec.UserID, stateKey 
 	// If there is then unmarshal it into the response. This will contain the
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != synctypes.FormatSyncFederation {
+			updatedInvite, err := synctypes.GetUpdatedInviteRoomState(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			}, inviteRoomState, event.PDU, event.RoomID(), eventFormat)
+			if err != nil {
+				return nil, err
+			}
+			_ = json.Unmarshal(updatedInvite, &res.InviteState.Events)
+		} else {
+			_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		}
+	}
+
+	// Clear unsigned so it doesn't have pseudoIDs converted during ToClientEvent
+	eventNoUnsigned, err := event.SetUnsigned(nil)
+	if err != nil {
+		return nil, err
 	}
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := synctypes.ToClientEvent(event.PDU, eventFormat, userID.String(), stateKey, event.Unsigned())
+	inviteEvent, err := synctypes.ToClientEvent(eventNoUnsigned, eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure unsigned field is empty so it isn't marshalled into the final JSON
 	inviteEvent.Unsigned = nil
-	if ev, err := json.Marshal(inviteEvent); err == nil {
+
+	if ev, err := json.Marshal(*inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
 	}
 
-	return &res
+	return &res, nil
 }
 
 // LeaveResponse represents a /sync response for a room which is under the 'leave' key.

@@ -440,7 +440,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests/... 2>&1 | gotestfmt -hide all
+          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         name: Run Complement Tests
         env:

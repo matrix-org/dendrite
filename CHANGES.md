@@ -1,5 +1,24 @@
 # Changelog
 
+## Dendrite 0.13.3 (2023-09-28)
+
+### Fixes:
+
+- The `user_id` query parameter when authenticating is now used correctly (contributed by [tulir](https://github.com/tulir))
+- Invitations are now correctly pushed to devices
+- A bug which could result in the corruption of `m.direct` account data has been fixed 
+
+### Features
+
+- [Sliding Sync proxy](https://github.com/matrix-org/sliding-sync) can be configured in the `/.well-known/matrix/client` response
+- Room version 11 is now supported
+- Clients can request the `federation` `event_format` when creating filters
+- Many under the hood improvements for [MSC4014: Pseudonymous Identities](https://github.com/matrix-org/matrix-spec-proposals/blob/kegan/pseudo-ids/proposals/4014-pseudonymous-identities.md)
+
+### Other
+
+- Dendrite now requires Go 1.20 if building from source
+
 ## Dendrite 0.13.2 (2023-08-23)
 
 ### Fixes:

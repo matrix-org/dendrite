@@ -108,7 +108,7 @@ func (s *membershipsStatements) UpsertMembership(
 	}
 	_, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
 		ctx,
-		event.RoomID(),
+		event.RoomID().String(),
 		event.StateKeyResolved,
 		membership,
 		event.EventID(),
@@ -131,7 +131,7 @@ func (s *membershipsStatements) SelectMembershipCount(
 // string as the membership.
 func (s *membershipsStatements) SelectMembershipForUser(
 	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64,
-) (membership string, topologyPos int, err error) {
+) (membership string, topologyPos int64, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
 	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
 	if err != nil {

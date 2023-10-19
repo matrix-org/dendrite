@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -11,8 +12,19 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func UserIDForSender(roomID string, senderID string) (*spec.UserID, error) {
-	return spec.NewUserID(senderID, true)
+type FakeRoomserverAPI struct{}
+
+func (f *FakeRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if senderID == "" {
+		return nil, nil
+	}
+
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (f *FakeRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	sender := spec.SenderID(userID.String())
+	return &sender, nil
 }
 
 func TestSyncTokens(t *testing.T) {
@@ -61,25 +73,18 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender, err := spec.NewUserID("@neilalexander:matrix.org", true)
+	rsAPI := FakeRoomserverAPI{}
+	res, err := NewInviteResponse(context.Background(), &rsAPI, &types.HeaderedEvent{PDU: ev}, synctypes.FormatSync)
 	if err != nil {
 		t.Fatal(err)
 	}
-	skUserID, err := spec.NewUserID("@neilalexander:dendrite.neilalexander.dev", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	skString := skUserID.String()
-	sk := &skString
-
-	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev}, *sender, sk, synctypes.FormatSync)
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if string(j) != expected {
-		t.Fatalf("Invite response didn't contain correct info")
+		t.Fatalf("Invite response didn't contain correct info, \nexpected: %s \ngot: %s", expected, string(j))
 	}
 }
 

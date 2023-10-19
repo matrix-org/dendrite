@@ -90,7 +90,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	} else {
 		senderID = spec.SenderID(userID.String())
 	}
-	createContent["creator"] = senderID
+
+	// TODO: Maybe, at some point, GMSL should return the events to create, so we can define the version
+	// entirely there.
+	switch createRequest.RoomVersion {
+	case gomatrixserverlib.RoomVersionV11:
+		// RoomVersionV11 removed the creator field from the create content: https://github.com/matrix-org/matrix-spec-proposals/pull/2175
+	default:
+		createContent["creator"] = senderID
+	}
+
 	createContent["room_version"] = createRequest.RoomVersion
 	powerLevelContent := eventutil.InitialPowerLevelsContent(string(senderID))
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{

@@ -696,8 +696,8 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
 
-	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID())
-	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID())
+	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID().String())
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID().String())
 	// if we found both, the roomNID and version in our cache, no need to query the database
 	if nidOK && versionOK {
 		return &types.RoomInfo{
@@ -707,14 +707,14 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 	}
 
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion)
+		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID().String(), roomVersion)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if roomVersion != "" {
-		d.Cache.StoreRoomVersion(event.RoomID(), roomVersion)
+		d.Cache.StoreRoomVersion(event.RoomID().String(), roomVersion)
 	}
 	return &types.RoomInfo{
 		RoomVersion: roomVersion,
@@ -1026,24 +1026,19 @@ func (d *EventDatabase) MaybeRedactEvent(
 		case validated || redactedEvent == nil || redactionEvent == nil:
 			// we've seen this redaction before or there is nothing to redact
 			return nil
-		case redactedEvent.RoomID() != redactionEvent.RoomID():
+		case redactedEvent.RoomID().String() != redactionEvent.RoomID().String():
 			// redactions across rooms aren't allowed
 			ignoreRedaction = true
 			return nil
 		}
 
-		var validRoomID *spec.RoomID
-		validRoomID, err = spec.NewRoomID(redactedEvent.RoomID())
-		if err != nil {
-			return err
-		}
 		sender1Domain := ""
-		sender1, err1 := querier.QueryUserIDForSender(ctx, *validRoomID, redactedEvent.SenderID())
+		sender1, err1 := querier.QueryUserIDForSender(ctx, redactedEvent.RoomID(), redactedEvent.SenderID())
 		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
 		sender2Domain := ""
-		sender2, err2 := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
+		sender2, err2 := querier.QueryUserIDForSender(ctx, redactedEvent.RoomID(), redactionEvent.SenderID())
 		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
@@ -1522,7 +1517,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		}
 		result[i] = tables.StrippedEvent{
 			EventType:    ev.Type(),
-			RoomID:       ev.RoomID(),
+			RoomID:       ev.RoomID().String(),
 			StateKey:     *ev.StateKey(),
 			ContentValue: tables.ExtractContentValue(&types.HeaderedEvent{PDU: ev}),
 		}

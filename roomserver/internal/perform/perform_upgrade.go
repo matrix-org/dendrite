@@ -368,7 +368,16 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// in the create event (such as for the room types MSC).
 	newCreateContent := map[string]interface{}{}
 	_ = json.Unmarshal(oldCreateEvent.Content(), &newCreateContent)
-	newCreateContent["creator"] = string(senderID)
+
+	switch newVersion {
+	case gomatrixserverlib.RoomVersionV11:
+		// RoomVersionV11 removed the creator field from the create content: https://github.com/matrix-org/matrix-spec-proposals/pull/2175
+		// So if we are upgrading from pre v11, we need to remove the field.
+		delete(newCreateContent, "creator")
+	default:
+		newCreateContent["creator"] = senderID
+	}
+
 	newCreateContent["room_version"] = newVersion
 	newCreateContent["predecessor"] = gomatrixserverlib.PreviousRoom{
 		EventID: tombstoneEvent.EventID(),
