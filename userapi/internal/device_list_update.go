@@ -181,21 +181,7 @@ func (u *DeviceListUpdater) Start() error {
 		return err
 	}
 
-	// Filter out dupe domains, as processServer is going to get all users anyway
-	seenDomains := make(map[spec.ServerName]struct{})
-	newStaleLists := make([]string, 0, len(staleLists))
-	for _, userID := range staleLists {
-		_, domain, err := gomatrixserverlib.SplitID('@', userID)
-		if err != nil {
-			// non-fatal and should not block starting up
-			continue
-		}
-		if _, ok := seenDomains[domain]; ok {
-			continue
-		}
-		newStaleLists = append(newStaleLists, userID)
-		seenDomains[domain] = struct{}{}
-	}
+	newStaleLists := dedupeStaleLists(staleLists)
 	offset, step := time.Second*10, time.Second
 	if max := len(newStaleLists); max > 120 {
 		step = (time.Second * 120) / time.Duration(max)
@@ -598,4 +584,25 @@ func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error
 		return fmt.Errorf("failed to emit key changes for fresh device list: %w", err)
 	}
 	return nil
+}
+
+// dedupeStaleLists de-duplicates the stateList entries using the domain.
+// This is used on startup, processServer is getting all users anyway, so
+// there is no need to send every user to the workers.
+func dedupeStaleLists(staleLists []string) []string {
+	seenDomains := make(map[spec.ServerName]struct{})
+	newStaleLists := make([]string, 0, len(staleLists))
+	for _, userID := range staleLists {
+		_, domain, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			// non-fatal and should not block starting up
+			continue
+		}
+		if _, ok := seenDomains[domain]; ok {
+			continue
+		}
+		newStaleLists = append(newStaleLists, userID)
+		seenDomains[domain] = struct{}{}
+	}
+	return newStaleLists
 }
