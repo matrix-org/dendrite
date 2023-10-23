@@ -81,7 +81,7 @@ func Test_evaluatePushRules(t *testing.T) {
 			{
 				name:         "m.reaction doesn't notify",
 				eventContent: `{"type":"m.reaction","room_id":"!room:example.com"}`,
-				wantAction:   "",
+				wantAction:   pushrules.UnknownAction,
 				wantActions:  []*pushrules.Action{},
 			},
 			{
