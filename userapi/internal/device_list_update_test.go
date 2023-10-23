@@ -433,6 +433,7 @@ func Test_dedupeStateList(t *testing.T) {
 	alice := "@alice:localhost"
 	bob := "@bob:localhost"
 	charlie := "@charlie:notlocalhost"
+	invalidUserID := "iaminvalid:localhost"
 
 	tests := []struct {
 		name       string
@@ -458,6 +459,11 @@ func Test_dedupeStateList(t *testing.T) {
 			name:       "multiple entries with dupe servers",
 			staleLists: []string{alice, bob, charlie},
 			want:       []string{alice, charlie},
+		},
+		{
+			name:       "list with invalid userID",
+			staleLists: []string{alice, bob, invalidUserID},
+			want:       []string{alice},
 		},
 	}
 	for _, tt := range tests {
