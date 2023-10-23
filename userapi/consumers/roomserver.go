@@ -538,8 +538,8 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if err != nil {
 		return fmt.Errorf("pushrules.ActionsToTweaks: %w", err)
 	}
-	// TODO: support coalescing.
-	if a != pushrules.NotifyAction && a != pushrules.CoalesceAction {
+
+	if a != pushrules.NotifyAction {
 		log.WithFields(log.Fields{
 			"event_id":  event.EventID(),
 			"room_id":   event.RoomID().String(),
