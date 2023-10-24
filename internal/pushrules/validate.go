@@ -18,6 +18,9 @@ func ValidateRule(kind Kind, rule *Rule) []error {
 		errs = append(errs, fmt.Errorf("invalid rule ID: %s", rule.RuleID))
 	}
 
+	if rule.Actions == nil {
+		errs = append(errs, fmt.Errorf("missing actions"))
+	}
 	for _, action := range rule.Actions {
 		errs = append(errs, validateAction(action)...)
 	}
