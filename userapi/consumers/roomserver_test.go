@@ -81,12 +81,8 @@ func Test_evaluatePushRules(t *testing.T) {
 			{
 				name:         "m.reaction doesn't notify",
 				eventContent: `{"type":"m.reaction","room_id":"!room:example.com"}`,
-				wantAction:   pushrules.DontNotifyAction,
-				wantActions: []*pushrules.Action{
-					{
-						Kind: pushrules.DontNotifyAction,
-					},
-				},
+				wantAction:   pushrules.UnknownAction,
+				wantActions:  []*pushrules.Action{},
 			},
 			{
 				name:         "m.room.message notifies",
@@ -136,7 +132,7 @@ func Test_evaluatePushRules(t *testing.T) {
 					t.Fatalf("expected action to be '%s', got '%s'", tc.wantAction, gotAction)
 				}
 				// this is taken from `notifyLocal`
-				if tc.wantNotify && gotAction != pushrules.NotifyAction && gotAction != pushrules.CoalesceAction {
+				if tc.wantNotify && gotAction != pushrules.NotifyAction {
 					t.Fatalf("expected to notify but didn't")
 				}
 			})
