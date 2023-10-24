@@ -215,8 +215,8 @@ func main() {
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 		func(eventID string) bool {
-			isRejected, err := roomserverDB.IsEventRejected(ctx, roomInfo.RoomNID, eventID)
-			if err != nil {
+			isRejected, rejectedErr := roomserverDB.IsEventRejected(ctx, roomInfo.RoomNID, eventID)
+			if rejectedErr != nil {
 				return true
 			}
 			return isRejected

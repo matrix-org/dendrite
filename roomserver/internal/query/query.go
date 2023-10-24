@@ -166,8 +166,8 @@ func (r *Queryer) QueryStateAfterEvents(
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
 			},
 			func(eventID string) bool {
-				isRejected, err := r.DB.IsEventRejected(ctx, info.RoomNID, eventID)
-				if err != nil {
+				isRejected, rejectedErr := r.DB.IsEventRejected(ctx, info.RoomNID, eventID)
+				if rejectedErr != nil {
 					return true
 				}
 				return isRejected
@@ -684,8 +684,8 @@ func (r *Queryer) QueryStateAndAuthChain(
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
 			},
 			func(eventID string) bool {
-				isRejected, err := r.DB.IsEventRejected(ctx, info.RoomNID, eventID)
-				if err != nil {
+				isRejected, rejectedErr := r.DB.IsEventRejected(ctx, info.RoomNID, eventID)
+				if rejectedErr != nil {
 					return true
 				}
 				return isRejected
