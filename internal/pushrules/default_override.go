@@ -10,6 +10,7 @@ func defaultOverrideRules(userID string) []*Rule {
 		&mRuleRoomNotifDefinition,
 		&mRuleTombstoneDefinition,
 		&mRuleReactionDefinition,
+		&mRuleACLsDefinition,
 	}
 }
 
