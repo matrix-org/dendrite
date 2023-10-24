@@ -21,12 +21,12 @@ func TestDefaultRules(t *testing.T) {
 		// Default override rules
 		{
 			name:       ".m.rule.master",
-			inputBytes: []byte(`{"rule_id":".m.rule.master","default":true,"enabled":false,"actions":["dont_notify"]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.master","default":true,"enabled":false,"actions":[]}`),
 			want:       mRuleMasterDefinition,
 		},
 		{
 			name:       ".m.rule.suppress_notices",
-			inputBytes: []byte(`{"rule_id":".m.rule.suppress_notices","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"content.msgtype","pattern":"m.notice"}],"actions":["dont_notify"]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.suppress_notices","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"content.msgtype","pattern":"m.notice"}],"actions":[]}`),
 			want:       mRuleSuppressNoticesDefinition,
 		},
 		{
@@ -36,7 +36,7 @@ func TestDefaultRules(t *testing.T) {
 		},
 		{
 			name:       ".m.rule.member_event",
-			inputBytes: []byte(`{"rule_id":".m.rule.member_event","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"type","pattern":"m.room.member"}],"actions":["dont_notify"]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.member_event","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"type","pattern":"m.room.member"}],"actions":[]}`),
 			want:       mRuleMemberEventDefinition,
 		},
 		{
