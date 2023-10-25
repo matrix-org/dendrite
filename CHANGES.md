@@ -1,5 +1,23 @@
 # Changelog
 
+## Dendrite 0.13.4 (2023-10-25)
+
+Upgrading to this version is **highly** recommended, as it fixes a long-standing bug in the state resolution
+algorithm.
+
+### Fixes:
+
+- The "device list updater" now de-duplicates the servers to fetch devices from on startup. (This also 
+  avoids spamming the logs when shutting down.)
+- A bug in the state resolution algorithm has been fixed. This bug could result in users "being reset"
+  out of rooms and other missing state events due to calculating the wrong state.
+- A bug when setting notifications from Element Android has been fixed by implementing MSC3987
+
+### Features
+
+- Updated dependencies
+  - Internal NATS Server has been updated from v2.9.19 to v2.9.23
+
 ## Dendrite 0.13.3 (2023-09-28)
 
 ### Fixes:
