@@ -141,6 +141,12 @@ func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api
 		}
 	}
 
+	util.GetLogger(req.Context()).
+		WithField("device keys", r.DeviceKeys).
+		WithField("one-time keys", r.OneTimeKeys).
+		WithField("one-time pseudoids", r.OneTimePseudoIDs).
+		Info("Uploading keys")
+
 	var uploadRes api.PerformUploadKeysResponse
 	if err := keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes); err != nil {
 		return util.ErrorResponse(err)
@@ -166,7 +172,7 @@ func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api
 	}
 	pseudoIDCount := make(map[string]int)
 	if len(uploadRes.OneTimePseudoIDCounts) > 0 {
-		keyCount = uploadRes.OneTimePseudoIDCounts[0].KeyCount
+		pseudoIDCount = uploadRes.OneTimePseudoIDCounts[0].KeyCount
 	}
 	return util.JSONResponse{
 		Code: 200,

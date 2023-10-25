@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -755,6 +756,38 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			if m.StreamID != wantStreamIDs[m.DeviceID] {
 				t.Errorf("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
 			}
+		}
+	})
+}
+
+func TestOneTimePseudoIDs(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clean := mustCreateKeyDatabase(t, dbType)
+		defer clean()
+		userID := "@alice:localhost"
+		otk := api.OneTimePseudoIDs{
+			UserID:  userID,
+			KeyJSON: map[string]json.RawMessage{"pseudoid_curve25519:KEY1": []byte(`{"key":"v1"}`)},
+		}
+
+		// Add a one time pseudoID to the DB
+		_, err := db.StoreOneTimePseudoIDs(ctx, otk)
+		MustNotError(t, err)
+
+		// Check the count of one time pseudoIDs is correct
+		count, err := db.OneTimePseudoIDsCount(ctx, userID)
+		MustNotError(t, err)
+		if count.KeyCount["pseudoid_curve25519"] != 1 {
+			t.Fatalf("Expected 1 pseudoID, got %d", count.KeyCount["pseudoid_curve25519"])
+		}
+
+		// Check the actual pseudoid contents are correct
+		keysJSON, err := db.ExistingOneTimePseudoIDs(ctx, userID, []string{"pseudoid_curve25519:KEY1"})
+		MustNotError(t, err)
+		keyJSON, err := keysJSON["pseudoid_curve25519:KEY1"].MarshalJSON()
+		MustNotError(t, err)
+		if !bytes.Equal(keyJSON, []byte(`{"key":"v1"}`)) {
+			t.Fatalf("Existing pseudoIDs do not match expected. Got %v", keysJSON["pseudoid_curve25519:KEY1"])
 		}
 	})
 }

@@ -58,6 +58,7 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 	if len(req.OneTimePseudoIDs) > 0 {
 		a.uploadOneTimePseudoIDs(ctx, req, res)
 	}
+	logrus.Infof("One time pseudoIDs count before: %v", res.OneTimePseudoIDCounts)
 	otks, err := a.KeyDatabase.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
 		return err
@@ -68,6 +69,7 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 		return err
 	}
 	res.OneTimePseudoIDCounts = []api.OneTimePseudoIDsCount{*otpIDs}
+	logrus.Infof("One time pseudoIDs count after: %v", res.OneTimePseudoIDCounts)
 	return nil
 }
 
@@ -806,6 +808,7 @@ func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.P
 			}
 		}
 		if counts != nil {
+			logrus.Infof("Uploading one-time pseudoIDs: early result count: %v", *counts)
 			res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
 		}
 		return
@@ -843,6 +846,7 @@ func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.P
 			continue
 		}
 		// collect counts
+		logrus.Infof("Uploading one-time pseudoIDs: result count: %v", *counts)
 		res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
 	}
 }

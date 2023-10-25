@@ -269,6 +269,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			defer userStreamListener.Close()
 
 			giveup := func() util.JSONResponse {
+				syncReq.Log.Info("Responding to sync since client gave up or timeout was reached")
 				syncReq.Log.Debugln("Responding to sync since client gave up or timeout was reached")
 				syncReq.Response.NextBatch = syncReq.Since
 				// We should always try to include OTKs in sync responses, otherwise clients might upload keys
@@ -284,6 +285,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					if err != nil && err != context.Canceled {
 						syncReq.Log.WithError(err).Warn("failed to get OTPseudoID counts")
 					}
+
+					syncReq.Log.Infof("one-time pseudoID counts: %v", syncReq.Response.OTPseudoIDsCount)
+					syncReq.Log.Infof("one-time key counts: %v", syncReq.Response.DeviceListsOTKCount)
 				}
 				return util.JSONResponse{
 					Code: http.StatusOK,

@@ -1598,6 +1598,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc_cryptoids/keys/upload",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/keys/upload")
 			return UploadKeysCryptoIDs(req, userAPI, device)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
