@@ -16,10 +16,7 @@ func ActionsToTweaks(as []*Action) (ActionKind, map[string]interface{}, error) {
 
 	for _, a := range as {
 		switch a.Kind {
-		case DontNotifyAction:
-			// Don't bother processing any further
-			return DontNotifyAction, nil, nil
-
+		case DontNotifyAction: // Ignored
 		case SetTweakAction:
 			if tweaks == nil {
 				tweaks = map[string]interface{}{}

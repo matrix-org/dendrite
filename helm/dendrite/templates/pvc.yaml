@@ -12,7 +12,14 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.media.capacity }}
-  storageClassName: {{ default .Values.persistence.storageClass .Values.persistence.media.storageClass }}
+  {{ $storageClass := .Values.persistence.media.storageClass | default .Values.persistence.storageClass }}
+  {{- if $storageClass }}
+  {{- if (eq "-" $storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: "{{ $storageClass }}"
+  {{- end }}
+  {{- end }}
 {{ end }}
 {{ if not .Values.persistence.jetstream.existingClaim }}
 ---
@@ -28,7 +35,14 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.jetstream.capacity }}
-  storageClassName: {{ default .Values.persistence.storageClass .Values.persistence.jetstream.storageClass }}
+  {{ $storageClass := .Values.persistence.jetstream.storageClass | default .Values.persistence.storageClass }}
+  {{- if $storageClass }}
+  {{- if (eq "-" $storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: "{{ $storageClass }}"
+  {{- end }}
+  {{- end }}
 {{ end }}
 {{ if not .Values.persistence.search.existingClaim }}
 ---
@@ -44,5 +58,12 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.search.capacity }}
-  storageClassName: {{ default .Values.persistence.storageClass .Values.persistence.search.storageClass }}
+  {{ $storageClass := .Values.persistence.search.storageClass | default .Values.persistence.storageClass }}
+  {{- if $storageClass }}
+  {{- if (eq "-" $storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: "{{ $storageClass }}"
+  {{- end }}
+  {{- end }}
 {{ end }}

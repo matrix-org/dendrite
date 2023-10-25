@@ -45,6 +45,7 @@ type StateResolutionStorage interface {
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	Events(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventNIDs []types.EventNID) ([]types.Event, error)
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
+	IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error)
 }
 
 type StateResolution struct {
@@ -1065,6 +1066,13 @@ func (v *StateResolution) resolveConflictsV2(
 			authEvents,
 			func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+			},
+			func(eventID string) bool {
+				isRejected, err := v.db.IsEventRejected(ctx, v.roomInfo.RoomNID, eventID)
+				if err != nil {
+					return true
+				}
+				return isRejected
 			},
 		)
 	}()

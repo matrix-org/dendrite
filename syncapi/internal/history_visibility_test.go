@@ -58,7 +58,7 @@ type mockDB struct {
 	roomID            string
 }
 
-func (s *mockDB) SelectMembershipForUser(ctx context.Context, roomID string, userID string, pos int64) (string, int, error) {
+func (s *mockDB) SelectMembershipForUser(ctx context.Context, roomID string, userID string, pos int64) (string, int64, error) {
 	if roomID == s.roomID {
 		membership, ok := s.currentMembership[userID]
 		if !ok {

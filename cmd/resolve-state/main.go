@@ -11,13 +11,11 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -34,6 +32,19 @@ import (
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 var filterType = flag.String("filtertype", "", "the event types to filter on")
 var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
+
+// dummyQuerier implements QuerySenderIDAPI. Does **NOT** do any "magic" for pseudoID rooms
+// to avoid having to "start" a full roomserver API.
+type dummyQuerier struct{}
+
+func (d dummyQuerier) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	s := spec.SenderIDFromUserID(userID)
+	return &s, nil
+}
+
+func (d dummyQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return senderID.ToUserID(), nil
+}
 
 // nolint:gocyclo
 func main() {
@@ -56,26 +67,31 @@ func main() {
 		}
 	}
 
-	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
-
 	processCtx := process.NewProcessContext()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+	dbOpts := cfg.RoomServer.Database
+	if dbOpts.ConnectionString == "" {
+		dbOpts = cfg.Global.DatabaseOptions
+	}
+
+	fmt.Println("Opening database")
 	roomserverDB, err := storage.Open(
-		processCtx.Context(), cm, &cfg.RoomServer.Database,
-		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
+		processCtx.Context(), cm, &dbOpts,
+		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, caching.DisableMetrics),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	natsInstance := &jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm,
-		natsInstance, caching.NewRistrettoCache(128*1024*1024, time.Hour, true), false)
+	rsAPI := dummyQuerier{}
 
 	roomInfo := &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	}
 	stateres := state.NewStateResolution(roomserverDB, roomInfo, rsAPI)
+
+	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
 	if *difference {
 		if len(snapshotNIDs) != 2 {
@@ -186,11 +202,24 @@ func main() {
 		authEvents[i] = authEventEntries[i].PDU
 	}
 
+	// Get the roomNID
+	roomInfo, err = roomserverDB.RoomInfo(ctx, authEvents[0].RoomID().String())
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		func(eventID string) bool {
+			isRejected, rejectedErr := roomserverDB.IsEventRejected(ctx, roomInfo.RoomNID, eventID)
+			if rejectedErr != nil {
+				return true
+			}
+			return isRejected
 		},
 	)
 	if err != nil {

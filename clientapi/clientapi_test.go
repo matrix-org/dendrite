@@ -1418,7 +1418,7 @@ func TestPushRules(t *testing.T) {
 				validateFunc: func(t *testing.T, respBody *bytes.Buffer) {
 					actions := gjson.GetBytes(respBody.Bytes(), "actions").Array()
 					// only a basic check
-					assert.Equal(t, 1, len(actions))
+					assert.Equal(t, 0, len(actions))
 				},
 			},
 			{

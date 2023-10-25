@@ -498,6 +498,13 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		},
+		func(eventID string) bool {
+			isRejected, err := t.db.IsEventRejected(ctx, t.roomInfo.RoomNID, eventID)
+			if err != nil {
+				return true
+			}
+			return isRejected
+		},
 	)
 	if err != nil {
 		return nil, err
