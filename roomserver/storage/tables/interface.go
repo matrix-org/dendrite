@@ -96,6 +96,8 @@ type StateSnapshot interface {
 	BulkSelectMembershipForHistoryVisibility(
 		ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
 	) (map[string]*types.HeaderedEvent, error)
+
+	GetAllStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) ([]types.StateSnapshotNID, error)
 }
 
 type StateBlock interface {

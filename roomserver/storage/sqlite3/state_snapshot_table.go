@@ -181,3 +181,7 @@ func (s *stateSnapshotStatements) selectStateBlockNIDsForRoomNID(
 
 	return res, rows.Err()
 }
+
+func (s *stateSnapshotStatements) GetAllStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) ([]types.StateSnapshotNID, error) {
+	return []types.StateSnapshotNID{}, fmt.Errorf("not implemented")
+}

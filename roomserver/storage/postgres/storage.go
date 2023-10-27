@@ -23,6 +23,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/types"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -34,6 +35,10 @@ import (
 // A Database is used to store room events and stream offsets.
 type Database struct {
 	shared.Database
+}
+
+func (d *Database) GetAllStateSnapshots(ctx context.Context, roomNID types.RoomNID) ([]types.StateSnapshotNID, error) {
+	return d.StateSnapshotTable.GetAllStateSnapshots(ctx, nil, roomNID)
 }
 
 // Open a postgres database.

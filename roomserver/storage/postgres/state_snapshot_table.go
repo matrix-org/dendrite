@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -114,11 +115,14 @@ WHERE re.event_id = ANY($2)
 
 `
 
+const getAllSnapshotsSQL = "SELECT state_snapshot_nid FROM roomserver_state_snapshots WHERE room_nid = $1"
+
 type stateSnapshotStatements struct {
 	insertStateStmt                               *sql.Stmt
 	bulkSelectStateBlockNIDsStmt                  *sql.Stmt
 	bulkSelectStateForHistoryVisibilityStmt       *sql.Stmt
 	bulktSelectMembershipForHistoryVisibilityStmt *sql.Stmt
+	getAllSnapshotsStmt                           *sql.Stmt
 }
 
 func CreateStateSnapshotTable(db *sql.DB) error {
@@ -134,7 +138,30 @@ func PrepareStateSnapshotTable(db *sql.DB) (*stateSnapshotStatements, error) {
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
 		{&s.bulkSelectStateForHistoryVisibilityStmt, bulkSelectStateForHistoryVisibilitySQL},
 		{&s.bulktSelectMembershipForHistoryVisibilityStmt, bulkSelectMembershipForHistoryVisibilitySQL},
+		{&s.getAllSnapshotsStmt, getAllSnapshotsSQL},
 	}.Prepare(db)
+}
+
+func (s *stateSnapshotStatements) GetAllStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) ([]types.StateSnapshotNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.getAllSnapshotsStmt)
+
+	rows, err := stmt.QueryContext(ctx, roomNID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
+
+	nids := make([]types.StateSnapshotNID, 0, 2000)
+	var nid types.StateSnapshotNID
+
+	for rows.Next() {
+		if err := rows.Scan(&nid); err != nil {
+			return nil, err
+		}
+		nids = append(nids, nid)
+	}
+
+	return nids, rows.Err()
 }
 
 func (s *stateSnapshotStatements) InsertState(

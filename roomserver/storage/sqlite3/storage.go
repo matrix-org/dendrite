@@ -35,6 +35,10 @@ type Database struct {
 	shared.Database
 }
 
+func (d *Database) GetAllStateSnapshots(ctx context.Context, roomNID types.RoomNID) ([]types.StateSnapshotNID, error) {
+	return []types.StateSnapshotNID{}, fmt.Errorf("not implemented")
+}
+
 // Open a sqlite database.
 func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database

@@ -32,6 +32,7 @@ import (
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 var filterType = flag.String("filtertype", "", "the event types to filter on")
 var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
+var roomID = flag.String("room_id", "", "roomID to get the state for")
 
 // dummyQuerier implements QuerySenderIDAPI. Does **NOT** do any "magic" for pseudoID rooms
 // to avoid having to "start" a full roomserver API.
@@ -57,8 +58,6 @@ func main() {
 	cfg.ClientAPI.RegistrationDisabled = true
 
 	args := flag.Args()
-
-	fmt.Println("Room version", *roomVersion)
 
 	snapshotNIDs := []types.StateSnapshotNID{}
 	for _, arg := range args {
@@ -89,6 +88,24 @@ func main() {
 	roomInfo := &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	}
+	if *roomID != "" {
+		roomInfo, err = roomserverDB.RoomInfo(ctx, *roomID)
+		if err != nil {
+			panic(err)
+		}
+		if roomInfo == nil {
+			panic("no room found")
+		}
+
+		snapshotNIDs, err = roomserverDB.GetAllStateSnapshots(ctx, roomInfo.RoomNID)
+		if err != nil {
+			panic(err)
+		}
+
+	}
+
+	fmt.Println("Room version", roomInfo.RoomVersion)
+
 	stateres := state.NewStateResolution(roomserverDB, roomInfo, rsAPI)
 
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
@@ -152,7 +169,8 @@ func main() {
 	}
 
 	var stateEntries []types.StateEntry
-	for _, snapshotNID := range snapshotNIDs {
+	for i, snapshotNID := range snapshotNIDs {
+		fmt.Printf("\r \a %d of %d", i, len(snapshotNIDs))
 		var entries []types.StateEntry
 		entries, err = stateres.LoadStateAtSnapshot(ctx, snapshotNID)
 		if err != nil {
@@ -160,6 +178,7 @@ func main() {
 		}
 		stateEntries = append(stateEntries, entries...)
 	}
+	fmt.Println()
 
 	eventNIDMap := map[types.EventNID]struct{}{}
 	for _, entry := range stateEntries {
