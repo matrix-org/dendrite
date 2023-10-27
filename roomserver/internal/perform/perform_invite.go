@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
@@ -109,8 +108,6 @@ func (r *Inviter) ProcessInviteMembership(
 	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 	outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 		EventNID: 0,
 		PDU:      inviteEvent.PDU,
@@ -118,7 +115,9 @@ func (r *Inviter) ProcessInviteMembership(
 	if err != nil {
 		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 	}
-	succeeded = true
+	if err = updater.Commit(); err != nil {
+		return nil, fmt.Errorf("updater.Commit: %w", err)
+	}
 	return outputUpdates, nil
 }
 
