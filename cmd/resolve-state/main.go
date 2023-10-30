@@ -28,11 +28,13 @@ import (
 //
 // Usage: ./resolve-state --roomversion=version snapshot [snapshot ...]
 //   e.g. ./resolve-state --roomversion=5 1254 1235 1282
+//   e.g. ./resolve-state -room_id '!abc:localhost'
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 var filterType = flag.String("filtertype", "", "the event types to filter on")
 var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
-var roomID = flag.String("room_id", "", "roomID to get the state for")
+var roomID = flag.String("room_id", "", "roomID to get the state for, using this flag ignores any passed snapshot NIDs and calculates the resolved state using ALL state snapshots")
+var fixState = flag.Bool("fix", false, "attempt to fix the room state")
 
 // dummyQuerier implements QuerySenderIDAPI. Does **NOT** do any "magic" for pseudoID rooms
 // to avoid having to "start" a full roomserver API.
@@ -169,6 +171,7 @@ func main() {
 	}
 
 	var stateEntries []types.StateEntry
+
 	for i, snapshotNID := range snapshotNIDs {
 		fmt.Printf("\r \a %d of %d", i, len(snapshotNIDs))
 		var entries []types.StateEntry
@@ -180,9 +183,9 @@ func main() {
 	}
 	fmt.Println()
 
-	eventNIDMap := map[types.EventNID]struct{}{}
+	eventNIDMap := map[types.EventNID]types.StateEntry{}
 	for _, entry := range stateEntries {
-		eventNIDMap[entry.EventNID] = struct{}{}
+		eventNIDMap[entry.EventNID] = entry
 	}
 
 	eventNIDs := make([]types.EventNID, 0, len(eventNIDMap))
@@ -198,7 +201,9 @@ func main() {
 
 	authEventIDMap := make(map[string]struct{})
 	events := make([]gomatrixserverlib.PDU, len(eventEntries))
+	eventIDNIDMap := make(map[string]types.EventNID)
 	for i := range eventEntries {
+		eventIDNIDMap[eventEntries[i].EventID()] = eventEntries[i].EventNID
 		events[i] = eventEntries[i].PDU
 		for _, authEventID := range eventEntries[i].AuthEventIDs() {
 			authEventIDMap[authEventID] = struct{}{}
@@ -261,6 +266,66 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("Returned", count, "state events after filtering")
+
+	if !*fixState {
+		return
+	}
+
+	fmt.Println()
+	fmt.Printf("\t\t !!! WARNING !!!\n")
+	fmt.Println("Attempting to fix the state of a room can make things even worse.")
+	fmt.Println("For the best result, please shut down Dendrite to avoid concurrent database changes.")
+	fmt.Println("If you have missing state events (e.g. users not in a room, missing power levels")
+	fmt.Println("make sure they would be added by checking the resolved state events above first (or by running without -fix).")
+	fmt.Println("If you are sure everything looks fine, press Return, if not, press CTRL+c.")
+	fmt.Scanln()
+
+	fmt.Println("Attempting to fix state")
+
+	stateEntriesResolved := make([]types.StateEntry, len(resolved))
+	for i := range resolved {
+		eventNID := eventIDNIDMap[resolved[i].EventID()]
+		stateEntriesResolved[i] = eventNIDMap[eventNID]
+	}
+
+	roomUpdater, err := roomserverDB.GetRoomUpdater(ctx, roomInfo)
+	if err != nil {
+		panic(err)
+	}
+
+	latestEvents := make([]types.StateAtEventAndReference, 0, len(roomUpdater.LatestEvents()))
+	for _, event := range roomUpdater.LatestEvents() {
+		// SetLatestEvents only uses the EventNID, so populate that
+		latestEvents = append(latestEvents, types.StateAtEventAndReference{
+			StateAtEvent: types.StateAtEvent{
+				StateEntry: types.StateEntry{
+					EventNID: event.EventNID,
+				},
+			},
+		})
+	}
+
+	lastEventSent, err := roomserverDB.EventsFromIDs(ctx, roomInfo, []string{roomUpdater.LastEventIDSent()})
+	if err != nil {
+		panic(err)
+	}
+	if len(lastEventSent) != 1 {
+		panic("expected to get one event from the database but didn't")
+	}
+
+	newSnapshotNID, err := roomserverDB.AddState(ctx, roomInfo.RoomNID, nil, stateEntriesResolved)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = roomUpdater.SetLatestEvents(roomInfo.RoomNID, latestEvents, lastEventSent[0].EventNID, newSnapshotNID); err != nil {
+		panic(err)
+	}
+	if err = roomUpdater.Commit(); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Successfully set new snapshot NID %d containing %d state events", newSnapshotNID, len(stateEntriesResolved))
 }
 
 type Events []gomatrixserverlib.PDU
