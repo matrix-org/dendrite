@@ -8,6 +8,7 @@ type RoomServerCaches interface {
 	RoomServerNIDsCache
 	RoomVersionCache
 	RoomServerEventsCache
+	RoomHierarchyCache
 	EventStateKeyCache
 	EventTypeCache
 }

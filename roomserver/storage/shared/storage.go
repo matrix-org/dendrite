@@ -491,14 +491,14 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	})
 }
 
-func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
+func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, membershipState tables.MembershipState, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, string(requestSenderID))
 		return err
 	})
 	if err != nil {
-		return 0, false, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
+		return 0, 0, false, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
 	}
 
 	senderMembershipEventNID, senderMembership, isRoomforgotten, err :=
@@ -507,12 +507,12 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 		)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
-		return 0, false, false, nil
+		return 0, 0, false, false, nil
 	} else if err != nil {
 		return
 	}
 
-	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, isRoomforgotten, nil
+	return senderMembershipEventNID, senderMembership, senderMembership == tables.MembershipStateJoin, isRoomforgotten, nil
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(
@@ -696,8 +696,8 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
 
-	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID())
-	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID())
+	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID().String())
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID().String())
 	// if we found both, the roomNID and version in our cache, no need to query the database
 	if nidOK && versionOK {
 		return &types.RoomInfo{
@@ -707,14 +707,14 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 	}
 
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion)
+		roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID().String(), roomVersion)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if roomVersion != "" {
-		d.Cache.StoreRoomVersion(event.RoomID(), roomVersion)
+		d.Cache.StoreRoomVersion(event.RoomID().String(), roomVersion)
 	}
 	return &types.RoomInfo{
 		RoomVersion: roomVersion,
@@ -1026,24 +1026,19 @@ func (d *EventDatabase) MaybeRedactEvent(
 		case validated || redactedEvent == nil || redactionEvent == nil:
 			// we've seen this redaction before or there is nothing to redact
 			return nil
-		case redactedEvent.RoomID() != redactionEvent.RoomID():
+		case redactedEvent.RoomID().String() != redactionEvent.RoomID().String():
 			// redactions across rooms aren't allowed
 			ignoreRedaction = true
 			return nil
 		}
 
-		var validRoomID *spec.RoomID
-		validRoomID, err = spec.NewRoomID(redactedEvent.RoomID())
-		if err != nil {
-			return err
-		}
 		sender1Domain := ""
-		sender1, err1 := querier.QueryUserIDForSender(ctx, *validRoomID, redactedEvent.SenderID())
+		sender1, err1 := querier.QueryUserIDForSender(ctx, redactedEvent.RoomID(), redactedEvent.SenderID())
 		if err1 == nil {
 			sender1Domain = string(sender1.Domain())
 		}
 		sender2Domain := ""
-		sender2, err2 := querier.QueryUserIDForSender(ctx, *validRoomID, redactionEvent.SenderID())
+		sender2, err2 := querier.QueryUserIDForSender(ctx, redactedEvent.RoomID(), redactionEvent.SenderID())
 		if err2 == nil {
 			sender2Domain = string(sender2.Domain())
 		}
@@ -1347,7 +1342,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 }
 
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
-func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
+func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID, membership string) ([]string, error) {
 	var membershipState tables.MembershipState
 	switch membership {
 	case "join":
@@ -1361,17 +1356,73 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 	default:
 		return nil, fmt.Errorf("GetRoomsByMembership: invalid membership %s", membership)
 	}
-	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+
+	// Convert provided user ID to NID
+	userNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
+		} else {
+			return nil, fmt.Errorf("SelectEventStateKeyNID: cannot map user ID to state key NIDs: %w", err)
 		}
-		return nil, fmt.Errorf("GetRoomsByMembership: cannot map user ID to state key NID: %w", err)
 	}
-	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, nil, stateKeyNID, membershipState)
+
+	// Use this NID to fetch all associated room keys (for pseudo ID rooms)
+	roomKeyMap, err := d.UserRoomKeyTable.SelectAllPublicKeysForUser(ctx, nil, userNID)
 	if err != nil {
-		return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectRoomsWithMembership: %w", err)
+		if err == sql.ErrNoRows {
+			roomKeyMap = map[types.RoomNID]ed25519.PublicKey{}
+		} else {
+			return nil, fmt.Errorf("SelectAllPublicKeysForUser: could not select user room public keys for user: %w", err)
+		}
 	}
+
+	var eventStateKeyNIDs []types.EventStateKeyNID
+
+	// If there are room keys (i.e. this user is in pseudo ID rooms), then gather the appropriate NIDs
+	if len(roomKeyMap) != 0 {
+		// Convert keys to string representation
+		userRoomKeys := make([]string, len(roomKeyMap))
+		i := 0
+		for _, key := range roomKeyMap {
+			userRoomKeys[i] = spec.Base64Bytes(key).Encode()
+			i += 1
+		}
+
+		// Convert the string representation to its NID
+		pseudoIDStateKeys, sqlErr := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, userRoomKeys)
+		if sqlErr != nil {
+			if sqlErr == sql.ErrNoRows {
+				pseudoIDStateKeys = map[string]types.EventStateKeyNID{}
+			} else {
+				return nil, fmt.Errorf("BulkSelectEventStateKeyNID: could not select state keys for public room keys: %w", err)
+			}
+		}
+
+		// Collect all NIDs together
+		eventStateKeyNIDs = make([]types.EventStateKeyNID, len(pseudoIDStateKeys)+1)
+		eventStateKeyNIDs[0] = userNID
+		i = 1
+		for _, nid := range pseudoIDStateKeys {
+			eventStateKeyNIDs[i] = nid
+			i += 1
+		}
+	} else {
+		// If there are no room keys (so no pseudo ID rooms), we only need to care about the user ID NID.
+		eventStateKeyNIDs = []types.EventStateKeyNID{userNID}
+	}
+
+	// Fetch rooms that match membership for each NID
+	roomNIDs := []types.RoomNID{}
+	for _, nid := range eventStateKeyNIDs {
+		var roomNIDsChunk []types.RoomNID
+		roomNIDsChunk, err = d.MembershipTable.SelectRoomsWithMembership(ctx, nil, nid, membershipState)
+		if err != nil {
+			return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectRoomsWithMembership: %w", err)
+		}
+		roomNIDs = append(roomNIDs, roomNIDsChunk...)
+	}
+
 	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, roomNIDs)
 	if err != nil {
 		return nil, fmt.Errorf("GetRoomsByMembership: failed to lookup room nids: %w", err)
@@ -1466,7 +1517,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		}
 		result[i] = tables.StrippedEvent{
 			EventType:    ev.Type(),
-			RoomID:       ev.RoomID(),
+			RoomID:       ev.RoomID().String(),
 			StateKey:     *ev.StateKey(),
 			ContentValue: tables.ExtractContentValue(&types.HeaderedEvent{PDU: ev}),
 		}

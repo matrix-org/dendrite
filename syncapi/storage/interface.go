@@ -81,8 +81,11 @@ type DatabaseTransaction interface {
 	// If no data is retrieved, returns an empty map
 	// If there was an issue with the retrieval, returns an error
 	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *synctypes.EventFilter) (map[string][]string, types.StreamPosition, error)
-	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit. If backwardsOrdering is true, the most recent event must be first, else last.
-	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *synctypes.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
+	// If backwardsOrdering is true, the most recent event must be first, else last.
+	// Returns the filtered StreamEvents on success. Returns **unfiltered** StreamEvents and ErrNoEventsForFilter if
+	// the provided filter removed all events, this can be used to still calculate the start/end position. (e.g for `/messages`)
+	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *synctypes.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, start, end types.TopologyToken, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
 	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
@@ -104,7 +107,7 @@ type DatabaseTransaction interface {
 	// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 	// string as the membership.
-	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
+	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error)
 	// getUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
 	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 	GetPresences(ctx context.Context, userID []string) ([]*types.PresenceInternal, error)

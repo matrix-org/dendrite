@@ -28,7 +28,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
 	mediaRouter *mux.Router,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,

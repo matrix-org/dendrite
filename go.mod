@@ -19,7 +19,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20231023121512-16e7431168be
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20231024124730-58af9a2712ca
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/nats-io/nats-server/v2 v2.9.23
@@ -115,12 +115,12 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	go.etcd.io/bbolt v1.3.6 // indirect
-	golang.org/x/mod v0.8.0 // indirect
+	go.etcd.io/bbolt v1.3.5 // indirect
+	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

@@ -99,7 +99,7 @@ func MakeJoin(
 		Roomserver: rsAPI,
 	}
 
-	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
+	senderIDPtr, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
 		return util.JSONResponse{
@@ -108,8 +108,11 @@ func MakeJoin(
 		}
 	}
 
-	if senderID == "" {
+	var senderID spec.SenderID
+	if senderIDPtr == nil {
 		senderID = spec.SenderID(userID.String())
+	} else {
+		senderID = *senderIDPtr
 	}
 
 	input := gomatrixserverlib.HandleMakeJoinInput{
@@ -187,9 +190,6 @@ func MakeJoin(
 }
 
 // SendJoin implements the /send_join API
-// The make-join send-join dance makes much more sense as a single
-// flow so the cyclomatic complexity is high:
-// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *fclient.FederationRequest,

@@ -133,7 +133,7 @@ type Database interface {
 	// in this room, along a boolean set to true if the user is still in this room,
 	// false if not.
 	// Returns an error if there was a problem talking to the database.
-	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
+	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, membershipNID tables.MembershipState, stillInRoom, isRoomForgotten bool, err error)
 	// Lookup the membership event numeric IDs for all user that are or have
 	// been members of a given room. Only lookup events of "join" membership if
 	// joinOnly is set to true.
@@ -158,7 +158,7 @@ type Database interface {
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
 	GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*types.HeaderedEvent, error)
 	// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
-	GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error)
+	GetRoomsByMembership(ctx context.Context, userID spec.UserID, membership string) ([]string, error)
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)

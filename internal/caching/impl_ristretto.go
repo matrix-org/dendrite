@@ -147,7 +147,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				MaxAge:  lesserOf(time.Hour/2, maxAge),
 			},
 		},
-		SpaceSummaryRooms: &RistrettoCachePartition[string, fclient.MSC2946SpacesResponse]{ // room ID -> space response
+		RoomHierarchies: &RistrettoCachePartition[string, fclient.RoomHierarchyResponse]{ // room ID -> space response
 			cache:   cache,
 			Prefix:  spaceSummaryRoomsCache,
 			Mutable: true,

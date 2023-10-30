@@ -43,6 +43,7 @@ func Setup(
 	cfg *config.SyncAPI,
 	lazyLoadCache caching.LazyLoadCache,
 	fts fulltext.Indexer,
+	rateLimits *httputil.RateLimits,
 ) {
 	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
@@ -53,6 +54,10 @@ func Setup(
 	}, httputil.WithAllowGuests())).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		// not specced, but ensure we're rate limiting requests to this endpoint
+		if r := rateLimits.Limit(req, device); r != nil {
+			return *r
+		}
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)

@@ -198,6 +198,8 @@ type UserRoomKeys interface {
 	// BulkSelectUserNIDs selects all userIDs for the requested senderKeys. Returns a map from publicKey -> types.UserRoomKeyPair.
 	// If a senderKey can't be found, it is omitted in the result.
 	BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error)
+	// SelectAllPublicKeysForUser returns all known public keys for a user. Returns a map from room NID -> public key
+	SelectAllPublicKeysForUser(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID) (map[types.RoomNID]ed25519.PublicKey, error)
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

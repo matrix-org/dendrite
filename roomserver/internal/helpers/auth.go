@@ -218,9 +218,9 @@ func loadAuthEvents(
 	roomID := ""
 	for _, ev := range result.events {
 		if roomID == "" {
-			roomID = ev.RoomID()
+			roomID = ev.RoomID().String()
 		}
-		if ev.RoomID() != roomID {
+		if ev.RoomID().String() != roomID {
 			result.valid = false
 			break
 		}

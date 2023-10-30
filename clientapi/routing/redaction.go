@@ -34,7 +34,8 @@ import (
 )
 
 type redactionContent struct {
-	Reason string `json:"reason"`
+	Reason  string `json:"reason"`
+	Redacts string `json:"redacts"`
 }
 
 type redactionResponse struct {
@@ -74,6 +75,16 @@ func SendRedaction(
 		return *resErr
 	}
 
+	// if user is member of room, and sender ID is nil, then this user doesn't have a pseudo ID for some reason,
+	// which is unexpected.
+	if senderID == nil {
+		util.GetLogger(req.Context()).WithField("userID", *deviceUserID).WithField("roomID", roomID).Error("missing sender ID for user, despite having membership")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID, req.URL); ok {
@@ -88,7 +99,7 @@ func SendRedaction(
 			JSON: spec.NotFound("unknown event ID"), // TODO: is it ok to leak existence?
 		}
 	}
-	if ev.RoomID() != roomID {
+	if ev.RoomID().String() != roomID {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: spec.NotFound("cannot redact event in another room"),
@@ -98,7 +109,7 @@ func SendRedaction(
 	// "Users may redact their own events, and any user with a power level greater than or equal
 	// to the redact power level of the room may redact events there"
 	// https://matrix.org/docs/spec/client_server/r0.6.1#put-matrix-client-r0-rooms-roomid-redact-eventid-txnid
-	allowedToRedact := ev.SenderID() == senderID
+	allowedToRedact := ev.SenderID() == *senderID
 	if !allowedToRedact {
 		plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
 			EventType: spec.MRoomPowerLevels,
@@ -119,7 +130,7 @@ func SendRedaction(
 				),
 			}
 		}
-		allowedToRedact = pl.UserLevel(senderID) >= pl.Redact
+		allowedToRedact = pl.UserLevel(*senderID) >= pl.Redact
 	}
 	if !allowedToRedact {
 		return util.JSONResponse{
@@ -136,11 +147,16 @@ func SendRedaction(
 
 	// create the new event and set all the fields we can
 	proto := gomatrixserverlib.ProtoEvent{
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   roomID,
 		Type:     spec.MRoomRedaction,
 		Redacts:  eventID,
 	}
+
+	// Room version 11 expects the "redacts" field on the
+	// content field, so add it here as well
+	r.Redacts = eventID
+
 	err = proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")

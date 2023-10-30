@@ -90,7 +90,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	} else {
 		senderID = spec.SenderID(userID.String())
 	}
-	createContent["creator"] = senderID
+
+	// TODO: Maybe, at some point, GMSL should return the events to create, so we can define the version
+	// entirely there.
+	switch createRequest.RoomVersion {
+	case gomatrixserverlib.RoomVersionV11:
+		// RoomVersionV11 removed the creator field from the create content: https://github.com/matrix-org/matrix-spec-proposals/pull/2175
+	default:
+		createContent["creator"] = senderID
+	}
+
 	createContent["room_version"] = createRequest.RoomVersion
 	powerLevelContent := eventutil.InitialPowerLevelsContent(string(senderID))
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
@@ -195,7 +204,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 		// sign all events with the pseudo ID key
 		identity = &fclient.SigningIdentity{
-			ServerName: "self",
+			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(pseudoIDKey)),
 			KeyID:      "ed25519:1",
 			PrivateKey: pseudoIDKey,
 		}
@@ -433,23 +442,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// from creating the room but still failing due to the alias having already
 	// been taken.
 	if roomAlias != "" {
-		aliasReq := api.SetRoomAliasRequest{
-			Alias:  roomAlias,
-			RoomID: roomID.String(),
-			UserID: userID.String(),
-		}
-
-		var aliasResp api.SetRoomAliasResponse
-		err = c.RSAPI.SetRoomAlias(ctx, &aliasReq, &aliasResp)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+		aliasAlreadyExists, aliasErr := c.RSAPI.SetRoomAlias(ctx, senderID, roomID, roomAlias)
+		if aliasErr != nil {
+			util.GetLogger(ctx).WithError(aliasErr).Error("aliasAPI.SetRoomAlias failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
 			}
 		}
 
-		if aliasResp.AliasExists {
+		if aliasAlreadyExists {
 			return "", &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.RoomInUse("Room alias already exists."),
@@ -489,7 +491,6 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 
 		// Process the invites.
-		var inviteEvent *types.HeaderedEvent
 		for _, invitee := range createRequest.InvitedUsers {
 			inviteeUserID, userIDErr := spec.NewUserID(invitee, true)
 			if userIDErr != nil {
@@ -499,54 +500,21 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 					JSON: spec.InternalServerError{},
 				}
 			}
-			inviteeSenderID, queryErr := c.RSAPI.QuerySenderIDForUser(ctx, roomID, *inviteeUserID)
-			if queryErr != nil {
-				util.GetLogger(ctx).WithError(queryErr).Error("rsapi.QuerySenderIDForUser failed")
-				return "", &util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-			inviteeString := string(inviteeSenderID)
-			proto := gomatrixserverlib.ProtoEvent{
-				SenderID: string(senderID),
-				RoomID:   roomID.String(),
-				Type:     "m.room.member",
-				StateKey: &inviteeString,
-			}
 
-			content := gomatrixserverlib.MemberContent{
-				Membership:  spec.Invite,
-				DisplayName: createRequest.UserDisplayName,
-				AvatarURL:   createRequest.UserAvatarURL,
-				Reason:      "",
-				IsDirect:    createRequest.IsDirect,
-			}
-
-			if err = proto.SetContent(content); err != nil {
-				return "", &util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-
-			// Build the invite event.
-			inviteEvent, err = eventutil.QueryAndBuildEvent(ctx, &proto, identity, createRequest.EventTime, c.RSAPI, nil)
-
-			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
-				continue
-			}
-			inviteStrippedState := append(
-				globalStrippedState,
-				gomatrixserverlib.NewInviteStrippedState(inviteEvent.PDU),
-			)
-			// Send the invite event to the roomserver.
-			event := inviteEvent
 			err = c.RSAPI.PerformInvite(ctx, &api.PerformInviteRequest{
-				Event:           event,
-				InviteRoomState: inviteStrippedState,
-				RoomVersion:     event.Version(),
+				InviteInput: api.InviteInput{
+					RoomID:      roomID,
+					Inviter:     userID,
+					Invitee:     *inviteeUserID,
+					DisplayName: createRequest.UserDisplayName,
+					AvatarURL:   createRequest.UserAvatarURL,
+					Reason:      "",
+					IsDirect:    createRequest.IsDirect,
+					KeyID:       createRequest.KeyID,
+					PrivateKey:  createRequest.PrivateKey,
+					EventTime:   createRequest.EventTime,
+				},
+				InviteRoomState: globalStrippedState,
 				SendAsServer:    string(userID.Domain()),
 			})
 			switch e := err.(type) {

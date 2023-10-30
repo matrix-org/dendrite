@@ -47,7 +47,7 @@ func AddPublicRoutes(
 	processContext *process.ProcessContext,
 	routers httputil.Routers,
 	dendriteCfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
@@ -164,10 +164,12 @@ func AddPublicRoutes(
 	if err = multiRoomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start multiroom consumer")
 	}
+	rateLimits := httputil.NewRateLimits(&dendriteCfg.ClientAPI.RateLimiting)
 
 	routing.Setup(
 		routers.Client, requestPool, syncDB, userAPI,
 		rsAPI, &dendriteCfg.SyncAPI, caches, fts,
+		rateLimits,
 	)
 
 	go func() {

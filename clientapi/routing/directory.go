@@ -181,13 +181,39 @@ func SetLocalAlias(
 		return *resErr
 	}
 
-	queryReq := roomserverAPI.SetRoomAliasRequest{
-		UserID: device.UserID,
-		RoomID: r.RoomID,
-		Alias:  alias,
+	roomID, err := spec.NewRoomID(r.RoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
+		}
 	}
-	var queryRes roomserverAPI.SetRoomAliasResponse
-	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
+
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *roomID, *userID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("QuerySenderIDForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	} else if senderID == nil {
+		util.GetLogger(req.Context()).WithField("roomID", *roomID).WithField("userID", *userID).Error("Sender ID not found")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	aliasAlreadyExists, err := rsAPI.SetRoomAlias(req.Context(), *senderID, *roomID, alias)
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -195,7 +221,7 @@ func SetLocalAlias(
 		}
 	}
 
-	if queryRes.AliasExists {
+	if aliasAlreadyExists {
 		return util.JSONResponse{
 			Code: http.StatusConflict,
 			JSON: spec.Unknown("The alias " + alias + " already exists."),
@@ -240,6 +266,31 @@ func RemoveLocalAlias(
 			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
+
+	// This seems like the kind of auth check that should be done in the roomserver, but
+	// if this check fails (user is not in the room), then there will be no SenderID for the user
+	// for pseudo-ID rooms - it will just return "". However, we can't use lack of a sender ID
+	// as meaning they are not in the room, since lacking a sender ID could be caused by other bugs.
+	// TODO: maybe have QuerySenderIDForUser return richer errors?
+	var queryResp roomserverAPI.QueryMembershipForUserResponse
+	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+		RoomID: validRoomID.String(),
+		UserID: *userID,
+	}, &queryResp)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.QueryMembershipForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+	if !queryResp.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You do not have permission to remove this alias."),
+		}
+	}
+
 	deviceSenderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *userID)
 	if err != nil {
 		return util.JSONResponse{
@@ -247,28 +298,31 @@ func RemoveLocalAlias(
 			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
-
-	queryReq := roomserverAPI.RemoveRoomAliasRequest{
-		Alias:    alias,
-		SenderID: deviceSenderID,
-	}
-	var queryRes roomserverAPI.RemoveRoomAliasResponse
-	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
+	// TODO: how to handle this case? missing user/room keys seem to be a whole new class of errors
+	if deviceSenderID == nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+			JSON: spec.Unknown("internal server error"),
 		}
 	}
 
-	if !queryRes.Found {
+	aliasFound, aliasRemoved, err := rsAPI.RemoveRoomAlias(req.Context(), *deviceSenderID, alias)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
+	if !aliasFound {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The alias does not exist."),
 		}
 	}
 
-	if !queryRes.Removed {
+	if !aliasRemoved {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You do not have permission to remove this alias."),
@@ -337,7 +391,7 @@ func SetVisibility(
 		}
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
-	if err != nil {
+	if err != nil || senderID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("failed to find senderID for this user"),
@@ -368,7 +422,7 @@ func SetVisibility(
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].PDU)
-	if power.UserLevel(senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
+	if power.UserLevel(*senderID) < power.EventLevel(spec.MRoomCanonicalAlias, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID doesn't have power level to change visibility"),

@@ -83,6 +83,7 @@ type Inputer struct {
 	ServerName          spec.ServerName
 	SigningIdentity     func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	FSAPI               fedapi.RoomserverFederationAPI
+	RSAPI               api.RoomserverInternalAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
 	InputRoomEventTopic string
@@ -357,7 +358,7 @@ func (r *Inputer) queueInputRoomEvents(
 	// For each event, marshal the input room event and then
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
-		roomID := e.Event.RoomID()
+		roomID := e.Event.RoomID().String()
 		subj := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
 		msg := &nats.Msg{
 			Subject: subj,
