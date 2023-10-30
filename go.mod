@@ -22,8 +22,8 @@ require (
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20231023121512-16e7431168be
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.17
-	github.com/nats-io/nats-server/v2 v2.9.19
-	github.com/nats-io/nats.go v1.27.0
+	github.com/nats-io/nats-server/v2 v2.9.23
+	github.com/nats-io/nats.go v1.28.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
@@ -38,12 +38,12 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.6
 	go.uber.org/atomic v1.10.0
-	golang.org/x/crypto v0.10.0
+	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
 	golang.org/x/image v0.5.0
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
 	golang.org/x/sync v0.2.0
-	golang.org/x/term v0.9.0
+	golang.org/x/term v0.13.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.4.0
@@ -95,7 +95,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.16.5 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -105,7 +105,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/nats-io/jwt/v2 v2.4.1 // indirect
+	github.com/nats-io/jwt/v2 v2.5.0 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -121,9 +121,9 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	golang.org/x/mod v0.8.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect

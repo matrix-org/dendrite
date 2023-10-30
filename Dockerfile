@@ -2,7 +2,7 @@
 # base installs required dependencies and runs go mod download to cache dependencies
 #
 ARG BUILDPLATFORM=${BUILDPLATFORM}
-FROM --platform=$BUILDPLATFORM docker.io/golang:1.20-alpine AS base
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.21-alpine AS base
 RUN apk --update --no-cache add bash build-base curl
 
 #
@@ -12,7 +12,6 @@ FROM --platform=$BUILDPLATFORM base AS build
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
-ARG FLAGS
 
 # Mount volumes using the -v flag instead of --mount to avoid requiring BuildKit which is not easily supported using cloudbuild.
 COPY . .
@@ -26,7 +25,7 @@ RUN USERARCH=`go env GOARCH`
 ENV GOARCH="$TARGETARCH"
 ENV GOOS="linux"
 RUN CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0")
-RUN go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
+RUN go build -v -trimpath -o /out/ ./cmd/...
 
 #
 # Builds the Dendrite image containing all required binaries
