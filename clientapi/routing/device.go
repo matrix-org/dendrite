@@ -161,12 +161,6 @@ func UpdateDeviceByID(
 			JSON: spec.Forbidden("device not owned by current user"),
 		}
 	}
-	if performRes.Forbidden {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("device not owned by current user"),
-		}
-	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -266,13 +260,13 @@ func DeleteDevices(
 	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
-	payload := devicesDeleteJSON{}
 
+	payload := devicesDeleteJSON{}
 	if resErr := httputil.UnmarshalJSONRequest(req, &payload); resErr != nil {
 		return *resErr
 	}
 
-	defer req.Body.Close() // nolint: errcheck
+	defer req.Body.Close() // nolint:errcheck
 
 	var res api.PerformDeviceDeletionResponse
 	if err := userAPI.PerformDeviceDeletion(ctx, &api.PerformDeviceDeletionRequest{

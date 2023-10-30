@@ -1,8 +1,8 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "dendrite.fullname" . -}}
 {{- $serverNameHost := .Values.dendrite_config.global.server_name -}}
-{{- $wellKnownServerHost := default $serverNameHost (regexFind "^[^:]+" .Values.dendrite_config.global.well_known_server_name) -}}
-{{- $wellKnownClientHost := default $serverNameHost (regexFind "^[^:]+" .Values.dendrite_config.global.well_known_client_name) -}}
+{{- $wellKnownServerHost := default $serverNameHost (regexFind "^(\\[.+\\])?[^:]*" .Values.dendrite_config.global.well_known_server_name) -}}
+{{- $wellKnownClientHost := default $serverNameHost (regexFind "//(\\[.+\\])?[^:/]*" .Values.dendrite_config.global.well_known_client_name | trimAll "/") -}}
 {{- $allHosts := list $serverNameHost $wellKnownServerHost $wellKnownClientHost | uniq -}}
 {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1

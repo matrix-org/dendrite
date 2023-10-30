@@ -1,5 +1,69 @@
 # Changelog
 
+## Dendrite 0.13.4 (2023-10-25)
+
+Upgrading to this version is **highly** recommended, as it fixes a long-standing bug in the state resolution
+algorithm.
+
+### Fixes:
+
+- The "device list updater" now de-duplicates the servers to fetch devices from on startup. (This also 
+  avoids spamming the logs when shutting down.)
+- A bug in the state resolution algorithm has been fixed. This bug could result in users "being reset"
+  out of rooms and other missing state events due to calculating the wrong state.
+- A bug when setting notifications from Element Android has been fixed by implementing MSC3987
+
+### Features
+
+- Updated dependencies
+  - Internal NATS Server has been updated from v2.9.19 to v2.9.23
+
+## Dendrite 0.13.3 (2023-09-28)
+
+### Fixes:
+
+- The `user_id` query parameter when authenticating is now used correctly (contributed by [tulir](https://github.com/tulir))
+- Invitations are now correctly pushed to devices
+- A bug which could result in the corruption of `m.direct` account data has been fixed 
+
+### Features
+
+- [Sliding Sync proxy](https://github.com/matrix-org/sliding-sync) can be configured in the `/.well-known/matrix/client` response
+- Room version 11 is now supported
+- Clients can request the `federation` `event_format` when creating filters
+- Many under the hood improvements for [MSC4014: Pseudonymous Identities](https://github.com/matrix-org/matrix-spec-proposals/blob/kegan/pseudo-ids/proposals/4014-pseudonymous-identities.md)
+
+### Other
+
+- Dendrite now requires Go 1.20 if building from source
+
+## Dendrite 0.13.2 (2023-08-23)
+
+### Fixes:
+
+- Migrations in SQLite are now prepared on the correct context (transaction or database)
+- The `InputRoomEvent` stream now has a maximum age of 24h, which should help with slow start up times of NATS JetStream (contributed by [neilalexander](https://github.com/neilalexander))
+- Event size checks are more in line with Synapse
+- Requests to `/messages` have been optimized, possibly reducing database round trips
+- Re-add the revision of Dendrite when building from source (Note: This only works if git is installed)
+- Getting local members to notify has been optimized, which should significantly reduce memory allocation and cache usage
+- When getting queried about user profiles, we now return HTTP404 if the user/profiles does not exist
+- Background federated joins should now be fixed and not timeout after a short time
+- Database connections are now correctly re-used
+- Restored the old behavior of the `/purgeRoom` admin endpoint (does not evacuate the room before purging)
+- Don't expose information about the system when trying to download files that don't exist
+
+### Features
+
+- Further improvements and fixes for [MSC4014: Pseudonymous Identities](https://github.com/matrix-org/matrix-spec-proposals/blob/kegan/pseudo-ids/proposals/4014-pseudonymous-identities.md)
+  - Lookup correct prev events in the sync API
+  - Populate `prev_sender` correctly in the sync API
+  - Event federation should work better
+- Added new `dendrite_up` Prometheus metric, containing the version of Dendrite
+- Space summaries ([MSC2946](https://github.com/matrix-org/matrix-spec-proposals/pull/2946)) have been moved from MSC to being natively supported
+- For easier issue investigation, logs for application services now contain the application service ID (contributed by [maxberger](https://github.com/maxberger))
+- The default room version to use when creating rooms can now be configured using `room_server.default_room_version`
+
 ## Dendrite 0.13.1 (2023-07-06)
 
 This releases fixes a long-standing "off-by-one" error which could result in state resets. Upgrading to this version is **highly** recommended.

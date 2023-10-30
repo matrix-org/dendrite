@@ -15,9 +15,11 @@
 package routing
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -52,6 +54,12 @@ func GetProfile(
 
 	profile, err := userAPI.QueryProfile(httpReq.Context(), userID)
 	if err != nil {
+		if errors.Is(err, appserviceAPI.ErrProfileNotExists) {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.NotFound("The user does not exist or does not have a profile."),
+			}
+		}
 		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

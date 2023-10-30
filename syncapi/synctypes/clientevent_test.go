@@ -91,21 +91,21 @@ func verifyEventFields(t *testing.T, got EventFieldsToVerify, want EventFieldsTo
 
 func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-		 "state_key": "",
-		 "event_id": "$test:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "@test:localhost",
-		 "content": {
-			 "name": "Hello World"
-		 },
-		 "origin_server_ts": 123456,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World"
-			 }
-		 }
-	 }`), false)
+		"type": "m.room.name",
+		"state_key": "",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "@test:localhost",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		}
+	}`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
@@ -156,21 +156,21 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 
 func TestToClientFormatSync(t *testing.T) {
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV1).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-		 "state_key": "",
-		 "event_id": "$test:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "@test:localhost",
-		 "content": {
-			 "name": "Hello World"
-		 },
-		 "origin_server_ts": 123456,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World"
-			 }
-		 }
-	 }`), false)
+		"type": "m.room.name",
+		"state_key": "",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "@test:localhost",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		}
+	}`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
@@ -187,30 +187,30 @@ func TestToClientFormatSync(t *testing.T) {
 
 func TestToClientEventFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-		 "state_key": "",
-		 "event_id": "$test:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "@test:localhost",
-		 "content": {
-			 "name": "Hello World"
-		 },
-		 "origin_server_ts": 123456,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World"
-			 }
-		 },
-				 "depth": 8,
-				 "prev_events": [
-					 "$f597Tp0Mm1PPxEgiprzJc2cZAjVhxCxACOGuwJb33Oo"
-				 ],
-				 "auth_events": [
-					 "$Bj0ZGgX6VTqAQdqKH4ZG3l6rlbxY3rZlC5D3MeuK1OQ",
-					 "$QsMs6A1PUVUhgSvmHBfpqEYJPgv4DXt96r8P2AK7iXQ",
-					 "$tBteKtlnFiwlmPJsv0wkKTMEuUVWpQH89H7Xskxve1Q"
-				 ]
-	 }`), false)
+		"type": "m.room.name",
+		"state_key": "",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "@test:localhost",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		},
+        "depth": 8,
+        "prev_events": [
+          "$f597Tp0Mm1PPxEgiprzJc2cZAjVhxCxACOGuwJb33Oo"
+        ],
+        "auth_events": [
+          "$Bj0ZGgX6VTqAQdqKH4ZG3l6rlbxY3rZlC5D3MeuK1OQ",
+          "$QsMs6A1PUVUhgSvmHBfpqEYJPgv4DXt96r8P2AK7iXQ",
+          "$tBteKtlnFiwlmPJsv0wkKTMEuUVWpQH89H7Xskxve1Q"
+        ]
+	}`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
@@ -262,59 +262,59 @@ func userIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, 
 
 func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-				 "state_key": "testSenderID",
-		 "event_id": "$test:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "testSenderID",
-		 "content": {
-			 "name": "Hello World"
-		 },
-		 "origin_server_ts": 123456,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World"
-			 }
-		 },
-				 "depth": 8,
-				 "prev_events": [
-					 "$f597Tp0Mm1PPxEgiprzJc2cZAjVhxCxACOGuwJb33Oo"
-				 ],
-				 "auth_events": [
-					 "$Bj0ZGgX6VTqAQdqKH4ZG3l6rlbxY3rZlC5D3MeuK1OQ",
-					 "$QsMs6A1PUVUhgSvmHBfpqEYJPgv4DXt96r8P2AK7iXQ",
-					 "$tBteKtlnFiwlmPJsv0wkKTMEuUVWpQH89H7Xskxve1Q"
-				 ]
-	 }`), false)
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		},
+        "depth": 8,
+        "prev_events": [
+          "$f597Tp0Mm1PPxEgiprzJc2cZAjVhxCxACOGuwJb33Oo"
+        ],
+        "auth_events": [
+          "$Bj0ZGgX6VTqAQdqKH4ZG3l6rlbxY3rZlC5D3MeuK1OQ",
+          "$QsMs6A1PUVUhgSvmHBfpqEYJPgv4DXt96r8P2AK7iXQ",
+          "$tBteKtlnFiwlmPJsv0wkKTMEuUVWpQH89H7Xskxve1Q"
+        ]
+	}`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
 	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-				 "state_key": "testSenderID",
-		 "event_id": "$test2:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "testSenderID",
-		 "content": {
-			 "name": "Hello World 2"
-		 },
-		 "origin_server_ts": 1234567,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World 2"
-			 },
-						 "prev_sender": "testSenderID"
-		 },
-				 "depth": 9,
-				 "prev_events": [
-					 "$f597Tp0Mm1PPxEgiprzJc2cZAjVhxCxACOGuwJb33Oo"
-				 ],
-				 "auth_events": [
-					 "$Bj0ZGgX6VTqAQdqKH4ZG3l6rlbxY3rZlC5D3MeuK1OQ",
-					 "$QsMs6A1PUVUhgSvmHBfpqEYJPgv4DXt96r8P2AK7iXQ",
-					 "$tBteKtlnFiwlmPJsv0wkKTMEuUVWpQH89H7Xskxve1Q"
-				 ]
-		 }`), false)
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test2:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World 2"
+		},
+		"origin_server_ts": 1234567,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World 2"
+			},
+            "prev_sender": "testSenderID"
+		},
+        "depth": 9,
+        "prev_events": [
+          "$f597Tp0Mm1PPxEgiprzJc2cZAjVhxCxACOGuwJb33Oo"
+        ],
+        "auth_events": [
+          "$Bj0ZGgX6VTqAQdqKH4ZG3l6rlbxY3rZlC5D3MeuK1OQ",
+          "$QsMs6A1PUVUhgSvmHBfpqEYJPgv4DXt96r8P2AK7iXQ",
+          "$tBteKtlnFiwlmPJsv0wkKTMEuUVWpQH89H7Xskxve1Q"
+        ]
+    }`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
@@ -378,42 +378,42 @@ func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 
 func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-				 "state_key": "testSenderID",
-		 "event_id": "$test:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "testSenderID",
-		 "content": {
-			 "name": "Hello World"
-		 },
-		 "origin_server_ts": 123456,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World"
-			 }
-		 }
-		 }`), false)
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		}
+    }`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
 	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-				 "state_key": "testSenderID",
-		 "event_id": "$test2:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "testSenderID",
-		 "content": {
-			 "name": "Hello World 2"
-		 },
-		 "origin_server_ts": 1234567,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World 2"
-			 },
-						 "prev_sender": "testSenderID"
-		 },
-				 "depth": 9	
-		 }`), false)
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test2:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World 2"
+		},
+		"origin_server_ts": 1234567,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World 2"
+			},
+            "prev_sender": "testSenderID"
+		},
+        "depth": 9	
+    }`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
@@ -470,42 +470,42 @@ func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
 
 func TestToClientEventsFormatSyncUnknownPrevSender(t *testing.T) { // nolint: gocyclo
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-				 "state_key": "testSenderID",
-		 "event_id": "$test:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "testSenderID",
-		 "content": {
-			 "name": "Hello World"
-		 },
-		 "origin_server_ts": 123456,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World"
-			 }
-		 }
-		 }`), false)
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World"
+		},
+		"origin_server_ts": 123456,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World"
+			}
+		}
+    }`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
 	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
-		 "type": "m.room.name",
-				 "state_key": "testSenderID",
-		 "event_id": "$test2:localhost",
-		 "room_id": "!test:localhost",
-		 "sender": "testSenderID",
-		 "content": {
-			 "name": "Hello World 2"
-		 },
-		 "origin_server_ts": 1234567,
-		 "unsigned": {
-			 "prev_content": {
-				 "name": "Goodbye World 2"
-			 },
-						 "prev_sender": "unknownSenderID"
-		 },
-				 "depth": 9	
-		 }`), false)
+		"type": "m.room.name",
+        "state_key": "testSenderID",
+		"event_id": "$test2:localhost",
+		"room_id": "!test:localhost",
+		"sender": "testSenderID",
+		"content": {
+			"name": "Hello World 2"
+		},
+		"origin_server_ts": 1234567,
+		"unsigned": {
+			"prev_content": {
+				"name": "Goodbye World 2"
+			},
+            "prev_sender": "unknownSenderID"
+		},
+        "depth": 9	
+    }`), false)
 	if err != nil {
 		t.Fatalf("failed to create Event: %s", err)
 	}
