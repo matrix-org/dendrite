@@ -233,6 +233,7 @@ func main() {
 	}
 
 	fmt.Println("Resolving state")
+	stateResStart := time.Now()
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -250,7 +251,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Resolved state contains", len(resolved), "events")
+	fmt.Printf("Resolved state contains %d events (resolution took %s)\n", len(resolved), time.Since(stateResStart))
 	sort.Sort(resolved)
 	filteringEventType := *filterType
 	count := 0
@@ -288,10 +289,12 @@ func main() {
 		stateEntriesResolved[i] = eventNIDMap[eventNID]
 	}
 
+	var succeeded bool
 	roomUpdater, err := roomserverDB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
 		panic(err)
 	}
+	defer sqlutil.EndTransactionWithCheck(roomUpdater, &succeeded, &err)
 
 	latestEvents := make([]types.StateAtEventAndReference, 0, len(roomUpdater.LatestEvents()))
 	for _, event := range roomUpdater.LatestEvents() {
@@ -305,25 +308,29 @@ func main() {
 		})
 	}
 
-	lastEventSent, err := roomserverDB.EventsFromIDs(ctx, roomInfo, []string{roomUpdater.LastEventIDSent()})
+	var lastEventSent []types.Event
+	lastEventSent, err = roomUpdater.EventsFromIDs(ctx, roomInfo, []string{roomUpdater.LastEventIDSent()})
 	if err != nil {
-		panic(err)
+		fmt.Printf("Error: %s", err)
+		return
 	}
 	if len(lastEventSent) != 1 {
-		panic("expected to get one event from the database but didn't")
+		fmt.Printf("Error: expected to get one event from the database but didn't, got %d", len(lastEventSent))
+		return
 	}
 
-	newSnapshotNID, err := roomserverDB.AddState(ctx, roomInfo.RoomNID, nil, stateEntriesResolved)
+	var newSnapshotNID types.StateSnapshotNID
+	newSnapshotNID, err = roomUpdater.AddState(ctx, roomInfo.RoomNID, nil, stateEntriesResolved)
 	if err != nil {
-		panic(err)
+		fmt.Printf("Error: %s", err)
+		return
 	}
 
 	if err = roomUpdater.SetLatestEvents(roomInfo.RoomNID, latestEvents, lastEventSent[0].EventNID, newSnapshotNID); err != nil {
-		panic(err)
+		fmt.Printf("Error: %s", err)
+		return
 	}
-	if err = roomUpdater.Commit(); err != nil {
-		panic(err)
-	}
+	succeeded = true
 
 	fmt.Printf("Successfully set new snapshot NID %d containing %d state events", newSnapshotNID, len(stateEntriesResolved))
 }
