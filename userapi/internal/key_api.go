@@ -17,9 +17,11 @@ package internal
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -849,6 +851,41 @@ func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.P
 		logrus.Infof("Uploading one-time pseudoIDs: result count: %v", *counts)
 		res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
 	}
+}
+
+type Ed25519Key struct {
+	Key spec.Base64Bytes `json:"key"`
+}
+
+func (a *UserInternalAPI) ClaimOneTimePseudoID(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+	pseudoIDs, err := a.KeyDatabase.ClaimOneTimePseudoID(ctx, userID, "ed25519")
+	if err != nil {
+		return "", err
+	}
+
+	logrus.Infof("Claimed one time pseuodID: %v", pseudoIDs)
+
+	if pseudoIDs != nil {
+		for key, value := range pseudoIDs.KeyJSON {
+			keyParts := strings.Split(key, ":")
+			if keyParts[0] == "ed25519" {
+				var key_bytes Ed25519Key
+				err := json.Unmarshal(value, &key_bytes)
+				if err != nil {
+					return "", err
+				}
+
+				length := len(key_bytes.Key)
+				if length != ed25519.PublicKeySize {
+					return "", fmt.Errorf("Invalid ed25519 public key, %d is the wrong size", length)
+				}
+				// TODO: cryptoIDs - store senderID for this user here?
+				return spec.SenderID(key_bytes.Key.Encode()), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed claiming a valid one time pseudoID for this user: %s", userID.String())
 }
 
 func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage, onlyUpdateDisplayName bool) error {

@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -279,6 +280,7 @@ func SendInvite(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	body, evTime, reqErr := extractRequestData(req)
 	if reqErr != nil {
@@ -323,7 +325,7 @@ func SendInvite(
 	}
 
 	// We already received the return value, so no need to check for an error here.
-	response, _ := sendInvite(req.Context(), profileAPI, device, roomID, body.UserID, body.Reason, cfg, rsAPI, asAPI, evTime)
+	response, _ := sendInvite(req.Context(), profileAPI, device, roomID, body.UserID, body.Reason, cfg, rsAPI, asAPI, evTime, cryptoIDs)
 	return response
 }
 
@@ -336,6 +338,7 @@ func sendInvite(
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI, evTime time.Time,
+	cryptoIDs bool,
 ) (util.JSONResponse, error) {
 	validRoomID, err := spec.NewRoomID(roomID)
 	if err != nil {
@@ -372,7 +375,7 @@ func sendInvite(
 			JSON: spec.InternalServerError{},
 		}, err
 	}
-	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
+	inviteEvent, err := rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
 		InviteInput: roomserverAPI.InviteInput{
 			RoomID:      *validRoomID,
 			Inviter:     *inviter,
@@ -387,7 +390,7 @@ func sendInvite(
 		},
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
 		SendAsServer:    string(device.UserDomain()),
-	})
+	}, cryptoIDs)
 
 	switch e := err.(type) {
 	case roomserverAPI.ErrInvalidID:
@@ -410,10 +413,22 @@ func sendInvite(
 		}, err
 	}
 
-	return util.JSONResponse{
+	response := util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
-	}, nil
+	}
+
+	type inviteCryptoIDResponse struct {
+		PDU json.RawMessage `json:"pdu"`
+	}
+
+	if inviteEvent != nil {
+		response.JSON = inviteCryptoIDResponse{
+			PDU: json.RawMessage(inviteEvent.JSON()),
+		}
+	}
+
+	return response, nil
 }
 
 func buildMembershipEventDirect(

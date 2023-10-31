@@ -918,7 +918,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				}
 			}
 
-			err = c.RSAPI.PerformInvite(ctx, &api.PerformInviteRequest{
+			_, err = c.RSAPI.PerformInvite(ctx, &api.PerformInviteRequest{
 				InviteInput: api.InviteInput{
 					RoomID:      roomID,
 					Inviter:     userID,
@@ -933,7 +933,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				},
 				InviteRoomState: globalStrippedState,
 				SendAsServer:    string(userID.Domain()),
-			})
+			}, false)
 			switch e := err.(type) {
 			case api.ErrInvalidID:
 				return "", &util.JSONResponse{

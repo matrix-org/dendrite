@@ -962,6 +962,24 @@ func (d *KeyDatabase) OneTimePseudoIDsCount(ctx context.Context, userID string) 
 	return d.OneTimePseudoIDsTable.CountOneTimePseudoIDs(ctx, userID)
 }
 
+func (d *KeyDatabase) ClaimOneTimePseudoID(ctx context.Context, userID spec.UserID, algorithm string) (*api.OneTimePseudoIDs, error) {
+	var result *api.OneTimePseudoIDs
+	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		keyJSON, err := d.OneTimePseudoIDsTable.SelectAndDeleteOneTimePseudoID(ctx, txn, userID.String(), algorithm)
+		if err != nil {
+			return err
+		}
+		if keyJSON != nil {
+			result = &api.OneTimePseudoIDs{
+				UserID:  userID.String(),
+				KeyJSON: keyJSON,
+			}
+		}
+		return nil
+	})
+	return result, err
+}
+
 func (d *KeyDatabase) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
 	return d.DeviceKeysTable.SelectDeviceKeysJSON(ctx, keys)
 }

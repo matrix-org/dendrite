@@ -480,7 +480,6 @@ func Setup(
 			return SendBan(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/invite",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req, device); r != nil {
@@ -490,7 +489,20 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
+			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, false)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/invite",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/invite")
+			if r := rateLimits.Limit(req, device); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, true)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	// TODO: update for cryptoIDs

@@ -125,16 +125,17 @@ func (r *Inviter) ProcessInviteMembership(
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-) error {
+	cryptoIDs bool,
+) (gomatrixserverlib.PDU, error) {
 	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.InviteInput.RoomID, req.InviteInput.Inviter)
 	if err != nil {
-		return err
+		return nil, err
 	} else if senderID == nil {
-		return fmt.Errorf("sender ID not found for %s in %s", req.InviteInput.Inviter, req.InviteInput.RoomID)
+		return nil, fmt.Errorf("sender ID not found for %s in %s", req.InviteInput.Inviter, req.InviteInput.RoomID)
 	}
 	info, err := r.DB.RoomInfo(ctx, req.InviteInput.RoomID.String())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	proto := gomatrixserverlib.ProtoEvent{
@@ -152,11 +153,11 @@ func (r *Inviter) PerformInvite(
 	}
 
 	if err = proto.SetContent(content); err != nil {
-		return err
+		return nil, err
 	}
 
 	if !r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Inviter.Domain()) {
-		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
+		return nil, api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
 	}
 
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Invitee.Domain())
@@ -165,7 +166,7 @@ func (r *Inviter) PerformInvite(
 	if info.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
 		signingKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, req.InviteInput.Inviter, req.InviteInput.RoomID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -222,6 +223,10 @@ func (r *Inviter) PerformInvite(
 			}
 			return r.RSAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
 		},
+		CryptoIDs: cryptoIDs,
+		ClaimSenderID: func(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+			return r.RSAPI.ClaimOneTimeSenderIDForUser(ctx, roomID, userID)
+		},
 	}
 
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
@@ -229,33 +234,38 @@ func (r *Inviter) PerformInvite(
 		switch e := err.(type) {
 		case spec.MatrixError:
 			if e.ErrCode == spec.ErrorForbidden {
-				return api.ErrNotAllowed{Err: fmt.Errorf("%s", e.Err)}
+				return nil, api.ErrNotAllowed{Err: fmt.Errorf("%s", e.Err)}
 			}
 		}
-		return err
+		return nil, err
 	}
 
-	// Send the invite event to the roomserver input stream. This will
-	// notify existing users in the room about the invite, update the
-	// membership table and ensure that the event is ready and available
-	// to use as an auth event when accepting the invite.
-	// It will NOT notify the invitee of this invite.
-	inputReq := &api.InputRoomEventsRequest{
-		InputRoomEvents: []api.InputRoomEvent{
-			{
-				Kind:         api.KindNew,
-				Event:        &types.HeaderedEvent{PDU: inviteEvent},
-				Origin:       req.InviteInput.Inviter.Domain(),
-				SendAsServer: req.SendAsServer,
+	var response gomatrixserverlib.PDU
+	if !cryptoIDs {
+		// Send the invite event to the roomserver input stream. This will
+		// notify existing users in the room about the invite, update the
+		// membership table and ensure that the event is ready and available
+		// to use as an auth event when accepting the invite.
+		// It will NOT notify the invitee of this invite.
+		inputReq := &api.InputRoomEventsRequest{
+			InputRoomEvents: []api.InputRoomEvent{
+				{
+					Kind:         api.KindNew,
+					Event:        &types.HeaderedEvent{PDU: inviteEvent},
+					Origin:       req.InviteInput.Inviter.Domain(),
+					SendAsServer: req.SendAsServer,
+				},
 			},
-		},
-	}
-	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
-	if err := inputRes.Err(); err != nil {
-		util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
-		return api.ErrNotAllowed{Err: err}
+		}
+		inputRes := &api.InputRoomEventsResponse{}
+		r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+		if err := inputRes.Err(); err != nil {
+			util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
+			return nil, api.ErrNotAllowed{Err: err}
+		}
+	} else {
+		response = inviteEvent
 	}
 
-	return nil
+	return response, nil
 }

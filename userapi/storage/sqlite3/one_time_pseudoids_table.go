@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/sirupsen/logrus"
 )
 
 var oneTimePseudoIDsSchema = `
@@ -183,6 +184,7 @@ func (s *oneTimePseudoIDsStatements) SelectAndDeleteOneTimePseudoID(
 	err := sqlutil.TxStmtContext(ctx, txn, s.selectPseudoIDByAlgorithmStmt).QueryRowContext(ctx, userID, algorithm).Scan(&keyID, &keyJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			logrus.Warnf("No rows found for one time pseudoIDs")
 			return nil, nil
 		}
 		return nil, err
@@ -192,6 +194,7 @@ func (s *oneTimePseudoIDsStatements) SelectAndDeleteOneTimePseudoID(
 		return nil, err
 	}
 	if keyJSON == "" {
+		logrus.Warnf("Empty key JSON for one time pseudoIDs")
 		return nil, nil
 	}
 	return map[string]json.RawMessage{

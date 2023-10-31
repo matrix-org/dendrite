@@ -54,6 +54,7 @@ type RoomserverInternalAPI struct {
 	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.RoomserverFederationAPI
 	asAPI                  asAPI.AppServiceInternalAPI
+	usAPI                  userapi.RoomserverUserAPI
 	NATSClient             *nats.Conn
 	JetStream              nats.JetStreamContext
 	Durable                string
@@ -214,6 +215,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	r.Leaver.UserAPI = userAPI
 	r.Inputer.UserAPI = userAPI
+	r.usAPI = userAPI
 }
 
 func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
@@ -251,8 +253,9 @@ func (r *RoomserverInternalAPI) PerformCreateRoom(
 func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
-) error {
-	return r.Inviter.PerformInvite(ctx, req)
+	cryptoIDs bool,
+) (gomatrixserverlib.PDU, error) {
+	return r.Inviter.PerformInvite(ctx, req, cryptoIDs)
 }
 
 func (r *RoomserverInternalAPI) PerformLeave(
@@ -306,6 +309,10 @@ func (r *RoomserverInternalAPI) StoreUserRoomPublicKey(ctx context.Context, send
 	}
 	_, err = r.DB.InsertUserRoomPublicKey(ctx, userID, roomID, ed25519.PublicKey(pubKeyBytes))
 	return err
+}
+
+func (r *RoomserverInternalAPI) ClaimOneTimeSenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+	return r.usAPI.ClaimOneTimePseudoID(ctx, roomID, userID)
 }
 
 func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error) {
