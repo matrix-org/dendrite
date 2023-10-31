@@ -325,7 +325,7 @@ user_api:
   auto_join_rooms:
   #  - "#main:matrix.org"
 
-  # The number of device list updater workers to start. Defaults to 8.
+  # The number of workers to start for the DeviceListUpdater. Defaults to 8.
   # This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
   # worker_count: 8
 

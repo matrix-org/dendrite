@@ -22,8 +22,8 @@ type UserAPI struct {
 	// be joined to the rooms listed under this option.
 	AutoJoinRooms []string `yaml:"auto_join_rooms"`
 
-	// The number of workers to start for the DeviceListUpdater.
-	// Setting this too low may result in the "InputDeviceListUpdate" growing forever.
+	// The number of workers to start for the DeviceListUpdater. Defaults to 8.
+	// This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
 	WorkerCount int `yaml:"worker_count"`
 }
 
