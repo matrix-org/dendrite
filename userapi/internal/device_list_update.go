@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -142,13 +143,27 @@ type KeyChangeProducer interface {
 	ProduceKeyChanges(keys []api.DeviceMessage) error
 }
 
+var deviceListUpdaterBackpressure = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "keyserver",
+		Name:      "worker_backpressure",
+		Help:      "How many device list updater requests are queued",
+	},
+	[]string{"worker_id"},
+)
+
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
 	rsAPI rsapi.KeyserverRoomserverAPI, thisServer spec.ServerName,
+	enableMetrics bool,
 ) *DeviceListUpdater {
+	if enableMetrics {
+		prometheus.MustRegister(deviceListUpdaterBackpressure)
+	}
 	return &DeviceListUpdater{
 		process:        process,
 		userIDToMutex:  make(map[string]*sync.Mutex),
@@ -343,6 +358,8 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	index := int(int64(hash.Sum32()) % int64(len(u.workerChans)))
 
 	ch := u.assignChannel(userID)
+	deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(index)}).Inc()
+	defer deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(index)}).Dec()
 	u.workerChans[index] <- remoteServer
 	select {
 	case <-ch:

@@ -54,6 +54,7 @@ var streams = []*nats.StreamConfig{
 		Name:      InputDeviceListUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
+		MaxAge:    time.Hour * 24,
 	},
 	{
 		Name:      InputSigningKeyUpdate,
