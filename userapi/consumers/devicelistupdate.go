@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -82,7 +83,10 @@ func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		return true
 	}
 
-	err := t.updater.Update(ctx, m)
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
+	err := t.updater.Update(timeoutCtx, m)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"user_id":   m.UserID,

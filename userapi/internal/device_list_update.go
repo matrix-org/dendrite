@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -142,13 +143,36 @@ type KeyChangeProducer interface {
 	ProduceKeyChanges(keys []api.DeviceMessage) error
 }
 
+var deviceListUpdaterBackpressure = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "keyserver",
+		Name:      "worker_backpressure",
+		Help:      "How many device list updater requests are queued",
+	},
+	[]string{"worker_id"},
+)
+var deviceListUpdaterServersRetrying = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "keyserver",
+		Name:      "worker_servers_retrying",
+		Help:      "How many servers are queued for retry",
+	},
+	[]string{"worker_id"},
+)
+
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
 	rsAPI rsapi.KeyserverRoomserverAPI, thisServer spec.ServerName,
+	enableMetrics bool,
 ) *DeviceListUpdater {
+	if enableMetrics {
+		prometheus.MustRegister(deviceListUpdaterBackpressure, deviceListUpdaterServersRetrying)
+	}
 	return &DeviceListUpdater{
 		process:        process,
 		userIDToMutex:  make(map[string]*sync.Mutex),
@@ -173,7 +197,7 @@ func (u *DeviceListUpdater) Start() error {
 		// to stop (in this transaction) until key requests can be made.
 		ch := make(chan spec.ServerName, 10)
 		u.workerChans[i] = ch
-		go u.worker(ch)
+		go u.worker(ch, i)
 	}
 
 	staleLists, err := u.db.StaleDeviceLists(u.process.Context(), []spec.ServerName{})
@@ -343,6 +367,8 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	index := int(int64(hash.Sum32()) % int64(len(u.workerChans)))
 
 	ch := u.assignChannel(userID)
+	deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(index)}).Inc()
+	defer deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(index)}).Dec()
 	u.workerChans[index] <- remoteServer
 	select {
 	case <-ch:
@@ -372,7 +398,7 @@ func (u *DeviceListUpdater) clearChannel(userID string) {
 	}
 }
 
-func (u *DeviceListUpdater) worker(ch chan spec.ServerName) {
+func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 	retries := make(map[spec.ServerName]time.Time)
 	retriesMu := &sync.Mutex{}
 	// restarter goroutine which will inject failed servers into ch when it is time
@@ -391,9 +417,12 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName) {
 			for _, srv := range serversToRetry {
 				delete(retries, srv)
 			}
+			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
 			retriesMu.Unlock()
 			for _, srv := range serversToRetry {
+				deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Inc()
 				ch <- srv
+				deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
 			}
 		}
 	}()
