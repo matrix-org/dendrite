@@ -21,6 +21,10 @@ type UserAPI struct {
 	// Users who register on this homeserver will automatically
 	// be joined to the rooms listed under this option.
 	AutoJoinRooms []string `yaml:"auto_join_rooms"`
+
+	// The number of workers to start for the DeviceListUpdater.
+	// Setting this too low may result in the "InputDeviceListUpdate" growing forever.
+	WorkerCount int `yaml:"worker_count"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
@@ -28,6 +32,7 @@ const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
 func (c *UserAPI) Defaults(opts DefaultOpts) {
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
+	c.WorkerCount = 8
 	if opts.Generate {
 		if !opts.SingleDatabase {
 			c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"

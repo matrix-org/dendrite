@@ -100,7 +100,7 @@ func NewInternalAPI(
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(processContext, keyDB, userAPI, keyChangeProducer, fedClient, 8, rsAPI, dendriteCfg.Global.ServerName, enableMetrics) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(processContext, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err := updater.CleanUp(); err != nil {
