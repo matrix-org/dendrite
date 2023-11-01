@@ -37,7 +37,7 @@ import (
 func GetEvent(
 	req *http.Request,
 	device *userapi.Device,
-	roomID string,
+	rawRoomID string,
 	eventID string,
 	cfg *config.SyncAPI,
 	syncDB storage.Database,
@@ -47,13 +47,21 @@ func GetEvent(
 	db, err := syncDB.NewDatabaseTransaction(ctx)
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id": eventID,
-		"room_id":  roomID,
+		"room_id":  rawRoomID,
 	})
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
+		}
+	}
+
+	roomID, err := spec.NewRoomID(rawRoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
 		}
 	}
 
@@ -76,13 +84,22 @@ func GetEvent(
 	}
 
 	// If the request is coming from an appservice, get the user from the request
-	userID := device.UserID
+	rawUserID := device.UserID
 	if asUserID := req.FormValue("user_id"); device.AppserviceID != "" && asUserID != "" {
-		userID = asUserID
+		rawUserID = asUserID
+	}
+
+	userID, err := spec.NewUserID(rawUserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("invalid device.UserID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
 	}
 
 	// Apply history visibility to determine if the user is allowed to view the event
-	events, err = internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, events, nil, userID, "event")
+	events, err = internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, events, nil, *userID, "event")
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: internal.ApplyHistoryVisibilityFilter failed")
 		return util.JSONResponse{
@@ -101,36 +118,19 @@ func GetEvent(
 		}
 	}
 
-	sender := spec.UserID{}
-	validRoomID, err := spec.NewRoomID(roomID)
+	clientEvent, err := synctypes.ToClientEvent(events[0], synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
 	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("roomID is invalid"),
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
 		}
-	}
-	senderUserID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, events[0].SenderID())
-	if err == nil && senderUserID != nil {
-		sender = *senderUserID
 	}
 
-	sk := events[0].StateKey()
-	if sk != nil && *sk != "" {
-		evRoomID, err := spec.NewRoomID(events[0].RoomID())
-		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: spec.BadJSON("roomID is invalid"),
-			}
-		}
-		skUserID, err := rsAPI.QueryUserIDForSender(ctx, *evRoomID, spec.SenderID(*events[0].StateKey()))
-		if err == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: synctypes.ToClientEvent(events[0], synctypes.FormatAll, sender, sk),
+		JSON: *clientEvent,
 	}
 }

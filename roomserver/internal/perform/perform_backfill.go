@@ -301,7 +301,7 @@ func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent
 		return ids, nil
 	}
 	if len(targetEvent.PrevEventIDs()) == 0 && targetEvent.Type() == "m.room.create" && targetEvent.StateKeyEquals("") {
-		util.GetLogger(ctx).WithField("room_id", targetEvent.RoomID()).Info("Backfilled to the beginning of the room")
+		util.GetLogger(ctx).WithField("room_id", targetEvent.RoomID().String()).Info("Backfilled to the beginning of the room")
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = []string{}
 		return nil, nil
 	}
@@ -494,11 +494,7 @@ FindSuccessor:
 	// Store the server names in a temporary map to avoid duplicates.
 	serverSet := make(map[spec.ServerName]bool)
 	for _, event := range memberEvents {
-		validRoomID, err := spec.NewRoomID(event.RoomID())
-		if err != nil {
-			continue
-		}
-		if sender, err := b.querier.QueryUserIDForSender(ctx, *validRoomID, event.SenderID()); err == nil {
+		if sender, err := b.querier.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID()); err == nil {
 			serverSet[sender.Domain()] = true
 		}
 	}

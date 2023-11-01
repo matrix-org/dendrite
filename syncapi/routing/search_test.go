@@ -238,7 +238,7 @@ func TestSearch(t *testing.T) {
 			}
 			elements = append(elements, fulltext.IndexElement{
 				EventID:        x.EventID(),
-				RoomID:         x.RoomID(),
+				RoomID:         x.RoomID().String(),
 				Content:        string(x.Content()),
 				ContentType:    x.Type(),
 				StreamPosition: int64(sp),

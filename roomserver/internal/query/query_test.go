@@ -49,6 +49,7 @@ func (db *getEventDB) addFakeEvent(eventID string, authIDs []string) error {
 	}
 	builder := map[string]interface{}{
 		"event_id":    eventID,
+		"room_id":     "!room:a",
 		"auth_events": authEvents,
 	}
 

@@ -59,14 +59,14 @@ type DB struct {
 }
 
 // NewDatabase loads the database for msc2836
-func NewDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
+func NewDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
 	if dbOpts.ConnectionString.IsPostgres() {
 		return newPostgresDatabase(conMan, dbOpts)
 	}
 	return newSQLiteDatabase(conMan, dbOpts)
 }
 
-func newPostgresDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
+func newPostgresDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
 	d := DB{}
 	var err error
 	if d.db, d.writer, err = conMan.Connection(dbOpts); err != nil {
@@ -144,7 +144,7 @@ func newPostgresDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOpti
 	return &d, err
 }
 
-func newSQLiteDatabase(conMan sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
+func newSQLiteDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
 	d := DB{}
 	var err error
 	if d.db, d.writer, err = conMan.Connection(dbOpts); err != nil {
@@ -239,7 +239,7 @@ func (p *DB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 			return err
 		}
 		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
-		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
+		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
 		return err
 	})
 }

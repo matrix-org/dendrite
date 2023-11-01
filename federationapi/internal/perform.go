@@ -481,8 +481,10 @@ func (r *FederationInternalAPI) PerformLeave(
 		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			return err
+		} else if senderID == nil {
+			return fmt.Errorf("sender ID not found for %s in %s", *userID, *roomID)
 		}
-		senderIDString := string(senderID)
+		senderIDString := string(*senderID)
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
 		respMakeLeave.LeaveEvent.SenderID = senderIDString
 		respMakeLeave.LeaveEvent.StateKey = &senderIDString
@@ -546,11 +548,7 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return nil, err
-	}
-	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +571,7 @@ func (r *FederationInternalAPI) SendInvite(
 	logrus.WithFields(logrus.Fields{
 		"event_id":     event.EventID(),
 		"user_id":      *event.StateKey(),
-		"room_id":      event.RoomID(),
+		"room_id":      event.RoomID().String(),
 		"room_version": event.Version(),
 		"destination":  destination,
 	}).Info("Sending invite")
@@ -595,6 +593,58 @@ func (r *FederationInternalAPI) SendInvite(
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
 	if err != nil {
 		return nil, fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
+	}
+	return inviteEvent, nil
+}
+
+// SendInviteV3 implements api.FederationInternalAPI
+func (r *FederationInternalAPI) SendInviteV3(
+	ctx context.Context,
+	event gomatrixserverlib.ProtoEvent,
+	invitee spec.UserID,
+	version gomatrixserverlib.RoomVersion,
+	strippedState []gomatrixserverlib.InviteStrippedState,
+) (gomatrixserverlib.PDU, error) {
+	validRoomID, err := spec.NewRoomID(event.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(event.SenderID))
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO (devon): This should be allowed via a relay. Currently only transactions
+	// can be sent to relays. Would need to extend relays to handle invites.
+	if !r.shouldAttemptDirectFederation(invitee.Domain()) {
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"user_id":      invitee.String(),
+		"room_id":      event.RoomID,
+		"room_version": version,
+		"destination":  invitee.Domain(),
+	}).Info("Sending invite")
+
+	inviteReq, err := fclient.NewInviteV3Request(event, version, strippedState)
+	if err != nil {
+		return nil, fmt.Errorf("gomatrixserverlib.NewInviteV3Request: %w", err)
+	}
+
+	inviteRes, err := r.federation.SendInviteV3(ctx, inviter.Domain(), invitee.Domain(), inviteReq, invitee)
+	if err != nil {
+		return nil, fmt.Errorf("r.federation.SendInviteV3: failed to send invite: %w", err)
+	}
+
+	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(inviteRes.Event)
+	if err != nil {
+		return nil, fmt.Errorf("r.federation.SendInviteV3 failed to decode event response: %w", err)
 	}
 	return inviteEvent, nil
 }

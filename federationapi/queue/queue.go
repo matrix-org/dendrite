@@ -218,7 +218,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		if api.IsServerBannedFromRoom(
 			oqs.process.Context(),
 			oqs.rsAPI,
-			ev.RoomID(),
+			ev.RoomID().String(),
 			destination,
 		) {
 			delete(destmap, destination)

@@ -99,7 +99,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 
 	err = sqlutil.TxStmt(txn, s.insertInviteEventStmt).QueryRowContext(
 		ctx,
-		inviteEvent.RoomID(),
+		inviteEvent.RoomID().String(),
 		inviteEvent.EventID(),
 		inviteEvent.UserID.String(),
 		headeredJSON,

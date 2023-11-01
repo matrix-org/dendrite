@@ -180,7 +180,6 @@ linters-settings:
 linters:
   enable:
     - errcheck
-    - goconst
     - gocyclo
     - goimports # Does everything gofmt does
     - gosimple
@@ -211,6 +210,7 @@ linters:
     - stylecheck
     - typecheck # Should turn back on soon
     - unconvert # Should turn back on soon
+    - goconst # Slightly annoying, as it reports "issues" in SQL statements
   disable-all: false
   presets:
   fast: false

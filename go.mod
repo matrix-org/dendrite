@@ -4,23 +4,27 @@ require (
 	github.com/Arceliar/ironwood v0.0.0-20221025225125-45b4281814c2
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/blevesearch/bleve/v2 v2.3.8
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/dgraph-io/ristretto v0.1.1
-	github.com/docker/docker v20.10.24+incompatible
+	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/getsentry/sentry-go v0.22.0
+	github.com/getsentry/sentry-go v0.14.0
+	github.com/go-ldap/ldap/v3 v3.4.6
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.9
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/gorilla/mux v1.8.0
 	github.com/kardianos/minwinsvc v1.0.2
 	github.com/lib/pq v1.10.9
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20231023121512-16e7431168be
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20231024124730-58af9a2712ca
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
+	github.com/matryer/is v1.4.1
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/nats-io/nats-server/v2 v2.9.23
 	github.com/nats-io/nats.go v1.28.0
@@ -32,30 +36,23 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.2
-	github.com/tidwall/gjson v1.14.4
+	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.6
 	go.uber.org/atomic v1.10.0
 	golang.org/x/crypto v0.14.0
-	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
+	golang.org/x/exp v0.0.0-20230809150735-7b3493d9a819
 	golang.org/x/image v0.5.0
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
-	golang.org/x/sync v0.2.0
+	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.13.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.4.0
 	maunium.net/go/mautrix v0.15.1
 	modernc.org/sqlite v1.23.1
-)
-
-require (
-	github.com/MFAshby/stdemuxerhook v1.0.0
-	github.com/go-ldap/ldap/v3 v3.4.5
-	github.com/golang-jwt/jwt/v4 v4.5.0
-	github.com/matryer/is v1.4.0
 )
 
 require (
@@ -85,12 +82,13 @@ require (
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/go-asn1-ber/asn1-ber v1.5.4 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/pprof v0.0.0-20230808223545-4887780b67fb // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v1.0.0 // indirect
@@ -120,12 +118,12 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
-	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.6.0 // indirect
+	golang.org/x/tools v0.12.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -141,4 +139,4 @@ require (
 	modernc.org/token v1.0.1 // indirect
 )
 
-go 1.18
+go 1.20

@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -156,13 +157,14 @@ func main() {
 
 	keyRing := fsAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient)
-	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
+
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient)
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
+
 	rsAPI.SetAppserviceAPI(asAPI)
 	rsAPI.SetUserAPI(userAPI)
 
@@ -186,6 +188,16 @@ func main() {
 			logrus.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}
+
+	upCounter := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "dendrite",
+		Name:      "up",
+		ConstLabels: map[string]string{
+			"version": internal.VersionString(),
+		},
+	})
+	upCounter.Add(1)
+	prometheus.MustRegister(upCounter)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

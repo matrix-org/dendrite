@@ -250,3 +250,7 @@ func (u *RoomUpdater) MarkEventAsSent(eventNID types.EventNID) error {
 func (u *RoomUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (*MembershipUpdater, error) {
 	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomInfo.RoomNID, targetUserNID, targetLocal)
 }
+
+func (u *RoomUpdater) IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error) {
+	return u.d.IsEventRejected(ctx, roomNID, eventID)
+}

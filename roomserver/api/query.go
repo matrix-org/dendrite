@@ -132,6 +132,8 @@ type QueryMembershipForUserResponse struct {
 	// True if the user asked to forget this room.
 	IsRoomForgotten bool `json:"is_room_forgotten"`
 	RoomExists      bool `json:"room_exists"`
+	// The sender ID of the user in the room, if it exists
+	SenderID *spec.SenderID
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -289,16 +291,6 @@ type QuerySharedUsersResponse struct {
 	UserIDsToCount map[string]int
 }
 
-type QueryRoomsForUserRequest struct {
-	UserID string
-	// The desired membership of the user. If this is the empty string then no rooms are returned.
-	WantMembership string
-}
-
-type QueryRoomsForUserResponse struct {
-	RoomIDs []string
-}
-
 type QueryBulkStateContentRequest struct {
 	// Returns state events in these rooms
 	RoomIDs []string
@@ -414,22 +406,6 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// QueryMembershipAtEventRequest requests the membership event for a user
-// for a list of eventIDs.
-type QueryMembershipAtEventRequest struct {
-	RoomID   string
-	EventIDs []string
-	UserID   string
-}
-
-// QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
-type QueryMembershipAtEventResponse struct {
-	// Membership is a map from eventID to membership event. Events that
-	// do not have known state will return a nil event, resulting in a "leave" membership
-	// when calculating history visibility.
-	Membership map[string]*types.HeaderedEvent `json:"membership"`
-}
-
 // QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a
 // a room with anymore. This is used to cleanup stale device list entries, where we would
 // otherwise keep on trying to get device lists.
@@ -502,4 +478,80 @@ func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.
 		membership = res.Membership
 	}
 	return membership, err
+}
+
+type QueryRoomHierarchyRequest struct {
+	SuggestedOnly bool `json:"suggested_only"`
+	Limit         int  `json:"limit"`
+	MaxDepth      int  `json:"max_depth"`
+	From          int  `json:"json"`
+}
+
+// A struct storing the intermediate state of a room hierarchy query for pagination purposes.
+//
+// Used for implementing space summaries / room hierarchies
+//
+// Use NewRoomHierarchyWalker to construct this, and QueryNextRoomHierarchyPage on the roomserver API
+// to traverse the room hierarchy.
+type RoomHierarchyWalker struct {
+	RootRoomID    spec.RoomID
+	Caller        types.DeviceOrServerName
+	SuggestedOnly bool
+	MaxDepth      int
+	Processed     RoomSet
+	Unvisited     []RoomHierarchyWalkerQueuedRoom
+}
+
+type RoomHierarchyWalkerQueuedRoom struct {
+	RoomID       spec.RoomID
+	ParentRoomID *spec.RoomID
+	Depth        int
+	Vias         []string // vias to query this room by
+}
+
+// Create a new room hierarchy walker, starting from the provided root room ID.
+//
+// Use the resulting struct with QueryNextRoomHierarchyPage on the roomserver API to traverse the room hierarchy.
+func NewRoomHierarchyWalker(caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker {
+	walker := RoomHierarchyWalker{
+		RootRoomID:    roomID,
+		Caller:        caller,
+		SuggestedOnly: suggestedOnly,
+		MaxDepth:      maxDepth,
+		Unvisited: []RoomHierarchyWalkerQueuedRoom{{
+			RoomID:       roomID,
+			ParentRoomID: nil,
+			Depth:        0,
+		}},
+		Processed: NewRoomSet(),
+	}
+
+	return walker
+}
+
+// A set of room IDs.
+type RoomSet map[spec.RoomID]struct{}
+
+// Create a new empty room set.
+func NewRoomSet() RoomSet {
+	return RoomSet{}
+}
+
+// Check if a room ID is in a room set.
+func (s RoomSet) Contains(val spec.RoomID) bool {
+	_, ok := s[val]
+	return ok
+}
+
+// Add a room ID to a room set.
+func (s RoomSet) Add(val spec.RoomID) {
+	s[val] = struct{}{}
+}
+
+func (s RoomSet) Copy() RoomSet {
+	copied := make(RoomSet, len(s))
+	for k := range s {
+		copied.Add(k)
+	}
+	return copied
 }

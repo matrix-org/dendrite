@@ -428,3 +428,49 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 		}
 	})
 }
+
+func Test_dedupeStateList(t *testing.T) {
+	alice := "@alice:localhost"
+	bob := "@bob:localhost"
+	charlie := "@charlie:notlocalhost"
+	invalidUserID := "iaminvalid:localhost"
+
+	tests := []struct {
+		name       string
+		staleLists []string
+		want       []string
+	}{
+		{
+			name:       "empty stateLists",
+			staleLists: []string{},
+			want:       []string{},
+		},
+		{
+			name:       "single entry",
+			staleLists: []string{alice},
+			want:       []string{alice},
+		},
+		{
+			name:       "multiple entries without dupe servers",
+			staleLists: []string{alice, charlie},
+			want:       []string{alice, charlie},
+		},
+		{
+			name:       "multiple entries with dupe servers",
+			staleLists: []string{alice, bob, charlie},
+			want:       []string{alice, charlie},
+		},
+		{
+			name:       "list with invalid userID",
+			staleLists: []string{alice, bob, invalidUserID},
+			want:       []string{alice},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dedupeStaleLists(tt.staleLists); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("dedupeStaleLists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

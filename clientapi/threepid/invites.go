@@ -366,9 +366,11 @@ func emit3PIDInviteEvent(
 	sender, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
 	if err != nil {
 		return err
+	} else if sender == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", *userID, *validRoomID)
 	}
 	proto := &gomatrixserverlib.ProtoEvent{
-		SenderID: string(sender),
+		SenderID: string(*sender),
 		RoomID:   roomID,
 		Type:     "m.room.third_party_invite",
 		StateKey: &res.Token,

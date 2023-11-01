@@ -202,11 +202,24 @@ func main() {
 		authEvents[i] = authEventEntries[i].PDU
 	}
 
+	// Get the roomNID
+	roomInfo, err = roomserverDB.RoomInfo(ctx, authEvents[0].RoomID().String())
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		func(eventID string) bool {
+			isRejected, rejectedErr := roomserverDB.IsEventRejected(ctx, roomInfo.RoomNID, eventID)
+			if rejectedErr != nil {
+				return true
+			}
+			return isRejected
 		},
 	)
 	if err != nil {
