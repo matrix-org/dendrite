@@ -420,7 +420,7 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 		for {
 			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
 			serversToRetry = serversToRetry[:0] // reuse memory
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 2)
 			if len(ch) == cap(ch) {
 				continue
 			}
