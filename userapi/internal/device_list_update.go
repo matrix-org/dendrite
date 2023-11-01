@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -108,6 +109,8 @@ type DeviceListUpdater struct {
 	userIDToChan   map[string]chan bool
 	userIDToChanMu *sync.Mutex
 	rsAPI          rsapi.KeyserverRoomserverAPI
+
+	isBlacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error)
 }
 
 // DeviceListUpdaterDatabase is the subset of functionality from storage.Database required for the updater.
@@ -167,25 +170,28 @@ func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
-	rsAPI rsapi.KeyserverRoomserverAPI, thisServer spec.ServerName,
+	rsAPI rsapi.KeyserverRoomserverAPI,
+	thisServer spec.ServerName,
 	enableMetrics bool,
+	isBlacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error),
 ) *DeviceListUpdater {
 	if enableMetrics {
 		prometheus.MustRegister(deviceListUpdaterBackpressure, deviceListUpdaterServersRetrying)
 	}
 	return &DeviceListUpdater{
-		process:        process,
-		userIDToMutex:  make(map[string]*sync.Mutex),
-		mu:             &sync.Mutex{},
-		db:             db,
-		api:            api,
-		producer:       producer,
-		fedClient:      fedClient,
-		thisServer:     thisServer,
-		workerChans:    make([]chan spec.ServerName, numWorkers),
-		userIDToChan:   make(map[string]chan bool),
-		userIDToChanMu: &sync.Mutex{},
-		rsAPI:          rsAPI,
+		process:                     process,
+		userIDToMutex:               make(map[string]*sync.Mutex),
+		mu:                          &sync.Mutex{},
+		db:                          db,
+		api:                         api,
+		producer:                    producer,
+		fedClient:                   fedClient,
+		thisServer:                  thisServer,
+		workerChans:                 make([]chan spec.ServerName, numWorkers),
+		userIDToChan:                make(map[string]chan bool),
+		userIDToChanMu:              &sync.Mutex{},
+		rsAPI:                       rsAPI,
+		isBlacklistedOrBackingOffFn: isBlacklistedOrBackingOffFn,
 	}
 }
 
@@ -362,15 +368,24 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	if err != nil {
 		return
 	}
+	_, err = u.isBlacklistedOrBackingOffFn(remoteServer)
+	var federationClientError *fedsenderapi.FederationClientError
+	if errors.As(err, &federationClientError) {
+		if federationClientError.Blacklisted {
+			return
+		}
+	}
+
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(remoteServer))
 	index := int(int64(hash.Sum32()) % int64(len(u.workerChans)))
 
 	ch := u.assignChannel(userID)
+	deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(index)}).Inc()
 	u.workerChans[index] <- remoteServer
 	select {
 	case <-ch:
-	case <-time.After(1 * time.Second):
+	case <-time.After(10 * time.Second):
 		// we don't return an error in this case as it's not a failure condition.
 		// we mainly block for the benefit of sytest anyway
 	}
@@ -403,27 +418,37 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 	go func() {
 		var serversToRetry []spec.ServerName
 		for {
+			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
 			serversToRetry = serversToRetry[:0] // reuse memory
-			time.Sleep(time.Second)
+			time.Sleep(time.Second * 10)
+			if len(ch) == cap(ch) {
+				continue
+			}
+			maxServers := cap(ch) - len(ch)
+
 			retriesMu.Lock()
 			now := time.Now()
 			for srv, retryAt := range retries {
 				if now.After(retryAt) {
 					serversToRetry = append(serversToRetry, srv)
+					if maxServers == len(serversToRetry) {
+						break
+					}
 				}
 			}
+
 			for _, srv := range serversToRetry {
 				delete(retries, srv)
 			}
-			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
 			retriesMu.Unlock()
+
 			for _, srv := range serversToRetry {
+				deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Inc()
 				ch <- srv
 			}
 		}
 	}()
 	for serverName := range ch {
-		deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Inc()
 		retriesMu.Lock()
 		_, exists := retries[serverName]
 		retriesMu.Unlock()
