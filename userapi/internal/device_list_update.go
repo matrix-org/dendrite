@@ -372,7 +372,7 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	u.workerChans[index] <- remoteServer
 	select {
 	case <-ch:
-	case <-time.After(10 * time.Second):
+	case <-time.After(1 * time.Second):
 		// we don't return an error in this case as it's not a failure condition.
 		// we mainly block for the benefit of sytest anyway
 	}
