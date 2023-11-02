@@ -115,15 +115,32 @@ func SendPDUs(
 				JSON: spec.InternalServerError{Err: err.Error()},
 			}
 		}
-		key, err := rsAPI.GetOrCreateUserRoomPrivateKey(req.Context(), *userID, pdu.RoomID())
+
+		util.GetLogger(req.Context()).Infof("Processing %s event (%s): %s", pdu.Type(), pdu.EventID(), pdu.JSON())
+
+		// Check that the event is signed by the server sending the request.
+		redacted, err := verImpl.RedactEventJSON(pdu.JSON())
 		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: spec.InternalServerError{Err: err.Error()},
-			}
+			util.GetLogger(req.Context()).WithError(err).Error("RedactEventJSON failed")
+			continue
 		}
-		pdu = pdu.Sign(string(pdu.SenderID()), "ed25519:1", key)
-		util.GetLogger(req.Context()).Infof("Processing %s event (%s)", pdu.Type(), pdu.EventID())
+
+		verifier := gomatrixserverlib.JSONVerifierSelf{}
+		verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
+			ServerName:           spec.ServerName(pdu.SenderID()),
+			Message:              redacted,
+			AtTS:                 pdu.OriginServerTS(),
+			ValidityCheckingFunc: gomatrixserverlib.StrictValiditySignatureCheck,
+		}}
+		verifyResults, err := verifier.VerifyJSONs(req.Context(), verifyRequests)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+			continue
+		}
+		if verifyResults[0].Error != nil {
+			util.GetLogger(req.Context()).WithError(verifyResults[0].Error).Error("Signature check failed: ")
+			continue
+		}
 
 		switch pdu.Type() {
 		case spec.MRoomCreate:

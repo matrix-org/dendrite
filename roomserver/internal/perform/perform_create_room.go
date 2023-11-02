@@ -80,17 +80,11 @@ func (c *Creator) PerformCreateRoomCryptoIDs(ctx context.Context, userID spec.Us
 			return nil, spec.BadJSON("SenderID is not a valid ed25519 public key")
 		}
 
-		// TODO: cryptoIDs - Swap this out for only storing the public key
-		key, keyErr := c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+		keyErr := c.RSAPI.StoreUserRoomPublicKey(ctx, senderID, userID, roomID)
 		if keyErr != nil {
-			util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+			util.GetLogger(ctx).WithError(keyErr).Error("StoreUserRoomPublicKey failed")
 			return nil, spec.InternalServerError{Err: keyErr.Error()}
 		}
-		senderID = spec.SenderIDFromPseudoIDKey(key)
-		//err := c.RSAPI.StoreUserRoomPublicKey(ctx, senderID, userID, roomID)
-		//if err != nil {
-		//	return nil, spec.InternalServerError{Err: err.Error()}
-		//}
 	}
 
 	createContent["creator"] = senderID
