@@ -419,12 +419,19 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 		var serversToRetry []spec.ServerName
 		for {
 			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
-			serversToRetry = serversToRetry[:0] // reuse memory
 			time.Sleep(time.Second * 2)
+
+			// The channel is at capacity, don't try to send more work
 			if len(ch) == cap(ch) {
 				continue
 			}
-			maxServers := cap(ch) - len(ch)
+			serversToRetry = serversToRetry[:0] // reuse memory
+
+			// -2, so we have space for incoming device list updates over federation
+			maxServers := (cap(ch) - len(ch)) - 2
+			if maxServers <= 0 {
+				continue
+			}
 
 			retriesMu.Lock()
 			now := time.Now()
