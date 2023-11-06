@@ -747,6 +747,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	ctx context.Context,
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
+	cryptoIDs bool,
 ) (err error) {
 	userID, err := spec.NewUserID(request.UserID, true)
 	if err != nil {

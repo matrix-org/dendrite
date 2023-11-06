@@ -262,16 +262,18 @@ func (r *RoomserverInternalAPI) PerformLeave(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse,
-) error {
-	outputEvents, err := r.Leaver.PerformLeave(ctx, req, res)
+	cryptoIDs bool,
+) (gomatrixserverlib.PDU, error) {
+	outputEvents, leaveEvent, err := r.Leaver.PerformLeave(ctx, req, res, cryptoIDs)
 	if err != nil {
 		sentry.CaptureException(err)
-		return err
+		return nil, err
 	}
 	if len(outputEvents) == 0 {
-		return nil
+		return leaveEvent, nil
 	}
-	return r.OutputProducer.ProduceRoomEvents(req.RoomID, outputEvents)
+	// TODO: cryptoIDs - what to do with this?
+	return leaveEvent, r.OutputProducer.ProduceRoomEvents(req.RoomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformForget(

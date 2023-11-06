@@ -858,15 +858,15 @@ type Ed25519Key struct {
 }
 
 func (a *UserInternalAPI) ClaimOneTimePseudoID(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
-	pseudoIDs, err := a.KeyDatabase.ClaimOneTimePseudoID(ctx, userID, "ed25519")
+	pseudoID, err := a.KeyDatabase.ClaimOneTimePseudoID(ctx, userID, "ed25519")
 	if err != nil {
 		return "", err
 	}
 
-	logrus.Infof("Claimed one time pseuodID: %v", pseudoIDs)
+	logrus.Infof("Claimed one time pseuodID: %s", pseudoID)
 
-	if pseudoIDs != nil {
-		for key, value := range pseudoIDs.KeyJSON {
+	if pseudoID != nil {
+		for key, value := range pseudoID.KeyJSON {
 			keyParts := strings.Split(key, ":")
 			if keyParts[0] == "ed25519" {
 				var key_bytes Ed25519Key

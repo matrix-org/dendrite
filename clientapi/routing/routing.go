@@ -443,7 +443,6 @@ func Setup(
 			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/leave",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req, device); r != nil {
@@ -454,7 +453,22 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return LeaveRoomByID(
-				req, device, rsAPI, vars["roomID"],
+				req, device, rsAPI, vars["roomID"], false,
+			)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/leave",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/leave")
+			if r := rateLimits.Limit(req, device); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return LeaveRoomByID(
+				req, device, rsAPI, vars["roomID"], true,
 			)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)

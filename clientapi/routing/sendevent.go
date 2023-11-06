@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -171,7 +172,7 @@ func SendEvent(
 		}
 	}
 
-	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, rsAPI, evTime)
+	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, rsAPI, evTime, false)
 	if resErr != nil {
 		return *resErr
 	}
@@ -362,7 +363,7 @@ func SendEventCryptoIDs(
 		}
 	}
 
-	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, rsAPI, evTime)
+	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, rsAPI, evTime, true)
 	if resErr != nil {
 		return *resErr
 	}
@@ -484,6 +485,7 @@ func generateSendEvent(
 	roomID, eventType string, stateKey *string,
 	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
+	cryptoIDs bool,
 ) (gomatrixserverlib.PDU, *util.JSONResponse) {
 	// parse the incoming http request
 	fullUserID, err := spec.NewUserID(device.UserID, true)
@@ -531,12 +533,18 @@ func generateSendEvent(
 		}
 	}
 
-	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *fullUserID)
-	if err != nil {
-		return nil, &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+	var identity fclient.SigningIdentity
+	if !cryptoIDs {
+		id, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *fullUserID)
+		if err != nil {
+			return nil, &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
+		identity = id
+	} else {
+		identity.ServerName = spec.ServerName(*senderID)
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse

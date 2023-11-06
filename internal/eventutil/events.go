@@ -85,12 +85,20 @@ func BuildEvent(
 	}
 	builder := verImpl.NewEventBuilderFromProtoEvent(proto)
 
-	event, err := builder.Build(
-		evTime, identity.ServerName, identity.KeyID,
-		identity.PrivateKey,
-	)
-	if err != nil {
-		return nil, err
+	var event gomatrixserverlib.PDU
+	if identity.PrivateKey != nil {
+		event, err = builder.Build(
+			evTime, identity.ServerName, identity.KeyID,
+			identity.PrivateKey,
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		event, err = builder.BuildWithoutSigning(evTime, identity.ServerName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &types.HeaderedEvent{PDU: event}, nil

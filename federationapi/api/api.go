@@ -61,7 +61,7 @@ type RoomserverFederationAPI interface {
 	PerformMakeJoin(ctx context.Context, request *PerformJoinRequest) (gomatrixserverlib.PDU, gomatrixserverlib.RoomVersion, spec.ServerName, error)
 	PerformSendJoin(ctx context.Context, request *PerformSendJoinRequestCryptoIDs, response *PerformJoinResponse)
 	// Handle an instruction to make_leave & send_leave with a remote server.
-	PerformLeave(ctx context.Context, request *PerformLeaveRequest, response *PerformLeaveResponse) error
+	PerformLeave(ctx context.Context, request *PerformLeaveRequest, response *PerformLeaveResponse, cryptoIDs bool) error
 	// Handle sending an invite to a remote server.
 	SendInvite(ctx context.Context, event gomatrixserverlib.PDU, strippedState []gomatrixserverlib.InviteStrippedState) (gomatrixserverlib.PDU, error)
 	// Handle sending an invite to a remote server.

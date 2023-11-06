@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -23,11 +24,16 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type leaveRoomCryptoIDsResponse struct {
+	PDU json.RawMessage `json:"pdu"`
+}
+
 func LeaveRoomByID(
 	req *http.Request,
 	device *api.Device,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
@@ -45,7 +51,8 @@ func LeaveRoomByID(
 	leaveRes := roomserverAPI.PerformLeaveResponse{}
 
 	// Ask the roomserver to perform the leave.
-	if err := rsAPI.PerformLeave(req.Context(), &leaveReq, &leaveRes); err != nil {
+	leaveEvent, err := rsAPI.PerformLeave(req.Context(), &leaveReq, &leaveRes, cryptoIDs)
+	if err != nil {
 		if leaveRes.Code != 0 {
 			return util.JSONResponse{
 				Code: leaveRes.Code,
@@ -60,6 +67,8 @@ func LeaveRoomByID(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: leaveRoomCryptoIDsResponse{
+			PDU: json.RawMessage(leaveEvent.JSON()),
+		},
 	}
 }

@@ -179,7 +179,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 			Leaver: *fullUserID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
-		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
+		outputEvents, _, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes, false)
 		if err != nil {
 			return nil, err
 		}

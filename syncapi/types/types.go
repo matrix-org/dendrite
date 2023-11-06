@@ -532,12 +532,15 @@ type InviteResponse struct {
 	InviteState struct {
 		Events []json.RawMessage `json:"events"`
 	} `json:"invite_state"`
+	OneTimePseudoID string `json:"one_time_pseudoid,omitempty"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
 func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *types.HeaderedEvent, eventFormat synctypes.ClientEventFormat) (*InviteResponse, error) {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
+
+	res.OneTimePseudoID = *event.PDU.StateKey()
 
 	// First see if there's invite_room_state in the unsigned key of the invite.
 	// If there is then unmarshal it into the response. This will contain the

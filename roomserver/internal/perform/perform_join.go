@@ -665,15 +665,8 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 
 	// at this point we know we have an existing room
 	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
-		var pseudoIDKey ed25519.PrivateKey
-		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
-			return nil, "", "", "", err
-		}
-
 		mapping := &gomatrixserverlib.MXIDMapping{
-			UserRoomKey: spec.SenderIDFromPseudoIDKey(pseudoIDKey),
+			UserRoomKey: senderID,
 			UserID:      userID.String(),
 		}
 
@@ -685,9 +678,9 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 
 		// sign the event with the pseudo ID key
 		identity = fclient.SigningIdentity{
-			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(pseudoIDKey)),
+			ServerName: spec.ServerName(senderID),
 			KeyID:      "ed25519:1",
-			PrivateKey: pseudoIDKey,
+			PrivateKey: nil,
 		}
 	}
 
