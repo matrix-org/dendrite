@@ -500,15 +500,18 @@ func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 		userIDToMutex:  make(map[string]*sync.Mutex),
 	}
 	workerCh := make(chan spec.ServerName)
+	defer close(workerCh)
 	updater.workerChans[0] = workerCh
 
 	// happy case
 	alice := "@alice:localhost"
 	aliceCh := updater.assignChannel(alice)
+	defer updater.clearChannel(alice)
 
 	// failing case
 	bob := "@bob:" + unreachableServer
 	bobCh := updater.assignChannel(string(bob))
+	defer updater.clearChannel(string(bob))
 
 	expectedServers := map[spec.ServerName]struct{}{
 		"localhost": {},
@@ -521,7 +524,7 @@ func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 			case "localhost":
 				delete(expectedServers, serverName)
 				aliceCh <- true // unblock notifyWorkers
-			case "notlocalhost": // this should not happen as it is "filtered" away by the blacklist
+			case unreachableServer: // this should not happen as it is "filtered" away by the blacklist
 				unexpectedServers[serverName] = struct{}{}
 				bobCh <- true
 			default:
