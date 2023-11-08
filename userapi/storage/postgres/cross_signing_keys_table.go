@@ -86,6 +86,7 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 		}
 		r[keyType] = keyData
 	}
+	err = rows.Err()
 	return
 }
 

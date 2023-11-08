@@ -250,6 +250,7 @@ func (s *membershipStatements) SelectMembershipsFromRoom(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
+	err = rows.Err()
 	return
 }
 
@@ -277,6 +278,7 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
+	err = rows.Err()
 	return
 }
 
@@ -313,7 +315,7 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
-	return roomNIDs, nil
+	return roomNIDs, rows.Err()
 }
 
 func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID, userNIDs []types.EventStateKeyNID, localOnly bool) (map[types.EventStateKeyNID]int, error) {

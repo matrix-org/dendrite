@@ -164,7 +164,7 @@ func (s *peekStatements) SelectPeekingDevices(
 		devices = append(devices, types.PeekingDevice{UserID: userID, DeviceID: deviceID})
 		result[roomID] = devices
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *peekStatements) SelectMaxPeekID(

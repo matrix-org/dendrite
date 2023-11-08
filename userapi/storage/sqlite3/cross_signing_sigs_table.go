@@ -104,6 +104,7 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 		}
 		r[userID][keyID] = signature
 	}
+	err = rows.Err()
 	return
 }
 

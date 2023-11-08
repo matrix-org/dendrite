@@ -326,7 +326,7 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 		devices = append(devices, dev)
 	}
 
-	return devices, nil
+	return devices, rows.Err()
 }
 
 func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {

@@ -301,7 +301,7 @@ func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string, rec
 		}
 		children = append(children, evInfo)
 	}
-	return children, nil
+	return children, rows.Err()
 }
 
 func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error) {

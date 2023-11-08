@@ -174,5 +174,5 @@ func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(ctx context.Context,
 		}
 		resultMap[roomNID] = pubkey
 	}
-	return resultMap, err
+	return resultMap, rows.Err()
 }

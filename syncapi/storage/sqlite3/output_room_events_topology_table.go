@@ -157,7 +157,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 		start = tokens[0]
 		end = tokens[len(tokens)-1]
 	}
-
+	err = rows.Err()
 	return
 }
 

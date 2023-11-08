@@ -121,5 +121,6 @@ func (s *keyChangesStatements) SelectKeyChanges(
 		}
 		userIDs = append(userIDs, userID)
 	}
+	err = rows.Err()
 	return
 }

@@ -109,7 +109,7 @@ func (s *threepidStatements) SelectThreePIDsForLocalpart(
 			Medium:  medium,
 		})
 	}
-
+	err = rows.Err()
 	return
 }
 

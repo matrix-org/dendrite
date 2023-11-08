@@ -120,7 +120,7 @@ func (s *accountDataStatements) SelectAccountData(
 		}
 	}
 
-	return global, rooms, nil
+	return global, rooms, rows.Err()
 }
 
 func (s *accountDataStatements) SelectAccountDataByType(
