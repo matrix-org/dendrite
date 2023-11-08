@@ -113,7 +113,7 @@ func (s *keyChangesStatements) SelectKeyChanges(
 	for rows.Next() {
 		var userID string
 		var offset int64
-		if err := rows.Scan(&userID, &offset); err != nil {
+		if err = rows.Scan(&userID, &offset); err != nil {
 			return nil, 0, err
 		}
 		if offset > latestOffset {
