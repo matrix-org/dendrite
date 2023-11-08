@@ -296,6 +296,7 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	if err != nil {
 		return devices, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectDevicesByLocalpart: failed to close rows")
 
 	var dev api.Device
 	var lastseents sql.NullInt64

@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -137,6 +138,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	} else if err != nil {
 		return
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectEventIDsInRange: failed to close rows")
 
 	// Return the IDs.
 	var eventID string

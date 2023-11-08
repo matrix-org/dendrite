@@ -249,6 +249,7 @@ func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectSnapshotsFromEventIDs: rows.close() failed")
 
 	var eventID string
 	var stateNID types.StateSnapshotNID

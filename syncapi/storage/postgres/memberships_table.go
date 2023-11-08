@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -160,6 +161,7 @@ func (s *membershipsStatements) SelectMemberships(
 	if err != nil {
 		return
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectMemberships: failed to close rows")
 	var (
 		eventID string
 	)
