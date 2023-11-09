@@ -176,7 +176,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	if lastPos == 0 {
 		lastPos = r.To
 	}
-	return result, retired, lastPos, nil
+	return result, retired, lastPos, rows.Err()
 }
 
 func (s *inviteEventsStatements) SelectMaxInviteID(

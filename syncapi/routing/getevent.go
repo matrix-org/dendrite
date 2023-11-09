@@ -44,7 +44,7 @@ func GetEvent(
 	rsAPI api.SyncRoomserverAPI,
 ) util.JSONResponse {
 	ctx := req.Context()
-	db, err := syncDB.NewDatabaseTransaction(ctx)
+	db, err := syncDB.NewDatabaseSnapshot(ctx)
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id": eventID,
 		"room_id":  rawRoomID,
@@ -56,6 +56,7 @@ func GetEvent(
 			JSON: spec.InternalServerError{},
 		}
 	}
+	defer db.Rollback() // nolint: errcheck
 
 	roomID, err := spec.NewRoomID(rawRoomID)
 	if err != nil {
