@@ -191,13 +191,13 @@ func startup() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, caching.EnableMetrics)
+	fedSenderAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, caching.EnableMetrics, fedSenderAPI.IsBlacklistedOrBackingOff)
 
 	asQuery := appservice.NewInternalAPI(
 		processCtx, cfg, &natsInstance, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true)
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 
 	monolith := setup.Monolith{
