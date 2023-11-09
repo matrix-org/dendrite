@@ -76,7 +76,7 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	for rows.Next() {
 		var keyTypeInt int16
 		var keyData spec.Base64Bytes
-		if err := rows.Scan(&keyTypeInt, &keyData); err != nil {
+		if err = rows.Scan(&keyTypeInt, &keyData); err != nil {
 			return nil, err
 		}
 		keyType, ok := types.KeyTypeIntToPurpose[keyTypeInt]
@@ -85,6 +85,7 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 		}
 		r[keyType] = keyData
 	}
+	err = rows.Err()
 	return
 }
 
