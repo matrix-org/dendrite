@@ -17,6 +17,7 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -53,6 +54,12 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 	// Depth first -> stack data structure
 	for len(unvisited) > 0 {
 		if len(discoveredRooms) >= limit && limit != -1 {
+			break
+		}
+
+		// If the context is canceled, we might still have discovered rooms
+		// return them to the client and let the client know there _may_ be more rooms.
+		if errors.Is(ctx.Err(), context.Canceled) {
 			break
 		}
 
@@ -111,6 +118,11 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			discoveredChildEvents = events
 
 			pubRoom := publicRoomsChunk(ctx, querier, queuedRoom.RoomID)
+
+			if pubRoom == nil {
+				util.GetLogger(ctx).WithField("room_id", queuedRoom.RoomID).Debug("unable to get publicRoomsChunk")
+				continue
+			}
 
 			discoveredRooms = append(discoveredRooms, fclient.RoomHierarchyRoom{
 				PublicRoom:    *pubRoom,

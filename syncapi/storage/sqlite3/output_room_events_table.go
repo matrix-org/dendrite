@@ -274,7 +274,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		}
 	}
 
-	return stateNeeded, eventIDToEvent, nil
+	return stateNeeded, eventIDToEvent, rows.Err()
 }
 
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
@@ -520,7 +520,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			ExcludeFromSync: excludeFromSync,
 		})
 	}
-	return result, nil
+	return result, rows.Err()
 }
 func (s *outputRoomEventsStatements) SelectContextEvent(
 	ctx context.Context, txn *sql.Tx, roomID, eventID string,

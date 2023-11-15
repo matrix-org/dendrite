@@ -249,6 +249,7 @@ func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectSnapshotsFromEventIDs: rows.close() failed")
 
 	var eventID string
 	var stateNID types.StateSnapshotNID
@@ -563,7 +564,7 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 		}
 		result[eventNID] = roomNID
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {

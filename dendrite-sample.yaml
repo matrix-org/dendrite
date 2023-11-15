@@ -325,6 +325,10 @@ user_api:
   auto_join_rooms:
   #  - "#main:matrix.org"
 
+  # The number of workers to start for the DeviceListUpdater. Defaults to 8.
+  # This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
+  # worker_count: 8
+
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on
 # how this works and how to set it up.

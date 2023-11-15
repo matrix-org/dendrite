@@ -162,5 +162,5 @@ func unpackKeys(ctx context.Context, rows *sql.Rows) (map[string]map[string]api.
 		roomData[key.SessionID] = key.KeyBackupSession
 		result[key.RoomID] = roomData
 	}
-	return result, nil
+	return result, rows.Err()
 }

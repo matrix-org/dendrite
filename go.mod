@@ -9,7 +9,7 @@ require (
 	github.com/blevesearch/bleve/v2 v2.3.8
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/dgraph-io/ristretto v0.1.1
-	github.com/docker/docker v24.0.5+incompatible
+	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.14.0
 	github.com/gologme/log v1.3.0
@@ -44,7 +44,7 @@ require (
 	go.uber.org/atomic v1.10.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20230809150735-7b3493d9a819
-	golang.org/x/image v0.5.0
+	golang.org/x/image v0.10.0
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
 	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.13.0
@@ -105,7 +105,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/nats-io/jwt/v2 v2.5.0 // indirect
-	github.com/nats-io/nkeys v0.4.4 // indirect
+	github.com/nats-io/nkeys v0.4.6 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect

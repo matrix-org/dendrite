@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -94,6 +95,7 @@ func (s *threepidStatements) SelectThreePIDsForLocalpart(
 	if err != nil {
 		return
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectThreePIDsForLocalpart: failed to close rows")
 
 	threepids = []authtypes.ThreePID{}
 	for rows.Next() {
@@ -107,7 +109,7 @@ func (s *threepidStatements) SelectThreePIDsForLocalpart(
 			Medium:  medium,
 		})
 	}
-
+	err = rows.Err()
 	return
 }
 

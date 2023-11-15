@@ -133,12 +133,15 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	var stateBlockNIDsJSON string
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
+		if err = rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
+		if err = json.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
 			return nil, err
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(stateNIDs) {
 		return nil, types.MissingStateError(fmt.Sprintf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs)))

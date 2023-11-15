@@ -151,7 +151,7 @@ func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn
 		}
 		results = append(results, sk)
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *notaryServerKeysMetadataStatements) DeleteOldJSONResponses(ctx context.Context, txn *sql.Tx) error {
