@@ -32,11 +32,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+type PDUInfo struct {
+	Version   string          `json:"room_version"`
+	ViaServer string          `json:"via_server,omitempty"`
+	PDU       json.RawMessage `json:"pdu"`
+}
+
 type sendPDUsRequest struct {
-	Version   string            `json:"room_version"`
-	ViaServer string            `json:"via_server,omitempty"`
-	TxnID     string            `json:"txn_id,omitempty"`
-	PDUs      []json.RawMessage `json:"pdus"`
+	PDUs []PDUInfo `json:"pdus"`
 }
 
 // SendPDUs implements /sendPDUs
@@ -45,6 +48,7 @@ func SendPDUs(
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
+	txnID *string,
 ) util.JSONResponse {
 	// TODO: cryptoIDs - should this include an "eventType"?
 	// if it's a bulk send endpoint, I don't think that makes any sense since there are multiple event types
@@ -79,16 +83,10 @@ func SendPDUs(
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
-	var txnID *roomserverAPI.TransactionID
-	if pdus.TxnID != "" {
-		txnID.TransactionID = pdus.TxnID
-		txnID.SessionID = device.SessionID
-	}
-
 	inputs := make([]roomserverAPI.InputRoomEvent, 0, len(pdus.PDUs))
 	for _, event := range pdus.PDUs {
 		// TODO: cryptoIDs - event hash check?
-		verImpl, err := gomatrixserverlib.GetRoomVersion(gomatrixserverlib.RoomVersion(pdus.Version))
+		verImpl, err := gomatrixserverlib.GetRoomVersion(gomatrixserverlib.RoomVersion(event.Version))
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -108,7 +106,7 @@ func SendPDUs(
 		// Also - untrusted JSON seems better - except it strips off the unsigned field?
 		// Also - gmsl events don't store the `hashes` field... problem?
 
-		pdu, err := verImpl.NewEventFromUntrustedJSON(event)
+		pdu, err := verImpl.NewEventFromUntrustedJSON(event.PDU)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -179,7 +177,7 @@ func SendPDUs(
 							RoomID:      pdu.RoomID().String(),
 							UserID:      device.UserID,
 							IsGuest:     device.AccountType == api.AccountTypeGuest,
-							ServerNames: []spec.ServerName{spec.ServerName(pdus.ViaServer)},
+							ServerNames: []spec.ServerName{spec.ServerName(event.ViaServer)},
 							JoinEvent:   pdu,
 						}
 						err := rsAPI.PerformSendJoinCryptoIDs(req.Context(), &joinReq)
@@ -200,6 +198,13 @@ func SendPDUs(
 		// We should be doing this already as part of `SendInputRoomEvents`, but how should we pass this
 		// failure back to the client?
 
+		var transactionID *roomserverAPI.TransactionID
+		if txnID != nil {
+			transactionID = &roomserverAPI.TransactionID{
+				SessionID: device.SessionID, TransactionID: *txnID,
+			}
+		}
+
 		inputs = append(inputs, roomserverAPI.InputRoomEvent{
 			Kind:   roomserverAPI.KindNew,
 			Event:  &types.HeaderedEvent{PDU: pdu},
@@ -207,7 +212,7 @@ func SendPDUs(
 			// TODO: cryptoIDs - what to do with this field?
 			// should probably generate this based on the event type being sent?
 			//SendAsServer: roomserverAPI.DoNotSendToOtherServers,
-			TransactionID: txnID,
+			TransactionID: transactionID,
 		})
 	}
 

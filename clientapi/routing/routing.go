@@ -318,15 +318,21 @@ func Setup(
 			return CreateRoomCryptoIDs(req, device, cfg, userAPI, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/sendPDUs",
+	unstableMux.Handle("/org.matrix.msc_cryptoids/send_pdus/{txnID}",
 		httputil.MakeAuthAPI("send_pdus", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			logrus.Info("Processing request to /org.matrix.msc_cryptoids/sendPDUs")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			txnID := vars["txnID"]
+
 			// NOTE: when making events such as for create_room, multiple PDUs will need to be passed between the client & server.
-			return SendPDUs(req, device, cfg, userAPI, rsAPI, asAPI)
+			return SendPDUs(req, device, cfg, userAPI, rsAPI, asAPI, &txnID)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
