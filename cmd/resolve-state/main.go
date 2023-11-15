@@ -330,6 +330,14 @@ func main() {
 		fmt.Printf("Error: %s", err)
 		return
 	}
+
+	for _, latestEvent := range roomUpdater.LatestEvents() {
+		if err = roomUpdater.SetState(ctx, latestEvent.EventNID, newSnapshotNID); err != nil {
+			fmt.Printf("Error: %s", err)
+			return
+		}
+	}
+
 	succeeded = true
 
 	fmt.Printf("Successfully set new snapshot NID %d containing %d state events", newSnapshotNID, len(stateEntriesResolved))
