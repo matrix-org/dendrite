@@ -65,10 +65,15 @@ func LeaveRoomByID(
 		}
 	}
 
+	if cryptoIDs {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: leaveRoomCryptoIDsResponse{
+				PDU: json.RawMessage(leaveEvent.JSON()),
+			},
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: leaveRoomCryptoIDsResponse{
-			PDU: json.RawMessage(leaveEvent.JSON()),
-		},
 	}
 }

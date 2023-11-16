@@ -312,15 +312,15 @@ func Setup(
 			return CreateRoom(req, device, cfg, userAPI, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/createRoom",
+	unstableMux.Handle("/org.matrix.msc4080/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/createRoom")
+			logrus.Info("Processing request to /org.matrix.msc4080/createRoom")
 			return CreateRoomCryptoIDs(req, device, cfg, userAPI, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/send_pdus/{txnID}",
+	unstableMux.Handle("/org.matrix.msc4080/send_pdus/{txnID}",
 		httputil.MakeAuthAPI("send_pdus", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/sendPDUs")
+			logrus.Info("Processing request to /org.matrix.msc4080/sendPDUs")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -358,9 +358,9 @@ func Setup(
 			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/join/{roomIDOrAlias}",
+	unstableMux.Handle("/org.matrix.msc4080/join/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(spec.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/join/{roomIDOrAlias}")
+			logrus.Info("Processing request to /org.matrix.msc4080/join/{roomIDOrAlias}")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -426,9 +426,9 @@ func Setup(
 			return resp.(util.JSONResponse)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/join",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/join",
 		httputil.MakeAuthAPI(spec.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/join")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/join")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -463,9 +463,9 @@ func Setup(
 			)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/leave",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/leave",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/leave")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/leave")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -512,9 +512,9 @@ func Setup(
 			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, false)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/invite",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/invite",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/invite")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/invite")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -554,9 +554,9 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/send/{eventType}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/send/{eventType}")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -575,9 +575,9 @@ func Setup(
 				nil, cfg, rsAPI, transactionsCache)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}/{txnID}",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/send/{eventType}/{txnID}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/send/{eventType}/{txnID}")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/send/{eventType}/{txnID}")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -635,9 +635,9 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType:[^/]+/?}",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/state/{eventType:[^/]+/?}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType:[^/]+/?}")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/state/{eventType:[^/]+/?}")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -658,9 +658,9 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType}/{stateKey}",
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/state/{eventType}/{stateKey}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/rooms/{roomID}/state/{eventType}/{stateKey}")
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/state/{eventType}/{stateKey}")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -1628,9 +1628,9 @@ func Setup(
 			return UploadKeys(req, userAPI, device)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
-	unstableMux.Handle("/org.matrix.msc_cryptoids/keys/upload",
+	unstableMux.Handle("/org.matrix.msc4080/keys/upload",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc_cryptoids/keys/upload")
+			logrus.Info("Processing request to /org.matrix.msc4080/keys/upload")
 			return UploadKeysCryptoIDs(req, userAPI, device)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
