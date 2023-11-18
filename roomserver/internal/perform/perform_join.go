@@ -577,7 +577,7 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 	info, err := r.DB.RoomInfo(ctx, req.RoomIDOrAlias)
 	if err == nil && info != nil {
 		switch info.RoomVersion {
-		case gomatrixserverlib.RoomVersionPseudoIDs:
+		case gomatrixserverlib.RoomVersionCryptoIDs:
 			senderIDPtr, queryErr := r.Queryer.QuerySenderIDForUser(ctx, *roomID, *userID)
 			if queryErr == nil {
 				checkInvitePending = true
@@ -664,7 +664,7 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 	identity := r.Cfg.Matrix.SigningIdentity
 
 	// at this point we know we have an existing room
-	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionCryptoIDs {
 		mapping := &gomatrixserverlib.MXIDMapping{
 			UserRoomKey: senderID,
 			UserID:      userID.String(),

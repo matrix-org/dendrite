@@ -314,7 +314,7 @@ func (r *RoomserverInternalAPI) StoreUserRoomPublicKey(ctx context.Context, send
 }
 
 func (r *RoomserverInternalAPI) ClaimOneTimeSenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
-	return r.usAPI.ClaimOneTimePseudoID(ctx, roomID, userID)
+	return r.usAPI.ClaimOneTimeCryptoID(ctx, roomID, userID)
 }
 
 func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error) {
@@ -328,7 +328,7 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 			roomVersion = roomInfo.RoomVersion
 		}
 	}
-	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs || roomVersion == gomatrixserverlib.RoomVersionCryptoIDs {
 		privKey, err := r.GetOrCreateUserRoomPrivateKey(ctx, senderID, roomID)
 		if err != nil {
 			return fclient.SigningIdentity{}, err

@@ -65,7 +65,7 @@ type Database struct {
 
 type KeyDatabase struct {
 	OneTimeKeysTable      tables.OneTimeKeys
-	OneTimePseudoIDsTable tables.OneTimePseudoIDs
+	OneTimeCryptoIDsTable tables.OneTimeCryptoIDs
 	DeviceKeysTable       tables.DeviceKeys
 	KeyChangesTable       tables.KeyChanges
 	StaleDeviceListsTable tables.StaleDeviceLists
@@ -946,31 +946,31 @@ func (d *KeyDatabase) OneTimeKeysCount(ctx context.Context, userID, deviceID str
 	return d.OneTimeKeysTable.CountOneTimeKeys(ctx, userID, deviceID)
 }
 
-func (d *KeyDatabase) ExistingOneTimePseudoIDs(ctx context.Context, userID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
-	return d.OneTimePseudoIDsTable.SelectOneTimePseudoIDs(ctx, userID, keyIDsWithAlgorithms)
+func (d *KeyDatabase) ExistingOneTimeCryptoIDs(ctx context.Context, userID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
+	return d.OneTimeCryptoIDsTable.SelectOneTimeCryptoIDs(ctx, userID, keyIDsWithAlgorithms)
 }
 
-func (d *KeyDatabase) StoreOneTimePseudoIDs(ctx context.Context, keys api.OneTimePseudoIDs) (counts *api.OneTimePseudoIDsCount, err error) {
+func (d *KeyDatabase) StoreOneTimeCryptoIDs(ctx context.Context, keys api.OneTimeCryptoIDs) (counts *api.OneTimeCryptoIDsCount, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		counts, err = d.OneTimePseudoIDsTable.InsertOneTimePseudoIDs(ctx, txn, keys)
+		counts, err = d.OneTimeCryptoIDsTable.InsertOneTimeCryptoIDs(ctx, txn, keys)
 		return err
 	})
 	return
 }
 
-func (d *KeyDatabase) OneTimePseudoIDsCount(ctx context.Context, userID string) (*api.OneTimePseudoIDsCount, error) {
-	return d.OneTimePseudoIDsTable.CountOneTimePseudoIDs(ctx, userID)
+func (d *KeyDatabase) OneTimeCryptoIDsCount(ctx context.Context, userID string) (*api.OneTimeCryptoIDsCount, error) {
+	return d.OneTimeCryptoIDsTable.CountOneTimeCryptoIDs(ctx, userID)
 }
 
-func (d *KeyDatabase) ClaimOneTimePseudoID(ctx context.Context, userID spec.UserID, algorithm string) (*api.OneTimePseudoIDs, error) {
-	var result *api.OneTimePseudoIDs
+func (d *KeyDatabase) ClaimOneTimeCryptoID(ctx context.Context, userID spec.UserID, algorithm string) (*api.OneTimeCryptoIDs, error) {
+	var result *api.OneTimeCryptoIDs
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		keyJSON, err := d.OneTimePseudoIDsTable.SelectAndDeleteOneTimePseudoID(ctx, txn, userID.String(), algorithm)
+		keyJSON, err := d.OneTimeCryptoIDsTable.SelectAndDeleteOneTimeCryptoID(ctx, txn, userID.String(), algorithm)
 		if err != nil {
 			return err
 		}
 		if keyJSON != nil {
-			result = &api.OneTimePseudoIDs{
+			result = &api.OneTimeCryptoIDs{
 				UserID:  userID.String(),
 				KeyJSON: keyJSON,
 			}

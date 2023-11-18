@@ -153,7 +153,7 @@ func ToClientEvent(se gomatrixserverlib.PDU, format ClientEventFormat, userIDFor
 		// TODO: Set Signatures & Hashes fields
 	}
 
-	if format != FormatSyncFederation && se.Version() == gomatrixserverlib.RoomVersionPseudoIDs {
+	if format != FormatSyncFederation && (se.Version() == gomatrixserverlib.RoomVersionPseudoIDs || se.Version() == gomatrixserverlib.RoomVersionCryptoIDs) {
 		err := updatePseudoIDs(&ce, se, userIDForSender, format)
 		if err != nil {
 			return nil, err
@@ -304,7 +304,7 @@ func GetUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomS
 		return nil, err
 	}
 
-	if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != FormatSyncFederation {
+	if (event.Version() == gomatrixserverlib.RoomVersionPseudoIDs || event.Version() == gomatrixserverlib.RoomVersionCryptoIDs) && eventFormat != FormatSyncFederation {
 		for i, ev := range inviteStateEvents {
 			userID, userIDErr := userIDForSender(roomID, spec.SenderID(ev.SenderID))
 			if userIDErr != nil {

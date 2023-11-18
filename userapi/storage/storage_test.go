@@ -760,29 +760,29 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	})
 }
 
-func TestOneTimePseudoIDs(t *testing.T) {
+func TestOneTimeCryptoIDs(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, clean := mustCreateKeyDatabase(t, dbType)
 		defer clean()
 		userID := "@alice:localhost"
-		otk := api.OneTimePseudoIDs{
+		otk := api.OneTimeCryptoIDs{
 			UserID:  userID,
 			KeyJSON: map[string]json.RawMessage{"pseudoid_curve25519:KEY1": []byte(`{"key":"v1"}`)},
 		}
 
 		// Add a one time pseudoID to the DB
-		_, err := db.StoreOneTimePseudoIDs(ctx, otk)
+		_, err := db.StoreOneTimeCryptoIDs(ctx, otk)
 		MustNotError(t, err)
 
 		// Check the count of one time pseudoIDs is correct
-		count, err := db.OneTimePseudoIDsCount(ctx, userID)
+		count, err := db.OneTimeCryptoIDsCount(ctx, userID)
 		MustNotError(t, err)
 		if count.KeyCount["pseudoid_curve25519"] != 1 {
 			t.Fatalf("Expected 1 pseudoID, got %d", count.KeyCount["pseudoid_curve25519"])
 		}
 
 		// Check the actual pseudoid contents are correct
-		keysJSON, err := db.ExistingOneTimePseudoIDs(ctx, userID, []string{"pseudoid_curve25519:KEY1"})
+		keysJSON, err := db.ExistingOneTimeCryptoIDs(ctx, userID, []string{"pseudoid_curve25519:KEY1"})
 		MustNotError(t, err)
 		keyJSON, err := keysJSON["pseudoid_curve25519:KEY1"].MarshalJSON()
 		MustNotError(t, err)

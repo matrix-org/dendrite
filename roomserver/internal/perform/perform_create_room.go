@@ -69,7 +69,7 @@ func (c *Creator) PerformCreateRoomCryptoIDs(ctx context.Context, userID spec.Us
 		return nil, spec.InternalServerError{Err: err.Error()}
 	}
 
-	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionCryptoIDs {
 		util.GetLogger(ctx).Infof("StoreUserRoomPublicKey - SenderID: %s UserID: %s RoomID: %s", senderID, userID.String(), roomID.String())
 		bytes := spec.Base64Bytes{}
 		err = bytes.Decode(string(senderID))
@@ -152,7 +152,7 @@ func (c *Creator) PerformCreateRoomCryptoIDs(ctx context.Context, userID spec.Us
 	}
 
 	// If we are creating a room with pseudo IDs, create and sign the MXIDMapping
-	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+	if createRequest.RoomVersion == gomatrixserverlib.RoomVersionCryptoIDs {
 		mapping := &gomatrixserverlib.MXIDMapping{
 			UserRoomKey: senderID,
 			UserID:      userID.String(),

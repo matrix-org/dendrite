@@ -100,7 +100,7 @@ func SendEvent(
 	}
 
 	// Translate user ID state keys to room keys in pseudo ID rooms
-	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && stateKey != nil {
+	if (roomVersion == gomatrixserverlib.RoomVersionPseudoIDs || roomVersion == gomatrixserverlib.RoomVersionCryptoIDs) && stateKey != nil {
 		parsedRoomID, innerErr := spec.NewRoomID(roomID)
 		if innerErr != nil {
 			return util.JSONResponse{
@@ -154,7 +154,7 @@ func SendEvent(
 	}
 
 	// for power level events we need to replace the userID with the pseudoID
-	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && eventType == spec.MRoomPowerLevels {
+	if (roomVersion == gomatrixserverlib.RoomVersionPseudoIDs || roomVersion == gomatrixserverlib.RoomVersionCryptoIDs) && eventType == spec.MRoomPowerLevels {
 		err = updatePowerLevels(req, r, roomID, rsAPI)
 		if err != nil {
 			return util.JSONResponse{
@@ -299,7 +299,7 @@ func SendEventCryptoIDs(
 	}
 
 	// Translate user ID state keys to room keys in pseudo ID rooms
-	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && stateKey != nil {
+	if (roomVersion == gomatrixserverlib.RoomVersionPseudoIDs || roomVersion == gomatrixserverlib.RoomVersionCryptoIDs) && stateKey != nil {
 		parsedRoomID, innerErr := spec.NewRoomID(roomID)
 		if innerErr != nil {
 			return util.JSONResponse{
@@ -345,7 +345,7 @@ func SendEventCryptoIDs(
 	}
 
 	// for power level events we need to replace the userID with the pseudoID
-	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs && eventType == spec.MRoomPowerLevels {
+	if (roomVersion == gomatrixserverlib.RoomVersionPseudoIDs || roomVersion == gomatrixserverlib.RoomVersionCryptoIDs) && eventType == spec.MRoomPowerLevels {
 		err = updatePowerLevels(req, r, roomID, rsAPI)
 		if err != nil {
 			return util.JSONResponse{

@@ -46,13 +46,13 @@ func DeviceOTKCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID, deviceI
 	return nil
 }
 
-// OTPseudoIDCounts adds one-time pseudoID counts to the /sync response
-func OTPseudoIDCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID string, res *types.Response) error {
-	count, err := keyAPI.QueryOneTimePseudoIDs(ctx, userID)
+// OTCryptoIDCounts adds one-time pseudoID counts to the /sync response
+func OTCryptoIDCounts(ctx context.Context, keyAPI api.SyncKeyAPI, userID string, res *types.Response) error {
+	count, err := keyAPI.QueryOneTimeCryptoIDs(ctx, userID)
 	if err != nil {
 		return err
 	}
-	res.OTPseudoIDsCount = count.KeyCount
+	res.OTCryptoIDsCount = count.KeyCount
 	return nil
 }
 

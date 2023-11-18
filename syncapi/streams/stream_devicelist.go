@@ -41,7 +41,7 @@ func (p *DeviceListStreamProvider) IncrementalSync(
 		req.Log.WithError(err).Error("internal.DeviceOTKCounts failed")
 		return from
 	}
-	err = internal.OTPseudoIDCounts(req.Context, p.userAPI, req.Device.UserID, req.Response)
+	err = internal.OTCryptoIDCounts(req.Context, p.userAPI, req.Device.UserID, req.Response)
 	if err != nil {
 		req.Log.WithError(err).Error("internal.OTPseudoIDCounts failed")
 		return from

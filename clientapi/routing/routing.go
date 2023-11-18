@@ -320,7 +320,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc4080/send_pdus/{txnID}",
 		httputil.MakeAuthAPI("send_pdus", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			logrus.Info("Processing request to /org.matrix.msc4080/sendPDUs")
+			logrus.Info("Processing request to /org.matrix.msc4080/send_pdus")
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}

@@ -168,12 +168,12 @@ type OneTimeKeys interface {
 	DeleteOneTimeKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 }
 
-type OneTimePseudoIDs interface {
-	SelectOneTimePseudoIDs(ctx context.Context, userID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
-	CountOneTimePseudoIDs(ctx context.Context, userID string) (*api.OneTimePseudoIDsCount, error)
-	InsertOneTimePseudoIDs(ctx context.Context, txn *sql.Tx, keys api.OneTimePseudoIDs) (*api.OneTimePseudoIDsCount, error)
-	SelectAndDeleteOneTimePseudoID(ctx context.Context, txn *sql.Tx, userID, algorithm string) (map[string]json.RawMessage, error)
-	DeleteOneTimePseudoIDs(ctx context.Context, txn *sql.Tx, userID string) error
+type OneTimeCryptoIDs interface {
+	SelectOneTimeCryptoIDs(ctx context.Context, userID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
+	CountOneTimeCryptoIDs(ctx context.Context, userID string) (*api.OneTimeCryptoIDsCount, error)
+	InsertOneTimeCryptoIDs(ctx context.Context, txn *sql.Tx, keys api.OneTimeCryptoIDs) (*api.OneTimeCryptoIDsCount, error)
+	SelectAndDeleteOneTimeCryptoID(ctx context.Context, txn *sql.Tx, userID, algorithm string) (map[string]json.RawMessage, error)
+	DeleteOneTimeCryptoIDs(ctx context.Context, txn *sql.Tx, userID string) error
 }
 
 type DeviceKeys interface {

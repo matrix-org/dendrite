@@ -51,7 +51,7 @@ type AppserviceUserAPI interface {
 type RoomserverUserAPI interface {
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
-	ClaimOneTimePseudoID(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error)
+	ClaimOneTimeCryptoID(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error)
 }
 
 // api functions required by the media api
@@ -670,7 +670,7 @@ type UploadDeviceKeysAPI interface {
 type SyncKeyAPI interface {
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse) error
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse) error
-	QueryOneTimePseudoIDs(ctx context.Context, userID string) (OneTimePseudoIDsCount, *KeyError)
+	QueryOneTimeCryptoIDs(ctx context.Context, userID string) (OneTimeCryptoIDsCount, *KeyError)
 	PerformMarkAsStaleIfNeeded(ctx context.Context, req *PerformMarkAsStaleRequest, res *struct{}) error
 }
 
@@ -774,7 +774,7 @@ type OneTimeKeys struct {
 	KeyJSON map[string]json.RawMessage
 }
 
-type OneTimePseudoIDs struct {
+type OneTimeCryptoIDs struct {
 	// The user who owns this device
 	UserID string
 	// A map of algorithm:key_id => key JSON
@@ -788,7 +788,7 @@ func (k *OneTimeKeys) Split(keyIDWithAlgo string) (algo string, keyID string) {
 }
 
 // Split a key in KeyJSON into algorithm and key ID
-func (k *OneTimePseudoIDs) Split(keyIDWithAlgo string) (algo string, keyID string) {
+func (k *OneTimeCryptoIDs) Split(keyIDWithAlgo string) (algo string, keyID string) {
 	segments := strings.Split(keyIDWithAlgo, ":")
 	return segments[0], segments[1]
 }
@@ -807,7 +807,7 @@ type OneTimeKeysCount struct {
 	KeyCount map[string]int
 }
 
-type OneTimePseudoIDsCount struct {
+type OneTimeCryptoIDsCount struct {
 	// The user who owns this device
 	UserID string
 	// algorithm to count e.g:
@@ -823,7 +823,7 @@ type PerformUploadKeysRequest struct {
 	DeviceID         string // Optional - Device performing the request, for fetching OTK count
 	DeviceKeys       []DeviceKeys
 	OneTimeKeys      []OneTimeKeys
-	OneTimePseudoIDs []OneTimePseudoIDs
+	OneTimeCryptoIDs []OneTimeCryptoIDs
 	// OnlyDisplayNameUpdates should be `true` if ALL the DeviceKeys are present to update
 	// the display name for their respective device, and NOT to modify the keys. The key
 	// itself doesn't change but it's easier to pretend upload new keys and reuse the same code paths.
@@ -838,7 +838,7 @@ type PerformUploadKeysResponse struct {
 	// A map of user_id -> device_id -> Error for tracking failures.
 	KeyErrors             map[string]map[string]*KeyError
 	OneTimeKeyCounts      []OneTimeKeysCount
-	OneTimePseudoIDCounts []OneTimePseudoIDsCount
+	OneTimeCryptoIDCounts []OneTimeCryptoIDsCount
 }
 
 // PerformDeleteKeysRequest asks the keyserver to forget about certain

@@ -280,7 +280,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					if err != nil && err != context.Canceled {
 						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
-					err = internal.OTPseudoIDCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Response)
+					err = internal.OTCryptoIDCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Response)
 					if err != nil && err != context.Canceled {
 						syncReq.Log.WithError(err).Warn("failed to get OTPseudoID counts")
 					}

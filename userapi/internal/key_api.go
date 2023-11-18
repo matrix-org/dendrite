@@ -57,21 +57,21 @@ func (a *UserInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perfor
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
-	if len(req.OneTimePseudoIDs) > 0 {
-		a.uploadOneTimePseudoIDs(ctx, req, res)
+	if len(req.OneTimeCryptoIDs) > 0 {
+		a.uploadOneTimeCryptoIDs(ctx, req, res)
 	}
-	logrus.Infof("One time pseudoIDs count before: %v", res.OneTimePseudoIDCounts)
+	logrus.Infof("One time cryptoIDs count before: %v", res.OneTimeCryptoIDCounts)
 	otks, err := a.KeyDatabase.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
 		return err
 	}
 	res.OneTimeKeyCounts = []api.OneTimeKeysCount{*otks}
-	otpIDs, err := a.KeyDatabase.OneTimePseudoIDsCount(ctx, req.UserID)
+	otpIDs, err := a.KeyDatabase.OneTimeCryptoIDsCount(ctx, req.UserID)
 	if err != nil {
 		return err
 	}
-	res.OneTimePseudoIDCounts = []api.OneTimePseudoIDsCount{*otpIDs}
-	logrus.Infof("One time pseudoIDs count after: %v", res.OneTimePseudoIDCounts)
+	res.OneTimeCryptoIDCounts = []api.OneTimeCryptoIDsCount{*otpIDs}
+	logrus.Infof("One time cryptoIDs count after: %v", res.OneTimeCryptoIDCounts)
 	return nil
 }
 
@@ -193,11 +193,11 @@ func (a *UserInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOn
 	return nil
 }
 
-func (a *UserInternalAPI) QueryOneTimePseudoIDs(ctx context.Context, userID string) (api.OneTimePseudoIDsCount, *api.KeyError) {
-	count, err := a.KeyDatabase.OneTimePseudoIDsCount(ctx, userID)
+func (a *UserInternalAPI) QueryOneTimeCryptoIDs(ctx context.Context, userID string) (api.OneTimeCryptoIDsCount, *api.KeyError) {
+	count, err := a.KeyDatabase.OneTimeCryptoIDsCount(ctx, userID)
 	if err != nil {
-		return api.OneTimePseudoIDsCount{}, &api.KeyError{
-			Err: fmt.Sprintf("Failed to query OTK counts: %s", err),
+		return api.OneTimeCryptoIDsCount{}, &api.KeyError{
+			Err: fmt.Sprintf("Failed to query OTID counts: %s", err),
 		}
 	}
 	return *count, nil
@@ -796,26 +796,26 @@ func (a *UserInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perfor
 
 }
 
-func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
+func (a *UserInternalAPI) uploadOneTimeCryptoIDs(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
 	if req.UserID == "" {
 		res.Error = &api.KeyError{
 			Err: "user ID  missing",
 		}
 	}
-	if len(req.OneTimePseudoIDs) == 0 {
-		counts, err := a.KeyDatabase.OneTimePseudoIDsCount(ctx, req.UserID)
+	if len(req.OneTimeCryptoIDs) == 0 {
+		counts, err := a.KeyDatabase.OneTimeCryptoIDsCount(ctx, req.UserID)
 		if err != nil {
 			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("a.KeyDatabase.OneTimePseudoIDsCount: %s", err),
+				Err: fmt.Sprintf("a.KeyDatabase.OneTimeCryptoIDsCount: %s", err),
 			}
 		}
 		if counts != nil {
-			logrus.Infof("Uploading one-time pseudoIDs: early result count: %v", *counts)
-			res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
+			logrus.Infof("Uploading one-time cryptoIDs: early result count: %v", *counts)
+			res.OneTimeCryptoIDCounts = append(res.OneTimeCryptoIDCounts, *counts)
 		}
 		return
 	}
-	for _, key := range req.OneTimePseudoIDs {
+	for _, key := range req.OneTimeCryptoIDs {
 		// grab existing keys based on (user/algorithm/key ID)
 		keyIDsWithAlgorithms := make([]string, len(key.KeyJSON))
 		i := 0
@@ -823,10 +823,10 @@ func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.P
 			keyIDsWithAlgorithms[i] = keyIDWithAlgo
 			i++
 		}
-		existingKeys, err := a.KeyDatabase.ExistingOneTimePseudoIDs(ctx, req.UserID, keyIDsWithAlgorithms)
+		existingKeys, err := a.KeyDatabase.ExistingOneTimeCryptoIDs(ctx, req.UserID, keyIDsWithAlgorithms)
 		if err != nil {
 			res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
-				Err: "failed to query existing one-time pseudoIDs: " + err.Error(),
+				Err: "failed to query existing one-time cryptoIDs: " + err.Error(),
 			})
 			continue
 		}
@@ -834,22 +834,22 @@ func (a *UserInternalAPI) uploadOneTimePseudoIDs(ctx context.Context, req *api.P
 			// if keys exist and the JSON doesn't match, error out as the key already exists
 			if !bytes.Equal(existingKeys[keyIDWithAlgo], key.KeyJSON[keyIDWithAlgo]) {
 				res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
-					Err: fmt.Sprintf("%s device %s: algorithm / key ID %s one-time pseudoID already exists", req.UserID, req.DeviceID, keyIDWithAlgo),
+					Err: fmt.Sprintf("%s device %s: algorithm / key ID %s one-time cryptoID already exists", req.UserID, req.DeviceID, keyIDWithAlgo),
 				})
 				continue
 			}
 		}
 		// store one-time keys
-		counts, err := a.KeyDatabase.StoreOneTimePseudoIDs(ctx, key)
+		counts, err := a.KeyDatabase.StoreOneTimeCryptoIDs(ctx, key)
 		if err != nil {
 			res.KeyError(req.UserID, req.DeviceID, &api.KeyError{
-				Err: fmt.Sprintf("%s device %s : failed to store one-time pseudoIDs: %s", req.UserID, req.DeviceID, err.Error()),
+				Err: fmt.Sprintf("%s device %s : failed to store one-time cryptoIDs: %s", req.UserID, req.DeviceID, err.Error()),
 			})
 			continue
 		}
 		// collect counts
-		logrus.Infof("Uploading one-time pseudoIDs: result count: %v", *counts)
-		res.OneTimePseudoIDCounts = append(res.OneTimePseudoIDCounts, *counts)
+		logrus.Infof("Uploading one-time cryptoIDs: result count: %v", *counts)
+		res.OneTimeCryptoIDCounts = append(res.OneTimeCryptoIDCounts, *counts)
 	}
 }
 
@@ -857,16 +857,16 @@ type Ed25519Key struct {
 	Key spec.Base64Bytes `json:"key"`
 }
 
-func (a *UserInternalAPI) ClaimOneTimePseudoID(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
-	pseudoID, err := a.KeyDatabase.ClaimOneTimePseudoID(ctx, userID, "ed25519")
+func (a *UserInternalAPI) ClaimOneTimeCryptoID(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+	cryptoID, err := a.KeyDatabase.ClaimOneTimeCryptoID(ctx, userID, "ed25519")
 	if err != nil {
 		return "", err
 	}
 
-	logrus.Infof("Claimed one time pseuodID: %s", pseudoID)
+	logrus.Infof("Claimed one time cryptoID: %s", cryptoID)
 
-	if pseudoID != nil {
-		for key, value := range pseudoID.KeyJSON {
+	if cryptoID != nil {
+		for key, value := range cryptoID.KeyJSON {
 			keyParts := strings.Split(key, ":")
 			if keyParts[0] == "ed25519" {
 				var key_bytes Ed25519Key
@@ -885,7 +885,7 @@ func (a *UserInternalAPI) ClaimOneTimePseudoID(ctx context.Context, roomID spec.
 		}
 	}
 
-	return "", fmt.Errorf("failed claiming a valid one time pseudoID for this user: %s", userID.String())
+	return "", fmt.Errorf("failed claiming a valid one time cryptoID for this user: %s", userID.String())
 }
 
 func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage, onlyUpdateDisplayName bool) error {

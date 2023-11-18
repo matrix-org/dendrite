@@ -100,7 +100,7 @@ type queryKeysRequest struct {
 type uploadKeysCryptoIDsRequest struct {
 	DeviceKeys       json.RawMessage            `json:"device_keys"`
 	OneTimeKeys      map[string]json.RawMessage `json:"one_time_keys"`
-	OneTimePseudoIDs map[string]json.RawMessage `json:"one_time_pseudoids"`
+	OneTimeCryptoIDs map[string]json.RawMessage `json:"one_time_cryptoids"`
 }
 
 func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api.Device) util.JSONResponse {
@@ -132,11 +132,11 @@ func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api
 			},
 		}
 	}
-	if r.OneTimePseudoIDs != nil {
-		uploadReq.OneTimePseudoIDs = []api.OneTimePseudoIDs{
+	if r.OneTimeCryptoIDs != nil {
+		uploadReq.OneTimeCryptoIDs = []api.OneTimeCryptoIDs{
 			{
 				UserID:  device.UserID,
-				KeyJSON: r.OneTimePseudoIDs,
+				KeyJSON: r.OneTimeCryptoIDs,
 			},
 		}
 	}
@@ -144,7 +144,7 @@ func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api
 	util.GetLogger(req.Context()).
 		WithField("device keys", r.DeviceKeys).
 		WithField("one-time keys", r.OneTimeKeys).
-		WithField("one-time pseudoids", r.OneTimePseudoIDs).
+		WithField("one-time cryptoids", r.OneTimeCryptoIDs).
 		Info("Uploading keys")
 
 	var uploadRes api.PerformUploadKeysResponse
@@ -170,16 +170,16 @@ func UploadKeysCryptoIDs(req *http.Request, keyAPI api.ClientKeyAPI, device *api
 	if len(uploadRes.OneTimeKeyCounts) > 0 {
 		keyCount = uploadRes.OneTimeKeyCounts[0].KeyCount
 	}
-	pseudoIDCount := make(map[string]int)
-	if len(uploadRes.OneTimePseudoIDCounts) > 0 {
-		pseudoIDCount = uploadRes.OneTimePseudoIDCounts[0].KeyCount
+	cryptoIDCount := make(map[string]int)
+	if len(uploadRes.OneTimeCryptoIDCounts) > 0 {
+		cryptoIDCount = uploadRes.OneTimeCryptoIDCounts[0].KeyCount
 	}
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct {
-			OTKCounts   interface{} `json:"one_time_key_counts"`
-			OTPIDCounts interface{} `json:"one_time_pseudoid_counts"`
-		}{keyCount, pseudoIDCount},
+			OTKCounts  interface{} `json:"one_time_key_counts"`
+			OTIDCounts interface{} `json:"one_time_cryptoid_counts"`
+		}{keyCount, cryptoIDCount},
 	}
 }
 

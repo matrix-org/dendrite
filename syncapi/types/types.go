@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -365,7 +366,7 @@ type Response struct {
 	ToDevice            *ToDeviceResponse `json:"to_device,omitempty"`
 	DeviceLists         *DeviceLists      `json:"device_lists,omitempty"`
 	DeviceListsOTKCount map[string]int    `json:"device_one_time_keys_count,omitempty"`
-	OTPseudoIDsCount    map[string]int    `json:"one_time_pseudoids_count,omitempty"`
+	OTCryptoIDsCount    map[string]int    `json:"one_time_cryptoids_count,omitempty"`
 }
 
 func (r Response) MarshalJSON() ([]byte, error) {
@@ -428,7 +429,7 @@ func NewResponse() *Response {
 	res.DeviceLists = &DeviceLists{}
 	res.ToDevice = &ToDeviceResponse{}
 	res.DeviceListsOTKCount = map[string]int{}
-	res.OTPseudoIDsCount = map[string]int{}
+	res.OTCryptoIDsCount = map[string]int{}
 
 	return &res
 }
@@ -532,7 +533,7 @@ type InviteResponse struct {
 	InviteState struct {
 		Events []json.RawMessage `json:"events"`
 	} `json:"invite_state"`
-	OneTimePseudoID string `json:"one_time_pseudoid,omitempty"`
+	OneTimeCryptoID string `json:"one_time_cryptoid,omitempty"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
@@ -540,13 +541,17 @@ func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *t
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
-	res.OneTimePseudoID = *event.PDU.StateKey()
+	logrus.Infof("Room version: %s", event.Version())
+	if event.Version() == gomatrixserverlib.RoomVersionCryptoIDs {
+		logrus.Infof("Setting invite cryptoID to %s", *event.PDU.StateKey())
+		res.OneTimeCryptoID = *event.PDU.StateKey()
+	}
 
 	// First see if there's invite_room_state in the unsigned key of the invite.
 	// If there is then unmarshal it into the response. This will contain the
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != synctypes.FormatSyncFederation {
+		if (event.Version() == gomatrixserverlib.RoomVersionPseudoIDs || event.Version() == gomatrixserverlib.RoomVersionCryptoIDs) && eventFormat != synctypes.FormatSyncFederation {
 			updatedInvite, err := synctypes.GetUpdatedInviteRoomState(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 			}, inviteRoomState, event.PDU, event.RoomID(), eventFormat)
