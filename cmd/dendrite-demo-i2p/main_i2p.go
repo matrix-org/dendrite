@@ -70,9 +70,9 @@ func Dial(network, addr string) (net.Conn, error) {
 //go:embed static/*.gotmpl
 var staticContent embed.FS
 
-// SetupAndServeHTTP sets up the HTTP server to serve client & federation APIs
+// SetupAndServeHTTPS sets up the HTTPS server to serve client & federation APIs
 // and adds a prometheus handler under /_dendrite/metrics.
-func SetupAndServeHTTP(
+func SetupAndServeHTTPS(
 	processContext *process.ProcessContext,
 	cfg *config.Dendrite,
 	routers httputil.Routers,
@@ -93,21 +93,21 @@ func SetupAndServeHTTP(
 	defer garlic.Close()
 	listener, err := garlic.ListenTLS()
 	if err != nil {
-		logrus.WithError(err).Fatal("failed to serve HTTP")
+		logrus.WithError(err).Fatal("failed to serve HTTPS")
 	}
 	defer listener.Close()
 
-	externalHTTPAddr := config.ServerAddress{}
+	externalHTTPSAddr := config.ServerAddress{}
 	https, err := config.HTTPAddress("https://" + listener.Addr().String())
 	if err != nil {
 		logrus.WithError(err).Fatalf("Failed to parse http address")
 	}
-	externalHTTPAddr = https
+	externalHTTPSAddr = https
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
 	externalServ := &http.Server{
-		Addr:         externalHTTPAddr.Address,
+		Addr:         externalHTTPSAddr.Address,
 		WriteTimeout: basepkg.HTTPServerTimeout,
 		Handler:      externalRouter,
 		BaseContext: func(_ net.Listener) context.Context {
@@ -169,22 +169,22 @@ func SetupAndServeHTTP(
 	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
 	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
 
-	if externalHTTPAddr.Enabled() {
+	if externalHTTPSAddr.Enabled() {
 		go func() {
 			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
-			logrus.Infof("Starting external listener on %s", externalServ.Addr)
+			logrus.Infof("Starting external listener on https://%s", externalServ.Addr)
 			processContext.ComponentStarted()
 			externalServ.RegisterOnShutdown(func() {
 				if externalShutdown.CompareAndSwap(false, true) {
 					processContext.ComponentFinished()
-					logrus.Infof("Stopped external HTTP listener")
+					logrus.Infof("Stopped external HTTPS listener")
 				}
 			})
 			addr := listener.Addr()
 			externalServ.Addr = addr.String()
 			if err := externalServ.Serve(listener); err != nil {
 				if err != http.ErrServerClosed {
-					logrus.WithError(err).Fatal("failed to serve HTTP")
+					logrus.WithError(err).Fatal("failed to serve HTTPS")
 				}
 			}
 
@@ -195,7 +195,7 @@ func SetupAndServeHTTP(
 	minwinsvc.SetOnExit(processContext.ShutdownDendrite)
 	<-processContext.WaitForShutdown()
 
-	logrus.Infof("Stopping HTTP listeners")
+	logrus.Infof("Stopping HTTPS listeners")
 	_ = externalServ.Shutdown(context.Background())
-	logrus.Infof("Stopped HTTP listeners")
+	logrus.Infof("Stopped HTTPS listeners")
 }

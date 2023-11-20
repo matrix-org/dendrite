@@ -170,7 +170,7 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		SetupAndServeHTTP(processCtx, cfg, routers) //, httpsAddr, nil, nil)
+		SetupAndServeHTTPS(processCtx, cfg, routers) //, httpsAddr, nil, nil)
 	}()
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
