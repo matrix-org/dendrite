@@ -39,41 +39,10 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 )
 
-var (
-	unixSocket = flag.String("unix-socket", "",
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket for the server (disables http[s]-bind-address feature)",
-	)
-	unixSocketPermission = flag.String("unix-socket-permission", "755",
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket permission for the server (in chmod format like 755)",
-	)
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
-)
+var samAddr = flag.String("samaddr", "127.0.0.1:7656", "Address to connect to the I2P SAMv3 API")
 
 func main() {
 	cfg := setup.ParseFlags(true)
-	httpAddr := config.ServerAddress{}
-	httpsAddr := config.ServerAddress{}
-	if *unixSocket == "" {
-		http, err := config.HTTPAddress("http://" + *httpBindAddr)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse http address")
-		}
-		httpAddr = http
-		https, err := config.HTTPAddress("https://" + *httpsBindAddr)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse https address")
-		}
-		httpsAddr = https
-	} else {
-		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse unix socket")
-		}
-		httpAddr = socket
-	}
 
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors)
@@ -201,14 +170,8 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		SetupAndServeHTTP(processCtx, cfg, routers, httpAddr, nil, nil)
+		SetupAndServeHTTP(processCtx, cfg, routers) //, httpsAddr, nil, nil)
 	}()
-	// Handle HTTPS if certificate and key are provided
-	if *unixSocket == "" && *certFile != "" && *keyFile != "" {
-		go func() {
-			SetupAndServeHTTP(processCtx, cfg, routers, httpsAddr, certFile, keyFile)
-		}()
-	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	basepkg.WaitForShutdown(processCtx)

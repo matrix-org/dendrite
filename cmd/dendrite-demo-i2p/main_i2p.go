@@ -40,9 +40,12 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-var sam, err = goSam.NewDefaultClient()
+var sam, err = goSam.NewClient(*samAddr)
 
 func Dial(network, addr string) (net.Conn, error) {
+	if err != nil {
+		return nil, err
+	}
 	if network == "unix" {
 		return net.Dial(network, addr)
 	}
@@ -73,8 +76,6 @@ func SetupAndServeHTTP(
 	processContext *process.ProcessContext,
 	cfg *config.Dendrite,
 	routers httputil.Routers,
-	externalHTTPAddr config.ServerAddress,
-	certFile, keyFile *string,
 ) {
 	// create a transport that uses SAM to dial TCP Connections
 	httpClient := &http.Client{
@@ -84,6 +85,24 @@ func SetupAndServeHTTP(
 	}
 
 	http.DefaultClient = httpClient
+
+	garlic, err := onramp.NewGarlic("dendrite", *samAddr, onramp.OPT_DEFAULTS)
+	if err != nil {
+		logrus.WithError(err).Fatal("failed to create garlic")
+	}
+	defer garlic.Close()
+	listener, err := garlic.ListenTLS()
+	if err != nil {
+		logrus.WithError(err).Fatal("failed to serve HTTP")
+	}
+	defer listener.Close()
+
+	externalHTTPAddr := config.ServerAddress{}
+	https, err := config.HTTPAddress("https://" + listener.Addr().String())
+	if err != nil {
+		logrus.WithError(err).Fatalf("Failed to parse http address")
+	}
+	externalHTTPAddr = https
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
@@ -161,16 +180,6 @@ func SetupAndServeHTTP(
 					logrus.Infof("Stopped external HTTP listener")
 				}
 			})
-			garlic, err := onramp.NewGarlic("dendrite", "127.0.0.1:7656", onramp.OPT_DEFAULTS)
-			if err != nil {
-				logrus.WithError(err).Fatal("failed to create garlic")
-			}
-			defer garlic.Close()
-			listener, err := garlic.ListenTLS()
-			if err != nil {
-				logrus.WithError(err).Fatal("failed to serve HTTP")
-			}
-			defer listener.Close()
 			addr := listener.Addr()
 			externalServ.Addr = addr.String()
 			if err := externalServ.Serve(listener); err != nil {
