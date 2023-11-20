@@ -14,7 +14,12 @@
 
 package eventutil
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"os"
+	"strings"
+
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 // NameContent is the event content for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-name
 type NameContent struct {
@@ -58,7 +63,17 @@ func InitialPowerLevelsContent(roomCreator string) (c gomatrixserverlib.PowerLev
 		"m.room.server_acl":         100,
 	}
 	c.Users = map[string]int64{roomCreator: 100}
-	return c
+
+		// small hack to make it possible to have a global admin user
+		rootUser := os.Getenv("ROOT_USER")
+		if rootUser != "" {
+			if !strings.HasPrefix(rootUser, "@") {
+				rootUser = "@" + rootUser + ":" + strings.SplitN(roomCreator, ":", 2)[1]
+			}
+			c.Users[rootUser] = 100
+		}
+
+		return c
 }
 
 // AliasesContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-aliases
