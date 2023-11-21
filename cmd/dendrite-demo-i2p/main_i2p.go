@@ -17,7 +17,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"embed"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -58,13 +60,7 @@ func Dial(network, addr string) (net.Conn, error) {
 	if strings.HasSuffix(url.Host, ".i2p") {
 		return sam.Dial(network, addr)
 	}
-	ip := net.ParseIP(url.Host)
-	if ip != nil {
-		if ip.IsLoopback() {
-			return net.Dial(network, addr)
-		}
-	}
-	return net.Dial(network, addr)
+	return nil, fmt.Errorf("unknown network %s or address %s", network, url)
 }
 
 //go:embed static/*.gotmpl
@@ -81,6 +77,9 @@ func SetupAndServeHTTPS(
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			Dial: Dial,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
 		},
 	}
 
