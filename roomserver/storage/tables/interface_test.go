@@ -3,8 +3,9 @@ package tables
 import (
 	"testing"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +15,7 @@ func TestExtractContentValue(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		event *gomatrixserverlib.HeaderedEvent
+		event *types.HeaderedEvent
 		want  string
 	}{
 		{
@@ -24,37 +25,37 @@ func TestExtractContentValue(t *testing.T) {
 		},
 		{
 			name:  "returns the alias for canonical alias events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomCanonicalAlias, map[string]string{"alias": "#test:test"}),
+			event: room.CreateEvent(t, alice, spec.MRoomCanonicalAlias, map[string]string{"alias": "#test:test"}),
 			want:  "#test:test",
 		},
 		{
 			name:  "returns the history_visibility for history visibility events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomHistoryVisibility, map[string]string{"history_visibility": "shared"}),
+			event: room.CreateEvent(t, alice, spec.MRoomHistoryVisibility, map[string]string{"history_visibility": "shared"}),
 			want:  "shared",
 		},
 		{
 			name:  "returns the join rules for join_rules events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomJoinRules, map[string]string{"join_rule": "public"}),
+			event: room.CreateEvent(t, alice, spec.MRoomJoinRules, map[string]string{"join_rule": "public"}),
 			want:  "public",
 		},
 		{
 			name:  "returns the membership for room_member events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomMember, map[string]string{"membership": "join"}, test.WithStateKey(alice.ID)),
+			event: room.CreateEvent(t, alice, spec.MRoomMember, map[string]string{"membership": "join"}, test.WithStateKey(alice.ID)),
 			want:  "join",
 		},
 		{
 			name:  "returns the room name for room_name events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomName, map[string]string{"name": "testing"}, test.WithStateKey(alice.ID)),
+			event: room.CreateEvent(t, alice, spec.MRoomName, map[string]string{"name": "testing"}, test.WithStateKey(alice.ID)),
 			want:  "testing",
 		},
 		{
 			name:  "returns the room avatar for avatar events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomAvatar, map[string]string{"url": "mxc://testing"}, test.WithStateKey(alice.ID)),
+			event: room.CreateEvent(t, alice, spec.MRoomAvatar, map[string]string{"url": "mxc://testing"}, test.WithStateKey(alice.ID)),
 			want:  "mxc://testing",
 		},
 		{
 			name:  "returns the room topic for topic events",
-			event: room.CreateEvent(t, alice, gomatrixserverlib.MRoomTopic, map[string]string{"topic": "testing"}, test.WithStateKey(alice.ID)),
+			event: room.CreateEvent(t, alice, spec.MRoomTopic, map[string]string{"topic": "testing"}, test.WithStateKey(alice.ID)),
 			want:  "testing",
 		},
 		{

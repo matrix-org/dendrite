@@ -1,9 +1,5 @@
 package pushrules
 
-import (
-	"github.com/matrix-org/dendrite/roomserver/acls"
-)
-
 func defaultOverrideRules(userID string) []*Rule {
 	return []*Rule{
 		&mRuleMasterDefinition,
@@ -113,7 +109,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: pointer(acls.MRoomServerACL),
+				Pattern: pointer("m.room.server_acl"),
 			},
 			{
 				Kind:    EventMatchCondition,
