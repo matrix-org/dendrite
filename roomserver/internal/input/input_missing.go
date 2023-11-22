@@ -84,7 +84,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// need to fallback to /state.
 	t.log = util.GetLogger(ctx).WithFields(map[string]interface{}{
 		"txn_event":       e.EventID(),
-		"room_id":         e.RoomID(),
+		"room_id":         e.RoomID().String(),
 		"txn_prev_events": e.PrevEventIDs(),
 	})
 
@@ -264,7 +264,7 @@ func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e 
 		// Look up what the state is after the backward extremity. This will either
 		// come from the roomserver, if we know all the required events, or it will
 		// come from a remote server via /state_ids if not.
-		prevState, trustworthy, err := t.lookupStateAfterEvent(ctx, roomVersion, e.RoomID(), prevEventID)
+		prevState, trustworthy, err := t.lookupStateAfterEvent(ctx, roomVersion, e.RoomID().String(), prevEventID)
 		switch err2 := err.(type) {
 		case gomatrixserverlib.EventValidationError:
 			if !err2.Persistable {
@@ -316,9 +316,9 @@ func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e 
 		}
 		// There's more than one previous state - run them all through state res
 		var err error
-		t.roomsMu.Lock(e.RoomID())
+		t.roomsMu.Lock(e.RoomID().String())
 		resolvedState, err = t.resolveStatesAndCheck(ctx, roomVersion, respStates, e)
-		t.roomsMu.Unlock(e.RoomID())
+		t.roomsMu.Unlock(e.RoomID().String())
 		switch err2 := err.(type) {
 		case gomatrixserverlib.EventValidationError:
 			if !err2.Persistable {
@@ -498,6 +498,13 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 		roomVersion, gomatrixserverlib.ToPDUs(stateEventList), gomatrixserverlib.ToPDUs(authEventList), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		},
+		func(eventID string) bool {
+			isRejected, err := t.db.IsEventRejected(ctx, t.roomInfo.RoomNID, eventID)
+			if err != nil {
+				return true
+			}
+			return isRejected
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -510,7 +517,7 @@ retryAllowedState:
 	}); err != nil {
 		switch missing := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
-			h, err2 := t.lookupEvent(ctx, roomVersion, backwardsExtremity.RoomID(), missing.AuthEventID, true)
+			h, err2 := t.lookupEvent(ctx, roomVersion, backwardsExtremity.RoomID().String(), missing.AuthEventID, true)
 			switch e := err2.(type) {
 			case gomatrixserverlib.EventValidationError:
 				if !e.Persistable {
@@ -546,7 +553,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	trace, ctx := internal.StartRegion(ctx, "getMissingEvents")
 	defer trace.EndRegion()
 
-	logger := t.log.WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
+	logger := t.log.WithField("event_id", e.EventID()).WithField("room_id", e.RoomID().String())
 	latest, _, _, err := t.db.LatestEventIDs(ctx, t.roomInfo.RoomNID)
 	if err != nil {
 		return nil, false, false, fmt.Errorf("t.DB.LatestEventIDs: %w", err)
@@ -560,7 +567,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	var missingResp *fclient.RespMissingEvents
 	for _, server := range t.servers {
 		var m fclient.RespMissingEvents
-		if m, err = t.federation.LookupMissingEvents(ctx, t.virtualHost, server, e.RoomID(), fclient.MissingEvents{
+		if m, err = t.federation.LookupMissingEvents(ctx, t.virtualHost, server, e.RoomID().String(), fclient.MissingEvents{
 			Limit: 20,
 			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 			EarliestEvents: latestEvents,

@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/internal"
@@ -102,7 +101,7 @@ func NewInternalAPI(
 	caches *caching.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
-) api.FederationInternalAPI {
+) *internal.FederationInternalAPI {
 	cfg := &dendriteCfg.FederationAPI
 
 	federationDB, err := storage.NewDatabase(processContext.Context(), cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)

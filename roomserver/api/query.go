@@ -132,6 +132,8 @@ type QueryMembershipForUserResponse struct {
 	// True if the user asked to forget this room.
 	IsRoomForgotten bool `json:"is_room_forgotten"`
 	RoomExists      bool `json:"room_exists"`
+	// The sender ID of the user in the room, if it exists
+	SenderID *spec.SenderID
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -289,16 +291,6 @@ type QuerySharedUsersResponse struct {
 	UserIDsToCount map[string]int
 }
 
-type QueryRoomsForUserRequest struct {
-	UserID string
-	// The desired membership of the user. If this is the empty string then no rooms are returned.
-	WantMembership string
-}
-
-type QueryRoomsForUserResponse struct {
-	RoomIDs []string
-}
-
 type QueryBulkStateContentRequest struct {
 	// Returns state events in these rooms
 	RoomIDs []string
@@ -412,22 +404,6 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 		}] = v
 	}
 	return nil
-}
-
-// QueryMembershipAtEventRequest requests the membership event for a user
-// for a list of eventIDs.
-type QueryMembershipAtEventRequest struct {
-	RoomID   string
-	EventIDs []string
-	UserID   string
-}
-
-// QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
-type QueryMembershipAtEventResponse struct {
-	// Membership is a map from eventID to membership event. Events that
-	// do not have known state will return a nil event, resulting in a "leave" membership
-	// when calculating history visibility.
-	Membership map[string]*types.HeaderedEvent `json:"membership"`
 }
 
 // QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a

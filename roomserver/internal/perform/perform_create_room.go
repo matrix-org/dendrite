@@ -90,7 +90,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	} else {
 		senderID = spec.SenderID(userID.String())
 	}
-	createContent["creator"] = senderID
+
+	// TODO: Maybe, at some point, GMSL should return the events to create, so we can define the version
+	// entirely there.
+	switch createRequest.RoomVersion {
+	case gomatrixserverlib.RoomVersionV11:
+		// RoomVersionV11 removed the creator field from the create content: https://github.com/matrix-org/matrix-spec-proposals/pull/2175
+	default:
+		createContent["creator"] = senderID
+	}
+
 	createContent["room_version"] = createRequest.RoomVersion
 	powerLevelContent := eventutil.InitialPowerLevelsContent(string(senderID))
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
@@ -433,23 +442,16 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// from creating the room but still failing due to the alias having already
 	// been taken.
 	if roomAlias != "" {
-		aliasReq := api.SetRoomAliasRequest{
-			Alias:  roomAlias,
-			RoomID: roomID.String(),
-			UserID: userID.String(),
-		}
-
-		var aliasResp api.SetRoomAliasResponse
-		err = c.RSAPI.SetRoomAlias(ctx, &aliasReq, &aliasResp)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+		aliasAlreadyExists, aliasErr := c.RSAPI.SetRoomAlias(ctx, senderID, roomID, roomAlias)
+		if aliasErr != nil {
+			util.GetLogger(ctx).WithError(aliasErr).Error("aliasAPI.SetRoomAlias failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
 			}
 		}
 
-		if aliasResp.AliasExists {
+		if aliasAlreadyExists {
 			return "", &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.RoomInUse("Room alias already exists."),

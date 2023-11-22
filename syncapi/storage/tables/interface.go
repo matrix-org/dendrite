@@ -194,7 +194,7 @@ type Receipts interface {
 type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
-	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
+	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error)
 	PurgeMemberships(ctx context.Context, txn *sql.Tx, roomID string) error
 	SelectMemberships(
 		ctx context.Context, txn *sql.Tx,

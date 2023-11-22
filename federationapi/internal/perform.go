@@ -481,8 +481,10 @@ func (r *FederationInternalAPI) PerformLeave(
 		senderID, err := r.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
 		if err != nil {
 			return err
+		} else if senderID == nil {
+			return fmt.Errorf("sender ID not found for %s in %s", *userID, *roomID)
 		}
-		senderIDString := string(senderID)
+		senderIDString := string(*senderID)
 		respMakeLeave.LeaveEvent.Type = spec.MRoomMember
 		respMakeLeave.LeaveEvent.SenderID = senderIDString
 		respMakeLeave.LeaveEvent.StateKey = &senderIDString
@@ -546,11 +548,7 @@ func (r *FederationInternalAPI) SendInvite(
 	event gomatrixserverlib.PDU,
 	strippedState []gomatrixserverlib.InviteStrippedState,
 ) (gomatrixserverlib.PDU, error) {
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return nil, err
-	}
-	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	inviter, err := r.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +571,7 @@ func (r *FederationInternalAPI) SendInvite(
 	logrus.WithFields(logrus.Fields{
 		"event_id":     event.EventID(),
 		"user_id":      *event.StateKey(),
-		"room_id":      event.RoomID(),
+		"room_id":      event.RoomID().String(),
 		"room_version": event.Version(),
 		"destination":  destination,
 	}).Info("Sending invite")

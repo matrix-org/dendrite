@@ -71,7 +71,7 @@ func SendBan(
 		}
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
-	if err != nil {
+	if err != nil || senderID == nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You don't have permission to ban this user, unknown senderID"),
@@ -87,7 +87,7 @@ func SendBan(
 	if errRes != nil {
 		return *errRes
 	}
-	allowedToBan := pl.UserLevel(senderID) >= pl.Ban
+	allowedToBan := pl.UserLevel(*senderID) >= pl.Ban
 	if !allowedToBan {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -169,7 +169,7 @@ func SendKick(
 		}
 	}
 	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
-	if err != nil {
+	if err != nil || senderID == nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You don't have permission to kick this user, unknown senderID"),
@@ -193,7 +193,7 @@ func SendKick(
 	if errRes != nil {
 		return *errRes
 	}
-	allowedToKick := pl.UserLevel(senderID) >= pl.Kick || bodyUserID.String() == deviceUserID.String()
+	allowedToKick := pl.UserLevel(*senderID) >= pl.Kick || bodyUserID.String() == deviceUserID.String()
 	if !allowedToKick {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -477,6 +477,8 @@ func buildMembershipEvent(
 	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
 	if err != nil {
 		return nil, err
+	} else if senderID == nil {
+		return nil, fmt.Errorf("no sender ID for %s in %s", *userID, *validRoomID)
 	}
 
 	targetID, err := spec.NewUserID(targetUserID, true)
@@ -486,6 +488,8 @@ func buildMembershipEvent(
 	targetSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *targetID)
 	if err != nil {
 		return nil, err
+	} else if targetSenderID == nil {
+		return nil, fmt.Errorf("no sender ID for %s in %s", *targetID, *validRoomID)
 	}
 
 	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *userID)
@@ -493,8 +497,8 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return buildMembershipEventDirect(ctx, targetSenderID, reason, profile.DisplayName, profile.AvatarURL,
-		senderID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
+	return buildMembershipEventDirect(ctx, *targetSenderID, reason, profile.DisplayName, profile.AvatarURL,
+		*senderID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

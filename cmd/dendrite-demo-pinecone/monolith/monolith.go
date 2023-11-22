@@ -145,7 +145,7 @@ func (p *P2PMonolith) SetupDendrite(
 	)
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, enableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 
 	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 
@@ -221,8 +221,8 @@ func (p *P2PMonolith) closeAllResources() {
 	p.httpServerMu.Lock()
 	if p.httpServer != nil {
 		_ = p.httpServer.Shutdown(context.Background())
-		p.httpServerMu.Unlock()
 	}
+	p.httpServerMu.Unlock()
 
 	select {
 	case p.stopHandlingEvents <- true:

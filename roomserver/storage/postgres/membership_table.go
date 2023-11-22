@@ -363,7 +363,7 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
-	return roomNIDs, nil
+	return roomNIDs, rows.Err()
 }
 
 func (s *membershipStatements) SelectJoinedUsersSetForRooms(

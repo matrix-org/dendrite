@@ -117,19 +117,27 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
-	var queryRes roomserverAPI.QueryRoomsForUserResponse
-	err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
-		UserID:         m.UserID,
-		WantMembership: "join",
-	}, &queryRes)
+	userID, err := spec.NewUserID(m.UserID, true)
+	if err != nil {
+		sentry.CaptureException(err)
+		logger.WithError(err).Error("invalid user ID")
+		return true
+	}
+
+	roomIDs, err := t.rsAPI.QueryRoomsForUser(t.ctx, *userID, "join")
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
 	}
 
+	roomIDStrs := make([]string, len(roomIDs))
+	for i, room := range roomIDs {
+		roomIDStrs[i] = room.String()
+	}
+
 	// send this key change to all servers who share rooms with this user.
-	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
+	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined hosts for rooms user is in")
@@ -179,18 +187,27 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	}
 	logger := logrus.WithField("user_id", output.UserID)
 
-	var queryRes roomserverAPI.QueryRoomsForUserResponse
-	err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
-		UserID:         output.UserID,
-		WantMembership: "join",
-	}, &queryRes)
+	outputUserID, err := spec.NewUserID(output.UserID, true)
+	if err != nil {
+		sentry.CaptureException(err)
+		logrus.WithError(err).Errorf("invalid user ID")
+		return true
+	}
+
+	rooms, err := t.rsAPI.QueryRoomsForUser(t.ctx, *outputUserID, "join")
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined rooms for user")
 		return true
 	}
+
+	roomIDStrs := make([]string, len(rooms))
+	for i, room := range rooms {
+		roomIDStrs[i] = room.String()
+	}
+
 	// send this key change to all servers who share rooms with this user.
-	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
+	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined hosts for rooms user is in")

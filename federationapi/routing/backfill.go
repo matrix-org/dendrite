@@ -109,7 +109,7 @@ func Backfill(
 
 	var ev *types.HeaderedEvent
 	for _, ev = range res.Events {
-		if ev.RoomID() == roomID {
+		if ev.RoomID().String() == roomID {
 			evs = append(evs, ev.PDU)
 		}
 	}

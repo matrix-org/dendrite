@@ -296,6 +296,7 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	if err != nil {
 		return devices, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectDevicesByLocalpart: failed to close rows")
 
 	var dev api.Device
 	var lastseents sql.NullInt64
@@ -325,7 +326,7 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 		devices = append(devices, dev)
 	}
 
-	return devices, nil
+	return devices, rows.Err()
 }
 
 func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {

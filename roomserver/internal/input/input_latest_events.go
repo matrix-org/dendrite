@@ -197,7 +197,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID().String(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
@@ -290,7 +290,7 @@ func (u *latestEventsUpdater) latestState() error {
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
 			"event_id":      u.event.EventID(),
-			"room_id":       u.event.RoomID(),
+			"room_id":       u.event.RoomID().String(),
 			"old_state_nid": u.oldStateNID,
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),

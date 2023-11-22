@@ -213,13 +213,14 @@ func main() {
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
-
-	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
 		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
+
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
+	rsAPI.SetAppserviceAPI(asAPI)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 

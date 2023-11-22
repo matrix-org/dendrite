@@ -106,7 +106,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	_, err = stmt.ExecContext(
 		ctx,
 		streamPos,
-		inviteEvent.RoomID(),
+		inviteEvent.RoomID().String(),
 		inviteEvent.EventID(),
 		inviteEvent.UserID.String(),
 		headeredJSON,
@@ -176,7 +176,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	if lastPos == 0 {
 		lastPos = r.To
 	}
-	return result, retired, lastPos, nil
+	return result, retired, lastPos, rows.Err()
 }
 
 func (s *inviteEventsStatements) SelectMaxInviteID(

@@ -99,7 +99,7 @@ func MakeJoin(
 		Roomserver: rsAPI,
 	}
 
-	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
+	senderIDPtr, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
 		return util.JSONResponse{
@@ -108,8 +108,11 @@ func MakeJoin(
 		}
 	}
 
-	if senderID == "" {
+	var senderID spec.SenderID
+	if senderIDPtr == nil {
 		senderID = spec.SenderID(userID.String())
+	} else {
+		senderID = *senderIDPtr
 	}
 
 	input := gomatrixserverlib.HandleMakeJoinInput{

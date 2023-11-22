@@ -134,7 +134,7 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 		}
 		counts.KeyCount[algorithm] = count
 	}
-	return counts, nil
+	return counts, rows.Err()
 }
 
 func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, txn *sql.Tx, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {

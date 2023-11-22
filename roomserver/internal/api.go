@@ -61,6 +61,7 @@ type RoomserverInternalAPI struct {
 	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []spec.ServerName
 	enableMetrics          bool
+	defaultRoomVersion     gomatrixserverlib.RoomVersion
 }
 
 func NewRoomserverAPI(
@@ -92,6 +93,7 @@ func NewRoomserverAPI(
 		Durable:                dendriteCfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		enableMetrics:          enableMetrics,
+		defaultRoomVersion:     dendriteCfg.RoomServer.DefaultRoomVersion,
 		// perform-er structs + queryer struct get initialised when we have a federation sender to use
 	}
 	return a
@@ -218,6 +220,10 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 	r.asAPI = asAPI
 }
 
+func (r *RoomserverInternalAPI) DefaultRoomVersion() gomatrixserverlib.RoomVersion {
+	return r.defaultRoomVersion
+}
+
 func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error) {
 	return r.Inviter.IsKnownRoom(ctx, roomID)
 }
@@ -233,7 +239,7 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID().String(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(

@@ -100,16 +100,12 @@ func (r *Inviter) ProcessInviteMembership(
 	var outputUpdates []api.OutputEvent
 	var updater *shared.MembershipUpdater
 
-	validRoomID, err := spec.NewRoomID(inviteEvent.RoomID())
-	if err != nil {
-		return nil, err
-	}
-	userID, err := r.RSAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*inviteEvent.StateKey()))
+	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), spec.SenderID(*inviteEvent.StateKey()))
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
-	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
+	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
 	outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
@@ -133,6 +129,8 @@ func (r *Inviter) PerformInvite(
 	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.InviteInput.RoomID, req.InviteInput.Inviter)
 	if err != nil {
 		return err
+	} else if senderID == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", req.InviteInput.Inviter, req.InviteInput.RoomID)
 	}
 	info, err := r.DB.RoomInfo(ctx, req.InviteInput.RoomID.String())
 	if err != nil {
@@ -140,7 +138,7 @@ func (r *Inviter) PerformInvite(
 	}
 
 	proto := gomatrixserverlib.ProtoEvent{
-		SenderID: string(senderID),
+		SenderID: string(*senderID),
 		RoomID:   req.InviteInput.RoomID.String(),
 		Type:     "m.room.member",
 	}
@@ -187,7 +185,7 @@ func (r *Inviter) PerformInvite(
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		},
-		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (spec.SenderID, error) {
+		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
 			return r.RSAPI.QuerySenderIDForUser(ctx, roomID, userID)
 		},
 		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {

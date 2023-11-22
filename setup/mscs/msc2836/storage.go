@@ -239,7 +239,7 @@ func (p *DB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 			return err
 		}
 		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
-		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
+		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
 		return err
 	})
 }
@@ -301,7 +301,7 @@ func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string, rec
 		}
 		children = append(children, evInfo)
 	}
-	return children, nil
+	return children, rows.Err()
 }
 
 func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error) {
