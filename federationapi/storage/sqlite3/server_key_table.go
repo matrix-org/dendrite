@@ -98,12 +98,12 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 	err := sqlutil.RunLimitedVariablesQuery(
 		ctx, bulkSelectServerSigningKeysSQL, s.db, iKeyIDs, sqlutil.SQLite3MaxVariables,
 		func(rows *sql.Rows) error {
+			var serverName string
+			var keyID string
+			var key string
+			var validUntilTS int64
+			var expiredTS int64
 			for rows.Next() {
-				var serverName string
-				var keyID string
-				var key string
-				var validUntilTS int64
-				var expiredTS int64
 				if err := rows.Scan(&serverName, &keyID, &validUntilTS, &expiredTS, &key); err != nil {
 					return fmt.Errorf("bulkSelectServerKeys: %v", err)
 				}
