@@ -103,6 +103,7 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 			var key string
 			var validUntilTS int64
 			var expiredTS int64
+			var vk gomatrixserverlib.VerifyKey
 			for rows.Next() {
 				if err := rows.Scan(&serverName, &keyID, &validUntilTS, &expiredTS, &key); err != nil {
 					return fmt.Errorf("bulkSelectServerKeys: %v", err)
@@ -111,7 +112,6 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 					ServerName: spec.ServerName(serverName),
 					KeyID:      gomatrixserverlib.KeyID(keyID),
 				}
-				vk := gomatrixserverlib.VerifyKey{}
 				err := vk.Key.Decode(key)
 				if err != nil {
 					return fmt.Errorf("bulkSelectServerKeys: %v", err)
