@@ -172,28 +172,16 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			}
 		}
 		for _, ev := range stateAfterRes.StateEvents {
-			sender := spec.UserID{}
-			evRoomID, err := spec.NewRoomID(ev.RoomID())
+			clientEvent, err := synctypes.ToClientEvent(ev, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			})
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Event roomID is invalid")
+				util.GetLogger(ctx).WithError(err).Error("Failed converting to ClientEvent")
 				continue
-			}
-			userID, err := rsAPI.QueryUserIDForSender(ctx, *evRoomID, ev.SenderID())
-			if err == nil && userID != nil {
-				sender = *userID
-			}
-
-			sk := ev.StateKey()
-			if sk != nil && *sk != "" {
-				skUserID, err := rsAPI.QueryUserIDForSender(ctx, *evRoomID, spec.SenderID(*ev.StateKey()))
-				if err == nil && skUserID != nil {
-					skString := skUserID.String()
-					sk = &skString
-				}
 			}
 			stateEvents = append(
 				stateEvents,
-				synctypes.ToClientEvent(ev, synctypes.FormatAll, sender, sk),
+				*clientEvent,
 			)
 		}
 	}
@@ -216,6 +204,37 @@ func OnIncomingStateTypeRequest(
 ) util.JSONResponse {
 	var worldReadable bool
 	var wantLatestState bool
+
+	roomVer, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
+		}
+	}
+
+	// Translate user ID state keys to room keys in pseudo ID rooms
+	if roomVer == gomatrixserverlib.RoomVersionPseudoIDs {
+		parsedRoomID, err := spec.NewRoomID(roomID)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.InvalidParam("invalid room ID"),
+			}
+		}
+		newStateKey, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+			return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
+		})
+		if err != nil {
+			// TODO: work out better logic for failure cases (e.g. sender ID not found)
+			util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
+		stateKey = *newStateKey
+	}
 
 	// Always fetch visibility so that we can work out whether to show
 	// the latest events or the last event from when the user was joined.

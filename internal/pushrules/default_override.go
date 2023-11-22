@@ -10,6 +10,7 @@ func defaultOverrideRules(userID string) []*Rule {
 		&mRuleRoomNotifDefinition,
 		&mRuleTombstoneDefinition,
 		&mRuleReactionDefinition,
+		&mRuleACLsDefinition,
 	}
 }
 
@@ -30,7 +31,7 @@ var (
 		RuleID:  MRuleMaster,
 		Default: true,
 		Enabled: false,
-		Actions: []*Action{{Kind: DontNotifyAction}},
+		Actions: []*Action{},
 	}
 	mRuleSuppressNoticesDefinition = Rule{
 		RuleID:  MRuleSuppressNotices,
@@ -43,7 +44,7 @@ var (
 				Pattern: pointer("m.notice"),
 			},
 		},
-		Actions: []*Action{{Kind: DontNotifyAction}},
+		Actions: []*Action{},
 	}
 	mRuleMemberEventDefinition = Rule{
 		RuleID:  MRuleMemberEvent,
@@ -56,7 +57,7 @@ var (
 				Pattern: pointer("m.room.member"),
 			},
 		},
-		Actions: []*Action{{Kind: DontNotifyAction}},
+		Actions: []*Action{},
 	}
 	mRuleContainsDisplayNameDefinition = Rule{
 		RuleID:     MRuleContainsDisplayName,
@@ -152,9 +153,7 @@ var (
 				Pattern: pointer("m.reaction"),
 			},
 		},
-		Actions: []*Action{
-			{Kind: DontNotifyAction},
-		},
+		Actions: []*Action{},
 	}
 )
 

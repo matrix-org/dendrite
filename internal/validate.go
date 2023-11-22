@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
+	maxUsernameLength = 254 // https://spec.matrix.org/v1.7/appendices/#user-identifiers TODO account for domain
 
 	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
 	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161

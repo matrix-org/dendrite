@@ -13,8 +13,6 @@ func TestActionJSON(t *testing.T) {
 		Want Action
 	}{
 		{Action{Kind: NotifyAction}},
-		{Action{Kind: DontNotifyAction}},
-		{Action{Kind: CoalesceAction}},
 		{Action{Kind: SetTweakAction}},
 
 		{Action{Kind: SetTweakAction, Tweak: SoundTweak, Value: "default"}},

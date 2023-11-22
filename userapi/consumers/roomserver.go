@@ -92,29 +92,42 @@ func (s *OutputRoomEventConsumer) Start() error {
 func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Only handle events we care about
-	if rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) != rsapi.OutputTypeNewRoomEvent {
-		return true
-	}
-	var output rsapi.OutputEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return true
-	}
-	event := output.NewRoomEvent.Event
-	if event == nil {
-		log.Errorf("userapi consumer: expected event")
+
+	var event *rstypes.HeaderedEvent
+	var isNewRoomEvent bool
+	switch rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) {
+	case rsapi.OutputTypeNewRoomEvent:
+		isNewRoomEvent = true
+		fallthrough
+	case rsapi.OutputTypeNewInviteEvent:
+		var output rsapi.OutputEvent
+		if err := json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return true
+		}
+		if isNewRoomEvent {
+			event = output.NewRoomEvent.Event
+		} else {
+			event = output.NewInviteEvent.Event
+		}
+
+		if event == nil {
+			log.Errorf("userapi consumer: expected event")
+			return true
+		}
+
+		log.WithFields(log.Fields{
+			"event_id":   event.EventID(),
+			"event_type": event.Type(),
+		}).Tracef("Received message from roomserver: %#v", output)
+	default:
 		return true
 	}
 
 	if s.cfg.Matrix.ReportStats.Enabled {
-		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID())
+		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
-
-	log.WithFields(log.Fields{
-		"event_id":   event.EventID(),
-		"event_type": event.Type(),
-	}).Tracef("Received message from roomserver: %#v", output)
 
 	metadata, err := msg.Metadata()
 	if err != nil {
@@ -253,8 +266,8 @@ func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, 
 	directChats := gjson.ParseBytes(directChatsRaw)
 	newDirectChats := make(map[string][]string)
 	// iterate over all userID -> roomIDs
+	var found bool
 	directChats.ForEach(func(userID, roomIDs gjson.Result) bool {
-		var found bool
 		for _, roomID := range roomIDs.Array() {
 			newDirectChats[userID.Str] = append(newDirectChats[userID.Str], roomID.Str)
 			// add the new roomID to m.direct
@@ -263,22 +276,21 @@ func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, 
 				newDirectChats[userID.Str] = append(newDirectChats[userID.Str], newRoomID)
 			}
 		}
-		// Only hit the database if we found the old room as a DM for this user
-		if found {
-			var data []byte
-			data, err = json.Marshal(newDirectChats)
-			if err != nil {
-				return true
-			}
-			if err = s.db.SaveAccountData(ctx, localpart, serverName, "", "m.direct", data); err != nil {
-				return true
-			}
-		}
 		return true
 	})
-	if err != nil {
-		return fmt.Errorf("failed to update m.direct state")
+
+	// Only hit the database if we found the old room as a DM for this user
+	if found {
+		var data []byte
+		data, err = json.Marshal(newDirectChats)
+		if err != nil {
+			return err
+		}
+		if err = s.db.SaveAccountData(ctx, localpart, serverName, "", "m.direct", data); err != nil {
+			return fmt.Errorf("failed to update m.direct state: %w", err)
+		}
 	}
+
 	return nil
 }
 
@@ -294,34 +306,21 @@ func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRo
 }
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rstypes.HeaderedEvent, streamPos uint64) error {
-	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
+	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID().String())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
 	}
 
 	switch {
 	case event.Type() == spec.MRoomMember:
-		sender := spec.UserID{}
-		validRoomID, roomErr := spec.NewRoomID(event.RoomID())
-		if roomErr != nil {
-			return roomErr
+		cevent, clientEvErr := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		})
+		if clientEvErr != nil {
+			return clientEvErr
 		}
-		userID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
-		if queryErr == nil && userID != nil {
-			sender = *userID
-		}
-
-		sk := event.StateKey()
-		if sk != nil && *sk != "" {
-			skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
-			if queryErr == nil && skUserID != nil {
-				skString := skUserID.String()
-				sk = &skString
-			}
-		}
-		cevent := synctypes.ToClientEvent(event, synctypes.FormatAll, sender, sk)
 		var member *localMembership
-		member, err = newLocalMembership(&cevent)
+		member, err = newLocalMembership(cevent)
 		if err != nil {
 			return fmt.Errorf("newLocalMembership: %w", err)
 		}
@@ -332,7 +331,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		}
 	case event.Type() == "m.room.tombstone" && event.StateKeyEquals(""):
 		// Handle room upgrades
-		oldRoomID := event.RoomID()
+		oldRoomID := event.RoomID().String()
 		newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
 		if err = s.handleRoomUpgrade(ctx, oldRoomID, newRoomID, members, roomSize); err != nil {
 			// while inconvenient, this shouldn't stop us from sending push notifications
@@ -349,7 +348,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 
 	log.WithFields(log.Fields{
 		"event_id":    event.EventID(),
-		"room_id":     event.RoomID(),
+		"room_id":     event.RoomID().String(),
 		"num_members": len(members),
 		"room_size":   roomSize,
 	}).Tracef("Notifying members")
@@ -403,15 +402,22 @@ func newLocalMembership(event *synctypes.ClientEvent) (*localMembership, error) 
 // localRoomMembers fetches the current local members of a room, and
 // the total number of members.
 func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
+	// Get only locally joined users to avoid unmarshalling and caching
+	// membership events we only use to calculate the room size.
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
+		LocalOnly:  true,
 	}
 	var res rsapi.QueryMembershipsForRoomResponse
-
-	// XXX: This could potentially race if the state for the event is not known yet
-	// e.g. the event came over federation but we do not have the full state persisted.
 	if err := s.rsAPI.QueryMembershipsForRoom(ctx, req, &res); err != nil {
+		return nil, 0, err
+	}
+
+	// Since we only queried locally joined users above,
+	// we also need to ask the roomserver about the joined user count.
+	totalCount, err := s.rsAPI.JoinedUserCount(ctx, roomID)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -424,31 +430,18 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 		if *event.StateKey == "" {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.SplitID('@', *event.StateKey)
-		if err != nil {
-			log.WithError(err).Error("failed to get servername from statekey")
-			continue
-		}
-		// Only get memberships for our server
-		if serverName != s.serverName {
-			continue
-		}
+		// We're going to trust the Query from above to really just return
+		// local users
 		member, err := newLocalMembership(&event)
 		if err != nil {
 			log.WithError(err).Errorf("Parsing MemberContent")
-			continue
-		}
-		if member.Membership != spec.Join {
-			continue
-		}
-		if member.Domain != s.cfg.Matrix.ServerName {
 			continue
 		}
 
 		members = append(members, member)
 	}
 
-	return members, len(res.JoinEvents), nil
+	return members, totalCount, nil
 }
 
 // roomName returns the name in the event (if type==m.room.name), or
@@ -467,8 +460,21 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *rstypes.H
 		}
 	}
 
+	// Special case for invites, as we don't store any "current state" for these events,
+	// we need to make sure that, if present, the m.room.name is sent as well.
+	if event.Type() == spec.MRoomMember &&
+		gjson.GetBytes(event.Content(), "membership").Str == "invite" {
+		invState := gjson.GetBytes(event.JSON(), "unsigned.invite_room_state")
+		for _, ev := range invState.Array() {
+			if ev.Get("type").Str == spec.MRoomName {
+				name := ev.Get("content.name").Str
+				return name, nil
+			}
+		}
+	}
+
 	req := &rsapi.QueryCurrentStateRequest{
-		RoomID:      event.RoomID(),
+		RoomID:      event.RoomID().String(),
 		StateTuples: []gomatrixserverlib.StateKeyTuple{roomNameTuple, canonicalAliasTuple},
 	}
 	var res rsapi.QueryCurrentStateResponse
@@ -532,11 +538,11 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if err != nil {
 		return fmt.Errorf("pushrules.ActionsToTweaks: %w", err)
 	}
-	// TODO: support coalescing.
-	if a != pushrules.NotifyAction && a != pushrules.CoalesceAction {
+
+	if a != pushrules.NotifyAction {
 		log.WithFields(log.Fields{
 			"event_id":  event.EventID(),
-			"room_id":   event.RoomID(),
+			"room_id":   event.RoomID().String(),
 			"localpart": mem.Localpart,
 		}).Tracef("Push rule evaluation rejected the event")
 		return nil
@@ -546,44 +552,32 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	if err != nil {
 		return fmt.Errorf("s.localPushDevices: %w", err)
 	}
-
-	sender := spec.UserID{}
-	validRoomID, err := spec.NewRoomID(event.RoomID())
+	clientEvent, err := synctypes.ToClientEvent(event, synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
 	if err != nil {
 		return err
 	}
-	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
-	if err == nil && userID != nil {
-		sender = *userID
-	}
 
-	sk := event.StateKey()
-	if sk != nil && *sk != "" {
-		skUserID, queryErr := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, spec.SenderID(*event.StateKey()))
-		if queryErr == nil && skUserID != nil {
-			skString := skUserID.String()
-			sk = &skString
-		}
-	}
 	n := &api.Notification{
 		Actions: actions,
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
 		// matches the behaviour of FormatSync.
-		Event: synctypes.ToClientEvent(event, synctypes.FormatSync, sender, sk),
+		Event: *clientEvent,
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
 		// make sense. What is this supposed to be? Sytests require it
 		// to "work", but they only use a single device.
 		ProfileTag: profileTag,
-		RoomID:     event.RoomID(),
+		RoomID:     event.RoomID().String(),
 		TS:         spec.AsTimestamp(time.Now()),
 	}
 	if err = s.db.InsertNotification(ctx, mem.Localpart, mem.Domain, event.EventID(), streamPos, tweaks, n); err != nil {
 		return fmt.Errorf("s.db.InsertNotification: %w", err)
 	}
 
-	if err = s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID()); err != nil {
+	if err = s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID().String()); err != nil {
 		return fmt.Errorf("s.syncProducer.GetAndSendNotificationData: %w", err)
 	}
 
@@ -595,7 +589,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 
 	log.WithFields(log.Fields{
 		"event_id":   event.EventID(),
-		"room_id":    event.RoomID(),
+		"room_id":    event.RoomID().String(),
 		"localpart":  mem.Localpart,
 		"num_urls":   len(devicesByURLAndFormat),
 		"num_unread": userNumUnreadNotifs,
@@ -652,11 +646,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
 	user := ""
-	validRoomID, err := spec.NewRoomID(event.RoomID())
-	if err != nil {
-		return nil, err
-	}
-	sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+	sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
 		user = sender.String()
 	}
@@ -690,7 +680,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		ctx:      ctx,
 		rsAPI:    s.rsAPI,
 		mem:      mem,
-		roomID:   event.RoomID(),
+		roomID:   event.RoomID().String(),
 		roomSize: roomSize,
 	}
 	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
@@ -708,7 +698,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 
 	log.WithFields(log.Fields{
 		"event_id":  event.EventID(),
-		"room_id":   event.RoomID(),
+		"room_id":   event.RoomID().String(),
 		"localpart": mem.Localpart,
 		"rule_id":   rule.RuleID,
 	}).Trace("Matched a push rule")
@@ -797,16 +787,12 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				},
 				Devices: devices,
 				EventID: event.EventID(),
-				RoomID:  event.RoomID(),
+				RoomID:  event.RoomID().String(),
 			},
 		}
 
 	default:
-		validRoomID, err := spec.NewRoomID(event.RoomID())
-		if err != nil {
-			return nil, err
-		}
-		sender, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, event.SenderID())
+		sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to get userID for sender %s", event.SenderID())
 			return nil, err
@@ -820,7 +806,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 				Devices:  devices,
 				EventID:  event.EventID(),
 				ID:       event.EventID(),
-				RoomID:   event.RoomID(),
+				RoomID:   event.RoomID().String(),
 				RoomName: roomName,
 				Sender:   sender.String(),
 				Type:     event.Type(),
@@ -834,18 +820,15 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
 			return nil, err
 		}
-		roomID, err := spec.NewRoomID(event.RoomID())
+		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, event.RoomID(), *userID)
 		if err != nil {
-			logger.WithError(err).Errorf("event roomID is invalid %s", event.RoomID())
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
 			return nil, err
+		} else if localSender == nil {
+			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
+			return nil, fmt.Errorf("no sender ID for user %s in %s", userID.String(), event.RoomID().String())
 		}
-
-		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, *roomID, *userID)
-		if err != nil {
-			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID())
-			return nil, err
-		}
-		if event.StateKey() != nil && *event.StateKey() == string(localSender) {
+		if event.StateKey() != nil && *event.StateKey() == string(*localSender) {
 			req.Notification.UserIsTarget = true
 		}
 	}

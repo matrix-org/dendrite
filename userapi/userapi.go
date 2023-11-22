@@ -18,10 +18,12 @@ import (
 	"time"
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -36,13 +38,18 @@ import (
 
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+//
+// Creating a new instance of the user API requires a roomserver API with a federation API set
+// using its `SetFederationAPI` method, other you may get nil-dereference errors.
 func NewInternalAPI(
 	processContext *process.ProcessContext,
 	dendriteCfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
+	enableMetrics bool,
+	blacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error),
 ) *internal.UserInternalAPI {
 	js, _ := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
 	appServices := dendriteCfg.Derived.ApplicationServices
@@ -96,7 +103,7 @@ func NewInternalAPI(
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(processContext, keyDB, userAPI, keyChangeProducer, fedClient, 8, rsAPI, dendriteCfg.Global.ServerName) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(processContext, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err := updater.CleanUp(); err != nil {

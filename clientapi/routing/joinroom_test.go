@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -20,6 +21,10 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
+
+var testIsBlacklistedOrBackingOff = func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+	return &statistics.ServerStatistics{}, nil
+}
 
 func TestJoinRoomByIDOrAlias(t *testing.T) {
 	alice := test.NewUser(t)
@@ -35,9 +40,9 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
-		asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 
 		// Create the users in the userapi
 		for _, u := range []*test.User{alice, bob, charlie} {

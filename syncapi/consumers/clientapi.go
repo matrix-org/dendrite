@@ -113,7 +113,7 @@ func (s *OutputClientDataConsumer) Start() error {
 				id = streamPos
 				e := fulltext.IndexElement{
 					EventID:        ev.EventID(),
-					RoomID:         ev.RoomID(),
+					RoomID:         ev.RoomID().String(),
 					StreamPosition: streamPos,
 				}
 				e.SetContentType(ev.Type())

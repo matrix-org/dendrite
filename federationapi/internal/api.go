@@ -54,11 +54,14 @@ func NewFederationInternalAPI(
 			KeyDatabase: serverKeyDB,
 		}
 
+		pubKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		addDirectFetcher := func() {
 			keyRing.KeyFetchers = append(
 				keyRing.KeyFetchers,
 				&gomatrixserverlib.DirectKeyFetcher{
-					Client: federation,
+					Client:            federation,
+					IsLocalServerName: cfg.Matrix.IsLocalServerName,
+					LocalPublicKey:    []byte(pubKey),
 				},
 			)
 		}
@@ -109,7 +112,7 @@ func NewFederationInternalAPI(
 	}
 }
 
-func (a *FederationInternalAPI) isBlacklistedOrBackingOff(s spec.ServerName) (*statistics.ServerStatistics, error) {
+func (a *FederationInternalAPI) IsBlacklistedOrBackingOff(s spec.ServerName) (*statistics.ServerStatistics, error) {
 	stats := a.statistics.ForServer(s)
 	if stats.Blacklisted() {
 		return stats, &api.FederationClientError{
@@ -148,7 +151,7 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
 	s spec.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
-	stats, err := a.isBlacklistedOrBackingOff(s)
+	stats, err := a.IsBlacklistedOrBackingOff(s)
 	if err != nil {
 		return nil, err
 	}

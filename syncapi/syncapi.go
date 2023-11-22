@@ -45,7 +45,7 @@ func AddPublicRoutes(
 	processContext *process.ProcessContext,
 	routers httputil.Routers,
 	dendriteCfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
@@ -144,8 +144,11 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
+	rateLimits := httputil.NewRateLimits(&dendriteCfg.ClientAPI.RateLimiting)
+
 	routing.Setup(
 		routers.Client, requestPool, syncDB, userAPI,
 		rsAPI, &dendriteCfg.SyncAPI, caches, fts,
+		rateLimits,
 	)
 }

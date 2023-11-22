@@ -42,7 +42,7 @@ func GetEvent(
 		return *err
 	}
 
-	err = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID())
+	err = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID, event.RoomID().String())
 	if err != nil {
 		return *err
 	}

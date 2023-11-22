@@ -340,7 +340,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err = stmt.ExecContext(
 		ctx,
-		event.RoomID(),
+		event.RoomID().String(),
 		event.EventID(),
 		event.Type(),
 		event.UserID.String(),
@@ -392,7 +392,7 @@ func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, er
 		})
 	}
 
-	return events, nil
+	return events, rows.Err()
 }
 
 func rowsToEvents(rows *sql.Rows) ([]*rstypes.HeaderedEvent, error) {

@@ -144,7 +144,7 @@ func (p *presenceStatements) GetPresenceForUsers(
 		presence.ClientFields.Presence = presence.Presence.String()
 		result = append(result, presence)
 	}
-	return result, err
+	return result, rows.Err()
 }
 
 func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {

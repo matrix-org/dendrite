@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -24,7 +25,7 @@ import (
 
 // GetCapabilities returns information about the server's supported feature set
 // and other relevant capabilities to an authenticated user.
-func GetCapabilities() util.JSONResponse {
+func GetCapabilities(rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	versionsMap := map[gomatrixserverlib.RoomVersion]string{}
 	for v, desc := range version.SupportedRoomVersions() {
 		if desc.Stable() {
@@ -40,7 +41,7 @@ func GetCapabilities() util.JSONResponse {
 				"enabled": true,
 			},
 			"m.room_versions": map[string]interface{}{
-				"default":   version.DefaultRoomVersion(),
+				"default":   rsAPI.DefaultRoomVersion(),
 				"available": versionsMap,
 			},
 		},

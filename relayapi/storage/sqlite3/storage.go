@@ -33,7 +33,7 @@ type Database struct {
 
 // NewDatabase opens a new database
 func NewDatabase(
-	conMan sqlutil.Connections,
+	conMan *sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,

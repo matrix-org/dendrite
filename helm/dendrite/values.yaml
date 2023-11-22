@@ -26,7 +26,13 @@ persistence:
   # -- The storage class to use for volume claims.
   # Used unless specified at the specific component.
   # Defaults to the cluster default storage class.
-  storageClass: ""
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: ""
   jetstream:
     # -- Use an existing volume claim for jetstream
     existingClaim: ""
@@ -34,7 +40,13 @@ persistence:
     capacity: "1Gi"
     # -- The storage class to use for volume claims.
     # Defaults to persistence.storageClass
-    storageClass: ""
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: ""
   media:
     # -- Use an existing volume claim for media files
     existingClaim: ""
@@ -42,7 +54,13 @@ persistence:
     capacity: "1Gi"
     # -- The storage class to use for volume claims.
     # Defaults to persistence.storageClass
-    storageClass: ""
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: ""
   search:
     # -- Use an existing volume claim for the fulltext search index
     existingClaim: ""
@@ -50,7 +68,13 @@ persistence:
     capacity: "1Gi"
     # -- The storage class to use for volume claims.
     # Defaults to persistence.storageClass
-    storageClass: ""
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: ""
 
 # -- Add additional volumes to the Dendrite Pod
 extraVolumes: []
@@ -211,14 +235,12 @@ dendrite_config:
       # -- pprof port, if enabled
       port: 65432
 
-  # -- Configuration for experimental MSC's. (Valid values are: msc2836 and msc2946)
+  # -- Configuration for experimental MSC's. (Valid values are: msc2836)
   mscs:
-    mscs:
-      - msc2946
+    mscs: []
       # A list of enabled MSC's
       # Currently valid values are:
       # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
-      # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
   app_service_api:
     # -- Disable the validation of TLS certificates of appservices. This is

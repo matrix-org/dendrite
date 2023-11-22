@@ -124,7 +124,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		if err != nil {
 			t.Fatalf("failed to select membership: %s", err)
 		}
-		expectedPos := 1
+		var expectedPos int64 = 1
 		if pos != expectedPos {
 			t.Fatalf("expected pos to be %d, got %d", expectedPos, pos)
 		}
