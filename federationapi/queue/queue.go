@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -42,7 +41,6 @@ type OutgoingQueues struct {
 	db          storage.Database
 	process     *process.ProcessContext
 	disabled    bool
-	rsAPI       api.FederationRoomserverAPI
 	origin      spec.ServerName
 	client      fclient.FederationClient
 	statistics  *statistics.Statistics
