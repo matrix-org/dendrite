@@ -27,11 +27,12 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
+	testOrigin = spec.ServerName("kaer.morhen")
 )
 
 func mustCreateTransaction() gomatrixserverlib.Transaction {

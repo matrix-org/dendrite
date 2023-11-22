@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 			SingleDatabase: true,
 		})
 		if *serverName != "" {
-			cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
+			cfg.Global.ServerName = spec.ServerName(*serverName)
 		}
 		uri := config.DataSource(*dbURI)
 		if uri.IsSQLite() || uri == "" {
@@ -74,7 +74,7 @@ func main() {
 			// don't hit matrix.org when running tests!!!
 			cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 			cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
-			cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}
+			cfg.MSCs.MSCs = []string{"msc2836", "msc2444", "msc2753"}
 			cfg.Logging[0].Level = "trace"
 			cfg.Logging[0].Type = "std"
 			cfg.UserAPI.BCryptCost = bcrypt.MinCost

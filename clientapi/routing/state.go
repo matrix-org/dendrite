@@ -20,16 +20,18 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
 type stateEventInStateResp struct {
-	gomatrixserverlib.ClientEvent
+	synctypes.ClientEvent
 	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
 	ReplacesState string          `json:"replaces_state,omitempty"`
 }
@@ -54,12 +56,15 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{},
 	}, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !stateRes.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("room does not exist"),
+			JSON: spec.Forbidden("room does not exist"),
 		}
 	}
 
@@ -67,11 +72,14 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
 	for _, ev := range stateRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if visibility, ok := content["history_visibility"]; ok {
 				worldReadable = visibility == "world_readable"
@@ -91,20 +99,31 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	if !worldReadable {
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("Device UserID is invalid"),
+			}
+		}
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
 			RoomID: roomID,
-			UserID: device.UserID,
+			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
 		if !membershipRes.HasBeenInRoom {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
+				JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
 			}
 		}
 		// Otherwise, if the user has been in the room, whether or not we
@@ -122,7 +141,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		"state_at_event": !wantLatestState,
 	}).Info("Fetching all state")
 
-	stateEvents := []gomatrixserverlib.ClientEvent{}
+	stateEvents := []synctypes.ClientEvent{}
 	if wantLatestState {
 		// If we are happy to use the latest state, either because the user is
 		// still in the room, or because the room is world-readable, then just
@@ -131,7 +150,9 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		for _, ev := range stateRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
-				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
+				synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+					return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+				}, ev),
 			)
 		}
 	} else {
@@ -145,12 +166,22 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		}, &stateAfterRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		for _, ev := range stateAfterRes.StateEvents {
+			clientEvent, err := synctypes.ToClientEvent(ev, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			})
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed converting to ClientEvent")
+				continue
+			}
 			stateEvents = append(
 				stateEvents,
-				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
+				*clientEvent,
 			)
 		}
 	}
@@ -174,6 +205,37 @@ func OnIncomingStateTypeRequest(
 	var worldReadable bool
 	var wantLatestState bool
 
+	roomVer, err := rsAPI.QueryRoomVersionForRoom(ctx, roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
+		}
+	}
+
+	// Translate user ID state keys to room keys in pseudo ID rooms
+	if roomVer == gomatrixserverlib.RoomVersionPseudoIDs {
+		parsedRoomID, err := spec.NewRoomID(roomID)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: spec.InvalidParam("invalid room ID"),
+			}
+		}
+		newStateKey, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+			return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
+		})
+		if err != nil {
+			// TODO: work out better logic for failure cases (e.g. sender ID not found)
+			util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.Unknown("internal server error"),
+			}
+		}
+		stateKey = *newStateKey
+	}
+
 	// Always fetch visibility so that we can work out whether to show
 	// the latest events or the last event from when the user was joined.
 	// Then include the requested event type and state key, assuming it
@@ -184,9 +246,9 @@ func OnIncomingStateTypeRequest(
 			StateKey:  stateKey,
 		},
 	}
-	if evType != gomatrixserverlib.MRoomHistoryVisibility && stateKey != "" {
+	if evType != spec.MRoomHistoryVisibility && stateKey != "" {
 		stateToFetch = append(stateToFetch, gomatrixserverlib.StateKeyTuple{
-			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			EventType: spec.MRoomHistoryVisibility,
 			StateKey:  "",
 		})
 	}
@@ -200,18 +262,24 @@ func OnIncomingStateTypeRequest(
 		StateToFetch: stateToFetch,
 	}, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Look at the room state and see if we have a history visibility event
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
 	for _, ev := range stateRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 			if visibility, ok := content["history_visibility"]; ok {
 				worldReadable = visibility == "world_readable"
@@ -229,22 +297,33 @@ func OnIncomingStateTypeRequest(
 	// membershipRes will only be populated if the room is not world-readable.
 	var membershipRes api.QueryMembershipForUserResponse
 	if !worldReadable {
+		userID, err := spec.NewUserID(device.UserID, true)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.Unknown("Device UserID is invalid"),
+			}
+		}
 		// The room isn't world-readable so try to work out based on the
 		// user's membership if we want the latest state or not.
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
 			RoomID: roomID,
-			UserID: device.UserID,
+			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
-		if !membershipRes.HasBeenInRoom || membershipRes.Membership == gomatrixserverlib.Ban {
+		if !membershipRes.HasBeenInRoom || membershipRes.Membership == spec.Ban {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
+				JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
 			}
 		}
 		// Otherwise, if the user has been in the room, whether or not we
@@ -264,7 +343,7 @@ func OnIncomingStateTypeRequest(
 		"state_at_event": !wantLatestState,
 	}).Info("Fetching state")
 
-	var event *gomatrixserverlib.HeaderedEvent
+	var event *types.HeaderedEvent
 	if wantLatestState {
 		// If we are happy to use the latest state, either because the user is
 		// still in the room, or because the room is world-readable, then just
@@ -292,7 +371,10 @@ func OnIncomingStateTypeRequest(
 		}, &stateAfterRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 		if len(stateAfterRes.StateEvents) > 0 {
 			event = stateAfterRes.StateEvents[0]
@@ -304,12 +386,14 @@ func OnIncomingStateTypeRequest(
 	if event == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
+			JSON: spec.NotFound(fmt.Sprintf("Cannot find state event for %q", evType)),
 		}
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll),
+		ClientEvent: synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}, event),
 	}
 
 	var res interface{}

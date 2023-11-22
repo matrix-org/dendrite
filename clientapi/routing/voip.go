@@ -25,9 +25,9 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // RequestTurnServer implements:
@@ -60,7 +60,10 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("mac.Write failed")
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		resp.Password = base64.StdEncoding.EncodeToString(mac.Sum(nil))

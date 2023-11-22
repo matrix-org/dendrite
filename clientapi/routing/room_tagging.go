@@ -19,10 +19,10 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -39,14 +39,17 @@ func GetTags(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot retrieve another user's tags"),
+			JSON: spec.Forbidden("Cannot retrieve another user's tags"),
 		}
 	}
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -71,7 +74,7 @@ func PutTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot modify another user's tags"),
+			JSON: spec.Forbidden("Cannot modify another user's tags"),
 		}
 	}
 
@@ -83,7 +86,10 @@ func PutTag(
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if tagContent.Tags == nil {
@@ -93,7 +99,10 @@ func PutTag(
 
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{
@@ -118,14 +127,17 @@ func DeleteTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot modify another user's tags"),
+			JSON: spec.Forbidden("Cannot modify another user's tags"),
 		}
 	}
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	// Check whether the tag to be deleted exists
@@ -141,7 +153,10 @@ func DeleteTag(
 
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

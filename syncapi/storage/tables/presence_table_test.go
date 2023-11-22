@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func mustPresenceTable(t *testing.T, dbType test.DBType) (tables.Presence, func()) {
@@ -51,7 +51,7 @@ func TestPresence(t *testing.T) {
 	ctx := context.Background()
 
 	statusMsg := "Hello World!"
-	timestamp := gomatrixserverlib.AsTimestamp(time.Now())
+	timestamp := spec.AsTimestamp(time.Now())
 
 	var txn *sql.Tx
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -96,7 +96,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// This should return only Bobs status
-		presences, err := tab.GetPresenceAfter(ctx, txn, maxPos, gomatrixserverlib.EventFilter{Limit: 10})
+		presences, err := tab.GetPresenceAfter(ctx, txn, maxPos, synctypes.EventFilter{Limit: 10})
 		if err != nil {
 			t.Error(err)
 		}

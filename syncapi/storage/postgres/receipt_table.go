@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const receiptsSchema = `
@@ -98,7 +98,7 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 	}.Prepare(db)
 }
 
-func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
+func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
 	stmt := sqlutil.TxStmt(txn, r.upsertReceipt)
 	err = stmt.QueryRowContext(ctx, roomId, receiptType, userId, eventId, timestamp).Scan(&pos)
 	return

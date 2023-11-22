@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // FetcherName implements KeyFetcher
@@ -30,7 +31,7 @@ func (d Database) FetcherName() string {
 // FetchKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) FetchKeys(
 	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	return d.ServerSigningKeys.BulkSelectServerKeys(ctx, nil, requests)
 }

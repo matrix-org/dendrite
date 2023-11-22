@@ -66,10 +66,10 @@ func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = db.Prepare(insertJSONSQL); err != nil {
-		return
-	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertJSONStmt, insertJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *queueJSONStatements) InsertQueueJSON(
@@ -135,5 +135,5 @@ func (s *queueJSONStatements) SelectQueueJSON(
 		}
 		blobs[nid] = blob
 	}
-	return blobs, err
+	return blobs, rows.Err()
 }

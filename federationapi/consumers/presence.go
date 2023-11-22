@@ -28,6 +28,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
@@ -39,7 +41,7 @@ type OutputPresenceConsumer struct {
 	durable                 string
 	db                      storage.Database
 	queues                  *queue.OutgoingQueues
-	isLocalServerName       func(gomatrixserverlib.ServerName) bool
+	isLocalServerName       func(spec.ServerName) bool
 	rsAPI                   roomserverAPI.FederationRoomserverAPI
 	topic                   string
 	outboundPresenceEnabled bool
@@ -93,14 +95,21 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
-	var queryRes roomserverAPI.QueryRoomsForUserResponse
-	err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
-		UserID:         userID,
-		WantMembership: "join",
-	}, &queryRes)
+	parsedUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("invalid user ID")
+		return true
+	}
+
+	roomIDs, err := t.rsAPI.QueryRoomsForUser(t.ctx, *parsedUserID, "join")
 	if err != nil {
 		log.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
+	}
+
+	roomIDStrs := make([]string, len(roomIDs))
+	for i, roomID := range roomIDs {
+		roomIDStrs[i] = roomID.String()
 	}
 
 	presence := msg.Header.Get("presence")
@@ -111,7 +120,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	// send this presence to all servers who share rooms with this user.
-	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
+	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
 		return true
@@ -127,7 +136,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		statusMsg = &status
 	}
 
-	p := types.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(ts)}
+	p := types.PresenceInternal{LastActiveTS: spec.Timestamp(ts)}
 
 	content := fedTypes.Presence{
 		Push: []fedTypes.PresenceContent{
@@ -142,7 +151,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MPresence,
+		Type:   spec.MPresence,
 		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {

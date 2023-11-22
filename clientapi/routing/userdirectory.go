@@ -26,6 +26,8 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -41,8 +43,8 @@ func SearchUserDirectory(
 	provider userapi.QuerySearchProfilesAPI,
 	searchString string,
 	limit int,
-	federation *gomatrixserverlib.FederationClient,
-	localServerName gomatrixserverlib.ServerName,
+	federation fclient.FederationClient,
+	localServerName spec.ServerName,
 ) util.JSONResponse {
 	if limit < 10 {
 		limit = 10

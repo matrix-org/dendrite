@@ -21,10 +21,14 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -97,14 +101,16 @@ type DeviceListUpdater struct {
 	api         DeviceListUpdaterAPI
 	producer    KeyChangeProducer
 	fedClient   fedsenderapi.KeyserverFederationAPI
-	workerChans []chan gomatrixserverlib.ServerName
-	thisServer  gomatrixserverlib.ServerName
+	workerChans []chan spec.ServerName
+	thisServer  spec.ServerName
 
 	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
 	// block on or timeout via a select.
 	userIDToChan   map[string]chan bool
 	userIDToChanMu *sync.Mutex
 	rsAPI          rsapi.KeyserverRoomserverAPI
+
+	isBlacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error)
 }
 
 // DeviceListUpdaterDatabase is the subset of functionality from storage.Database required for the updater.
@@ -112,7 +118,7 @@ type DeviceListUpdater struct {
 type DeviceListUpdaterDatabase interface {
 	// StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 	// If no domains are given, all user IDs with stale device lists are returned.
-	StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error)
+	StaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error)
 
 	// MarkDeviceListStale sets the stale bit for this user to isStale.
 	MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error
@@ -132,7 +138,7 @@ type DeviceListUpdaterDatabase interface {
 }
 
 type DeviceListUpdaterAPI interface {
-	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) error
+	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse)
 }
 
 // KeyChangeProducer is the interface for producers.KeyChange useful for testing.
@@ -140,26 +146,52 @@ type KeyChangeProducer interface {
 	ProduceKeyChanges(keys []api.DeviceMessage) error
 }
 
+var deviceListUpdaterBackpressure = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "keyserver",
+		Name:      "worker_backpressure",
+		Help:      "How many device list updater requests are queued",
+	},
+	[]string{"worker_id"},
+)
+var deviceListUpdaterServersRetrying = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "keyserver",
+		Name:      "worker_servers_retrying",
+		Help:      "How many servers are queued for retry",
+	},
+	[]string{"worker_id"},
+)
+
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
-	rsAPI rsapi.KeyserverRoomserverAPI, thisServer gomatrixserverlib.ServerName,
+	rsAPI rsapi.KeyserverRoomserverAPI,
+	thisServer spec.ServerName,
+	enableMetrics bool,
+	isBlacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error),
 ) *DeviceListUpdater {
+	if enableMetrics {
+		prometheus.MustRegister(deviceListUpdaterBackpressure, deviceListUpdaterServersRetrying)
+	}
 	return &DeviceListUpdater{
-		process:        process,
-		userIDToMutex:  make(map[string]*sync.Mutex),
-		mu:             &sync.Mutex{},
-		db:             db,
-		api:            api,
-		producer:       producer,
-		fedClient:      fedClient,
-		thisServer:     thisServer,
-		workerChans:    make([]chan gomatrixserverlib.ServerName, numWorkers),
-		userIDToChan:   make(map[string]chan bool),
-		userIDToChanMu: &sync.Mutex{},
-		rsAPI:          rsAPI,
+		process:                     process,
+		userIDToMutex:               make(map[string]*sync.Mutex),
+		mu:                          &sync.Mutex{},
+		db:                          db,
+		api:                         api,
+		producer:                    producer,
+		fedClient:                   fedClient,
+		thisServer:                  thisServer,
+		workerChans:                 make([]chan spec.ServerName, numWorkers),
+		userIDToChan:                make(map[string]chan bool),
+		userIDToChanMu:              &sync.Mutex{},
+		rsAPI:                       rsAPI,
+		isBlacklistedOrBackingOffFn: isBlacklistedOrBackingOffFn,
 	}
 }
 
@@ -169,20 +201,22 @@ func (u *DeviceListUpdater) Start() error {
 		// Allocate a small buffer per channel.
 		// If the buffer limit is reached, backpressure will cause the processing of EDUs
 		// to stop (in this transaction) until key requests can be made.
-		ch := make(chan gomatrixserverlib.ServerName, 10)
+		ch := make(chan spec.ServerName, 10)
 		u.workerChans[i] = ch
-		go u.worker(ch)
+		go u.worker(ch, i)
 	}
 
-	staleLists, err := u.db.StaleDeviceLists(u.process.Context(), []gomatrixserverlib.ServerName{})
+	staleLists, err := u.db.StaleDeviceLists(u.process.Context(), []spec.ServerName{})
 	if err != nil {
 		return err
 	}
+
+	newStaleLists := dedupeStaleLists(staleLists)
 	offset, step := time.Second*10, time.Second
-	if max := len(staleLists); max > 120 {
+	if max := len(newStaleLists); max > 120 {
 		step = (time.Second * 120) / time.Duration(max)
 	}
-	for _, userID := range staleLists {
+	for _, userID := range newStaleLists {
 		userID := userID // otherwise we are only sending the last entry
 		time.AfterFunc(offset, func() {
 			u.notifyWorkers(userID)
@@ -194,7 +228,7 @@ func (u *DeviceListUpdater) Start() error {
 
 // CleanUp removes stale device entries for users we don't share a room with anymore
 func (u *DeviceListUpdater) CleanUp() error {
-	staleUsers, err := u.db.StaleDeviceLists(u.process.Context(), []gomatrixserverlib.ServerName{})
+	staleUsers, err := u.db.StaleDeviceLists(u.process.Context(), []spec.ServerName{})
 	if err != nil {
 		return err
 	}
@@ -222,7 +256,7 @@ func (u *DeviceListUpdater) mutex(userID string) *sync.Mutex {
 
 // ManualUpdate invalidates the device list for the given user and fetches the latest and tracks it.
 // Blocks until the device list is synced or the timeout is reached.
-func (u *DeviceListUpdater) ManualUpdate(ctx context.Context, serverName gomatrixserverlib.ServerName, userID string) error {
+func (u *DeviceListUpdater) ManualUpdate(ctx context.Context, serverName spec.ServerName, userID string) error {
 	mu := u.mutex(userID)
 	mu.Lock()
 	err := u.db.MarkDeviceListStale(ctx, userID, true)
@@ -334,11 +368,22 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	if err != nil {
 		return
 	}
+	_, err = u.isBlacklistedOrBackingOffFn(remoteServer)
+	var federationClientError *fedsenderapi.FederationClientError
+	if errors.As(err, &federationClientError) {
+		if federationClientError.Blacklisted {
+			return
+		}
+	}
+
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(remoteServer))
 	index := int(int64(hash.Sum32()) % int64(len(u.workerChans)))
 
 	ch := u.assignChannel(userID)
+	// Since workerChans are buffered, we only increment here and let the worker
+	// decrement it once it is done processing.
+	deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(index)}).Inc()
 	u.workerChans[index] <- remoteServer
 	select {
 	case <-ch:
@@ -368,27 +413,44 @@ func (u *DeviceListUpdater) clearChannel(userID string) {
 	}
 }
 
-func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
-	retries := make(map[gomatrixserverlib.ServerName]time.Time)
+func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
+	retries := make(map[spec.ServerName]time.Time)
 	retriesMu := &sync.Mutex{}
 	// restarter goroutine which will inject failed servers into ch when it is time
 	go func() {
-		var serversToRetry []gomatrixserverlib.ServerName
+		var serversToRetry []spec.ServerName
 		for {
-			serversToRetry = serversToRetry[:0] // reuse memory
-			time.Sleep(time.Second)
+			// nuke serversToRetry by re-slicing it to be "empty".
+			// The capacity of the slice is unchanged, which ensures we can reuse the memory.
+			serversToRetry = serversToRetry[:0]
+
+			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
+			time.Sleep(time.Second * 2)
+
+			// -2, so we have space for incoming device list updates over federation
+			maxServers := (cap(ch) - len(ch)) - 2
+			if maxServers <= 0 {
+				continue
+			}
+
 			retriesMu.Lock()
 			now := time.Now()
 			for srv, retryAt := range retries {
 				if now.After(retryAt) {
 					serversToRetry = append(serversToRetry, srv)
+					if maxServers == len(serversToRetry) {
+						break
+					}
 				}
 			}
+
 			for _, srv := range serversToRetry {
 				delete(retries, srv)
 			}
 			retriesMu.Unlock()
+
 			for _, srv := range serversToRetry {
+				deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Inc()
 				ch <- srv
 			}
 		}
@@ -397,8 +459,18 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 		retriesMu.Lock()
 		_, exists := retries[serverName]
 		retriesMu.Unlock()
-		if exists {
-			// Don't retry a server that we're already waiting for.
+
+		// If the serverName is coming from retries, maybe it was
+		// blacklisted in the meantime.
+		_, err := u.isBlacklistedOrBackingOffFn(serverName)
+		var federationClientError *fedsenderapi.FederationClientError
+		// unwrap errors and check for FederationClientError, if found, federationClientError will be not nil
+		errors.As(err, &federationClientError)
+		isBlacklisted := federationClientError != nil && federationClientError.Blacklisted
+
+		// Don't retry a server that we're already waiting for or is blacklisted by now.
+		if exists || isBlacklisted {
+			deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
 			continue
 		}
 		waitTime, shouldRetry := u.processServer(serverName)
@@ -409,29 +481,29 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 			}
 			retriesMu.Unlock()
 		}
+		deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
 	}
 }
 
-func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerName) (time.Duration, bool) {
+func (u *DeviceListUpdater) processServer(serverName spec.ServerName) (time.Duration, bool) {
 	ctx := u.process.Context()
+	// If the process.Context is canceled, there is no need to go further.
+	// This avoids spamming the logs when shutting down
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return defaultWaitTime, false
+	}
+
 	logger := util.GetLogger(ctx).WithField("server_name", serverName)
 	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
 
 	waitTime := defaultWaitTime // How long should we wait to try again?
 	successCount := 0           // How many user requests failed?
 
-	userIDs, err := u.db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{serverName})
+	userIDs, err := u.db.StaleDeviceLists(ctx, []spec.ServerName{serverName})
 	if err != nil {
 		logger.WithError(err).Error("Failed to load stale device lists")
 		return waitTime, true
 	}
-
-	defer func() {
-		for _, userID := range userIDs {
-			// always clear the channel to unblock Update calls regardless of success/failure
-			u.clearChannel(userID)
-		}
-	}()
 
 	for _, userID := range userIDs {
 		userWait, err := u.processServerUser(ctx, serverName, userID)
@@ -456,9 +528,14 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 	return waitTime, !allUsersSucceeded
 }
 
-func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName gomatrixserverlib.ServerName, userID string) (time.Duration, error) {
+func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName spec.ServerName, userID string) (time.Duration, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+
+	// If we are processing more than one user per server, this unblocks further calls to Update
+	// immediately instead of just after **all** users have been processed.
+	defer u.clearChannel(userID)
+
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"server_name": serverName,
 		"user_id":     userID,
@@ -508,16 +585,16 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		}
 		uploadRes := &api.PerformUploadDeviceKeysResponse{}
 		if res.MasterKey != nil {
-			if err = sanityCheckKey(*res.MasterKey, userID, gomatrixserverlib.CrossSigningKeyPurposeMaster); err == nil {
+			if err = sanityCheckKey(*res.MasterKey, userID, fclient.CrossSigningKeyPurposeMaster); err == nil {
 				uploadReq.MasterKey = *res.MasterKey
 			}
 		}
 		if res.SelfSigningKey != nil {
-			if err = sanityCheckKey(*res.SelfSigningKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
+			if err = sanityCheckKey(*res.SelfSigningKey, userID, fclient.CrossSigningKeyPurposeSelfSigning); err == nil {
 				uploadReq.SelfSigningKey = *res.SelfSigningKey
 			}
 		}
-		_ = u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+		u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	}
 	err = u.updateDeviceList(&res)
 	if err != nil {
@@ -527,7 +604,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 	return defaultWaitTime, nil
 }
 
-func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevices) error {
+func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error {
 	ctx := context.Background() // we've got the keys, don't time out when persisting them to the database.
 	keys := make([]api.DeviceMessage, len(res.Devices))
 	existingKeys := make([]api.DeviceMessage, len(res.Devices))
@@ -576,4 +653,25 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 		return fmt.Errorf("failed to emit key changes for fresh device list: %w", err)
 	}
 	return nil
+}
+
+// dedupeStaleLists de-duplicates the stateList entries using the domain.
+// This is used on startup, processServer is getting all users anyway, so
+// there is no need to send every user to the workers.
+func dedupeStaleLists(staleLists []string) []string {
+	seenDomains := make(map[spec.ServerName]struct{})
+	newStaleLists := make([]string, 0, len(staleLists))
+	for _, userID := range staleLists {
+		_, domain, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			// non-fatal and should not block starting up
+			continue
+		}
+		if _, ok := seenDomains[domain]; ok {
+			continue
+		}
+		newStaleLists = append(newStaleLists, userID)
+		seenDomains[domain] = struct{}{}
+	}
+	return newStaleLists
 }

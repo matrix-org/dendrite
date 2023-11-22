@@ -21,13 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const membershipSchema = `
@@ -251,6 +250,7 @@ func (s *membershipStatements) SelectMembershipsFromRoom(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
+	err = rows.Err()
 	return
 }
 
@@ -278,6 +278,7 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
+	err = rows.Err()
 	return
 }
 
@@ -314,7 +315,7 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
-	return roomNIDs, nil
+	return roomNIDs, rows.Err()
 }
 
 func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID, userNIDs []types.EventStateKeyNID, localOnly bool) (map[types.EventStateKeyNID]int, error) {
@@ -398,7 +399,7 @@ func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, txn 
 	return found, nil
 }
 
-func (s *membershipStatements) SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+func (s *membershipStatements) SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName spec.ServerName) (bool, error) {
 	var nid types.RoomNID
 	stmt := sqlutil.TxStmt(txn, s.selectServerInRoomStmt)
 	err := stmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID, serverName).Scan(&nid)

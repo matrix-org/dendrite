@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
@@ -38,7 +38,7 @@ func mustOpenIndex(t *testing.T, tempDir string) (*fulltext.Search, *process.Pro
 		cfg.InMemory = false
 	}
 	ctx := process.NewProcessContext()
-	fts, err := fulltext.New(ctx.Context(), cfg)
+	fts, err := fulltext.New(ctx, cfg)
 	if err != nil {
 		t.Fatal("failed to open fulltext index:", err)
 	}
@@ -77,7 +77,7 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 		Content:        "Roomname testing",
 		StreamPosition: streamPos,
 	}
-	e.SetContentType(gomatrixserverlib.MRoomName)
+	e.SetContentType(spec.MRoomName)
 	batchItems = append(batchItems, e)
 	e = fulltext.IndexElement{
 		EventID:        util.RandomString(16),
@@ -85,7 +85,7 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 		Content:        "Room topic fulltext",
 		StreamPosition: streamPos,
 	}
-	e.SetContentType(gomatrixserverlib.MRoomTopic)
+	e.SetContentType(spec.MRoomTopic)
 	batchItems = append(batchItems, e)
 	if err := fts.Index(batchItems...); err != nil {
 		t.Fatalf("failed to batch insert elements: %v", err)
@@ -160,14 +160,16 @@ func TestSearch(t *testing.T) {
 		roomIndex        []int
 	}
 	tests := []struct {
-		name      string
-		args      args
-		wantCount int
-		wantErr   bool
+		name           string
+		args           args
+		wantCount      int
+		wantErr        bool
+		wantHighlights []string
 	}{
 		{
-			name:      "Can search for many results in one room",
-			wantCount: 16,
+			name:           "Can search for many results in one room",
+			wantCount:      16,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:      "lorem",
 				roomIndex: []int{0},
@@ -175,8 +177,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for one result in one room",
-			wantCount: 1,
+			name:           "Can search for one result in one room",
+			wantCount:      1,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:      "lorem",
 				roomIndex: []int{16},
@@ -184,8 +187,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for many results in multiple rooms",
-			wantCount: 17,
+			name:           "Can search for many results in multiple rooms",
+			wantCount:      17,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:      "lorem",
 				roomIndex: []int{0, 16},
@@ -193,8 +197,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for many results in all rooms, reversed",
-			wantCount: 30,
+			name:           "Can search for many results in all rooms, reversed",
+			wantCount:      30,
+			wantHighlights: []string{"lorem"},
 			args: args{
 				term:             "lorem",
 				limit:            30,
@@ -202,8 +207,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for specific search room name",
-			wantCount: 1,
+			name:           "Can search for specific search room name",
+			wantCount:      1,
+			wantHighlights: []string{"testing"},
 			args: args{
 				term:      "testing",
 				roomIndex: []int{},
@@ -212,8 +218,9 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:      "Can search for specific search room topic",
-			wantCount: 1,
+			name:           "Can search for specific search room topic",
+			wantCount:      1,
+			wantHighlights: []string{"fulltext"},
 			args: args{
 				term:      "fulltext",
 				roomIndex: []int{},
@@ -222,6 +229,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f, ctx := mustOpenIndex(t, "")
@@ -238,6 +246,12 @@ func TestSearch(t *testing.T) {
 				t.Errorf("Search() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			highlights := f.GetHighlights(got)
+			if !reflect.DeepEqual(highlights, tt.wantHighlights) {
+				t.Errorf("Search() got highligts = %v, want %v", highlights, tt.wantHighlights)
+			}
+
 			if !reflect.DeepEqual(len(got.Hits), tt.wantCount) {
 				t.Errorf("Search() got = %v, want %v", len(got.Hits), tt.wantCount)
 			}

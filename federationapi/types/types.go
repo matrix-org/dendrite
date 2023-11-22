@@ -14,9 +14,7 @@
 
 package types
 
-import (
-	"github.com/matrix-org/gomatrixserverlib"
-)
+import "github.com/matrix-org/gomatrixserverlib/spec"
 
 const MSigningKeyUpdate = "m.signing_key_update" // TODO: move to gomatrixserverlib
 
@@ -25,10 +23,10 @@ type JoinedHost struct {
 	// The MemberEventID of a m.room.member join event.
 	MemberEventID string
 	// The domain part of the state key of the m.room.member join event
-	ServerName gomatrixserverlib.ServerName
+	ServerName spec.ServerName
 }
 
-type ServerNames []gomatrixserverlib.ServerName
+type ServerNames []spec.ServerName
 
 func (s ServerNames) Len() int           { return len(s) }
 func (s ServerNames) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
@@ -38,7 +36,7 @@ func (s ServerNames) Less(i, j int) bool { return s[i] < s[j] }
 type OutboundPeek struct {
 	PeekID            string
 	RoomID            string
-	ServerName        gomatrixserverlib.ServerName
+	ServerName        spec.ServerName
 	CreationTimestamp int64
 	RenewedTimestamp  int64
 	RenewalInterval   int64
@@ -48,7 +46,7 @@ type OutboundPeek struct {
 type InboundPeek struct {
 	PeekID            string
 	RoomID            string
-	ServerName        gomatrixserverlib.ServerName
+	ServerName        spec.ServerName
 	CreationTimestamp int64
 	RenewedTimestamp  int64
 	RenewalInterval   int64
@@ -64,7 +62,7 @@ type FederationReceiptData struct {
 }
 
 type ReceiptTS struct {
-	TS gomatrixserverlib.Timestamp `json:"ts"`
+	TS spec.Timestamp `json:"ts"`
 }
 
 type Presence struct {

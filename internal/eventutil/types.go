@@ -15,15 +15,10 @@
 package eventutil
 
 import (
-	"errors"
 	"strconv"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
-
-// ErrProfileNoExists is returned when trying to lookup a user's profile that
-// doesn't exist locally.
-var ErrProfileNoExists = errors.New("no known profile for given user ID")
 
 // AccountData represents account data sent from the client API server to the
 // sync API server
@@ -56,20 +51,10 @@ type NotificationData struct {
 	UnreadNotificationCount int `json:"unread_notification_count"`
 }
 
-// ProfileResponse is a struct containing all known user profile data
-type ProfileResponse struct {
-	AvatarURL   string `json:"avatar_url"`
-	DisplayName string `json:"displayname"`
-}
-
-// AvatarURL is a struct containing only the URL to a user's avatar
-type AvatarURL struct {
-	AvatarURL string `json:"avatar_url"`
-}
-
-// DisplayName is a struct containing only a user's display name
-type DisplayName struct {
-	DisplayName string `json:"displayname"`
+// UserProfile is a struct containing all known user profile data
+type UserProfile struct {
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	DisplayName string `json:"displayname,omitempty"`
 }
 
 // WeakBoolean is a type that will Unmarshal to true or false even if the encoded

@@ -3,8 +3,8 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.20-alpine AS base
-RUN apk --update --no-cache add bash build-base curl
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.21-alpine AS base
+RUN apk --update --no-cache add bash build-base curl git
 
 #
 # build creates all needed binaries
@@ -13,7 +13,6 @@ FROM --platform=${BUILDPLATFORM} base AS build
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
-ARG FLAGS
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
@@ -21,7 +20,7 @@ RUN --mount=target=. \
     GOARCH="$TARGETARCH" \
     GOOS="linux" \
     CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
-    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
+    go build -v -trimpath -o /out/ ./cmd/...
 
 
 #

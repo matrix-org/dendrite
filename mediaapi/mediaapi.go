@@ -21,17 +21,17 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
 	mediaRouter *mux.Router,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
-	client *gomatrixserverlib.Client,
+	client *fclient.Client,
 ) {
 	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
 	if err != nil {

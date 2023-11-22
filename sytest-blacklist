@@ -8,6 +8,7 @@ Events in rooms with AS-hosted room aliases are sent to AS server
 Inviting an AS-hosted user asks the AS server
 Accesing an AS-hosted room alias asks the AS server
 If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
+New federated private chats get full presence information (SYN-115)
 
 # This will fail in HTTP API mode, so blacklisted for now
 If a device list update goes missing, the server resyncs on the next one

@@ -19,7 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const assumedOfflineSchema = `
@@ -68,7 +68,7 @@ func NewSQLiteAssumedOfflineTable(db *sql.DB) (s *assumedOfflineStatements, err 
 }
 
 func (s *assumedOfflineStatements) InsertAssumedOffline(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertAssumedOfflineStmt)
 	_, err := stmt.ExecContext(ctx, serverName)
@@ -76,7 +76,7 @@ func (s *assumedOfflineStatements) InsertAssumedOffline(
 }
 
 func (s *assumedOfflineStatements) SelectAssumedOffline(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) (bool, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectAssumedOfflineStmt)
 	res, err := stmt.QueryContext(ctx, serverName)
@@ -91,7 +91,7 @@ func (s *assumedOfflineStatements) SelectAssumedOffline(
 }
 
 func (s *assumedOfflineStatements) DeleteAssumedOffline(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteAssumedOfflineStmt)
 	_, err := stmt.ExecContext(ctx, serverName)

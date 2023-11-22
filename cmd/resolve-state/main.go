@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -31,6 +32,19 @@ import (
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 var filterType = flag.String("filtertype", "", "the event types to filter on")
 var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
+
+// dummyQuerier implements QuerySenderIDAPI. Does **NOT** do any "magic" for pseudoID rooms
+// to avoid having to "start" a full roomserver API.
+type dummyQuerier struct{}
+
+func (d dummyQuerier) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	s := spec.SenderIDFromUserID(userID)
+	return &s, nil
+}
+
+func (d dummyQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return senderID.ToUserID(), nil
+}
 
 // nolint:gocyclo
 func main() {
@@ -53,22 +67,31 @@ func main() {
 		}
 	}
 
-	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
-
 	processCtx := process.NewProcessContext()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+
+	dbOpts := cfg.RoomServer.Database
+	if dbOpts.ConnectionString == "" {
+		dbOpts = cfg.Global.DatabaseOptions
+	}
+
+	fmt.Println("Opening database")
 	roomserverDB, err := storage.Open(
-		processCtx.Context(), cm, &cfg.RoomServer.Database,
-		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
+		processCtx.Context(), cm, &dbOpts,
+		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, caching.DisableMetrics),
 	)
 	if err != nil {
 		panic(err)
 	}
 
+	rsAPI := dummyQuerier{}
+
 	roomInfo := &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	}
-	stateres := state.NewStateResolution(roomserverDB, roomInfo)
+	stateres := state.NewStateResolution(roomserverDB, roomInfo, rsAPI)
+
+	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
 	if *difference {
 		if len(snapshotNIDs) != 2 {
@@ -91,14 +114,14 @@ func main() {
 		}
 
 		var eventEntries []types.Event
-		eventEntries, err = roomserverDB.Events(ctx, roomInfo, eventNIDs)
+		eventEntries, err = roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 		if err != nil {
 			panic(err)
 		}
 
-		events := make(map[types.EventNID]*gomatrixserverlib.Event, len(eventEntries))
+		events := make(map[types.EventNID]gomatrixserverlib.PDU, len(eventEntries))
 		for _, entry := range eventEntries {
-			events[entry.EventNID] = entry.Event
+			events[entry.EventNID] = entry.PDU
 		}
 
 		if len(removed) > 0 {
@@ -149,15 +172,15 @@ func main() {
 	}
 
 	fmt.Println("Fetching", len(eventNIDMap), "state events")
-	eventEntries, err := roomserverDB.Events(ctx, roomInfo, eventNIDs)
+	eventEntries, err := roomserverDB.Events(ctx, roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		panic(err)
 	}
 
 	authEventIDMap := make(map[string]struct{})
-	events := make([]*gomatrixserverlib.Event, len(eventEntries))
+	events := make([]gomatrixserverlib.PDU, len(eventEntries))
 	for i := range eventEntries {
-		events[i] = eventEntries[i].Event
+		events[i] = eventEntries[i].PDU
 		for _, authEventID := range eventEntries[i].AuthEventIDs() {
 			authEventIDMap[authEventID] = struct{}{}
 		}
@@ -174,17 +197,30 @@ func main() {
 		panic(err)
 	}
 
-	authEvents := make([]*gomatrixserverlib.Event, len(authEventEntries))
+	authEvents := make([]gomatrixserverlib.PDU, len(authEventEntries))
 	for i := range authEventEntries {
-		authEvents[i] = authEventEntries[i].Event
+		authEvents[i] = authEventEntries[i].PDU
+	}
+
+	// Get the roomNID
+	roomInfo, err = roomserverDB.RoomInfo(ctx, authEvents[0].RoomID().String())
+	if err != nil {
+		panic(err)
 	}
 
 	fmt.Println("Resolving state")
 	var resolved Events
 	resolved, err = gomatrixserverlib.ResolveConflicts(
-		gomatrixserverlib.RoomVersion(*roomVersion),
-		events,
-		authEvents,
+		gomatrixserverlib.RoomVersion(*roomVersion), events, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		func(eventID string) bool {
+			isRejected, rejectedErr := roomserverDB.IsEventRejected(ctx, roomInfo.RoomNID, eventID)
+			if rejectedErr != nil {
+				return true
+			}
+			return isRejected
+		},
 	)
 	if err != nil {
 		panic(err)
@@ -208,7 +244,7 @@ func main() {
 	fmt.Println("Returned", count, "state events after filtering")
 }
 
-type Events []*gomatrixserverlib.Event
+type Events []gomatrixserverlib.PDU
 
 func (e Events) Len() int {
 	return len(e)

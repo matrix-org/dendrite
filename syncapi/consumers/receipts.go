@@ -19,7 +19,6 @@ import (
 	"strconv"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
@@ -89,7 +89,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return true
 	}
 
-	output.Timestamp = gomatrixserverlib.Timestamp(timestamp)
+	output.Timestamp = spec.Timestamp(timestamp)
 
 	streamPos, err := s.db.StoreReceipt(
 		s.ctx,

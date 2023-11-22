@@ -20,7 +20,7 @@ Matrix servers usually discover each other when federating using the following m
    well-known file to connect to the remote homeserver;
 2. If a DNS SRV delegation exists on `example.com`, use the IP address and port from the DNS SRV
    record to connect to the remote homeserver;
-3. If neither well-known or DNS SRV delegation are configured, attempt to connect to the remote
+3. If neither well-known nor DNS SRV delegation are configured, attempt to connect to the remote
    homeserver by connecting to `example.com` port TCP/8448 using HTTPS.
 
 The exact details of how server name resolution works can be found in

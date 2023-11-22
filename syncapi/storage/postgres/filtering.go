@@ -17,7 +17,7 @@ package postgres
 import (
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 // filterConvertWildcardToSQL converts wildcards as defined in
@@ -39,7 +39,7 @@ func filterConvertTypeWildcardToSQL(values *[]string) []string {
 }
 
 // TODO: Replace when Dendrite uses Go 1.18
-func getSendersRoomEventFilter(filter *gomatrixserverlib.RoomEventFilter) (senders []string, notSenders []string) {
+func getSendersRoomEventFilter(filter *synctypes.RoomEventFilter) (senders []string, notSenders []string) {
 	if filter.Senders != nil {
 		senders = *filter.Senders
 	}
@@ -49,7 +49,7 @@ func getSendersRoomEventFilter(filter *gomatrixserverlib.RoomEventFilter) (sende
 	return senders, notSenders
 }
 
-func getSendersStateFilterFilter(filter *gomatrixserverlib.StateFilter) (senders []string, notSenders []string) {
+func getSendersStateFilterFilter(filter *synctypes.StateFilter) (senders []string, notSenders []string) {
 	if filter.Senders != nil {
 		senders = *filter.Senders
 	}

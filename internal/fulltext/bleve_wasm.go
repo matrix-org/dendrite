@@ -33,6 +33,7 @@ type Indexer interface {
 	Index(elements ...IndexElement) error
 	Delete(eventID string) error
 	Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (SearchResult, error)
+	GetHighlights(result SearchResult) []string
 	Close() error
 }
 
@@ -70,4 +71,8 @@ func (f *Search) Delete(eventID string) error {
 
 func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (SearchResult, error) {
 	return SearchResult{}, nil
+}
+
+func (f *Search) GetHighlights(result SearchResult) []string {
+	return []string{}
 }

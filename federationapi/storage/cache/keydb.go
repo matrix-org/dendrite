@@ -6,6 +6,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
@@ -36,7 +37,7 @@ func (d KeyDatabase) FetcherName() string {
 // FetchKeys implements gomatrixserverlib.KeyDatabase
 func (d *KeyDatabase) FetchKeys(
 	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	results := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
 	for req, ts := range requests {

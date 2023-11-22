@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,14 +32,14 @@ func (s *FederationInternalAPI) StoreKeys(
 
 func (s *FederationInternalAPI) FetchKeys(
 	_ context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	// Run in a background context - we don't want to stop this work just
 	// because the caller gives up waiting.
 	ctx := context.Background()
-	now := gomatrixserverlib.AsTimestamp(time.Now())
+	now := spec.AsTimestamp(time.Now())
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
-	origRequests := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{}
+	origRequests := map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{}
 	for k, v := range requests {
 		origRequests[k] = v
 	}
@@ -95,7 +96,7 @@ func (s *FederationInternalAPI) FetcherName() string {
 // a request for our own server keys, either current or old.
 func (s *FederationInternalAPI) handleLocalKeys(
 	_ context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) {
 	for req := range requests {
@@ -111,10 +112,10 @@ func (s *FederationInternalAPI) handleLocalKeys(
 			// Insert our own key into the response.
 			results[req] = gomatrixserverlib.PublicKeyLookupResult{
 				VerifyKey: gomatrixserverlib.VerifyKey{
-					Key: gomatrixserverlib.Base64Bytes(s.cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)),
+					Key: spec.Base64Bytes(s.cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)),
 				},
 				ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-				ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(s.cfg.Matrix.KeyValidityPeriod)),
+				ValidUntilTS: spec.AsTimestamp(time.Now().Add(s.cfg.Matrix.KeyValidityPeriod)),
 			}
 		} else {
 			// The key request doesn't match our current key. Let's see
@@ -128,7 +129,7 @@ func (s *FederationInternalAPI) handleLocalKeys(
 					// Insert our own key into the response.
 					results[req] = gomatrixserverlib.PublicKeyLookupResult{
 						VerifyKey: gomatrixserverlib.VerifyKey{
-							Key: gomatrixserverlib.Base64Bytes(oldVerifyKey.PrivateKey.Public().(ed25519.PublicKey)),
+							Key: spec.Base64Bytes(oldVerifyKey.PrivateKey.Public().(ed25519.PublicKey)),
 						},
 						ExpiredTS:    oldVerifyKey.ExpiredAt,
 						ValidUntilTS: gomatrixserverlib.PublicKeyNotValid,
@@ -146,8 +147,8 @@ func (s *FederationInternalAPI) handleLocalKeys(
 // satisfied from our local database/cache.
 func (s *FederationInternalAPI) handleDatabaseKeys(
 	ctx context.Context,
-	now gomatrixserverlib.Timestamp,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	now spec.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	// Ask the database/cache for the keys.
@@ -169,7 +170,7 @@ func (s *FederationInternalAPI) handleDatabaseKeys(
 		// in that case. If the key isn't valid right now, then by
 		// leaving it in the 'requests' map, we'll try to update the
 		// key using the fetchers in handleFetcherKeys.
-		if res.WasValidAt(now, true) {
+		if res.WasValidAt(now, gomatrixserverlib.StrictValiditySignatureCheck) {
 			delete(requests, req)
 		}
 	}
@@ -180,9 +181,9 @@ func (s *FederationInternalAPI) handleDatabaseKeys(
 // the remaining requests.
 func (s *FederationInternalAPI) handleFetcherKeys(
 	ctx context.Context,
-	_ gomatrixserverlib.Timestamp,
+	_ spec.Timestamp,
 	fetcher gomatrixserverlib.KeyFetcher,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	logrus.WithFields(logrus.Fields{

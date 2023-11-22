@@ -29,7 +29,7 @@ func NewUserDatabase(
 	ctx context.Context,
 	conMan sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	bcryptCost int,
 	openIDTokenLifetimeMS int64,
 	loginTokenLifetime time.Duration,

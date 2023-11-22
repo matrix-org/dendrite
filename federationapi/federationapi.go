@@ -21,9 +21,9 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/internal"
@@ -48,11 +48,10 @@ func AddPublicRoutes(
 	dendriteConfig *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.FederationUserAPI,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fedAPI federationAPI.FederationInternalAPI,
-	servers federationAPI.ServersInRoomProvider,
 	enableMetrics bool,
 ) {
 	cfg := &dendriteConfig.FederationAPI
@@ -86,7 +85,7 @@ func AddPublicRoutes(
 		dendriteConfig,
 		rsAPI, f, keyRing,
 		federation, userAPI, mscCfg,
-		servers, producer, enableMetrics,
+		producer, enableMetrics,
 	)
 }
 
@@ -95,14 +94,14 @@ func AddPublicRoutes(
 func NewInternalAPI(
 	processContext *process.ProcessContext,
 	dendriteCfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
-	federation api.FederationClient,
+	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *caching.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
-) api.FederationInternalAPI {
+) *internal.FederationInternalAPI {
 	cfg := &dendriteCfg.FederationAPI
 
 	federationDB, err := storage.NewDatabase(processContext.Context(), cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)

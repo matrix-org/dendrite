@@ -25,11 +25,12 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Database struct {
 	DB                *sql.DB
-	IsLocalServerName func(gomatrixserverlib.ServerName) bool
+	IsLocalServerName func(spec.ServerName) bool
 	Cache             caching.FederationCache
 	Writer            sqlutil.Writer
 	RelayQueue        tables.RelayQueue
@@ -61,7 +62,7 @@ func (d *Database) StoreTransaction(
 
 func (d *Database) AssociateTransactionWithDestinations(
 	ctx context.Context,
-	destinations map[gomatrixserverlib.UserID]struct{},
+	destinations map[spec.UserID]struct{},
 	transactionID gomatrixserverlib.TransactionID,
 	dbReceipt *receipt.Receipt,
 ) error {
@@ -88,7 +89,7 @@ func (d *Database) AssociateTransactionWithDestinations(
 
 func (d *Database) CleanTransactions(
 	ctx context.Context,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 	receipts []*receipt.Receipt,
 ) error {
 	nids := make([]int64, len(receipts))
@@ -123,7 +124,7 @@ func (d *Database) CleanTransactions(
 
 func (d *Database) GetTransaction(
 	ctx context.Context,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 ) (*gomatrixserverlib.Transaction, *receipt.Receipt, error) {
 	entriesRequested := 1
 	nids, err := d.RelayQueue.SelectQueueEntries(ctx, nil, userID.Domain(), entriesRequested)
@@ -160,7 +161,7 @@ func (d *Database) GetTransaction(
 
 func (d *Database) GetTransactionCount(
 	ctx context.Context,
-	userID gomatrixserverlib.UserID,
+	userID spec.UserID,
 ) (int64, error) {
 	count, err := d.RelayQueue.SelectQueueEntryCount(ctx, nil, userID.Domain())
 	if err != nil {

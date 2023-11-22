@@ -21,11 +21,11 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"
 )
@@ -38,7 +38,7 @@ func GetAccountData(
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not match the current user"),
+			JSON: spec.Forbidden("userID does not match the current user"),
 		}
 	}
 
@@ -69,7 +69,7 @@ func GetAccountData(
 
 	return util.JSONResponse{
 		Code: http.StatusNotFound,
-		JSON: jsonerror.NotFound("data not found"),
+		JSON: spec.NotFound("data not found"),
 	}
 }
 
@@ -81,7 +81,7 @@ func SaveAccountData(
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("userID does not match the current user"),
+			JSON: spec.Forbidden("userID does not match the current user"),
 		}
 	}
 
@@ -90,27 +90,30 @@ func SaveAccountData(
 	if req.Body == http.NoBody {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("Content not JSON"),
+			JSON: spec.NotJSON("Content not JSON"),
 		}
 	}
 
 	if dataType == "m.fully_read" || dataType == "m.push_rules" {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(fmt.Sprintf("Unable to modify %q using this API", dataType)),
+			JSON: spec.Forbidden(fmt.Sprintf("Unable to modify %q using this API", dataType)),
 		}
 	}
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	if !json.Valid(body) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Bad JSON content"),
+			JSON: spec.BadJSON("Bad JSON content"),
 		}
 	}
 
@@ -142,8 +145,16 @@ func SaveReadMarker(
 	userAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	syncProducer *producers.SyncAPIProducer, device *api.Device, roomID string,
 ) util.JSONResponse {
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("userID for this device is invalid"),
+		}
+	}
+
 	// Verify that the user is a member of this room
-	resErr := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}
@@ -157,7 +168,10 @@ func SaveReadMarker(
 	if r.FullyRead != "" {
 		data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
 		if err != nil {
-			return jsonerror.InternalServerError()
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 
 		dataReq := api.InputAccountDataRequest{

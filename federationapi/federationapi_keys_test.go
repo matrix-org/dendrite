@@ -16,6 +16,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/routing"
@@ -24,12 +26,12 @@ import (
 )
 
 type server struct {
-	name      gomatrixserverlib.ServerName        // server name
-	validity  time.Duration                       // key validity duration from now
-	config    *config.FederationAPI               // skeleton config, from TestMain
-	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
-	cache     *caching.Caches                     // server-specific cache
-	api       api.FederationInternalAPI           // server-specific server key API
+	name      spec.ServerName           // server name
+	validity  time.Duration             // key validity duration from now
+	config    *config.FederationAPI     // skeleton config, from TestMain
+	fedclient fclient.FederationClient  // uses MockRoundTripper
+	cache     *caching.Caches           // server-specific cache
+	api       api.FederationInternalAPI // server-specific server key API
 }
 
 func (s *server) renew() {
@@ -82,7 +84,7 @@ func TestMain(m *testing.M) {
 				Generate:       true,
 				SingleDatabase: false,
 			})
-			cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
+			cfg.Global.ServerName = spec.ServerName(s.name)
 			cfg.Global.PrivateKey = testPriv
 			cfg.Global.JetStream.InMemory = true
 			cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
@@ -105,9 +107,9 @@ func TestMain(m *testing.M) {
 			transport.RegisterProtocol("matrix", &MockRoundTripper{})
 
 			// Create the federation client.
-			s.fedclient = gomatrixserverlib.NewFederationClient(
+			s.fedclient = fclient.NewFederationClient(
 				s.config.Matrix.SigningIdentities(),
-				gomatrixserverlib.WithTransport(transport),
+				fclient.WithTransport(transport),
 			)
 
 			// Finally, build the server key APIs.
@@ -140,7 +142,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	}
 
 	// Get the keys and JSON-ify them.
-	keys := routing.LocalKeys(s.config, gomatrixserverlib.ServerName(req.Host))
+	keys := routing.LocalKeys(s.config, spec.ServerName(req.Host))
 	body, err := json.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err
@@ -165,8 +167,8 @@ func TestServersRequestOwnKeys(t *testing.T) {
 		}
 		res, err := s.api.FetchKeys(
 			context.Background(),
-			map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-				req: gomatrixserverlib.AsTimestamp(time.Now()),
+			map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
+				req: spec.AsTimestamp(time.Now()),
 			},
 		)
 		if err != nil {
@@ -191,8 +193,8 @@ func TestRenewalBehaviour(t *testing.T) {
 
 	res, err := serverA.api.FetchKeys(
 		context.Background(),
-		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-			req: gomatrixserverlib.AsTimestamp(time.Now()),
+		map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
+			req: spec.AsTimestamp(time.Now()),
 		},
 	)
 	if err != nil {
@@ -215,8 +217,8 @@ func TestRenewalBehaviour(t *testing.T) {
 
 	res, err = serverA.api.FetchKeys(
 		context.Background(),
-		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-			req: gomatrixserverlib.AsTimestamp(time.Now()),
+		map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
+			req: spec.AsTimestamp(time.Now()),
 		},
 	)
 	if err != nil {

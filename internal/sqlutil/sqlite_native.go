@@ -4,7 +4,6 @@
 package sqlutil
 
 import (
-	"modernc.org/sqlite"
 	"strings"
 )
 
@@ -22,8 +21,4 @@ func sqliteDSNExtension(dsn string) string {
 	// https://gitlab.com/cznic/sqlite/-/issues/106#note_1058094993
 	dsn += "_pragma=busy_timeout%3d10000"
 	return dsn
-}
-
-func sqliteDriver() *sqlite.Driver {
-	return &sqlite.Driver{}
 }

@@ -36,7 +36,7 @@ type SyncServerDatasource struct {
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(ctx context.Context, cm sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 	if d.db, d.writer, err = cm.Connection(dbProperties); err != nil {

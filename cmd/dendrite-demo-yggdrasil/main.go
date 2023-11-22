@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
@@ -133,7 +134,7 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", filepath.Join(*instanceDir, *instanceName)))
-		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+		cfg.MSCs.MSCs = []string{"msc2836"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
@@ -145,7 +146,7 @@ func main() {
 		}
 	}
 
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.ServerName = spec.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	configErrors := &config.ConfigErrors{}
@@ -212,13 +213,14 @@ func main() {
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
-
-	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
 		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
+
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
+	rsAPI.SetAppserviceAPI(asAPI)
 
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,7 +74,7 @@ func TestShoudInsertQueueTransaction(t *testing.T) {
 		defer close()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
-		serverName := gomatrixserverlib.ServerName("domain")
+		serverName := spec.ServerName("domain")
 		nid := int64(1)
 		err := db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, nid)
 		if err != nil {
@@ -89,7 +90,7 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 		defer close()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
-		serverName := gomatrixserverlib.ServerName("domain")
+		serverName := spec.ServerName("domain")
 		nid := int64(1)
 
 		err := db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, nid)
@@ -114,7 +115,7 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 		defer close()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
-		serverName := gomatrixserverlib.ServerName("domain")
+		serverName := spec.ServerName("domain")
 		nid := int64(2)
 		err := db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, nid)
 		if err != nil {
@@ -122,7 +123,7 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 		}
 
 		transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
-		serverName = gomatrixserverlib.ServerName("domain")
+		serverName = spec.ServerName("domain")
 		oldestNID := int64(1)
 		err = db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, oldestNID)
 		if err != nil {
@@ -155,7 +156,7 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 		defer close()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
-		serverName := gomatrixserverlib.ServerName("domain")
+		serverName := spec.ServerName("domain")
 		nid := int64(1)
 
 		err := db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, nid)
@@ -186,10 +187,10 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 		defer close()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
-		serverName := gomatrixserverlib.ServerName("domain")
+		serverName := spec.ServerName("domain")
 		nid := int64(1)
 		transactionID2 := gomatrixserverlib.TransactionID(fmt.Sprintf("%d2", time.Now().UnixNano()))
-		serverName2 := gomatrixserverlib.ServerName("domain2")
+		serverName2 := spec.ServerName("domain2")
 		nid2 := int64(2)
 		transactionID3 := gomatrixserverlib.TransactionID(fmt.Sprintf("%d3", time.Now().UnixNano()))
 

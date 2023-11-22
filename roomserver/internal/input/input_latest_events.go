@@ -53,7 +53,7 @@ func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
-	event *gomatrixserverlib.Event,
+	event gomatrixserverlib.PDU,
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
@@ -101,7 +101,7 @@ type latestEventsUpdater struct {
 	updater       *shared.RoomUpdater
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
-	event         *gomatrixserverlib.Event
+	event         gomatrixserverlib.PDU
 	transactionID *api.TransactionID
 	rewritesState bool
 	// Which server to send this event as.
@@ -154,8 +154,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	extremitiesChanged, err := u.calculateLatest(
 		u.oldLatest, u.event,
 		types.StateAtEventAndReference{
-			EventReference: u.event.EventReference(),
-			StateAtEvent:   u.stateAtEvent,
+			EventID:      u.event.EventID(),
+			StateAtEvent: u.stateAtEvent,
 		},
 	)
 	if err != nil {
@@ -197,7 +197,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID().String(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
@@ -213,7 +213,7 @@ func (u *latestEventsUpdater) latestState() error {
 	defer trace.EndRegion()
 
 	var err error
-	roomState := state.NewStateResolution(u.updater, u.roomInfo)
+	roomState := state.NewStateResolution(u.updater, u.roomInfo, u.api.Queryer)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
@@ -290,7 +290,7 @@ func (u *latestEventsUpdater) latestState() error {
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
 			"event_id":      u.event.EventID(),
-			"room_id":       u.event.RoomID(),
+			"room_id":       u.event.RoomID().String(),
 			"old_state_nid": u.oldStateNID,
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),
@@ -326,7 +326,7 @@ func (u *latestEventsUpdater) latestState() error {
 // true if the new event is included in those extremites, false otherwise.
 func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
-	newEvent *gomatrixserverlib.Event,
+	newEvent gomatrixserverlib.PDU,
 	newStateAndRef types.StateAtEventAndReference,
 ) (bool, error) {
 	trace, _ := internal.StartRegion(u.ctx, "calculateLatest")
@@ -349,7 +349,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// If the "new" event is already referenced by an existing event
 	// then do nothing - it's not a candidate to be a new extremity if
 	// it has been referenced.
-	if referenced, err := u.updater.IsReferenced(newEvent.EventReference()); err != nil {
+	if referenced, err := u.updater.IsReferenced(newEvent.EventID()); err != nil {
 		return false, fmt.Errorf("u.updater.IsReferenced(new): %w", err)
 	} else if referenced {
 		u.latest = oldLatest
@@ -360,7 +360,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// have entries in the previous events table. If they do then we
 	// will no longer include them as forward extremities.
 	for k, l := range existingRefs {
-		referenced, err := u.updater.IsReferenced(l.EventReference)
+		referenced, err := u.updater.IsReferenced(l.EventID)
 		if err != nil {
 			return false, fmt.Errorf("u.updater.IsReferenced: %w", err)
 		} else if referenced {
@@ -393,7 +393,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:             u.event.Headered(u.roomInfo.RoomVersion),
+		Event:             &types.HeaderedEvent{PDU: u.event},
 		RewritesState:     u.rewritesState,
 		LastSentEventID:   u.lastEventIDSent,
 		LatestEventIDs:    latestEventIDs,

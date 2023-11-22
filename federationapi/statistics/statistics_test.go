@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -108,10 +108,10 @@ func TestBackoff(t *testing.T) {
 func TestRelayServersListing(t *testing.T) {
 	stats := NewStatistics(test.NewInMemoryFederationDatabase(), FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	server := ServerStatistics{statistics: &stats}
-	server.AddRelayServers([]gomatrixserverlib.ServerName{"relay1", "relay1", "relay2"})
+	server.AddRelayServers([]spec.ServerName{"relay1", "relay1", "relay2"})
 	relayServers := server.KnownRelayServers()
-	assert.Equal(t, []gomatrixserverlib.ServerName{"relay1", "relay2"}, relayServers)
-	server.AddRelayServers([]gomatrixserverlib.ServerName{"relay1", "relay1", "relay2"})
+	assert.Equal(t, []spec.ServerName{"relay1", "relay2"}, relayServers)
+	server.AddRelayServers([]spec.ServerName{"relay1", "relay1", "relay2"})
 	relayServers = server.KnownRelayServers()
-	assert.Equal(t, []gomatrixserverlib.ServerName{"relay1", "relay2"}, relayServers)
+	assert.Equal(t, []spec.ServerName{"relay1", "relay2"}, relayServers)
 }

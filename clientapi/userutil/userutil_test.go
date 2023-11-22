@@ -16,21 +16,22 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var (
-	localpart                                      = "somelocalpart"
-	serverName        gomatrixserverlib.ServerName = "someservername"
-	invalidServerName gomatrixserverlib.ServerName = "invalidservername"
-	goodUserID                                     = "@" + localpart + ":" + string(serverName)
-	badUserID                                      = "@bad:user:name@noservername:"
+	localpart                         = "somelocalpart"
+	serverName        spec.ServerName = "someservername"
+	invalidServerName spec.ServerName = "invalidservername"
+	goodUserID                        = "@" + localpart + ":" + string(serverName)
+	badUserID                         = "@bad:user:name@noservername:"
 )
 
 // TestGoodUserID checks that correct localpart is returned for a valid user ID.
 func TestGoodUserID(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	}
@@ -49,7 +50,7 @@ func TestGoodUserID(t *testing.T) {
 // TestWithLocalpartOnly checks that localpart is returned when usernameParam contains only localpart.
 func TestWithLocalpartOnly(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	}
@@ -68,7 +69,7 @@ func TestWithLocalpartOnly(t *testing.T) {
 // TestIncorrectDomain checks for error when there's server name mismatch.
 func TestIncorrectDomain(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: invalidServerName,
 		},
 	}
@@ -83,7 +84,7 @@ func TestIncorrectDomain(t *testing.T) {
 // TestBadUserID checks that ParseUsernameParam fails for invalid user ID
 func TestBadUserID(t *testing.T) {
 	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
+		SigningIdentity: fclient.SigningIdentity{
 			ServerName: serverName,
 		},
 	}

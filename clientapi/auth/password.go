@@ -21,10 +21,10 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -65,26 +65,26 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("A username must be supplied."),
+			JSON: spec.BadJSON("A username must be supplied."),
 		}
 	}
 	if len(r.Password) == 0 {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("A password must be supplied."),
+			JSON: spec.BadJSON("A password must be supplied."),
 		}
 	}
 	localpart, domain, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
 	if !t.Config.Matrix.IsLocalServerName(domain) {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername("The server name is not known."),
+			JSON: spec.InvalidUsername("The server name is not known."),
 		}
 	}
 	// Squash username to all lowercase letters
@@ -97,7 +97,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Unable to fetch account by password."),
+			JSON: spec.Unknown("Unable to fetch account by password."),
 		}
 	}
 
@@ -112,7 +112,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		if err != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("Unable to fetch account by password."),
+				JSON: spec.Unknown("Unable to fetch account by password."),
 			}
 		}
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
@@ -120,7 +120,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		if !res.Exists {
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
+				JSON: spec.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
 	}

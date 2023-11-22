@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -35,16 +36,16 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		ctx, cancel := context.WithDeadline(processCtx.Context(), deadline)
 		defer cancel()
 
-		event, err := gomatrixserverlib.NewEventFromTrustedJSON(
+		event, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV6).NewEventFromTrustedJSON(
 			[]byte(`{"auth_events":[],"content":{"creator":"@neilalexander:dendrite.matrix.org","room_version":"6"},"depth":1,"hashes":{"sha256":"jqOqdNEH5r0NiN3xJtj0u5XUVmRqq9YvGbki1wxxuuM"},"origin":"dendrite.matrix.org","origin_server_ts":1644595362726,"prev_events":[],"prev_state":[],"room_id":"!jSZZRknA6GkTBXNP:dendrite.matrix.org","sender":"@neilalexander:dendrite.matrix.org","signatures":{"dendrite.matrix.org":{"ed25519:6jB2aB":"bsQXO1wketf1OSe9xlndDIWe71W9KIundc6rBw4KEZdGPW7x4Tv4zDWWvbxDsG64sS2IPWfIm+J0OOozbrWIDw"}},"state_key":"","type":"m.room.create"}`),
-			false, gomatrixserverlib.RoomVersionV6,
+			false,
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		in := api.InputRoomEvent{
 			Kind:  api.KindOutlier, // don't panic if we generate an output event
-			Event: event.Headered(gomatrixserverlib.RoomVersionV6),
+			Event: &types.HeaderedEvent{PDU: event},
 		}
 
 		inputter := &input.Inputer{

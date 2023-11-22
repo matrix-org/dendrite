@@ -22,19 +22,19 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const (
-	// Event was passed to the roomserver
+	// Event was passed to the Roomserver
 	MetricsOutcomeOK = "ok"
 	// Event failed to be processed
 	MetricsOutcomeFail = "fail"
@@ -55,15 +55,14 @@ var inFlightTxnsPerOrigin sync.Map // transaction ID -> chan util.JSONResponse
 // Send implements /_matrix/federation/v1/send/{txnID}
 func Send(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
+	request *fclient.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keyAPI userAPI.FederationUserAPI,
 	keys gomatrixserverlib.JSONVerifier,
-	federation federationAPI.FederationClient,
+	federation fclient.FederationClient,
 	mu *internal.MutexByRoom,
-	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	// First we should check if this origin has already submitted this
@@ -105,7 +104,7 @@ func Send(
 	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 	// Transactions are limited in size; they can have at most 50 PDUs and 100 EDUs.
@@ -113,7 +112,7 @@ func Send(
 	if len(txnEvents.PDUs) > 50 || len(txnEvents.EDUs) > 100 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("max 50 pdus / 100 edus"),
+			JSON: spec.BadJSON("max 50 pdus / 100 edus"),
 		}
 	}
 

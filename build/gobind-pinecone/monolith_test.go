@@ -18,11 +18,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func TestMonolithStarts(t *testing.T) {
-	monolith := DendriteMonolith{}
+	monolith := DendriteMonolith{
+		StorageDirectory: t.TempDir(),
+		CacheDirectory:   t.TempDir(),
+	}
 	monolith.Start()
 	monolith.PublicKey()
 	monolith.Stop()
@@ -60,7 +63,10 @@ func TestMonolithSetRelayServers(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		monolith := DendriteMonolith{}
+		monolith := DendriteMonolith{
+			StorageDirectory: t.TempDir(),
+			CacheDirectory:   t.TempDir(),
+		}
 		monolith.Start()
 
 		inputRelays := tc.relays
@@ -110,7 +116,7 @@ func TestParseServerKey(t *testing.T) {
 		name        string
 		serverKey   string
 		expectedErr bool
-		expectedKey gomatrixserverlib.ServerName
+		expectedKey spec.ServerName
 	}{
 		{
 			name:        "valid userid as key",

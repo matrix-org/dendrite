@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 func Test_parseContextParams(t *testing.T) {
@@ -19,28 +19,28 @@ func Test_parseContextParams(t *testing.T) {
 	tests := []struct {
 		name       string
 		req        *http.Request
-		wantFilter *gomatrixserverlib.RoomEventFilter
+		wantFilter *synctypes.RoomEventFilter
 		wantErr    bool
 	}{
 		{
 			name:       "no params set",
 			req:        noParamsReq,
-			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 10},
+			wantFilter: &synctypes.RoomEventFilter{Limit: 10},
 		},
 		{
 			name:       "limit 2 param set",
 			req:        limit2Req,
-			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 2},
+			wantFilter: &synctypes.RoomEventFilter{Limit: 2},
 		},
 		{
 			name:       "limit 10000 param set",
 			req:        limit10000Req,
-			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 100},
+			wantFilter: &synctypes.RoomEventFilter{Limit: 100},
 		},
 		{
 			name:       "filter lazy_load_members param set",
 			req:        lazyLoadReq,
-			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 2, LazyLoadMembers: true},
+			wantFilter: &synctypes.RoomEventFilter{Limit: 2, LazyLoadMembers: true},
 		},
 		{
 			name:    "invalid limit req",

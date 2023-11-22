@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const KeyID = "ed25519:dendrite-demo-yggdrasil"
@@ -36,7 +37,7 @@ func (f *YggdrasilKeys) KeyRing() *gomatrixserverlib.KeyRing {
 
 func (f *YggdrasilKeys) FetchKeys(
 	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	res := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
 	for req := range requests {
@@ -54,7 +55,7 @@ func (f *YggdrasilKeys) FetchKeys(
 				Key: hexkey,
 			},
 			ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-			ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(24 * time.Hour * 365)),
+			ValidUntilTS: spec.AsTimestamp(time.Now().Add(24 * time.Hour * 365)),
 		}
 	}
 	return res, nil

@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
@@ -38,7 +39,7 @@ type OutputReceiptEventConsumer struct {
 	durable      string
 	topic        string
 	db           storage.UserDatabase
-	serverName   gomatrixserverlib.ServerName
+	serverName   spec.ServerName
 	syncProducer *producers.SyncAPI
 	pgClient     pushgateway.Client
 }
@@ -104,7 +105,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return false
 	}
 
-	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(gomatrixserverlib.AsTimestamp(metadata.Timestamp)), true)
+	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(spec.AsTimestamp(metadata.Timestamp)), true)
 	if err != nil {
 		log.WithError(err).Error("userapi EDU consumer")
 		return false

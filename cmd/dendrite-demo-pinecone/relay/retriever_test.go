@@ -21,13 +21,13 @@ import (
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gotest.tools/v3/poll"
 )
 
-var testRelayServers = []gomatrixserverlib.ServerName{"relay1", "relay2"}
+var testRelayServers = []spec.ServerName{"relay1", "relay2"}
 
 type FakeFedAPI struct {
 	federationAPI.FederationInternalAPI
@@ -48,8 +48,8 @@ type FakeRelayAPI struct {
 
 func (r *FakeRelayAPI) PerformRelayServerSync(
 	ctx context.Context,
-	userID gomatrixserverlib.UserID,
-	relayServer gomatrixserverlib.ServerName,
+	userID spec.UserID,
+	relayServer spec.ServerName,
 ) error {
 	return nil
 }

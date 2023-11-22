@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Presence uint8
@@ -60,10 +60,10 @@ func PresenceFromString(input string) (Presence, bool) {
 
 type PresenceInternal struct {
 	ClientFields PresenceClientResponse
-	StreamPos    StreamPosition              `json:"-"`
-	UserID       string                      `json:"-"`
-	LastActiveTS gomatrixserverlib.Timestamp `json:"-"`
-	Presence     Presence                    `json:"-"`
+	StreamPos    StreamPosition `json:"-"`
+	UserID       string         `json:"-"`
+	LastActiveTS spec.Timestamp `json:"-"`
+	Presence     Presence       `json:"-"`
 }
 
 // Equals compares p1 with p2.

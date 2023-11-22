@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage/tables"
 	"github.com/matrix-org/dendrite/mediaapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const thumbnailSchema = `
@@ -79,7 +79,7 @@ func NewSQLiteThumbnailsTable(db *sql.DB) (tables.Thumbnails, error) {
 }
 
 func (s *thumbnailStatements) InsertThumbnail(ctx context.Context, txn *sql.Tx, thumbnailMetadata *types.ThumbnailMetadata) error {
-	thumbnailMetadata.MediaMetadata.CreationTimestamp = gomatrixserverlib.AsTimestamp(time.Now())
+	thumbnailMetadata.MediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
 	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertThumbnailStmt).ExecContext(
 		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
@@ -98,7 +98,7 @@ func (s *thumbnailStatements) SelectThumbnail(
 	ctx context.Context,
 	txn *sql.Tx,
 	mediaID types.MediaID,
-	mediaOrigin gomatrixserverlib.ServerName,
+	mediaOrigin spec.ServerName,
 	width, height int,
 	resizeMethod string,
 ) (*types.ThumbnailMetadata, error) {
@@ -130,7 +130,7 @@ func (s *thumbnailStatements) SelectThumbnail(
 
 func (s *thumbnailStatements) SelectThumbnails(
 	ctx context.Context, txn *sql.Tx, mediaID types.MediaID,
-	mediaOrigin gomatrixserverlib.ServerName,
+	mediaOrigin spec.ServerName,
 ) ([]*types.ThumbnailMetadata, error) {
 	rows, err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailsStmt).QueryContext(
 		ctx, mediaID, mediaOrigin,

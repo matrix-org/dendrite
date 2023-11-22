@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -24,7 +24,7 @@ func Deactivate(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+			JSON: spec.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
 
@@ -33,19 +33,26 @@ func Deactivate(
 		return *errRes
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', login.Username())
+	localpart, serverName, err := gomatrixserverlib.SplitID('@', login.Username())
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	var res api.PerformAccountDeactivationResponse
 	err = accountAPI.PerformAccountDeactivation(ctx, &api.PerformAccountDeactivationRequest{
-		Localpart: localpart,
+		Localpart:  localpart,
+		ServerName: serverName,
 	}, &res)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 
 	return util.JSONResponse{

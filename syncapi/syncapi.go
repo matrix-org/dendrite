@@ -45,7 +45,7 @@ func AddPublicRoutes(
 	processContext *process.ProcessContext,
 	routers httputil.Routers,
 	dendriteCfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
@@ -60,7 +60,7 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
-	notifier := notifier.NewNotifier()
+	notifier := notifier.NewNotifier(rsAPI)
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
@@ -69,11 +69,10 @@ func AddPublicRoutes(
 
 	var fts *fulltext.Search
 	if dendriteCfg.SyncAPI.Fulltext.Enabled {
-		fts, err = fulltext.New(processContext.Context(), dendriteCfg.SyncAPI.Fulltext)
+		fts, err = fulltext.New(processContext, dendriteCfg.SyncAPI.Fulltext)
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to create full text")
 		}
-		processContext.ComponentStarted()
 	}
 
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
@@ -145,8 +144,11 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
+	rateLimits := httputil.NewRateLimits(&dendriteCfg.ClientAPI.RateLimiting)
+
 	routing.Setup(
 		routers.Client, requestPool, syncDB, userAPI,
 		rsAPI, &dendriteCfg.SyncAPI, caches, fts,
+		rateLimits,
 	)
 }

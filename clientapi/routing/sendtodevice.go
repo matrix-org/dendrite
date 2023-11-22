@@ -19,10 +19,10 @@ import (
 	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // SendToDevice handles PUT /_matrix/client/r0/sendToDevice/{eventType}/{txnId}
@@ -53,7 +53,10 @@ func SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
-				return jsonerror.InternalServerError()
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
 			}
 		}
 	}

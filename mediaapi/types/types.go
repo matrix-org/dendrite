@@ -18,7 +18,7 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // FileSizeBytes is a file size in bytes
@@ -48,10 +48,10 @@ type MatrixUserID string
 // MediaMetadata is metadata associated with a media file
 type MediaMetadata struct {
 	MediaID           MediaID
-	Origin            gomatrixserverlib.ServerName
+	Origin            spec.ServerName
 	ContentType       ContentType
 	FileSizeBytes     FileSizeBytes
-	CreationTimestamp gomatrixserverlib.Timestamp
+	CreationTimestamp spec.Timestamp
 	UploadName        Filename
 	Base64Hash        Base64Hash
 	UserID            MatrixUserID

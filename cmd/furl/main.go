@@ -13,6 +13,8 @@ import (
 	"os"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var requestFrom = flag.String("from", "", "the server name that the request should originate from")
@@ -48,9 +50,9 @@ func main() {
 		panic("unexpected key block")
 	}
 
-	serverName := gomatrixserverlib.ServerName(*requestFrom)
-	client := gomatrixserverlib.NewFederationClient(
-		[]*gomatrixserverlib.SigningIdentity{
+	serverName := spec.ServerName(*requestFrom)
+	client := fclient.NewFederationClient(
+		[]*fclient.SigningIdentity{
 			{
 				ServerName: serverName,
 				KeyID:      gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
@@ -82,10 +84,10 @@ func main() {
 		}
 	}
 
-	req := gomatrixserverlib.NewFederationRequest(
+	req := fclient.NewFederationRequest(
 		method,
 		serverName,
-		gomatrixserverlib.ServerName(u.Host),
+		spec.ServerName(u.Host),
 		u.RequestURI(),
 	)
 
@@ -96,7 +98,7 @@ func main() {
 	}
 
 	if err = req.Sign(
-		gomatrixserverlib.ServerName(*requestFrom),
+		spec.ServerName(*requestFrom),
 		gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
 		privateKey,
 	); err != nil {

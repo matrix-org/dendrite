@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type SyncRequest struct {
@@ -15,7 +16,7 @@ type SyncRequest struct {
 	Log           *logrus.Entry
 	Device        *userapi.Device
 	Response      *Response
-	Filter        gomatrixserverlib.Filter
+	Filter        synctypes.Filter
 	Since         StreamingToken
 	Timeout       time.Duration
 	WantFullState bool
@@ -34,11 +35,11 @@ func (r *SyncRequest) IsRoomPresent(roomID string) bool {
 		return false
 	}
 	switch membership {
-	case gomatrixserverlib.Join:
+	case spec.Join:
 		return true
-	case gomatrixserverlib.Invite:
+	case spec.Invite:
 		return true
-	case gomatrixserverlib.Peek:
+	case spec.Peek:
 		return true
 	default:
 		return false

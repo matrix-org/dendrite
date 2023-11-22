@@ -101,7 +101,7 @@ func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *
 	var inserted bool    // Did the query result in a membership change?
 	var retired []string // Did we retire any updates in the process?
 	return inserted, retired, u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, string(event.SenderID()))
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}

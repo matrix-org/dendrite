@@ -23,7 +23,9 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/federationapi/types"
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var nidMutex sync.Mutex
@@ -31,28 +33,28 @@ var nid = int64(0)
 
 type InMemoryFederationDatabase struct {
 	dbMutex            sync.Mutex
-	pendingPDUServers  map[gomatrixserverlib.ServerName]struct{}
-	pendingEDUServers  map[gomatrixserverlib.ServerName]struct{}
-	blacklistedServers map[gomatrixserverlib.ServerName]struct{}
-	assumedOffline     map[gomatrixserverlib.ServerName]struct{}
-	pendingPDUs        map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent
+	pendingPDUServers  map[spec.ServerName]struct{}
+	pendingEDUServers  map[spec.ServerName]struct{}
+	blacklistedServers map[spec.ServerName]struct{}
+	assumedOffline     map[spec.ServerName]struct{}
+	pendingPDUs        map[*receipt.Receipt]*rstypes.HeaderedEvent
 	pendingEDUs        map[*receipt.Receipt]*gomatrixserverlib.EDU
-	associatedPDUs     map[gomatrixserverlib.ServerName]map[*receipt.Receipt]struct{}
-	associatedEDUs     map[gomatrixserverlib.ServerName]map[*receipt.Receipt]struct{}
-	relayServers       map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName
+	associatedPDUs     map[spec.ServerName]map[*receipt.Receipt]struct{}
+	associatedEDUs     map[spec.ServerName]map[*receipt.Receipt]struct{}
+	relayServers       map[spec.ServerName][]spec.ServerName
 }
 
 func NewInMemoryFederationDatabase() *InMemoryFederationDatabase {
 	return &InMemoryFederationDatabase{
-		pendingPDUServers:  make(map[gomatrixserverlib.ServerName]struct{}),
-		pendingEDUServers:  make(map[gomatrixserverlib.ServerName]struct{}),
-		blacklistedServers: make(map[gomatrixserverlib.ServerName]struct{}),
-		assumedOffline:     make(map[gomatrixserverlib.ServerName]struct{}),
-		pendingPDUs:        make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent),
+		pendingPDUServers:  make(map[spec.ServerName]struct{}),
+		pendingEDUServers:  make(map[spec.ServerName]struct{}),
+		blacklistedServers: make(map[spec.ServerName]struct{}),
+		assumedOffline:     make(map[spec.ServerName]struct{}),
+		pendingPDUs:        make(map[*receipt.Receipt]*rstypes.HeaderedEvent),
 		pendingEDUs:        make(map[*receipt.Receipt]*gomatrixserverlib.EDU),
-		associatedPDUs:     make(map[gomatrixserverlib.ServerName]map[*receipt.Receipt]struct{}),
-		associatedEDUs:     make(map[gomatrixserverlib.ServerName]map[*receipt.Receipt]struct{}),
-		relayServers:       make(map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName),
+		associatedPDUs:     make(map[spec.ServerName]map[*receipt.Receipt]struct{}),
+		associatedEDUs:     make(map[spec.ServerName]map[*receipt.Receipt]struct{}),
+		relayServers:       make(map[spec.ServerName][]spec.ServerName),
 	}
 }
 
@@ -63,7 +65,7 @@ func (d *InMemoryFederationDatabase) StoreJSON(
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	var event gomatrixserverlib.HeaderedEvent
+	var event rstypes.HeaderedEvent
 	if err := json.Unmarshal([]byte(js), &event); err == nil {
 		nidMutex.Lock()
 		defer nidMutex.Unlock()
@@ -88,14 +90,14 @@ func (d *InMemoryFederationDatabase) StoreJSON(
 
 func (d *InMemoryFederationDatabase) GetPendingPDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
-) (pdus map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent, err error) {
+) (pdus map[*receipt.Receipt]*rstypes.HeaderedEvent, err error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
 	pduCount := 0
-	pdus = make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent)
+	pdus = make(map[*receipt.Receipt]*rstypes.HeaderedEvent)
 	if receipts, ok := d.associatedPDUs[serverName]; ok {
 		for dbReceipt := range receipts {
 			if event, ok := d.pendingPDUs[dbReceipt]; ok {
@@ -112,7 +114,7 @@ func (d *InMemoryFederationDatabase) GetPendingPDUs(
 
 func (d *InMemoryFederationDatabase) GetPendingEDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	limit int,
 ) (edus map[*receipt.Receipt]*gomatrixserverlib.EDU, err error) {
 	d.dbMutex.Lock()
@@ -136,7 +138,7 @@ func (d *InMemoryFederationDatabase) GetPendingEDUs(
 
 func (d *InMemoryFederationDatabase) AssociatePDUWithDestinations(
 	ctx context.Context,
-	destinations map[gomatrixserverlib.ServerName]struct{},
+	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 ) error {
 	d.dbMutex.Lock()
@@ -158,7 +160,7 @@ func (d *InMemoryFederationDatabase) AssociatePDUWithDestinations(
 
 func (d *InMemoryFederationDatabase) AssociateEDUWithDestinations(
 	ctx context.Context,
-	destinations map[gomatrixserverlib.ServerName]struct{},
+	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
@@ -182,7 +184,7 @@ func (d *InMemoryFederationDatabase) AssociateEDUWithDestinations(
 
 func (d *InMemoryFederationDatabase) CleanPDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	receipts []*receipt.Receipt,
 ) error {
 	d.dbMutex.Lock()
@@ -199,7 +201,7 @@ func (d *InMemoryFederationDatabase) CleanPDUs(
 
 func (d *InMemoryFederationDatabase) CleanEDUs(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	receipts []*receipt.Receipt,
 ) error {
 	d.dbMutex.Lock()
@@ -216,7 +218,7 @@ func (d *InMemoryFederationDatabase) CleanEDUs(
 
 func (d *InMemoryFederationDatabase) GetPendingPDUCount(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (int64, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -230,7 +232,7 @@ func (d *InMemoryFederationDatabase) GetPendingPDUCount(
 
 func (d *InMemoryFederationDatabase) GetPendingEDUCount(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (int64, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -244,11 +246,11 @@ func (d *InMemoryFederationDatabase) GetPendingEDUCount(
 
 func (d *InMemoryFederationDatabase) GetPendingPDUServerNames(
 	ctx context.Context,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	servers := []gomatrixserverlib.ServerName{}
+	servers := []spec.ServerName{}
 	for server := range d.pendingPDUServers {
 		servers = append(servers, server)
 	}
@@ -257,11 +259,11 @@ func (d *InMemoryFederationDatabase) GetPendingPDUServerNames(
 
 func (d *InMemoryFederationDatabase) GetPendingEDUServerNames(
 	ctx context.Context,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	servers := []gomatrixserverlib.ServerName{}
+	servers := []spec.ServerName{}
 	for server := range d.pendingEDUServers {
 		servers = append(servers, server)
 	}
@@ -269,7 +271,7 @@ func (d *InMemoryFederationDatabase) GetPendingEDUServerNames(
 }
 
 func (d *InMemoryFederationDatabase) AddServerToBlacklist(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -279,7 +281,7 @@ func (d *InMemoryFederationDatabase) AddServerToBlacklist(
 }
 
 func (d *InMemoryFederationDatabase) RemoveServerFromBlacklist(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -292,12 +294,12 @@ func (d *InMemoryFederationDatabase) RemoveAllServersFromBlacklist() error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	d.blacklistedServers = make(map[gomatrixserverlib.ServerName]struct{})
+	d.blacklistedServers = make(map[spec.ServerName]struct{})
 	return nil
 }
 
 func (d *InMemoryFederationDatabase) IsServerBlacklisted(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (bool, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -312,7 +314,7 @@ func (d *InMemoryFederationDatabase) IsServerBlacklisted(
 
 func (d *InMemoryFederationDatabase) SetServerAssumedOffline(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -323,7 +325,7 @@ func (d *InMemoryFederationDatabase) SetServerAssumedOffline(
 
 func (d *InMemoryFederationDatabase) RemoveServerAssumedOffline(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -338,13 +340,13 @@ func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffine(
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	d.assumedOffline = make(map[gomatrixserverlib.ServerName]struct{})
+	d.assumedOffline = make(map[spec.ServerName]struct{})
 	return nil
 }
 
 func (d *InMemoryFederationDatabase) IsServerAssumedOffline(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (bool, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -359,12 +361,12 @@ func (d *InMemoryFederationDatabase) IsServerAssumedOffline(
 
 func (d *InMemoryFederationDatabase) P2PGetRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-) ([]gomatrixserverlib.ServerName, error) {
+	serverName spec.ServerName,
+) ([]spec.ServerName, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	knownRelayServers := []gomatrixserverlib.ServerName{}
+	knownRelayServers := []spec.ServerName{}
 	if relayServers, ok := d.relayServers[serverName]; ok {
 		knownRelayServers = relayServers
 	}
@@ -374,8 +376,8 @@ func (d *InMemoryFederationDatabase) P2PGetRelayServersForServer(
 
 func (d *InMemoryFederationDatabase) P2PAddRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-	relayServers []gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
+	relayServers []spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -401,8 +403,8 @@ func (d *InMemoryFederationDatabase) P2PAddRelayServersForServer(
 
 func (d *InMemoryFederationDatabase) P2PRemoveRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-	relayServers []gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
+	relayServers []spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -426,7 +428,7 @@ func (d *InMemoryFederationDatabase) P2PRemoveRelayServersForServer(
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) FetchKeys(ctx context.Context, requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
+func (d *InMemoryFederationDatabase) FetchKeys(ctx context.Context, requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	return nil, nil
 }
 
@@ -446,11 +448,11 @@ func (d *InMemoryFederationDatabase) GetJoinedHosts(ctx context.Context, roomID 
 	return nil, nil
 }
 
-func (d *InMemoryFederationDatabase) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
+func (d *InMemoryFederationDatabase) GetAllJoinedHosts(ctx context.Context) ([]spec.ServerName, error) {
 	return nil, nil
 }
 
-func (d *InMemoryFederationDatabase) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf, excludeBlacklisted bool) ([]gomatrixserverlib.ServerName, error) {
+func (d *InMemoryFederationDatabase) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf, excludeBlacklisted bool) ([]spec.ServerName, error) {
 	return nil, nil
 }
 
@@ -458,19 +460,19 @@ func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffline(ctx context.
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) P2PRemoveAllRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName) error {
+func (d *InMemoryFederationDatabase) P2PRemoveAllRelayServersForServer(ctx context.Context, serverName spec.ServerName) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *InMemoryFederationDatabase) AddOutboundPeek(ctx context.Context, serverName spec.ServerName, roomID, peekID string, renewalInterval int64) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *InMemoryFederationDatabase) RenewOutboundPeek(ctx context.Context, serverName spec.ServerName, roomID, peekID string, renewalInterval int64) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) GetOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.OutboundPeek, error) {
+func (d *InMemoryFederationDatabase) GetOutboundPeek(ctx context.Context, serverName spec.ServerName, roomID, peekID string) (*types.OutboundPeek, error) {
 	return nil, nil
 }
 
@@ -478,15 +480,15 @@ func (d *InMemoryFederationDatabase) GetOutboundPeeks(ctx context.Context, roomI
 	return nil, nil
 }
 
-func (d *InMemoryFederationDatabase) AddInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *InMemoryFederationDatabase) AddInboundPeek(ctx context.Context, serverName spec.ServerName, roomID, peekID string, renewalInterval int64) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) RenewInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *InMemoryFederationDatabase) RenewInboundPeek(ctx context.Context, serverName spec.ServerName, roomID, peekID string, renewalInterval int64) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) GetInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.InboundPeek, error) {
+func (d *InMemoryFederationDatabase) GetInboundPeek(ctx context.Context, serverName spec.ServerName, roomID, peekID string) (*types.InboundPeek, error) {
 	return nil, nil
 }
 
@@ -494,11 +496,11 @@ func (d *InMemoryFederationDatabase) GetInboundPeeks(ctx context.Context, roomID
 	return nil, nil
 }
 
-func (d *InMemoryFederationDatabase) UpdateNotaryKeys(ctx context.Context, serverName gomatrixserverlib.ServerName, serverKeys gomatrixserverlib.ServerKeys) error {
+func (d *InMemoryFederationDatabase) UpdateNotaryKeys(ctx context.Context, serverName spec.ServerName, serverKeys gomatrixserverlib.ServerKeys) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) GetNotaryKeys(ctx context.Context, serverName gomatrixserverlib.ServerName, optKeyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error) {
+func (d *InMemoryFederationDatabase) GetNotaryKeys(ctx context.Context, serverName spec.ServerName, optKeyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error) {
 	return nil, nil
 }
 

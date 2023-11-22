@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -39,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
@@ -298,53 +298,65 @@ func Test_register(t *testing.T) {
 		guestsDisabled       bool
 		enableRecaptcha      bool
 		captchaBody          string
-		wantResponse         util.JSONResponse
+		// in case of an error, the expected response
+		wantErrorResponse util.JSONResponse
+		// in case of success, the expected username assigned
+		wantUsername string
 	}{
 		{
 			name:           "disallow guests",
 			kind:           "guest",
 			guestsDisabled: true,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(`Guest registration is disabled on "test"`),
+				JSON: spec.Forbidden(`Guest registration is disabled on "test"`),
 			},
 		},
 		{
-			name: "allow guests",
-			kind: "guest",
+			name:         "allow guests",
+			kind:         "guest",
+			wantUsername: "1",
 		},
 		{
 			name:      "unknown login type",
 			loginType: "im.not.known",
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusNotImplemented,
-				JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
+				JSON: spec.Unknown("unknown/unimplemented auth type"),
 			},
 		},
 		{
 			name:                 "disabled registration",
 			registrationDisabled: true,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(`Registration is disabled on "test"`),
+				JSON: spec.Forbidden(`Registration is disabled on "test"`),
 			},
 		},
 		{
-			name:       "successful registration, numeric ID",
-			username:   "",
-			password:   "someRandomPassword",
-			forceEmpty: true,
+			name:         "successful registration, numeric ID",
+			username:     "",
+			password:     "someRandomPassword",
+			forceEmpty:   true,
+			wantUsername: "2",
 		},
 		{
 			name:     "successful registration",
 			username: "success",
 		},
 		{
+			name:         "successful registration, sequential numeric ID",
+			username:     "",
+			password:     "someRandomPassword",
+			forceEmpty:   true,
+			wantUsername: "3",
+		},
+		{
 			name:     "failing registration - user already exists",
 			username: "success",
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+				JSON: spec.UserInUse("Desired user ID is already taken."),
 			},
 		},
 		{
@@ -352,33 +364,33 @@ func Test_register(t *testing.T) {
 			username: "LOWERCASED", // this is going to be lower-cased
 		},
 		{
-			name:         "invalid username",
-			username:     "#totalyNotValid",
-			wantResponse: *internal.UsernameResponse(internal.ErrUsernameInvalid),
+			name:              "invalid username",
+			username:          "#totalyNotValid",
+			wantErrorResponse: *internal.UsernameResponse(internal.ErrUsernameInvalid),
 		},
 		{
 			name:     "numeric username is forbidden",
 			username: "1337",
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
+				JSON: spec.InvalidUsername("Numeric user IDs are reserved"),
 			},
 		},
 		{
 			name:      "disabled recaptcha login",
 			loginType: authtypes.LoginTypeRecaptcha,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Unknown(ErrCaptchaDisabled.Error()),
+				JSON: spec.Unknown(ErrCaptchaDisabled.Error()),
 			},
 		},
 		{
 			name:            "enabled recaptcha, no response defined",
 			enableRecaptcha: true,
 			loginType:       authtypes.LoginTypeRecaptcha,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(ErrMissingResponse.Error()),
+				JSON: spec.BadJSON(ErrMissingResponse.Error()),
 			},
 		},
 		{
@@ -386,9 +398,9 @@ func Test_register(t *testing.T) {
 			enableRecaptcha: true,
 			loginType:       authtypes.LoginTypeRecaptcha,
 			captchaBody:     `notvalid`,
-			wantResponse: util.JSONResponse{
+			wantErrorResponse: util.JSONResponse{
 				Code: http.StatusUnauthorized,
-				JSON: jsonerror.BadJSON(ErrInvalidCaptcha.Error()),
+				JSON: spec.BadJSON(ErrInvalidCaptcha.Error()),
 			},
 		},
 		{
@@ -398,11 +410,11 @@ func Test_register(t *testing.T) {
 			captchaBody:     `success`,
 		},
 		{
-			name:            "captcha invalid from remote",
-			enableRecaptcha: true,
-			loginType:       authtypes.LoginTypeRecaptcha,
-			captchaBody:     `i should fail for other reasons`,
-			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: jsonerror.InternalServerError()},
+			name:              "captcha invalid from remote",
+			enableRecaptcha:   true,
+			loginType:         authtypes.LoginTypeRecaptcha,
+			captchaBody:       `i should fail for other reasons`,
+			wantErrorResponse: util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}},
 		},
 	}
 
@@ -415,7 +427,8 @@ func Test_register(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -484,9 +497,9 @@ func Test_register(t *testing.T) {
 					if !reflect.DeepEqual(r.Flows, cfg.Derived.Registration.Flows) {
 						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
 					}
-				case *jsonerror.MatrixError:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
+				case spec.MatrixError:
+					if !reflect.DeepEqual(tc.wantErrorResponse, resp) {
+						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantErrorResponse)
 					}
 					return
 				case registerResponse:
@@ -503,6 +516,13 @@ func Test_register(t *testing.T) {
 					}
 					if r.DeviceID == "" {
 						t.Fatalf("missing deviceID in response")
+					}
+					// if an expected username is provided, assert that it is a match
+					if tc.wantUsername != "" {
+						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
+						if wantUserID != r.UserID {
+							t.Fatalf("unexpected userID: %s, want %s", r.UserID, wantUserID)
+						}
 					}
 					return
 				default:
@@ -540,39 +560,29 @@ func Test_register(t *testing.T) {
 
 				resp = Register(req, userAPI, &cfg.ClientAPI)
 
-				switch resp.JSON.(type) {
-				case *jsonerror.MatrixError:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+				switch rr := resp.JSON.(type) {
+				case spec.InternalServerError, spec.MatrixError, util.JSONResponse:
+					if !reflect.DeepEqual(tc.wantErrorResponse, resp) {
+						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantErrorResponse)
 					}
 					return
-				case util.JSONResponse:
-					if !reflect.DeepEqual(tc.wantResponse, resp) {
-						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+				case registerResponse:
+					// validate the response
+					if tc.wantUsername != "" {
+						// if an expected username is provided, assert that it is a match
+						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
+						if wantUserID != rr.UserID {
+							t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+						}
 					}
-					return
-				}
-
-				rr, ok := resp.JSON.(registerResponse)
-				if !ok {
-					t.Fatalf("expected a registerresponse, got %T", resp.JSON)
-				}
-
-				// validate the response
-				if tc.forceEmpty {
-					// when not supplying a username, one will be generated. Given this _SHOULD_ be
-					// the second user, set the username accordingly
-					reg.Username = "2"
-				}
-				wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
-				if wantUserID != rr.UserID {
-					t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
-				}
-				if rr.DeviceID != *reg.DeviceID {
-					t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
-				}
-				if rr.AccessToken == "" {
-					t.Fatalf("missing accessToken in response")
+					if rr.DeviceID != *reg.DeviceID {
+						t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
+					}
+					if rr.AccessToken == "" {
+						t.Fatalf("missing accessToken in response")
+					}
+				default:
+					t.Fatalf("expected one of internalservererror, matrixerror, jsonresponse, registerresponse, got %T", resp.JSON)
 				}
 			})
 		}
@@ -589,7 +599,8 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 		deviceName, deviceID := "deviceName", "deviceID"
 		expectedDisplayName := "DisplayName"
 		response := completeRegistration(
@@ -611,11 +622,9 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		req := api.QueryProfileRequest{UserID: "@user:server"}
-		var res api.QueryProfileResponse
-		err := userAPI.QueryProfile(processCtx.Context(), &req, &res)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@user:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, res.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }
 
@@ -631,7 +640,8 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		expectedDisplayName := "rabbit"
 		jsonStr := []byte(`{"admin":true,"mac":"24dca3bba410e43fe64b9b5c28306693bf3baa9f","nonce":"759f047f312b99ff428b21d581256f8592b8976e58bc1b543972dc6147e529a79657605b52d7becd160ff5137f3de11975684319187e06901955f79e5a6c5a79","password":"wonderland","username":"alice","displayname":"rabbit"}`)
@@ -662,10 +672,8 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		)
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		profilReq := api.QueryProfileRequest{UserID: "@alice:server"}
-		var profileRes api.QueryProfileResponse
-		err = userAPI.QueryProfile(processCtx.Context(), &profilReq, &profileRes)
+		profile, err := userAPI.QueryProfile(processCtx.Context(), "@alice:server")
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDisplayName, profileRes.DisplayName)
+		assert.Equal(t, expectedDisplayName, profile.DisplayName)
 	})
 }

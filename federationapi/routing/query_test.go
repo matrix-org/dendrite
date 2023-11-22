@@ -25,8 +25,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	fedAPI "github.com/matrix-org/dendrite/federationapi"
-	fedclient "github.com/matrix-org/dendrite/federationapi/api"
-	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -35,15 +33,17 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
 
 type fakeFedClient struct {
-	fedclient.FederationClient
+	fclient.FederationClient
 }
 
-func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res gomatrixserverlib.RespDirectory, err error) {
+func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.ServerName, roomAlias string) (res fclient.RespDirectory, err error) {
 	return
 }
 
@@ -64,18 +64,15 @@ func TestHandleQueryDirectory(t *testing.T) {
 		keyRing := serverKeyAPI.KeyRing()
 		fedapi := fedAPI.NewInternalAPI(processCtx, cfg, cm, &natsInstance, &fedClient, nil, nil, keyRing, true)
 		userapi := fakeUserAPI{}
-		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
-		if !ok {
-			panic("This is a programming error.")
-		}
-		routing.Setup(routers, cfg, nil, r, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, nil, caching.DisableMetrics)
+
+		routing.Setup(routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, caching.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
 		keyID := signing.KeyID
 		pk := sk.Public().(ed25519.PublicKey)
-		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-		req := gomatrixserverlib.NewFederationRequest("GET", serverName, testOrigin, "/query/directory?room_alias="+url.QueryEscape("#room:server"))
+		serverName := spec.ServerName(hex.EncodeToString(pk))
+		req := fclient.NewFederationRequest("GET", serverName, testOrigin, "/query/directory?room_alias="+url.QueryEscape("#room:server"))
 		type queryContent struct{}
 		content := queryContent{}
 		err := req.SetContent(content)

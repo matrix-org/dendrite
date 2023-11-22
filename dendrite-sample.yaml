@@ -69,9 +69,12 @@ global:
   # e.g. localhost:443
   well_known_server_name: ""
 
-  # The server name to delegate client-server communications to, with optional port
-  # e.g. localhost:443
+  # The base URL to delegate client-server communications to e.g. https://localhost
   well_known_client_name: ""
+
+  # The server name to delegate sliding sync communications to, with optional port.
+  # Requires `well_known_client_name` to also be configured.
+  well_known_sliding_sync_proxy: ""
 
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
@@ -277,7 +280,6 @@ media_api:
 mscs:
   mscs:
   #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
-  #  - msc2946  # (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
 # Configuration for the Sync API.
 sync_api:
@@ -322,6 +324,10 @@ user_api:
   # As Spaces are just rooms under the hood, Space aliases may also be used.
   auto_join_rooms:
   #  - "#main:matrix.org"
+
+  # The number of workers to start for the DeviceListUpdater. Defaults to 8.
+  # This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
+  # worker_count: 8
 
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on

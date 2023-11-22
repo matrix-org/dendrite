@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
@@ -36,7 +37,7 @@ type OutputTypingConsumer struct {
 	durable           string
 	db                storage.Database
 	queues            *queue.OutgoingQueues
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 	topic             string
 }
 
@@ -97,7 +98,7 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 		return false
 	}
 
-	names := make([]gomatrixserverlib.ServerName, len(joined))
+	names := make([]spec.ServerName, len(joined))
 	for i := range joined {
 		names[i] = joined[i].ServerName
 	}

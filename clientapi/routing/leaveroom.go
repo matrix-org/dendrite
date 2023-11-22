@@ -17,9 +17,9 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -29,10 +29,18 @@ func LeaveRoomByID(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("device userID is invalid"),
+		}
+	}
+
 	// Prepare to ask the roomserver to perform the room join.
 	leaveReq := roomserverAPI.PerformLeaveRequest{
 		RoomID: roomID,
-		UserID: device.UserID,
+		Leaver: *userID,
 	}
 	leaveRes := roomserverAPI.PerformLeaveResponse{}
 
@@ -41,12 +49,12 @@ func LeaveRoomByID(
 		if leaveRes.Code != 0 {
 			return util.JSONResponse{
 				Code: leaveRes.Code,
-				JSON: jsonerror.LeaveServerNoticeError(),
+				JSON: spec.LeaveServerNoticeError(),
 			}
 		}
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(err.Error()),
+			JSON: spec.Unknown(err.Error()),
 		}
 	}
 

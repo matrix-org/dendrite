@@ -23,7 +23,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	fedAPI "github.com/matrix-org/dendrite/federationapi"
-	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -32,12 +31,14 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
 
 const (
-	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
+	testOrigin = spec.ServerName("kaer.morhen")
 )
 
 type sendContent struct {
@@ -60,18 +61,15 @@ func TestHandleSend(t *testing.T) {
 		fedapi := fedAPI.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, nil, nil, nil, true)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
-		if !ok {
-			panic("This is a programming error.")
-		}
-		routing.Setup(routers, cfg, nil, r, keyRing, nil, nil, &cfg.MSCs, nil, nil, caching.DisableMetrics)
+
+		routing.Setup(routers, cfg, nil, fedapi, keyRing, nil, nil, &cfg.MSCs, nil, caching.DisableMetrics)
 
 		handler := fedMux.Get(routing.SendRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
 		keyID := signing.KeyID
 		pk := sk.Public().(ed25519.PublicKey)
-		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-		req := gomatrixserverlib.NewFederationRequest("PUT", serverName, testOrigin, "/send/1234")
+		serverName := spec.ServerName(hex.EncodeToString(pk))
+		req := fclient.NewFederationRequest("PUT", serverName, testOrigin, "/send/1234")
 		content := sendContent{}
 		err := req.SetContent(content)
 		if err != nil {

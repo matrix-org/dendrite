@@ -15,10 +15,12 @@
 package httputil
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // URLDecodeMapValues is a function that iterates through each of the items in a
@@ -66,13 +68,15 @@ func NewRouters() Routers {
 var NotAllowedHandler = WrapHandlerInCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusMethodNotAllowed)
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+	unrecognizedErr, _ := json.Marshal(spec.Unrecognized("Unrecognized request")) // nolint:misspell
+	_, _ = w.Write(unrecognizedErr)                                               // nolint:misspell
 }))
 
 var NotFoundCORSHandler = WrapHandlerInCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+	unrecognizedErr, _ := json.Marshal(spec.Unrecognized("Unrecognized request")) // nolint:misspell
+	_, _ = w.Write(unrecognizedErr)                                               // nolint:misspell
 }))
 
 func (r *Routers) configureHTTPErrors() {

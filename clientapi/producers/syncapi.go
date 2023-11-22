@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
@@ -37,13 +38,13 @@ type SyncAPIProducer struct {
 	TopicTypingEvent       string
 	TopicPresenceEvent     string
 	JetStream              nats.JetStreamContext
-	ServerName             gomatrixserverlib.ServerName
+	ServerName             spec.ServerName
 	UserAPI                userapi.ClientUserAPI
 }
 
 func (p *SyncAPIProducer) SendReceipt(
 	ctx context.Context,
-	userID, roomID, eventID, receiptType string, timestamp gomatrixserverlib.Timestamp,
+	userID, roomID, eventID, receiptType string, timestamp spec.Timestamp,
 ) error {
 	m := &nats.Msg{
 		Subject: p.TopicReceiptEvent,
@@ -154,7 +155,7 @@ func (p *SyncAPIProducer) SendPresence(
 		m.Header.Set("status_msg", *statusMsg)
 	}
 
-	m.Header.Set("last_active_ts", strconv.Itoa(int(gomatrixserverlib.AsTimestamp(time.Now()))))
+	m.Header.Set("last_active_ts", strconv.Itoa(int(spec.AsTimestamp(time.Now()))))
 
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err

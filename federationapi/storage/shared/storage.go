@@ -26,11 +26,12 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Database struct {
 	DB                       *sql.DB
-	IsLocalServerName        func(gomatrixserverlib.ServerName) bool
+	IsLocalServerName        func(spec.ServerName) bool
 	Cache                    caching.FederationCache
 	Writer                   sqlutil.Writer
 	FederationQueuePDUs      tables.FederationQueuePDUs
@@ -102,7 +103,7 @@ func (d *Database) GetJoinedHosts(
 // Returns an error if something goes wrong.
 func (d *Database) GetAllJoinedHosts(
 	ctx context.Context,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	return d.FederationJoinedHosts.SelectAllJoinedHosts(ctx)
 }
 
@@ -111,7 +112,7 @@ func (d *Database) GetJoinedHostsForRooms(
 	roomIDs []string,
 	excludeSelf,
 	excludeBlacklisted bool,
-) ([]gomatrixserverlib.ServerName, error) {
+) ([]spec.ServerName, error) {
 	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs, excludeBlacklisted)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (d *Database) StoreJSON(
 }
 
 func (d *Database) AddServerToBlacklist(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationBlacklist.InsertBlacklist(context.TODO(), txn, serverName)
@@ -156,7 +157,7 @@ func (d *Database) AddServerToBlacklist(
 }
 
 func (d *Database) RemoveServerFromBlacklist(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationBlacklist.DeleteBlacklist(context.TODO(), txn, serverName)
@@ -170,14 +171,14 @@ func (d *Database) RemoveAllServersFromBlacklist() error {
 }
 
 func (d *Database) IsServerBlacklisted(
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (bool, error) {
 	return d.FederationBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }
 
 func (d *Database) SetServerAssumedOffline(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationAssumedOffline.InsertAssumedOffline(ctx, txn, serverName)
@@ -186,7 +187,7 @@ func (d *Database) SetServerAssumedOffline(
 
 func (d *Database) RemoveServerAssumedOffline(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationAssumedOffline.DeleteAssumedOffline(ctx, txn, serverName)
@@ -203,15 +204,15 @@ func (d *Database) RemoveAllServersAssumedOffline(
 
 func (d *Database) IsServerAssumedOffline(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) (bool, error) {
 	return d.FederationAssumedOffline.SelectAssumedOffline(ctx, nil, serverName)
 }
 
 func (d *Database) P2PAddRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-	relayServers []gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
+	relayServers []spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationRelayServers.InsertRelayServers(ctx, txn, serverName, relayServers)
@@ -220,15 +221,15 @@ func (d *Database) P2PAddRelayServersForServer(
 
 func (d *Database) P2PGetRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-) ([]gomatrixserverlib.ServerName, error) {
+	serverName spec.ServerName,
+) ([]spec.ServerName, error) {
 	return d.FederationRelayServers.SelectRelayServers(ctx, nil, serverName)
 }
 
 func (d *Database) P2PRemoveRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-	relayServers []gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
+	relayServers []spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationRelayServers.DeleteRelayServers(ctx, txn, serverName, relayServers)
@@ -237,7 +238,7 @@ func (d *Database) P2PRemoveRelayServersForServer(
 
 func (d *Database) P2PRemoveAllRelayServersForServer(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationRelayServers.DeleteAllRelayServers(ctx, txn, serverName)
@@ -246,7 +247,7 @@ func (d *Database) P2PRemoveAllRelayServersForServer(
 
 func (d *Database) AddOutboundPeek(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	roomID string,
 	peekID string,
 	renewalInterval int64,
@@ -258,7 +259,7 @@ func (d *Database) AddOutboundPeek(
 
 func (d *Database) RenewOutboundPeek(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	roomID string,
 	peekID string,
 	renewalInterval int64,
@@ -270,7 +271,7 @@ func (d *Database) RenewOutboundPeek(
 
 func (d *Database) GetOutboundPeek(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	roomID,
 	peekID string,
 ) (*types.OutboundPeek, error) {
@@ -286,7 +287,7 @@ func (d *Database) GetOutboundPeeks(
 
 func (d *Database) AddInboundPeek(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	roomID string,
 	peekID string,
 	renewalInterval int64,
@@ -298,7 +299,7 @@ func (d *Database) AddInboundPeek(
 
 func (d *Database) RenewInboundPeek(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	roomID string,
 	peekID string,
 	renewalInterval int64,
@@ -310,7 +311,7 @@ func (d *Database) RenewInboundPeek(
 
 func (d *Database) GetInboundPeek(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	roomID string,
 	peekID string,
 ) (*types.InboundPeek, error) {
@@ -326,7 +327,7 @@ func (d *Database) GetInboundPeeks(
 
 func (d *Database) UpdateNotaryKeys(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	serverKeys gomatrixserverlib.ServerKeys,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -337,7 +338,7 @@ func (d *Database) UpdateNotaryKeys(
 		// https://spec.matrix.org/unstable/server-server-api/#querying-keys-through-another-server
 		weekIntoFuture := time.Now().Add(7 * 24 * time.Hour)
 		if weekIntoFuture.Before(validUntil.Time()) {
-			validUntil = gomatrixserverlib.AsTimestamp(weekIntoFuture)
+			validUntil = spec.AsTimestamp(weekIntoFuture)
 		}
 		notaryID, err := d.NotaryServerKeysJSON.InsertJSONResponse(ctx, txn, serverKeys, serverName, validUntil)
 		if err != nil {
@@ -364,7 +365,7 @@ func (d *Database) UpdateNotaryKeys(
 
 func (d *Database) GetNotaryKeys(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	serverName spec.ServerName,
 	optKeyIDs []gomatrixserverlib.KeyID,
 ) (sks []gomatrixserverlib.ServerKeys, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {

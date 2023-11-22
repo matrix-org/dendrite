@@ -6,7 +6,7 @@ import (
 
 	"github.com/matrix-org/dendrite/userapi/storage/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -57,7 +57,7 @@ func TestStaleDeviceLists(t *testing.T) {
 
 		// Query one server
 		wantStaleUsers := []string{alice.ID, bob.ID}
-		gotStaleUsers, err := tab.SelectUserIDsWithStaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		gotStaleUsers, err := tab.SelectUserIDsWithStaleDeviceLists(ctx, []spec.ServerName{"test"})
 		if err != nil {
 			t.Fatalf("failed to query stale device lists: %s", err)
 		}
@@ -67,7 +67,7 @@ func TestStaleDeviceLists(t *testing.T) {
 
 		// Query all servers
 		wantStaleUsers = []string{alice.ID, bob.ID, charlie}
-		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []gomatrixserverlib.ServerName{})
+		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []spec.ServerName{})
 		if err != nil {
 			t.Fatalf("failed to query stale device lists: %s", err)
 		}
@@ -82,7 +82,7 @@ func TestStaleDeviceLists(t *testing.T) {
 		}
 
 		// Verify we don't get anything back after deleting
-		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []spec.ServerName{"test"})
 		if err != nil {
 			t.Fatalf("failed to query stale device lists: %s", err)
 		}

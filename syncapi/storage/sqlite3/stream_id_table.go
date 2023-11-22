@@ -47,10 +47,9 @@ func (s *StreamIDStatements) Prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.increaseStreamIDStmt, err = db.Prepare(increaseStreamIDStmt); err != nil {
-		return
-	}
-	return
+	return sqlutil.StatementList{
+		{&s.increaseStreamIDStmt, increaseStreamIDStmt},
+	}.Prepare(db)
 }
 
 func (s *StreamIDStatements) nextPDUID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {

@@ -15,6 +15,7 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,9 +23,12 @@ import (
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 )
 
 var (
@@ -36,7 +40,7 @@ var (
 
 type StateDelta struct {
 	RoomID      string
-	StateEvents []*gomatrixserverlib.HeaderedEvent
+	StateEvents []*types.HeaderedEvent
 	NewlyJoined bool
 	Membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
@@ -57,7 +61,7 @@ func NewStreamPositionFromString(s string) (StreamPosition, error) {
 
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
-	*gomatrixserverlib.HeaderedEvent
+	*types.HeaderedEvent
 	StreamPosition  StreamPosition
 	TransactionID   *api.TransactionID
 	ExcludeFromSync bool
@@ -336,13 +340,6 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	return token, nil
 }
 
-// PrevEventRef represents a reference to a previous event in a state event upgrade
-type PrevEventRef struct {
-	PrevContent   json.RawMessage `json:"prev_content"`
-	ReplacesState string          `json:"replaces_state"`
-	PrevSender    string          `json:"prev_sender"`
-}
-
 type DeviceLists struct {
 	Changed []string `json:"changed,omitempty"`
 	Left    []string `json:"left,omitempty"`
@@ -451,13 +448,13 @@ type UnreadNotifications struct {
 }
 
 type ClientEvents struct {
-	Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	Events []synctypes.ClientEvent `json:"events,omitempty"`
 }
 
 type Timeline struct {
-	Events    []gomatrixserverlib.ClientEvent `json:"events"`
-	Limited   bool                            `json:"limited"`
-	PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
+	Events    []synctypes.ClientEvent `json:"events"`
+	Limited   bool                    `json:"limited"`
+	PrevBatch *TopologyToken          `json:"prev_batch,omitempty"`
 }
 
 type Summary struct {
@@ -536,7 +533,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
+func NewInviteResponse(ctx context.Context, rsAPI api.QuerySenderIDAPI, event *types.HeaderedEvent, eventFormat synctypes.ClientEventFormat) (*InviteResponse, error) {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -544,18 +541,42 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	// If there is then unmarshal it into the response. This will contain the
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		if event.Version() == gomatrixserverlib.RoomVersionPseudoIDs && eventFormat != synctypes.FormatSyncFederation {
+			updatedInvite, err := synctypes.GetUpdatedInviteRoomState(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+			}, inviteRoomState, event.PDU, event.RoomID(), eventFormat)
+			if err != nil {
+				return nil, err
+			}
+			_ = json.Unmarshal(updatedInvite, &res.InviteState.Events)
+		} else {
+			_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		}
+	}
+
+	// Clear unsigned so it doesn't have pseudoIDs converted during ToClientEvent
+	eventNoUnsigned, err := event.SetUnsigned(nil)
+	if err != nil {
+		return nil, err
 	}
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), gomatrixserverlib.FormatSync)
+	inviteEvent, err := synctypes.ToClientEvent(eventNoUnsigned, eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure unsigned field is empty so it isn't marshalled into the final JSON
 	inviteEvent.Unsigned = nil
-	if ev, err := json.Marshal(inviteEvent); err == nil {
+
+	if ev, err := json.Marshal(*inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
 	}
 
-	return &res
+	return &res, nil
 }
 
 // LeaveResponse represents a /sync response for a room which is under the 'leave' key.
@@ -605,11 +626,11 @@ type Peek struct {
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
 type OutputReceiptEvent struct {
-	UserID    string                      `json:"user_id"`
-	RoomID    string                      `json:"room_id"`
-	EventID   string                      `json:"event_id"`
-	Type      string                      `json:"type"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+	UserID    string         `json:"user_id"`
+	RoomID    string         `json:"room_id"`
+	EventID   string         `json:"event_id"`
+	Type      string         `json:"type"`
+	Timestamp spec.Timestamp `json:"timestamp"`
 }
 
 // OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.

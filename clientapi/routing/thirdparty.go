@@ -21,8 +21,8 @@ import (
 	"github.com/matrix-org/util"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Protocols implements
@@ -33,13 +33,16 @@ func Protocols(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, dev
 	resp := &appserviceAPI.ProtocolResponse{}
 
 	if err := asAPI.Protocols(req.Context(), &appserviceAPI.ProtocolRequest{Protocol: protocol}, resp); err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !resp.Exists {
 		if protocol != "" {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The protocol is unknown."),
+				JSON: spec.NotFound("The protocol is unknown."),
 			}
 		}
 		return util.JSONResponse{
@@ -71,12 +74,15 @@ func User(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, device *
 		Protocol: protocol,
 		Params:   params.Encode(),
 	}, resp); err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !resp.Exists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The Matrix User ID was not found"),
+			JSON: spec.NotFound("The Matrix User ID was not found"),
 		}
 	}
 	return util.JSONResponse{
@@ -97,12 +103,15 @@ func Location(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, devi
 		Protocol: protocol,
 		Params:   params.Encode(),
 	}, resp); err != nil {
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
 	}
 	if !resp.Exists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("No portal rooms were found."),
+			JSON: spec.NotFound("No portal rooms were found."),
 		}
 	}
 	return util.JSONResponse{

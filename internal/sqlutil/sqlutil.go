@@ -13,8 +13,7 @@ import (
 var skipSanityChecks = flag.Bool("skip-db-sanity", false, "Ignore sanity checks on the database connections (NOT RECOMMENDED!)")
 
 // Open opens a database specified by its database driver name and a driver-specific data source name,
-// usually consisting of at least a database name and connection information. Includes tracing driver
-// if DENDRITE_TRACE_SQL=1
+// usually consisting of at least a database name and connection information.
 func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) {
 	var err error
 	var driverName, dsn string
@@ -31,10 +30,6 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 		dsn = string(dbProperties.ConnectionString)
 	default:
 		return nil, fmt.Errorf("invalid database connection string %q", dbProperties.ConnectionString)
-	}
-	if tracingEnabled {
-		// install the wrapped driver
-		driverName += "-trace"
 	}
 	db, err := sql.Open(driverName, dsn)
 	if err != nil {

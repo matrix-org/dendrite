@@ -20,9 +20,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
 
@@ -71,31 +71,29 @@ func UploadCrossSigningDeviceKeys(
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	uploadReq.UserID = device.UserID
-	if err := keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
+	keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes)
 
 	if err := uploadRes.Error; err != nil {
 		switch {
 		case err.IsInvalidSignature:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidSignature(err.Error()),
+				JSON: spec.InvalidSignature(err.Error()),
 			}
 		case err.IsMissingParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.MissingParam(err.Error()),
+				JSON: spec.MissingParam(err.Error()),
 			}
 		case err.IsInvalidParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidParam(err.Error()),
+				JSON: spec.InvalidParam(err.Error()),
 			}
 		default:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown(err.Error()),
+				JSON: spec.Unknown(err.Error()),
 			}
 		}
 	}
@@ -115,31 +113,29 @@ func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.Clie
 	}
 
 	uploadReq.UserID = device.UserID
-	if err := keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes); err != nil {
-		return jsonerror.InternalAPIError(req.Context(), err)
-	}
+	keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes)
 
 	if err := uploadRes.Error; err != nil {
 		switch {
 		case err.IsInvalidSignature:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidSignature(err.Error()),
+				JSON: spec.InvalidSignature(err.Error()),
 			}
 		case err.IsMissingParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.MissingParam(err.Error()),
+				JSON: spec.MissingParam(err.Error()),
 			}
 		case err.IsInvalidParam:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidParam(err.Error()),
+				JSON: spec.InvalidParam(err.Error()),
 			}
 		default:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown(err.Error()),
+				JSON: spec.Unknown(err.Error()),
 			}
 		}
 	}

@@ -38,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -171,7 +172,7 @@ func startup() {
 	cfg.Global.TrustedIDServers = []string{}
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.PrivateKey = sk
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.ServerName = spec.ServerName(hex.EncodeToString(pk))
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 
@@ -190,13 +191,13 @@ func startup() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
+	fedSenderAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, caching.EnableMetrics, fedSenderAPI.IsBlacklistedOrBackingOff)
 
 	asQuery := appservice.NewInternalAPI(
 		processCtx, cfg, &natsInstance, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true)
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 
 	monolith := setup.Monolith{

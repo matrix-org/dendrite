@@ -51,7 +51,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
@@ -98,7 +98,7 @@ func GenerateDefaultConfig(sk ed25519.PrivateKey, storageDir string, cacheDir st
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(storageDir, dbPrefix)))
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(storageDir, dbPrefix)))
 	cfg.RelayAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-relayapi.db", filepath.Join(storageDir, dbPrefix)))
-	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+	cfg.MSCs.MSCs = []string{"msc2836"}
 	cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(storageDir, dbPrefix)))
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
@@ -126,7 +126,7 @@ func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 }
 
 func (p *P2PMonolith) SetupDendrite(
-	processCtx *process.ProcessContext, cfg *config.Dendrite, cm sqlutil.Connections, routers httputil.Routers,
+	processCtx *process.ProcessContext, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers,
 	port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
 
 	p.port = port
@@ -143,12 +143,11 @@ func (p *P2PMonolith) SetupDendrite(
 	fsAPI := federationapi.NewInternalAPI(
 		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, enableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 
 	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-
-	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(p.Router, p.Sessions, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(p.Router, p.Sessions, fsAPI, federation)
@@ -213,7 +212,7 @@ func (p *P2PMonolith) Stop() {
 }
 
 func (p *P2PMonolith) WaitForShutdown() {
-	p.ProcessCtx.WaitForShutdown()
+	base.WaitForShutdown(p.ProcessCtx)
 	p.closeAllResources()
 }
 
@@ -222,8 +221,8 @@ func (p *P2PMonolith) closeAllResources() {
 	p.httpServerMu.Lock()
 	if p.httpServer != nil {
 		_ = p.httpServer.Shutdown(context.Background())
-		p.httpServerMu.Unlock()
 	}
+	p.httpServerMu.Unlock()
 
 	select {
 	case p.stopHandlingEvents <- true:
@@ -347,7 +346,7 @@ func (p *P2PMonolith) startEventHandler() {
 	eLog := logrus.WithField("pinecone", "events")
 	p.RelayRetriever = relay.NewRelayServerRetriever(
 		context.Background(),
-		gomatrixserverlib.ServerName(p.Router.PublicKey().String()),
+		spec.ServerName(p.Router.PublicKey().String()),
 		p.dendrite.FederationAPI,
 		p.dendrite.RelayAPI,
 		stopRelayServerSync,
@@ -373,7 +372,7 @@ func (p *P2PMonolith) startEventHandler() {
 					// eLog.Info("Broadcast received from: ", e.PeerID)
 
 					req := &federationAPI.PerformWakeupServersRequest{
-						ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
+						ServerNames: []spec.ServerName{spec.ServerName(e.PeerID)},
 					}
 					res := &federationAPI.PerformWakeupServersResponse{}
 					if err := p.dendrite.FederationAPI.PerformWakeupServers(p.ProcessCtx.Context(), req, res); err != nil {

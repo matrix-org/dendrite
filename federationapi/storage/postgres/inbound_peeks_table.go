@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const inboundPeeksSchema = `
@@ -86,7 +86,7 @@ func NewPostgresInboundPeeksTable(db *sql.DB) (s *inboundPeeksStatements, err er
 }
 
 func (s *inboundPeeksStatements) InsertInboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	stmt := sqlutil.TxStmt(txn, s.insertInboundPeekStmt)
@@ -95,7 +95,7 @@ func (s *inboundPeeksStatements) InsertInboundPeek(
 }
 
 func (s *inboundPeeksStatements) RenewInboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	_, err = sqlutil.TxStmt(txn, s.renewInboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
@@ -103,7 +103,7 @@ func (s *inboundPeeksStatements) RenewInboundPeek(
 }
 
 func (s *inboundPeeksStatements) SelectInboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (*types.InboundPeek, error) {
 	row := sqlutil.TxStmt(txn, s.selectInboundPeeksStmt).QueryRowContext(ctx, roomID)
 	inboundPeek := types.InboundPeek{}
@@ -152,7 +152,7 @@ func (s *inboundPeeksStatements) SelectInboundPeeks(
 }
 
 func (s *inboundPeeksStatements) DeleteInboundPeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.deleteInboundPeekStmt).ExecContext(ctx, roomID, serverName, peekID)
 	return

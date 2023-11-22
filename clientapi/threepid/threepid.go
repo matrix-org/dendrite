@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // EmailAssociationRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-register-email-requesttoken
@@ -37,7 +39,7 @@ type EmailAssociationRequest struct {
 
 // EmailAssociationCheckRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-account-3pid
 type EmailAssociationCheckRequest struct {
-	Creds Credentials `json:"threePidCreds"`
+	Creds Credentials `json:"three_pid_creds"`
 	Bind  bool        `json:"bind"`
 }
 
@@ -48,12 +50,16 @@ type Credentials struct {
 	Secret   string `json:"client_secret"`
 }
 
+type SID struct {
+	SID string `json:"sid"`
+}
+
 // CreateSession creates a session on an identity server.
 // Returns the session's ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func CreateSession(
-	ctx context.Context, req EmailAssociationRequest, cfg *config.ClientAPI,
+	ctx context.Context, req EmailAssociationRequest, cfg *config.ClientAPI, client *fclient.Client,
 ) (string, error) {
 	if err := isTrusted(req.IDServer, cfg); err != nil {
 		return "", err
@@ -73,8 +79,7 @@ func CreateSession(
 	}
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := http.Client{}
-	resp, err := client.Do(request.WithContext(ctx))
+	resp, err := client.DoHTTPRequest(ctx, request)
 	if err != nil {
 		return "", err
 	}
@@ -85,12 +90,18 @@ func CreateSession(
 	}
 
 	// Extract the SID from the response and return it
-	var sid struct {
-		SID string `json:"sid"`
-	}
+	var sid SID
 	err = json.NewDecoder(resp.Body).Decode(&sid)
 
 	return sid.SID, err
+}
+
+type GetValidatedResponse struct {
+	Medium      string `json:"medium"`
+	ValidatedAt int64  `json:"validated_at"`
+	Address     string `json:"address"`
+	ErrCode     string `json:"errcode"`
+	Error       string `json:"error"`
 }
 
 // CheckAssociation checks the status of an ongoing association validation on an
@@ -102,6 +113,7 @@ func CreateSession(
 // response, or if the identity server responded with a non-OK status.
 func CheckAssociation(
 	ctx context.Context, creds Credentials, cfg *config.ClientAPI,
+	client *fclient.Client,
 ) (bool, string, string, error) {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return false, "", "", err
@@ -112,24 +124,17 @@ func CheckAssociation(
 	if err != nil {
 		return false, "", "", err
 	}
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	resp, err := client.DoHTTPRequest(ctx, req)
 	if err != nil {
 		return false, "", "", err
 	}
 
-	var respBody struct {
-		Medium      string `json:"medium"`
-		ValidatedAt int64  `json:"validated_at"`
-		Address     string `json:"address"`
-		ErrCode     string `json:"errcode"`
-		Error       string `json:"error"`
-	}
-
+	var respBody GetValidatedResponse
 	if err = json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		return false, "", "", err
 	}
 
-	if respBody.ErrCode == "M_SESSION_NOT_VALIDATED" {
+	if respBody.ErrCode == string(spec.ErrorSessionNotValidated) {
 		return false, "", "", nil
 	} else if len(respBody.ErrCode) > 0 {
 		return false, "", "", errors.New(respBody.Error)
@@ -142,7 +147,7 @@ func CheckAssociation(
 // identifier and a Matrix ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func PublishAssociation(creds Credentials, userID string, cfg *config.ClientAPI) error {
+func PublishAssociation(ctx context.Context, creds Credentials, userID string, cfg *config.ClientAPI, client *fclient.Client) error {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return err
 	}
@@ -160,8 +165,7 @@ func PublishAssociation(creds Credentials, userID string, cfg *config.ClientAPI)
 	}
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := http.Client{}
-	resp, err := client.Do(request)
+	resp, err := client.DoHTTPRequest(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -183,5 +187,5 @@ func isTrusted(idServer string, cfg *config.ClientAPI) error {
 			return nil
 		}
 	}
-	return ErrNotTrusted
+	return ErrNotTrusted{}
 }

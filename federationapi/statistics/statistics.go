@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Statistics contains information about all of the remote federated
@@ -19,10 +19,10 @@ import (
 // wrapper.
 type Statistics struct {
 	DB      storage.Database
-	servers map[gomatrixserverlib.ServerName]*ServerStatistics
+	servers map[spec.ServerName]*ServerStatistics
 	mutex   sync.RWMutex
 
-	backoffTimers map[gomatrixserverlib.ServerName]*time.Timer
+	backoffTimers map[spec.ServerName]*time.Timer
 	backoffMutex  sync.RWMutex
 
 	// How many times should we tolerate consecutive failures before we
@@ -45,14 +45,14 @@ func NewStatistics(
 		DB:                          db,
 		FailuresUntilBlacklist:      failuresUntilBlacklist,
 		FailuresUntilAssumedOffline: failuresUntilAssumedOffline,
-		backoffTimers:               make(map[gomatrixserverlib.ServerName]*time.Timer),
-		servers:                     make(map[gomatrixserverlib.ServerName]*ServerStatistics),
+		backoffTimers:               make(map[spec.ServerName]*time.Timer),
+		servers:                     make(map[spec.ServerName]*ServerStatistics),
 	}
 }
 
 // ForServer returns server statistics for the given server name. If it
 // does not exist, it will create empty statistics and return those.
-func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerStatistics {
+func (s *Statistics) ForServer(serverName spec.ServerName) *ServerStatistics {
 	// Look up if we have statistics for this server already.
 	s.mutex.RLock()
 	server, found := s.servers[serverName]
@@ -63,7 +63,7 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 		server = &ServerStatistics{
 			statistics:        s,
 			serverName:        serverName,
-			knownRelayServers: []gomatrixserverlib.ServerName{},
+			knownRelayServers: []spec.ServerName{},
 		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
@@ -104,17 +104,17 @@ const (
 // many times we failed etc. It also manages the backoff time and black-
 // listing a remote host if it remains uncooperative.
 type ServerStatistics struct {
-	statistics        *Statistics                  //
-	serverName        gomatrixserverlib.ServerName //
-	blacklisted       atomic.Bool                  // is the node blacklisted
-	assumedOffline    atomic.Bool                  // is the node assumed to be offline
-	backoffStarted    atomic.Bool                  // is the backoff started
-	backoffUntil      atomic.Value                 // time.Time until this backoff interval ends
-	backoffCount      atomic.Uint32                // number of times BackoffDuration has been called
-	successCounter    atomic.Uint32                // how many times have we succeeded?
-	backoffNotifier   func()                       // notifies destination queue when backoff completes
+	statistics        *Statistics     //
+	serverName        spec.ServerName //
+	blacklisted       atomic.Bool     // is the node blacklisted
+	assumedOffline    atomic.Bool     // is the node assumed to be offline
+	backoffStarted    atomic.Bool     // is the backoff started
+	backoffUntil      atomic.Value    // time.Time until this backoff interval ends
+	backoffCount      atomic.Uint32   // number of times BackoffDuration has been called
+	successCounter    atomic.Uint32   // how many times have we succeeded?
+	backoffNotifier   func()          // notifies destination queue when backoff completes
 	notifierMutex     sync.Mutex
-	knownRelayServers []gomatrixserverlib.ServerName
+	knownRelayServers []spec.ServerName
 	relayMutex        sync.Mutex
 }
 
@@ -307,15 +307,15 @@ func (s *ServerStatistics) SuccessCount() uint32 {
 
 // KnownRelayServers returns the list of relay servers associated with this
 // server.
-func (s *ServerStatistics) KnownRelayServers() []gomatrixserverlib.ServerName {
+func (s *ServerStatistics) KnownRelayServers() []spec.ServerName {
 	s.relayMutex.Lock()
 	defer s.relayMutex.Unlock()
 	return s.knownRelayServers
 }
 
-func (s *ServerStatistics) AddRelayServers(relayServers []gomatrixserverlib.ServerName) {
-	seenSet := make(map[gomatrixserverlib.ServerName]bool)
-	uniqueList := []gomatrixserverlib.ServerName{}
+func (s *ServerStatistics) AddRelayServers(relayServers []spec.ServerName) {
+	seenSet := make(map[spec.ServerName]bool)
+	uniqueList := []spec.ServerName{}
 	for _, srv := range relayServers {
 		if seenSet[srv] {
 			continue

@@ -17,6 +17,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,7 +28,7 @@ type FederationInternalAPI struct {
 	cfg        *config.FederationAPI
 	statistics *statistics.Statistics
 	rsAPI      roomserverAPI.FederationRoomserverAPI
-	federation api.FederationClient
+	federation fclient.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
 	joins      sync.Map // joins currently in progress
@@ -35,7 +37,7 @@ type FederationInternalAPI struct {
 func NewFederationInternalAPI(
 	db storage.Database, cfg *config.FederationAPI,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-	federation api.FederationClient,
+	federation fclient.FederationClient,
 	statistics *statistics.Statistics,
 	caches *caching.Caches,
 	queues *queue.OutgoingQueues,
@@ -52,11 +54,14 @@ func NewFederationInternalAPI(
 			KeyDatabase: serverKeyDB,
 		}
 
+		pubKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		addDirectFetcher := func() {
 			keyRing.KeyFetchers = append(
 				keyRing.KeyFetchers,
 				&gomatrixserverlib.DirectKeyFetcher{
-					Client: federation,
+					Client:            federation,
+					IsLocalServerName: cfg.Matrix.IsLocalServerName,
+					LocalPublicKey:    []byte(pubKey),
 				},
 			)
 		}
@@ -107,7 +112,7 @@ func NewFederationInternalAPI(
 	}
 }
 
-func (a *FederationInternalAPI) isBlacklistedOrBackingOff(s gomatrixserverlib.ServerName) (*statistics.ServerStatistics, error) {
+func (a *FederationInternalAPI) IsBlacklistedOrBackingOff(s spec.ServerName) (*statistics.ServerStatistics, error) {
 	stats := a.statistics.ForServer(s)
 	if stats.Blacklisted() {
 		return stats, &api.FederationClientError{
@@ -144,9 +149,9 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 }
 
 func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
-	s gomatrixserverlib.ServerName, request func() (interface{}, error),
+	s spec.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
-	stats, err := a.isBlacklistedOrBackingOff(s)
+	stats, err := a.IsBlacklistedOrBackingOff(s)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +174,7 @@ func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
 }
 
 func (a *FederationInternalAPI) doRequestIfNotBlacklisted(
-	s gomatrixserverlib.ServerName, request func() (interface{}, error),
+	s spec.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
 	stats := a.statistics.ForServer(s)
 	if blacklisted := stats.Blacklisted(); blacklisted {

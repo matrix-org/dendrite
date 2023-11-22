@@ -19,7 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -37,7 +37,7 @@ func AddPublicRoutes(
 	routers httputil.Routers,
 	cfg *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
-	federation *gomatrixserverlib.FederationClient,
+	federation fclient.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	transactionsCache *transactions.Cache,

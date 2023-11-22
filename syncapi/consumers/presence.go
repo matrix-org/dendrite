@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
@@ -108,7 +108,7 @@ func (s *PresenceConsumer) Start() error {
 
 		for i := range deviceRes.Devices {
 			if int64(presence.LastActiveTS) < deviceRes.Devices[i].LastSeenTS {
-				presence.LastActiveTS = gomatrixserverlib.Timestamp(deviceRes.Devices[i].LastSeenTS)
+				presence.LastActiveTS = spec.Timestamp(deviceRes.Devices[i].LastSeenTS)
 			}
 		}
 
@@ -161,11 +161,11 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool
 	// already checked, so no need to check error
 	p, _ := types.PresenceFromString(presence)
 
-	s.EmitPresence(ctx, userID, p, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
+	s.EmitPresence(ctx, userID, p, statusMsg, spec.Timestamp(ts), fromSync)
 	return true
 }
 
-func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool) {
+func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts spec.Timestamp, fromSync bool) {
 	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, ts, fromSync)
 	if err != nil {
 		logrus.WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")

@@ -18,9 +18,10 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
@@ -77,7 +78,7 @@ func NewPostgresThreePIDTable(db *sql.DB) (tables.ThreePIDTable, error) {
 
 func (s *threepidStatements) SelectLocalpartForThreePID(
 	ctx context.Context, txn *sql.Tx, threepid string, medium string,
-) (localpart string, serverName gomatrixserverlib.ServerName, err error) {
+) (localpart string, serverName spec.ServerName, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
 	err = stmt.QueryRowContext(ctx, threepid, medium).Scan(&localpart, &serverName)
 	if err == sql.ErrNoRows {
@@ -88,12 +89,13 @@ func (s *threepidStatements) SelectLocalpartForThreePID(
 
 func (s *threepidStatements) SelectThreePIDsForLocalpart(
 	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) (threepids []authtypes.ThreePID, err error) {
 	rows, err := s.selectThreePIDsForLocalpartStmt.QueryContext(ctx, localpart, serverName)
 	if err != nil {
 		return
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectThreePIDsForLocalpart: failed to close rows")
 
 	threepids = []authtypes.ThreePID{}
 	for rows.Next() {
@@ -107,13 +109,13 @@ func (s *threepidStatements) SelectThreePIDsForLocalpart(
 			Medium:  medium,
 		})
 	}
-
+	err = rows.Err()
 	return
 }
 
 func (s *threepidStatements) InsertThreePID(
 	ctx context.Context, txn *sql.Tx, threepid, medium,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	localpart string, serverName spec.ServerName,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertThreePIDStmt)
 	_, err = stmt.ExecContext(ctx, threepid, medium, localpart, serverName)

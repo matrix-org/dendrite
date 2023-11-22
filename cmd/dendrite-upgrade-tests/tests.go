@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const userPassword = "this_is_a_long_password"
@@ -56,7 +57,7 @@ func runTests(baseURL string, v *semver.Version) error {
 
 	// create DM room, join it and exchange messages
 	createRoomResp, err := users[0].client.CreateRoom(&gomatrix.ReqCreateRoom{
-		Preset:   "trusted_private_chat",
+		Preset:   spec.PresetTrustedPrivateChat,
 		Invite:   []string{users[1].userID},
 		IsDirect: true,
 	})
@@ -98,7 +99,7 @@ func runTests(baseURL string, v *semver.Version) error {
 	publicRoomID := ""
 	createRoomResp, err = users[0].client.CreateRoom(&gomatrix.ReqCreateRoom{
 		RoomAliasName: "global",
-		Preset:        "public_chat",
+		Preset:        spec.PresetPublicChat,
 	})
 	if err != nil { // this is okay and expected if the room already exists and the aliases clash
 		// try to join it

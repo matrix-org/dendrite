@@ -19,13 +19,14 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // ParseUsernameParam extracts localpart from usernameParam.
 // usernameParam can either be a user ID or just the localpart/username.
 // If serverName is passed, it is verified against the domain obtained from usernameParam (if present)
 // Returns error in case of invalid usernameParam.
-func ParseUsernameParam(usernameParam string, cfg *config.Global) (string, gomatrixserverlib.ServerName, error) {
+func ParseUsernameParam(usernameParam string, cfg *config.Global) (string, spec.ServerName, error) {
 	localpart := usernameParam
 
 	if strings.HasPrefix(usernameParam, "@") {
@@ -45,6 +46,6 @@ func ParseUsernameParam(usernameParam string, cfg *config.Global) (string, gomat
 }
 
 // MakeUserID generates user ID from localpart & server name
-func MakeUserID(localpart string, server gomatrixserverlib.ServerName) string {
+func MakeUserID(localpart string, server spec.ServerName) string {
 	return fmt.Sprintf("@%s:%s", localpart, string(server))
 }

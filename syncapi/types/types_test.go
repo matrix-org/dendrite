@@ -1,12 +1,31 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+type FakeRoomserverAPI struct{}
+
+func (f *FakeRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if senderID == "" {
+		return nil, nil
+	}
+
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (f *FakeRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	sender := spec.SenderID(userID.String())
+	return &sender, nil
+}
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
@@ -49,19 +68,23 @@ func TestNewInviteResponse(t *testing.T) {
 	event := `{"auth_events":["$SbSsh09j26UAXnjd3RZqf2lyA3Kw2sY_VZJVZQAV9yA","$EwL53onrLwQ5gL8Dv3VrOOCvHiueXu2ovLdzqkNi3lo","$l2wGmz9iAwevBDGpHT_xXLUA5O8BhORxWIGU1cGi1ZM","$GsWFJLXgdlF5HpZeyWkP72tzXYWW3uQ9X28HBuTztHE"],"content":{"avatar_url":"","displayname":"neilalexander","membership":"invite"},"depth":9,"hashes":{"sha256":"8p+Ur4f8vLFX6mkIXhxI0kegPG7X3tWy56QmvBkExAg"},"origin":"matrix.org","origin_server_ts":1602087113066,"prev_events":["$1v-O6tNwhOZcA8bvCYY-Dnj1V2ZDE58lLPxtlV97S28"],"prev_state":[],"room_id":"!XbeXirGWSPXbEaGokF:matrix.org","sender":"@neilalexander:matrix.org","signatures":{"dendrite.neilalexander.dev":{"ed25519:BMJi":"05KQ5lPw0cSFsE4A0x1z7vi/3cc8bG4WHUsFWYkhxvk/XkXMGIYAYkpNThIvSeLfdcHlbm/k10AsBSKH8Uq4DA"},"matrix.org":{"ed25519:a_RXGa":"jeovuHr9E/x0sHbFkdfxDDYV/EyoeLi98douZYqZ02iYddtKhfB7R3WLay/a+D3V3V7IW0FUmPh/A404x5sYCw"}},"state_key":"@neilalexander:dendrite.neilalexander.dev","type":"m.room.member","unsigned":{"age":2512,"invite_room_state":[{"content":{"join_rule":"invite"},"sender":"@neilalexander:matrix.org","state_key":"","type":"m.room.join_rules"},{"content":{"avatar_url":"mxc://matrix.org/BpDaozLwgLnlNStxDxvLzhPr","displayname":"neilalexander","membership":"join"},"sender":"@neilalexander:matrix.org","state_key":"@neilalexander:matrix.org","type":"m.room.member"},{"content":{"name":"Test room"},"sender":"@neilalexander:matrix.org","state_key":"","type":"m.room.name"}]},"_room_version":"5"}`
 	expected := `{"invite_state":{"events":[{"content":{"join_rule":"invite"},"sender":"@neilalexander:matrix.org","state_key":"","type":"m.room.join_rules"},{"content":{"avatar_url":"mxc://matrix.org/BpDaozLwgLnlNStxDxvLzhPr","displayname":"neilalexander","membership":"join"},"sender":"@neilalexander:matrix.org","state_key":"@neilalexander:matrix.org","type":"m.room.member"},{"content":{"name":"Test room"},"sender":"@neilalexander:matrix.org","state_key":"","type":"m.room.name"},{"content":{"avatar_url":"","displayname":"neilalexander","membership":"invite"},"event_id":"$GQmw8e8-26CQv1QuFoHBHpKF1hQj61Flg3kvv_v_XWs","origin_server_ts":1602087113066,"sender":"@neilalexander:matrix.org","state_key":"@neilalexander:dendrite.neilalexander.dev","type":"m.room.member"}]}}`
 
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(event), false, gomatrixserverlib.RoomVersionV5)
+	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV5).NewEventFromTrustedJSON([]byte(event), false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res := NewInviteResponse(ev.Headered(gomatrixserverlib.RoomVersionV5))
+	rsAPI := FakeRoomserverAPI{}
+	res, err := NewInviteResponse(context.Background(), &rsAPI, &types.HeaderedEvent{PDU: ev}, synctypes.FormatSync)
+	if err != nil {
+		t.Fatal(err)
+	}
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if string(j) != expected {
-		t.Fatalf("Invite response didn't contain correct info")
+		t.Fatalf("Invite response didn't contain correct info, \nexpected: %s \ngot: %s", expected, string(j))
 	}
 }
 
@@ -125,7 +148,7 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 		{
 			name: "unread notifications are NOT removed, if state is set",
 			fields: fields{
-				State:               &ClientEvents{Events: []gomatrixserverlib.ClientEvent{{Content: []byte("{}")}}},
+				State:               &ClientEvents{Events: []synctypes.ClientEvent{{Content: []byte("{}")}}},
 				UnreadNotifications: &UnreadNotifications{NotificationCount: 1},
 			},
 			want: []byte(`{"state":{"events":[{"content":{},"type":""}]},"unread_notifications":{"highlight_count":0,"notification_count":1}}`),
@@ -134,7 +157,7 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 			name: "roomID is removed from EDUs",
 			fields: fields{
 				Ephemeral: &ClientEvents{
-					Events: []gomatrixserverlib.ClientEvent{
+					Events: []synctypes.ClientEvent{
 						{RoomID: "!someRandomRoomID:test", Content: []byte("{}")},
 					},
 				},

@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,8 +11,10 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
@@ -356,12 +359,12 @@ func Test_OpenID(t *testing.T) {
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
 		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
 		assert.NoError(t, err, "unable to create OpenID token")
-		assert.Equal(t, expiresAtMS, expires)
+		assert.InDelta(t, expiresAtMS, expires, 2) // 2ms leeway
 
 		attributes, err := db.GetOpenIDTokenAttributes(ctx, token)
 		assert.NoError(t, err, "unable to get OpenID token attributes")
 		assert.Equal(t, alice.ID, attributes.UserID)
-		assert.Equal(t, expiresAtMS, attributes.ExpiresAtMS)
+		assert.InDelta(t, expiresAtMS, attributes.ExpiresAtMS, 2) // 2ms leeway
 	})
 }
 
@@ -526,12 +529,12 @@ func Test_Notification(t *testing.T) {
 				Actions: []*pushrules.Action{
 					{},
 				},
-				Event: gomatrixserverlib.ClientEvent{
-					Content: gomatrixserverlib.RawJSON("{}"),
+				Event: synctypes.ClientEvent{
+					Content: spec.RawJSON("{}"),
 				},
 				Read:   false,
 				RoomID: roomID,
-				TS:     gomatrixserverlib.AsTimestamp(ts),
+				TS:     spec.AsTimestamp(ts),
 			}
 			err = db.InsertNotification(ctx, aliceLocalpart, aliceDomain, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")
@@ -753,6 +756,56 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			if m.StreamID != wantStreamIDs[m.DeviceID] {
 				t.Errorf("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
 			}
+		}
+	})
+}
+
+func TestOneTimeKeys(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clean := mustCreateKeyDatabase(t, dbType)
+		defer clean()
+		userID := "@alice:localhost"
+		deviceID := "alice_device"
+		otk := api.OneTimeKeys{
+			UserID:   userID,
+			DeviceID: deviceID,
+			KeyJSON:  map[string]json.RawMessage{"curve25519:KEY1": []byte(`{"key":"v1"}`)},
+		}
+
+		// Add a one time key to the DB
+		_, err := db.StoreOneTimeKeys(ctx, otk)
+		MustNotError(t, err)
+
+		// Check the count of one time keys is correct
+		count, err := db.OneTimeKeysCount(ctx, userID, deviceID)
+		MustNotError(t, err)
+		if count.KeyCount["curve25519"] != 1 {
+			t.Fatalf("Expected 1 key, got %d", count.KeyCount["curve25519"])
+		}
+
+		// Check the actual key contents are correct
+		keysJSON, err := db.ExistingOneTimeKeys(ctx, userID, deviceID, []string{"curve25519:KEY1"})
+		MustNotError(t, err)
+		keyJSON, err := keysJSON["curve25519:KEY1"].MarshalJSON()
+		MustNotError(t, err)
+		if !bytes.Equal(keyJSON, []byte(`{"key":"v1"}`)) {
+			t.Fatalf("Existing keys do not match expected. Got %v", keysJSON["curve25519:KEY1"])
+		}
+
+		// Claim a one time key from the database. This should remove it from the database.
+		claimedKeys, err := db.ClaimKeys(ctx, map[string]map[string]string{userID: {deviceID: "curve25519"}})
+		MustNotError(t, err)
+
+		// Check the claimed key contents are correct
+		if !reflect.DeepEqual(claimedKeys[0], otk) {
+			t.Fatalf("Expected to claim stored key %v. Got %v", otk, claimedKeys[0])
+		}
+
+		// Check the count of one time keys is now zero
+		count, err = db.OneTimeKeysCount(ctx, userID, deviceID)
+		MustNotError(t, err)
+		if count.KeyCount["curve25519"] != 0 {
+			t.Fatalf("Expected 0 keys, got %d", count.KeyCount["curve25519"])
 		}
 	})
 }

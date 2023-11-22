@@ -15,11 +15,14 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/tidwall/gjson"
 
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/synctypes"
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -35,6 +38,15 @@ import (
 type syncRoomserverAPI struct {
 	rsapi.SyncRoomserverAPI
 	rooms []*test.Room
+}
+
+func (s *syncRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (s *syncRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	senderID := spec.SenderID(userID.String())
+	return &senderID, nil
 }
 
 func (s *syncRoomserverAPI) QueryLatestEventsAndState(ctx context.Context, req *rsapi.QueryLatestEventsAndStateRequest, res *rsapi.QueryLatestEventsAndStateResponse) error {
@@ -67,8 +79,13 @@ func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsa
 	return nil
 }
 
-func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembershipAtEventRequest, res *rsapi.QueryMembershipAtEventResponse) error {
-	return nil
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(
+	ctx context.Context,
+	roomID spec.RoomID,
+	eventIDs []string,
+	senderID spec.SenderID,
+) (map[string]*rstypes.HeaderedEvent, error) {
+	return map[string]*rstypes.HeaderedEvent{}, nil
 }
 
 type syncUserAPI struct {
@@ -188,6 +205,156 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 				gotEventIDs[i] = ev.EventID
 			}
 			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+		}
+	}
+}
+
+func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testSyncEventFormatPowerLevels(t, dbType)
+	})
+}
+
+func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
+	user := test.NewUser(t)
+	setRoomVersion := func(t *testing.T, r *test.Room) { r.Version = gomatrixserverlib.RoomVersionPseudoIDs }
+	room := test.NewRoom(t, user, setRoomVersion)
+	alice := userapi.Device{
+		ID:          "ALICEID",
+		UserID:      user.ID,
+		AccessToken: "ALICE_BEARER_TOKEN",
+		DisplayName: "Alice",
+		AccountType: userapi.AccountTypeUser,
+	}
+
+	room.CreateAndInsert(t, user, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
+		Users: map[string]int64{
+			user.ID: 100,
+		},
+	}, test.WithStateKey(""))
+
+	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	routers := httputil.NewRouters()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	natsInstance := jetstream.NATSInstance{}
+	defer close()
+
+	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+	msgs := toNATSMsgs(t, cfg, room.Events()...)
+	AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+	testrig.MustPublishMsgs(t, jsctx, msgs...)
+
+	testCases := []struct {
+		name            string
+		wantCode        int
+		wantJoinedRooms []string
+		eventFormat     synctypes.ClientEventFormat
+	}{
+		{
+			name:            "Client format",
+			wantCode:        200,
+			wantJoinedRooms: []string{room.ID},
+			eventFormat:     synctypes.FormatSync,
+		},
+		{
+			name:            "Federation format",
+			wantCode:        200,
+			wantJoinedRooms: []string{room.ID},
+			eventFormat:     synctypes.FormatSyncFederation,
+		},
+	}
+
+	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+		// wait for the last sent eventID to come down sync
+		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+		return gjson.Get(syncBody, path).Exists()
+	})
+
+	for _, tc := range testCases {
+		format := ""
+		if tc.eventFormat == synctypes.FormatSyncFederation {
+			format = "federation"
+		}
+
+		w := httptest.NewRecorder()
+		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+			"access_token": alice.AccessToken,
+			"timeout":      "0",
+			"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
+		})))
+		if w.Code != tc.wantCode {
+			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+		}
+		if tc.wantJoinedRooms != nil {
+			var res types.Response
+			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+			}
+			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
+				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+			}
+			t.Logf("res: %+v", res.Rooms.Join[room.ID])
+
+			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+				gotEventIDs[i] = ev.EventID
+			}
+			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+
+			event := room.CreateAndInsert(t, user, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
+				Users: map[string]int64{
+					user.ID:                100,
+					"@otheruser:localhost": 50,
+				},
+			}, test.WithStateKey(""))
+
+			msgs := toNATSMsgs(t, cfg, event)
+			testrig.MustPublishMsgs(t, jsctx, msgs...)
+
+			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+				// wait for the last sent eventID to come down sync
+				path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+				return gjson.Get(syncBody, path).Exists()
+			})
+
+			since := res.NextBatch.String()
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"timeout":      "0",
+				"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
+				"since":        since,
+			})))
+			if w.Code != 200 {
+				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			}
+
+			res = *types.NewResponse()
+			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Errorf("failed to decode response body: %s", err)
+			}
+			if len(res.Rooms.Join) != 1 {
+				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
+			}
+			gotEventIDs = make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+				gotEventIDs[j] = ev.EventID
+				if ev.Type == spec.MRoomPowerLevels {
+					content := gomatrixserverlib.PowerLevelContent{}
+					err := json.Unmarshal(ev.Content, &content)
+					if err != nil {
+						t.Errorf("failed to unmarshal power level content: %s", err)
+					}
+					otherUserLevel := content.UserLevel("@otheruser:localhost")
+					if otherUserLevel != 50 {
+						t.Errorf("Expected user PL of %d but got %d", 50, otherUserLevel)
+					}
+				}
+			}
+			events := []*rstypes.HeaderedEvent{room.Events()[len(room.Events())-1]}
+			test.AssertEventIDsEqual(t, gotEventIDs, events)
 		}
 	}
 }
@@ -426,6 +593,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		}
 
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
@@ -473,7 +641,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				}
 				// We only care about the returned events at this point
 				var res struct {
-					Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+					Chunk []synctypes.ClientEvent `json:"chunk"`
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
 					t.Errorf("failed to decode response body: %s", err)
@@ -488,7 +656,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
 				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
 
-				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
@@ -521,7 +689,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 	}
 }
 
-func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []gomatrixserverlib.ClientEvent) {
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *rstypes.HeaderedEvent, chunk []synctypes.ClientEvent) {
 	t.Helper()
 	if wantVisible {
 		for _, ev := range chunk {
@@ -611,10 +779,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -630,10 +798,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
 			},
@@ -649,7 +817,7 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(alice.ID))
 			},
@@ -665,7 +833,7 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -705,10 +873,10 @@ func TestGetMembership(t *testing.T) {
 				}))
 			},
 			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "join",
 				}, test.WithStateKey(bob.ID))
-				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 					"membership": "leave",
 				}, test.WithStateKey(bob.ID))
 			},
@@ -1140,7 +1308,7 @@ func TestUpdateRelations(t *testing.T) {
 		},
 		{
 			name:      "redactions are ignored",
-			eventType: gomatrixserverlib.MRoomRedaction,
+			eventType: spec.MRoomRedaction,
 			eventContent: map[string]interface{}{
 				"m.relates_to": map[string]interface{}{
 					"event_id": "$randomEventID",
@@ -1226,14 +1394,14 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
+func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID(), api.OutputEvent{
+		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID().String(), api.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

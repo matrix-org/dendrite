@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -134,12 +133,15 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	var stateBlockNIDsJSON string
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
+		if err = rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
+		if err = json.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
 			return nil, err
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(stateNIDs) {
 		return nil, types.MissingStateError(fmt.Sprintf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs)))
@@ -153,7 +155,7 @@ func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 	return nil, tables.OptimisationNotSupportedError
 }
 
-func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string) (map[string]*gomatrixserverlib.HeaderedEvent, error) {
+func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string) (map[string]*types.HeaderedEvent, error) {
 	return nil, tables.OptimisationNotSupportedError
 }
 

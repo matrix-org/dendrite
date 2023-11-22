@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type FederationAPI struct {
@@ -101,7 +102,7 @@ type KeyPerspectives []KeyPerspective
 
 type KeyPerspective struct {
 	// The server name of the perspective key server
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+	ServerName spec.ServerName `yaml:"server_name"`
 	// Server keys for the perspective user, used to verify the
 	// keys have been signed by the perspective server
 	Keys []KeyPerspectiveTrustKey `yaml:"keys"`

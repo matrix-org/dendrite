@@ -84,6 +84,7 @@ jobs:
           kubectl get pods -A
           kubectl get services
           kubectl get ingress
+          kubectl logs -l app.kubernetes.io/name=dendrite
       - name: Run create account
         run: |
           podName=$(kubectl get pods -l app.kubernetes.io/name=dendrite -o name)

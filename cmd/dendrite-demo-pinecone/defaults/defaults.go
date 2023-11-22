@@ -14,8 +14,8 @@
 
 package defaults
 
-import "github.com/matrix-org/gomatrixserverlib"
+import "github.com/matrix-org/gomatrixserverlib/spec"
 
-var DefaultServerNames = map[gomatrixserverlib.ServerName]struct{}{
+var DefaultServerNames = map[spec.ServerName]struct{}{
 	"3bf0258d23c60952639cc4c69c71d1508a7d43a0475d9000ff900a1848411ec7": {},
 }

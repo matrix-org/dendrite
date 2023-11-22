@@ -10,11 +10,15 @@ import (
 func ValidateRule(kind Kind, rule *Rule) []error {
 	var errs []error
 
+	if len(rule.RuleID) > 0 && rule.RuleID[:1] == "." {
+		errs = append(errs, fmt.Errorf("invalid rule ID: rule can not start with a dot"))
+	}
+
 	if !validRuleIDRE.MatchString(rule.RuleID) {
 		errs = append(errs, fmt.Errorf("invalid rule ID: %s", rule.RuleID))
 	}
 
-	if len(rule.Actions) == 0 {
+	if rule.Actions == nil {
 		errs = append(errs, fmt.Errorf("missing actions"))
 	}
 	for _, action := range rule.Actions {

@@ -52,7 +52,7 @@ func NewRequest(t *testing.T, method, path string, opts ...HTTPRequestOpt) *http
 // ListenAndServe will listen on a random high-numbered port and attach the given router.
 // Returns the base URL to send requests to. Call `cancel` to shutdown the server, which will block until it has closed.
 func ListenAndServe(t *testing.T, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %s", err)
 	}

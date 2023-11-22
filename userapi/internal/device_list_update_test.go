@@ -27,8 +27,13 @@ import (
 	"testing"
 	"time"
 
+	api2 "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/statistics"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -64,7 +69,7 @@ func (d *mockDeviceListUpdaterDatabase) DeleteStaleDeviceLists(ctx context.Conte
 
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 // If no domains are given, all user IDs with stale device lists are returned.
-func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var result []string
@@ -123,8 +128,11 @@ func (d *mockDeviceListUpdaterDatabase) DeviceKeysJSON(ctx context.Context, keys
 type mockDeviceListUpdaterAPI struct {
 }
 
-func (d *mockDeviceListUpdaterAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) error {
-	return nil
+func (d *mockDeviceListUpdaterAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) {
+}
+
+var testIsBlacklistedOrBackingOff = func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+	return &statistics.ServerStatistics{}, nil
 }
 
 type roundTripper struct {
@@ -135,19 +143,17 @@ func (t *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.fn(req)
 }
 
-func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrixserverlib.FederationClient {
+func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.FederationClient {
 	_, pkey, _ := ed25519.GenerateKey(nil)
-	fedClient := gomatrixserverlib.NewFederationClient(
-		[]*gomatrixserverlib.SigningIdentity{
+	fedClient := fclient.NewFederationClient(
+		[]*fclient.SigningIdentity{
 			{
-				ServerName: gomatrixserverlib.ServerName("example.test"),
+				ServerName: spec.ServerName("example.test"),
 				KeyID:      gomatrixserverlib.KeyID("ed25519:test"),
 				PrivateKey: pkey,
 			},
 		},
-	)
-	fedClient.Client = *gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(&roundTripper{tripper}),
+		fclient.WithTransport(&roundTripper{tripper}),
 	)
 	return fedClient
 }
@@ -162,7 +168,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1, nil, "localhost")
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -234,7 +240,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, nil, "example.test")
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -293,7 +299,7 @@ func TestDebounce(t *testing.T) {
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
 	fedCh := make(chan *http.Response, 1)
-	srv := gomatrixserverlib.ServerName("example.com")
+	srv := spec.ServerName("example.com")
 	userID := "@alice:example.com"
 	keyJSON := `{"user_id":"` + userID + `","device_id":"JLAFKJWSCS","algorithms":["m.olm.v1.curve25519-aes-sha2","m.megolm.v1.aes-sha2"],"keys":{"curve25519:JLAFKJWSCS":"3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI","ed25519:JLAFKJWSCS":"lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI"},"signatures":{"` + userID + `":{"ed25519:JLAFKJWSCS":"dSO80A01XiigH3uBiDVx/EjzaoycHcjq9lfQX0uWsqxl2giMIiSPR8a4d291W1ihKJL/a+myXS367WT6NAIcBA"}}}`
 	incomingFedReq := make(chan struct{})
@@ -304,7 +310,7 @@ func TestDebounce(t *testing.T) {
 		close(incomingFedReq)
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1, nil, "localhost")
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -407,13 +413,13 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 
 		updater := NewDeviceListUpdater(processCtx, db, nil,
 			nil, nil,
-			0, rsAPI, "test")
+			0, rsAPI, "test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 		if err := updater.CleanUp(); err != nil {
 			t.Error(err)
 		}
 
 		// check that we still have Alice in our stale list
-		staleUsers, err := db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		staleUsers, err := db.StaleDeviceLists(ctx, []spec.ServerName{"test"})
 		if err != nil {
 			t.Error(err)
 		}
@@ -428,4 +434,115 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 			t.Fatalf("unexpected stale device list user: %s, want %s", staleUsers[0], alice.ID)
 		}
 	})
+}
+
+func Test_dedupeStateList(t *testing.T) {
+	alice := "@alice:localhost"
+	bob := "@bob:localhost"
+	charlie := "@charlie:notlocalhost"
+	invalidUserID := "iaminvalid:localhost"
+
+	tests := []struct {
+		name       string
+		staleLists []string
+		want       []string
+	}{
+		{
+			name:       "empty stateLists",
+			staleLists: []string{},
+			want:       []string{},
+		},
+		{
+			name:       "single entry",
+			staleLists: []string{alice},
+			want:       []string{alice},
+		},
+		{
+			name:       "multiple entries without dupe servers",
+			staleLists: []string{alice, charlie},
+			want:       []string{alice, charlie},
+		},
+		{
+			name:       "multiple entries with dupe servers",
+			staleLists: []string{alice, bob, charlie},
+			want:       []string{alice, charlie},
+		},
+		{
+			name:       "list with invalid userID",
+			staleLists: []string{alice, bob, invalidUserID},
+			want:       []string{alice},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dedupeStaleLists(tt.staleLists); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("dedupeStaleLists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
+	unreachableServer := spec.ServerName("notlocalhost")
+
+	updater := DeviceListUpdater{
+		workerChans: make([]chan spec.ServerName, 1),
+		isBlacklistedOrBackingOffFn: func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+			switch s {
+			case unreachableServer:
+				return nil, &api2.FederationClientError{Blacklisted: true}
+			}
+			return nil, nil
+		},
+		mu:             &sync.Mutex{},
+		userIDToChanMu: &sync.Mutex{},
+		userIDToChan:   make(map[string]chan bool),
+		userIDToMutex:  make(map[string]*sync.Mutex),
+	}
+	workerCh := make(chan spec.ServerName)
+	defer close(workerCh)
+	updater.workerChans[0] = workerCh
+
+	// happy case
+	alice := "@alice:localhost"
+	aliceCh := updater.assignChannel(alice)
+	defer updater.clearChannel(alice)
+
+	// failing case
+	bob := "@bob:" + unreachableServer
+	bobCh := updater.assignChannel(string(bob))
+	defer updater.clearChannel(string(bob))
+
+	expectedServers := map[spec.ServerName]struct{}{
+		"localhost": {},
+	}
+	unexpectedServers := make(map[spec.ServerName]struct{})
+
+	go func() {
+		for serverName := range workerCh {
+			switch serverName {
+			case "localhost":
+				delete(expectedServers, serverName)
+				aliceCh <- true // unblock notifyWorkers
+			case unreachableServer: // this should not happen as it is "filtered" away by the blacklist
+				unexpectedServers[serverName] = struct{}{}
+				bobCh <- true
+			default:
+				unexpectedServers[serverName] = struct{}{}
+			}
+		}
+	}()
+
+	// alice is not blacklisted
+	updater.notifyWorkers(alice)
+	// bob is blacklisted
+	updater.notifyWorkers(string(bob))
+
+	for server := range expectedServers {
+		t.Errorf("Server still in expectedServers map: %s", server)
+	}
+
+	for server := range unexpectedServers {
+		t.Errorf("unexpected server in result: %s", server)
+	}
 }

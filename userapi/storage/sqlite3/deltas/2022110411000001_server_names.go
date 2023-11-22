@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // I know what you're thinking: you're wondering "why doesn't this use $1
@@ -14,7 +14,7 @@ import (
 // PostgreSQL doesn't expect the table name to be specified as a substituted
 // argument in that way so it results in a syntax error in the query.
 
-func UpServerNamesPopulate(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib.ServerName) error {
+func UpServerNamesPopulate(ctx context.Context, tx *sql.Tx, serverName spec.ServerName) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
 			"UPDATE %s SET server_name = %s WHERE server_name = '';",

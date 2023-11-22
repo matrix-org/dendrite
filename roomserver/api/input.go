@@ -18,7 +18,9 @@ package api
 import (
 	"fmt"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Kind int
@@ -66,9 +68,9 @@ type InputRoomEvent struct {
 	// This controls how the event is processed.
 	Kind Kind `json:"kind"`
 	// The event JSON for the event to add.
-	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *types.HeaderedEvent `json:"event"`
 	// Which server told us about this event.
-	Origin gomatrixserverlib.ServerName `json:"origin"`
+	Origin spec.ServerName `json:"origin"`
 	// Whether the state is supplied as a list of event IDs or whether it
 	// should be derived from the state at the previous events.
 	HasState bool `json:"has_state"`
@@ -94,9 +96,9 @@ type TransactionID struct {
 
 // InputRoomEventsRequest is a request to InputRoomEvents
 type InputRoomEventsRequest struct {
-	InputRoomEvents []InputRoomEvent             `json:"input_room_events"`
-	Asynchronous    bool                         `json:"async"`
-	VirtualHost     gomatrixserverlib.ServerName `json:"virtual_host"`
+	InputRoomEvents []InputRoomEvent `json:"input_room_events"`
+	Asynchronous    bool             `json:"async"`
+	VirtualHost     spec.ServerName  `json:"virtual_host"`
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents

@@ -13,6 +13,10 @@ type ClientAPI struct {
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
 
+	// If set, requires users to submit a token during registration.
+	// Tokens can be managed using admin API.
+	RegistrationRequiresToken bool `yaml:"registration_requires_token"`
+
 	// Enable registration without captcha verification or shared secret.
 	// This option is populated by the -really-enable-open-registration
 	// command line parameter as it is not recommended.
@@ -56,6 +60,7 @@ type ClientAPI struct {
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.RegistrationSharedSecret = ""
+	c.RegistrationRequiresToken = false
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""
 	c.RecaptchaEnabled = false
@@ -88,17 +93,15 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 		checkNotEmpty(configErrs, "client_api.recaptcha_sitekey_class", c.RecaptchaSitekeyClass)
 	}
 	// Ensure there is any spam counter measure when enabling registration
-	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled {
-		if !c.RecaptchaEnabled {
-			configErrs.Add(
-				"You have tried to enable open registration without any secondary verification methods " +
-					"(such as reCAPTCHA). By enabling open registration, you are SIGNIFICANTLY " +
-					"increasing the risk that your server will be used to send spam or abuse, and may result in " +
-					"your server being banned from some rooms. If you are ABSOLUTELY CERTAIN you want to do this, " +
-					"start Dendrite with the -really-enable-open-registration command line flag. Otherwise, you " +
-					"should set the registration_disabled option in your Dendrite config.",
-			)
-		}
+	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled && !c.RecaptchaEnabled {
+		configErrs.Add(
+			"You have tried to enable open registration without any secondary verification methods " +
+				"(such as reCAPTCHA). By enabling open registration, you are SIGNIFICANTLY " +
+				"increasing the risk that your server will be used to send spam or abuse, and may result in " +
+				"your server being banned from some rooms. If you are ABSOLUTELY CERTAIN you want to do this, " +
+				"start Dendrite with the -really-enable-open-registration command line flag. Otherwise, you " +
+				"should set the registration_disabled option in your Dendrite config.",
+		)
 	}
 }
 

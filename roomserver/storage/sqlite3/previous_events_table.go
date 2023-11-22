@@ -18,10 +18,12 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -34,9 +36,8 @@ import (
 const previousEventSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     previous_event_id TEXT NOT NULL,
-    previous_reference_sha256 BLOB,
     event_nids TEXT NOT NULL,
-    UNIQUE (previous_event_id, previous_reference_sha256)
+    UNIQUE (previous_event_id)
   );
 `
 
@@ -47,20 +48,20 @@ const previousEventSchema = `
 // The lock is necessary to avoid data races when checking whether an event is already referenced by another event.
 const insertPreviousEventSQL = `
 	INSERT OR REPLACE INTO roomserver_previous_events
-	  (previous_event_id, previous_reference_sha256, event_nids)
-	  VALUES ($1, $2, $3)
+	  (previous_event_id, event_nids)
+	  VALUES ($1, $2)
 `
 
 const selectPreviousEventNIDsSQL = `
 	SELECT event_nids FROM roomserver_previous_events
-	  WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
+	  WHERE previous_event_id = $1
 `
 
 // Check if the event is referenced by another event in the table.
 // This should only be done while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
 const selectPreviousEventExistsSQL = `
 	SELECT 1 FROM roomserver_previous_events
-	  WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
+	  WHERE previous_event_id = $1
 `
 
 type previousEventStatements struct {
@@ -72,7 +73,30 @@ type previousEventStatements struct {
 
 func CreatePrevEventsTable(db *sql.DB) error {
 	_, err := db.Exec(previousEventSchema)
-	return err
+	if err != nil {
+		return err
+	}
+	// check if the column exists
+	var cName string
+	migrationName := "roomserver: drop column reference_sha from roomserver_prev_events"
+	err = db.QueryRowContext(context.Background(), `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'roomserver_previous_events' AND p.name = 'previous_reference_sha256'`).Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(context.Background(), db, migrationName); err != nil {
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+			}
+			return nil
+		}
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: migrationName,
+			Up:      deltas.UpDropEventReferenceSHAPrevEvents,
+		},
+	}...)
+	return m.Up(context.Background())
 }
 
 func PreparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
@@ -91,13 +115,12 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	ctx context.Context,
 	txn *sql.Tx,
 	previousEventID string,
-	previousEventReferenceSHA256 []byte,
 	eventNID types.EventNID,
 ) error {
 	var eventNIDs string
 	eventNIDAsString := fmt.Sprintf("%d", eventNID)
 	selectStmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
-	err := selectStmt.QueryRowContext(ctx, previousEventID, previousEventReferenceSHA256).Scan(&eventNIDs)
+	err := selectStmt.QueryRowContext(ctx, previousEventID).Scan(&eventNIDs)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("selectStmt.QueryRowContext.Scan: %w", err)
 	}
@@ -115,7 +138,7 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	}
 	insertStmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
 	_, err = insertStmt.ExecContext(
-		ctx, previousEventID, previousEventReferenceSHA256, eventNIDs,
+		ctx, previousEventID, eventNIDs,
 	)
 	return err
 }
@@ -123,9 +146,9 @@ func (s *previousEventStatements) InsertPreviousEvent(
 // Check if the event reference exists
 // Returns sql.ErrNoRows if the event reference doesn't exist.
 func (s *previousEventStatements) SelectPreviousEventExists(
-	ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte,
+	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
 	var ok int64
 	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
-	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
+	return stmt.QueryRowContext(ctx, eventID).Scan(&ok)
 }

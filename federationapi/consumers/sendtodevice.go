@@ -20,6 +20,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -39,7 +40,7 @@ type OutputSendToDeviceConsumer struct {
 	durable           string
 	db                storage.Database
 	queues            *queue.OutgoingQueues
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	isLocalServerName func(spec.ServerName) bool
 	topic             string
 }
 
@@ -107,7 +108,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MDirectToDevice,
+		Type:   spec.MDirectToDevice,
 		Origin: string(originServerName),
 	}
 	tdm := gomatrixserverlib.ToDeviceMessage{
@@ -127,7 +128,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	}
 
 	log.Debugf("Sending send-to-device message into %q destination queue", destServerName)
-	if err := t.queues.SendEDU(edu, originServerName, []gomatrixserverlib.ServerName{destServerName}); err != nil {
+	if err := t.queues.SendEDU(edu, originServerName, []spec.ServerName{destServerName}); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

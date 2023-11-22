@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -77,7 +78,7 @@ func main() {
 		cfg = monolith.GenerateDefaultConfig(sk, *instanceDir, *instanceDir, *instanceName)
 	}
 
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.ServerName = spec.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	p2pMonolith := monolith.P2PMonolith{}

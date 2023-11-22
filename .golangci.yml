@@ -179,9 +179,7 @@ linters-settings:
 
 linters:
   enable:
-    - deadcode
     - errcheck
-    - goconst
     - gocyclo
     - goimports # Does everything gofmt does
     - gosimple
@@ -191,10 +189,8 @@ linters:
     - misspell # Check code comments, whereas misspell in CI checks *.md files
     - nakedret
     - staticcheck
-    - structcheck
     - unparam
     - unused
-    - varcheck
   enable-all: false
   disable:
     - bodyclose
@@ -214,6 +210,7 @@ linters:
     - stylecheck
     - typecheck # Should turn back on soon
     - unconvert # Should turn back on soon
+    - goconst # Slightly annoying, as it reports "issues" in SQL statements
   disable-all: false
   presets:
   fast: false
