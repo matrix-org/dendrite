@@ -88,7 +88,6 @@ func TestServerKeysTable(t *testing.T) {
 		assert.Equal(t, res, gotKeys[req])
 
 		// Upsert a different key to validate querying multiple keys
-
 		req2 := gomatrixserverlib.PublicKeyLookupRequest{
 			ServerName: "notlocalhost",
 			KeyID:      "ed25519:test2",
