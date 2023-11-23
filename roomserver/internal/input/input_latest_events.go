@@ -89,6 +89,12 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
+	update, err := u.makeOutputNewRoomEvent()
+	if err != nil {
+		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
+	}
+	updates = append(updates, *update)
+
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
 	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
@@ -184,7 +190,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() ([]api.OutputEvent, error) 
 
 	// Now that we know what the latest events are, it's time to get the
 	// latest state.
-	var updates []api.OutputEvent
+	var membershipUpdates []api.OutputEvent
 	if extremitiesChanged || u.rewritesState {
 		if err = u.latestState(); err != nil {
 			return nil, fmt.Errorf("u.latestState: %w", err)
@@ -192,7 +198,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() ([]api.OutputEvent, error) 
 
 		// If we need to generate any output events then here's where we do it.
 		// TODO: Move this!
-		if updates, err = u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added); err != nil {
+		if membershipUpdates, err = u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added); err != nil {
 			return nil, fmt.Errorf("u.api.updateMemberships: %w", err)
 		}
 	} else {
@@ -203,13 +209,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() ([]api.OutputEvent, error) 
 		return nil, fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
-	update, err := u.makeOutputNewRoomEvent()
-	if err != nil {
-		return nil, fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
-	}
-	updates = append(updates, *update)
-
-	return updates, nil
+	return membershipUpdates, nil
 }
 
 func (u *latestEventsUpdater) latestState() error {
