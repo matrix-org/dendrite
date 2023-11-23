@@ -176,6 +176,29 @@ func SendLeave(
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
+	parsedRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	roomInfo, err := rsAPI.QueryRoomInfo(httpReq.Context(), *parsedRoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	// Either the room does not exist or does not
+	// have any events.
+	if roomInfo == nil || roomInfo.IsStub() {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	}
+
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
 	if err != nil {
 		return util.JSONResponse{
