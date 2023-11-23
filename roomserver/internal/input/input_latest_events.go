@@ -74,7 +74,6 @@ func (r *Inputer) updateLatestEvents(
 		ctx:               ctx,
 		api:               r,
 		updater:           updater,
-		roomInfo:          roomInfo,
 		stateAtEvent:      stateAtEvent,
 		event:             event,
 		rewritesState:     rewritesState,
@@ -82,7 +81,7 @@ func (r *Inputer) updateLatestEvents(
 	}
 
 	var updates []api.OutputEvent
-	updates, err = u.doUpdateLatestEvents()
+	updates, err = u.doUpdateLatestEvents(roomInfo)
 	if err != nil {
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
@@ -123,7 +122,6 @@ type latestEventsUpdater struct {
 	ctx           context.Context
 	api           *Inputer
 	updater       *shared.RoomUpdater
-	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.PDU
 	rewritesState bool
@@ -147,7 +145,7 @@ type latestEventsUpdater struct {
 	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
-func (u *latestEventsUpdater) doUpdateLatestEvents() ([]api.OutputEvent, error) {
+func (u *latestEventsUpdater) doUpdateLatestEvents(roomInfo *types.RoomInfo) ([]api.OutputEvent, error) {
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 
 	// If we are doing a regular event update then we will get the
@@ -187,7 +185,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() ([]api.OutputEvent, error) 
 	// latest state.
 	var membershipUpdates []api.OutputEvent
 	if extremitiesChanged || u.rewritesState {
-		if err = u.latestState(); err != nil {
+		if err = u.latestState(roomInfo); err != nil {
 			return nil, fmt.Errorf("u.latestState: %w", err)
 		}
 
@@ -200,19 +198,19 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() ([]api.OutputEvent, error) 
 		u.newStateNID = u.oldStateNID
 	}
 
-	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+	if err = u.updater.SetLatestEvents(roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
 		return nil, fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
 	return membershipUpdates, nil
 }
 
-func (u *latestEventsUpdater) latestState() error {
+func (u *latestEventsUpdater) latestState(roomInfo *types.RoomInfo) error {
 	trace, ctx := internal.StartRegion(u.ctx, "processEventWithMissingState")
 	defer trace.EndRegion()
 
 	var err error
-	roomState := state.NewStateResolution(u.updater, u.roomInfo, u.api.Queryer)
+	roomState := state.NewStateResolution(u.updater, roomInfo, u.api.Queryer)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
