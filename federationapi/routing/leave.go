@@ -184,34 +184,8 @@ func SendLeave(
 		}
 	}
 
-	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.UnsupportedRoomVersion(
-				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", roomVersion),
-			),
-		}
-	}
-
-	// Decode the event JSON from the request.
-	event, err := verImpl.NewEventFromUntrustedJSON(request.Content())
-	switch err.(type) {
-	case gomatrixserverlib.BadJSONError:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON(err.Error()),
-		}
-	case nil:
-	default:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
-		}
-	}
-
 	leaveEvent, err := gomatrixserverlib.HandleSendLeave(
-		httpReq.Context(), incomingEvent, request.Origin(), roomVersion, eventID, roomID, rsAPI, keys)
+		httpReq.Context(), request.Content(), request.Origin(), roomVersion, eventID, roomID, rsAPI, keys)
 
 	switch e := err.(type) {
 	case nil:
@@ -244,6 +218,15 @@ func SendLeave(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
+		}
+	}
+
+	// The user was never joined to the room, has already left,
+	// or we already processed this leave event, so this is a no-op.
+	if leaveEvent == nil {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
 		}
 	}
 
