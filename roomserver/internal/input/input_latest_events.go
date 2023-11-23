@@ -78,7 +78,6 @@ func (r *Inputer) updateLatestEvents(
 		stateAtEvent:      stateAtEvent,
 		event:             event,
 		sendAsServer:      sendAsServer,
-		transactionID:     transactionID,
 		rewritesState:     rewritesState,
 		historyVisibility: historyVisibility,
 	}
@@ -89,7 +88,7 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
-	update, err := u.makeOutputNewRoomEvent()
+	update, err := u.makeOutputNewRoomEvent(transactionID)
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
@@ -128,7 +127,6 @@ type latestEventsUpdater struct {
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.PDU
-	transactionID *api.TransactionID
 	rewritesState bool
 	// Which server to send this event as.
 	sendAsServer string
@@ -390,7 +388,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	return true, nil
 }
 
-func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {
+func (u *latestEventsUpdater) makeOutputNewRoomEvent(transactionID *api.TransactionID) (*api.OutputEvent, error) {
 	latestEventIDs := make([]string, len(u.latest))
 	for i := range u.latest {
 		latestEventIDs[i] = u.latest[i].EventID
@@ -401,7 +399,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		RewritesState:     u.rewritesState,
 		LastSentEventID:   u.lastEventIDSent,
 		LatestEventIDs:    latestEventIDs,
-		TransactionID:     u.transactionID,
+		TransactionID:     transactionID,
 		SendAsServer:      u.sendAsServer,
 		HistoryVisibility: u.historyVisibility,
 	}
