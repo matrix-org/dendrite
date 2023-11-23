@@ -86,7 +86,7 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
-	update, err := u.makeOutputNewRoomEvent(transactionID, sendAsServer)
+	update, err := u.makeOutputNewRoomEvent(transactionID, sendAsServer, updater.LastEventIDSent())
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
@@ -125,8 +125,6 @@ type latestEventsUpdater struct {
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.PDU
 	rewritesState bool
-	// The eventID of the event that was processed before this one.
-	lastEventIDSent string
 	// The latest events in the room after processing this event.
 	oldLatest types.StateAtEventAndReferences
 	latest    types.StateAtEventAndReferences
@@ -146,8 +144,6 @@ type latestEventsUpdater struct {
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents(roomInfo *types.RoomInfo) ([]api.OutputEvent, error) {
-	u.lastEventIDSent = u.updater.LastEventIDSent()
-
 	// If we are doing a regular event update then we will get the
 	// previous latest events to use as a part of the calculation. If
 	// we are overwriting the latest events because we have a complete
@@ -383,7 +379,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	return true, nil
 }
 
-func (u *latestEventsUpdater) makeOutputNewRoomEvent(transactionID *api.TransactionID, sendAsServer string) (*api.OutputEvent, error) {
+func (u *latestEventsUpdater) makeOutputNewRoomEvent(transactionID *api.TransactionID, sendAsServer string, lastEventIDSent string) (*api.OutputEvent, error) {
 	latestEventIDs := make([]string, len(u.latest))
 	for i := range u.latest {
 		latestEventIDs[i] = u.latest[i].EventID
@@ -392,7 +388,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent(transactionID *api.Transact
 	ore := api.OutputNewRoomEvent{
 		Event:             &types.HeaderedEvent{PDU: u.event},
 		RewritesState:     u.rewritesState,
-		LastSentEventID:   u.lastEventIDSent,
+		LastSentEventID:   lastEventIDSent,
 		LatestEventIDs:    latestEventIDs,
 		TransactionID:     transactionID,
 		SendAsServer:      sendAsServer,
