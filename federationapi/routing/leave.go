@@ -199,16 +199,8 @@ func SendLeave(
 		}
 	}
 
-	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.UnsupportedRoomVersion(err.Error()),
-		}
-	}
-
 	leaveEvent, err := gomatrixserverlib.HandleSendLeave(
-		httpReq.Context(), request.Content(), request.Origin(), roomVersion, eventID, roomID, rsAPI, keys)
+		httpReq.Context(), request.Content(), request.Origin(), roomInfo.RoomVersion, eventID, roomID, rsAPI, keys)
 
 	switch e := err.(type) {
 	case nil:
