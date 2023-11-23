@@ -177,7 +177,7 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 		users = append(users, userID)
 		result[roomID] = users
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
@@ -236,7 +236,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 		}
 		result = append(result, roomID)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // SelectRoomIDsWithAnyMembership returns a map of all memberships for the given user.
@@ -339,12 +339,12 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err = stmt.ExecContext(
 		ctx,
-		event.RoomID(),
+		event.RoomID().String(),
 		event.EventID(),
 		event.Type(),
-		event.Sender(),
+		event.UserID.String(),
 		containsURL,
-		*event.StateKey(),
+		*event.StateKeyResolved,
 		headeredJSON,
 		membership,
 		addedAt,
@@ -419,7 +419,7 @@ func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, er
 		})
 	}
 
-	return events, nil
+	return events, rows.Err()
 }
 
 func rowsToEvents(rows *sql.Rows) ([]*rstypes.HeaderedEvent, error) {

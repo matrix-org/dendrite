@@ -44,8 +44,8 @@ type DatabaseTransaction interface {
 	MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error)
 
 	CurrentState(ctx context.Context, roomID string, stateFilterPart *synctypes.StateFilter, excludeEventIDs []string) ([]*rstypes.HeaderedEvent, error)
-	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *synctypes.StateFilter) ([]types.StateDelta, []string, error)
-	GetStateDeltas(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *synctypes.StateFilter) ([]types.StateDelta, []string, error)
+	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI) ([]types.StateDelta, []string, error)
+	GetStateDeltas(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *synctypes.StateFilter, rsAPI api.SyncRoomserverAPI) ([]types.StateDelta, []string, error)
 	RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error)
 	MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error)
 	GetRoomSummary(ctx context.Context, roomID, userID string) (summary *types.Summary, err error)
@@ -81,8 +81,11 @@ type DatabaseTransaction interface {
 	// If no data is retrieved, returns an empty map
 	// If there was an issue with the retrieval, returns an error
 	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *synctypes.EventFilter) (map[string][]string, types.StreamPosition, error)
-	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit. If backwardsOrdering is true, the most recent event must be first, else last.
-	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *synctypes.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
+	// If backwardsOrdering is true, the most recent event must be first, else last.
+	// Returns the filtered StreamEvents on success. Returns **unfiltered** StreamEvents and ErrNoEventsForFilter if
+	// the provided filter removed all events, this can be used to still calculate the start/end position. (e.g for `/messages`)
+	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *synctypes.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, start, end types.TopologyToken, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
 	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
@@ -90,7 +93,7 @@ type DatabaseTransaction interface {
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
-	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*rstypes.HeaderedEvent
+	StreamEventsToEvents(ctx context.Context, device *userapi.Device, in []types.StreamEvent, rsAPI api.SyncRoomserverAPI) []*rstypes.HeaderedEvent
 	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns the
 	// relevant events within the given ranges for the supplied user ID and device ID.
 	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (pos types.StreamPosition, events []types.SendToDeviceEvent, err error)
@@ -104,7 +107,7 @@ type DatabaseTransaction interface {
 	// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 	// string as the membership.
-	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
+	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error)
 	// getUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
 	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 	GetPresences(ctx context.Context, userID []string) ([]*types.PresenceInternal, error)
@@ -174,7 +177,7 @@ type Database interface {
 	// goes wrong.
 	PutFilter(ctx context.Context, localpart string, filter *synctypes.Filter) (string, error)
 	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
-	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent) error
+	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error
 	// StoreReceipt stores new receipt events
 	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error

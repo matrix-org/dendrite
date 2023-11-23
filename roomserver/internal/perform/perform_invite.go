@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
@@ -34,6 +35,7 @@ import (
 
 type QueryState struct {
 	storage.Database
+	querier api.QuerySenderIDAPI
 }
 
 func (q *QueryState) GetAuthEvents(ctx context.Context, event gomatrixserverlib.PDU) (gomatrixserverlib.AuthEventProvider, error) {
@@ -46,7 +48,7 @@ func (q *QueryState) GetState(ctx context.Context, roomID spec.RoomID, stateWant
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 	if info != nil {
-		roomState := state.NewStateResolution(q.Database, info)
+		roomState := state.NewStateResolution(q.Database, info, q.querier)
 		stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
 			ctx, info.StateSnapshotNID(), stateWanted,
 		)
@@ -97,12 +99,13 @@ func (r *Inviter) ProcessInviteMembership(
 ) ([]api.OutputEvent, error) {
 	var outputUpdates []api.OutputEvent
 	var updater *shared.MembershipUpdater
-	_, domain, err := gomatrixserverlib.SplitID('@', *inviteEvent.StateKey())
+
+	userID, err := r.RSAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), spec.SenderID(*inviteEvent.StateKey()))
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
-	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
+	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
 	outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
@@ -123,39 +126,104 @@ func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 ) error {
-	event := req.Event
-
-	sender, err := spec.NewUserID(event.Sender(), true)
+	senderID, err := r.RSAPI.QuerySenderIDForUser(ctx, req.InviteInput.RoomID, req.InviteInput.Inviter)
 	if err != nil {
-		return spec.InvalidParam("The user ID is invalid")
+		return err
+	} else if senderID == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", req.InviteInput.Inviter, req.InviteInput.RoomID)
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(sender.Domain()) {
-		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
-	}
-
-	if event.StateKey() == nil {
-		return fmt.Errorf("invite must be a state event")
-	}
-	invitedUser, err := spec.NewUserID(*event.StateKey(), true)
-	if err != nil {
-		return spec.InvalidParam("The user ID is invalid")
-	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(invitedUser.Domain())
-
-	validRoomID, err := spec.NewRoomID(event.RoomID())
+	info, err := r.DB.RoomInfo(ctx, req.InviteInput.RoomID.String())
 	if err != nil {
 		return err
 	}
 
-	input := gomatrixserverlib.PerformInviteInput{
-		RoomID:            *validRoomID,
-		InviteEvent:       event.PDU,
-		InvitedUser:       *invitedUser,
-		IsTargetLocal:     isTargetLocal,
-		StrippedState:     req.InviteRoomState,
-		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
-		StateQuerier:      &QueryState{r.DB},
+	proto := gomatrixserverlib.ProtoEvent{
+		SenderID: string(*senderID),
+		RoomID:   req.InviteInput.RoomID.String(),
+		Type:     "m.room.member",
 	}
+
+	content := gomatrixserverlib.MemberContent{
+		Membership:  spec.Invite,
+		DisplayName: req.InviteInput.DisplayName,
+		AvatarURL:   req.InviteInput.AvatarURL,
+		Reason:      req.InviteInput.Reason,
+		IsDirect:    req.InviteInput.IsDirect,
+	}
+
+	if err = proto.SetContent(content); err != nil {
+		return err
+	}
+
+	if !r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Inviter.Domain()) {
+		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
+	}
+
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Invitee.Domain())
+
+	signingKey := req.InviteInput.PrivateKey
+	if info.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		signingKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, req.InviteInput.Inviter, req.InviteInput.RoomID)
+		if err != nil {
+			return err
+		}
+	}
+
+	input := gomatrixserverlib.PerformInviteInput{
+		RoomID:            req.InviteInput.RoomID,
+		RoomVersion:       info.RoomVersion,
+		Inviter:           req.InviteInput.Inviter,
+		Invitee:           req.InviteInput.Invitee,
+		IsTargetLocal:     isTargetLocal,
+		EventTemplate:     proto,
+		StrippedState:     req.InviteRoomState,
+		KeyID:             req.InviteInput.KeyID,
+		SigningKey:        signingKey,
+		EventTime:         req.InviteInput.EventTime,
+		MembershipQuerier: &api.MembershipQuerier{Roomserver: r.RSAPI},
+		StateQuerier:      &QueryState{r.DB, r.RSAPI},
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return r.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		},
+		SenderIDQuerier: func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+			return r.RSAPI.QuerySenderIDForUser(ctx, roomID, userID)
+		},
+		SenderIDCreator: func(ctx context.Context, userID spec.UserID, roomID spec.RoomID, roomVersion string) (spec.SenderID, ed25519.PrivateKey, error) {
+			key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
+			if keyErr != nil {
+				return "", nil, keyErr
+			}
+
+			return spec.SenderIDFromPseudoIDKey(key), key, nil
+		},
+		EventQuerier: func(ctx context.Context, roomID spec.RoomID, eventsNeeded []gomatrixserverlib.StateKeyTuple) (gomatrixserverlib.LatestEvents, error) {
+			req := api.QueryLatestEventsAndStateRequest{RoomID: roomID.String(), StateToFetch: eventsNeeded}
+			res := api.QueryLatestEventsAndStateResponse{}
+			err = r.RSAPI.QueryLatestEventsAndState(ctx, &req, &res)
+			if err != nil {
+				return gomatrixserverlib.LatestEvents{}, nil
+			}
+
+			stateEvents := []gomatrixserverlib.PDU{}
+			for _, event := range res.StateEvents {
+				stateEvents = append(stateEvents, event.PDU)
+			}
+			return gomatrixserverlib.LatestEvents{
+				RoomExists:   res.RoomExists,
+				StateEvents:  stateEvents,
+				PrevEventIDs: res.LatestEvents,
+				Depth:        res.Depth,
+			}, nil
+		},
+		StoreSenderIDFromPublicID: func(ctx context.Context, senderID spec.SenderID, userIDRaw string, roomID spec.RoomID) error {
+			storeUserID, userErr := spec.NewUserID(userIDRaw, true)
+			if userErr != nil {
+				return userErr
+			}
+			return r.RSAPI.StoreUserRoomPublicKey(ctx, senderID, *storeUserID, roomID)
+		},
+	}
+
 	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
 	if err != nil {
 		switch e := err.(type) {
@@ -165,12 +233,6 @@ func (r *Inviter) PerformInvite(
 			}
 		}
 		return err
-	}
-
-	// Use the returned event if there was one (due to federation), otherwise
-	// send the original invite event to the roomserver.
-	if inviteEvent == nil {
-		inviteEvent = event
 	}
 
 	// Send the invite event to the roomserver input stream. This will
@@ -183,7 +245,7 @@ func (r *Inviter) PerformInvite(
 			{
 				Kind:         api.KindNew,
 				Event:        &types.HeaderedEvent{PDU: inviteEvent},
-				Origin:       sender.Domain(),
+				Origin:       req.InviteInput.Inviter.Domain(),
 				SendAsServer: req.SendAsServer,
 			},
 		},
@@ -191,7 +253,7 @@ func (r *Inviter) PerformInvite(
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 	if err := inputRes.Err(); err != nil {
-		util.GetLogger(ctx).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}
 	}
 

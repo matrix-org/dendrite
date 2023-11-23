@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -112,9 +113,9 @@ type QueryEventsByIDResponse struct {
 // QueryMembershipForUserRequest is a request to QueryMembership
 type QueryMembershipForUserRequest struct {
 	// ID of the room to fetch membership from
-	RoomID string `json:"room_id"`
+	RoomID string
 	// ID of the user for whom membership is requested
-	UserID string `json:"user_id"`
+	UserID spec.UserID
 }
 
 // QueryMembershipForUserResponse is a response to QueryMembership
@@ -131,6 +132,8 @@ type QueryMembershipForUserResponse struct {
 	// True if the user asked to forget this room.
 	IsRoomForgotten bool `json:"is_room_forgotten"`
 	RoomExists      bool `json:"room_exists"`
+	// The sender ID of the user in the room, if it exists
+	SenderID *spec.SenderID
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -144,7 +147,7 @@ type QueryMembershipsForRoomRequest struct {
 	// Optional - ID of the user sending the request, for checking if the
 	// user is allowed to see the memberships. If not specified then all
 	// room memberships will be returned.
-	Sender string `json:"sender"`
+	SenderID spec.SenderID `json:"sender"`
 }
 
 // QueryMembershipsForRoomResponse is a response to QueryMembershipsForRoom
@@ -173,6 +176,8 @@ type QueryServerJoinedToRoomResponse struct {
 	RoomExists bool `json:"room_exists"`
 	// True if we still believe that the server is participating in the room
 	IsInRoom bool `json:"is_in_room"`
+	// The roomversion if joined to room
+	RoomVersion gomatrixserverlib.RoomVersion
 }
 
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
@@ -286,16 +291,6 @@ type QuerySharedUsersResponse struct {
 	UserIDsToCount map[string]int
 }
 
-type QueryRoomsForUserRequest struct {
-	UserID string
-	// The desired membership of the user. If this is the empty string then no rooms are returned.
-	WantMembership string
-}
-
-type QueryRoomsForUserResponse struct {
-	RoomIDs []string
-}
-
 type QueryBulkStateContentRequest struct {
 	// Returns state events in these rooms
 	RoomIDs []string
@@ -349,26 +344,6 @@ type QueryServerBannedFromRoomRequest struct {
 
 type QueryServerBannedFromRoomResponse struct {
 	Banned bool `json:"banned"`
-}
-
-type QueryRestrictedJoinAllowedRequest struct {
-	UserID string `json:"user_id"`
-	RoomID string `json:"room_id"`
-}
-
-type QueryRestrictedJoinAllowedResponse struct {
-	// True if the room membership is restricted by the join rule being set to "restricted"
-	Restricted bool `json:"restricted"`
-	// True if our local server is joined to all of the allowed rooms specified in the "allow"
-	// key of the join rule, false if we are missing from some of them and therefore can't
-	// reliably decide whether or not we can satisfy the join
-	Resident bool `json:"resident"`
-	// True if the restricted join is allowed because we found the membership in one of the
-	// allowed rooms from the join rule, false if not
-	Allowed bool `json:"allowed"`
-	// Contains the user ID of the selected user ID that has power to issue invites, this will
-	// get populated into the "join_authorised_via_users_server" content in the membership
-	AuthorisedVia string `json:"authorised_via,omitempty"`
 }
 
 // MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
@@ -431,22 +406,6 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// QueryMembershipAtEventRequest requests the membership event for a user
-// for a list of eventIDs.
-type QueryMembershipAtEventRequest struct {
-	RoomID   string
-	EventIDs []string
-	UserID   string
-}
-
-// QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
-type QueryMembershipAtEventResponse struct {
-	// Membership is a map from eventID to membership event. Events that
-	// do not have known state will return a nil event, resulting in a "leave" membership
-	// when calculating history visibility.
-	Membership map[string]*types.HeaderedEvent `json:"membership"`
-}
-
 // QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a
 // a room with anymore. This is used to cleanup stale device list entries, where we would
 // otherwise keep on trying to get device lists.
@@ -459,21 +418,140 @@ type QueryLeftUsersResponse struct {
 	LeftUsers []string `json:"user_ids"`
 }
 
+type JoinRoomQuerier struct {
+	Roomserver RestrictedJoinAPI
+}
+
+func (rq *JoinRoomQuerier) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eventType string, stateKey string) (gomatrixserverlib.PDU, error) {
+	return rq.Roomserver.CurrentStateEvent(ctx, roomID, eventType, stateKey)
+}
+
+func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (bool, error) {
+	return rq.Roomserver.InvitePending(ctx, roomID, senderID)
+}
+
+func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
+	roomInfo, err := rq.Roomserver.QueryRoomInfo(ctx, roomID)
+	if err != nil || roomInfo == nil || roomInfo.IsStub() {
+		return nil, err
+	}
+
+	req := QueryServerJoinedToRoomRequest{
+		ServerName: localServerName,
+		RoomID:     roomID.String(),
+	}
+	res := QueryServerJoinedToRoomResponse{}
+	if err = rq.Roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
+	}
+
+	userJoinedToRoom, err := rq.Roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	locallyJoinedUsers, err := rq.Roomserver.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
+		return nil, fmt.Errorf("InternalServerError: %w", err)
+	}
+
+	return &gomatrixserverlib.RestrictedRoomJoinInfo{
+		LocalServerInRoom: res.RoomExists && res.IsInRoom,
+		UserJoinedToRoom:  userJoinedToRoom,
+		JoinedUsers:       locallyJoinedUsers,
+	}, nil
+}
+
 type MembershipQuerier struct {
 	Roomserver FederationRoomserverAPI
 }
 
-func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (string, error) {
-	req := QueryMembershipForUserRequest{
-		RoomID: roomID.String(),
-		UserID: userID.String(),
-	}
+func (mq *MembershipQuerier) CurrentMembership(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (string, error) {
 	res := QueryMembershipForUserResponse{}
-	err := mq.Roomserver.QueryMembershipForUser(ctx, &req, &res)
+	err := mq.Roomserver.QueryMembershipForSenderID(ctx, roomID, senderID, &res)
 
 	membership := ""
 	if err == nil {
 		membership = res.Membership
 	}
 	return membership, err
+}
+
+type QueryRoomHierarchyRequest struct {
+	SuggestedOnly bool `json:"suggested_only"`
+	Limit         int  `json:"limit"`
+	MaxDepth      int  `json:"max_depth"`
+	From          int  `json:"json"`
+}
+
+// A struct storing the intermediate state of a room hierarchy query for pagination purposes.
+//
+// Used for implementing space summaries / room hierarchies
+//
+// Use NewRoomHierarchyWalker to construct this, and QueryNextRoomHierarchyPage on the roomserver API
+// to traverse the room hierarchy.
+type RoomHierarchyWalker struct {
+	RootRoomID    spec.RoomID
+	Caller        types.DeviceOrServerName
+	SuggestedOnly bool
+	MaxDepth      int
+	Processed     RoomSet
+	Unvisited     []RoomHierarchyWalkerQueuedRoom
+}
+
+type RoomHierarchyWalkerQueuedRoom struct {
+	RoomID       spec.RoomID
+	ParentRoomID *spec.RoomID
+	Depth        int
+	Vias         []string // vias to query this room by
+}
+
+// Create a new room hierarchy walker, starting from the provided root room ID.
+//
+// Use the resulting struct with QueryNextRoomHierarchyPage on the roomserver API to traverse the room hierarchy.
+func NewRoomHierarchyWalker(caller types.DeviceOrServerName, roomID spec.RoomID, suggestedOnly bool, maxDepth int) RoomHierarchyWalker {
+	walker := RoomHierarchyWalker{
+		RootRoomID:    roomID,
+		Caller:        caller,
+		SuggestedOnly: suggestedOnly,
+		MaxDepth:      maxDepth,
+		Unvisited: []RoomHierarchyWalkerQueuedRoom{{
+			RoomID:       roomID,
+			ParentRoomID: nil,
+			Depth:        0,
+		}},
+		Processed: NewRoomSet(),
+	}
+
+	return walker
+}
+
+// A set of room IDs.
+type RoomSet map[spec.RoomID]struct{}
+
+// Create a new empty room set.
+func NewRoomSet() RoomSet {
+	return RoomSet{}
+}
+
+// Check if a room ID is in a room set.
+func (s RoomSet) Contains(val spec.RoomID) bool {
+	_, ok := s[val]
+	return ok
+}
+
+// Add a room ID to a room set.
+func (s RoomSet) Add(val spec.RoomID) {
+	s[val] = struct{}{}
+}
+
+func (s RoomSet) Copy() RoomSet {
+	copied := make(RoomSet, len(s))
+	for k := range s {
+		copied.Add(k)
+	}
+	return copied
 }

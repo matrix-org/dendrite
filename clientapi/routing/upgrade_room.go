@@ -59,7 +59,15 @@ func UpgradeRoom(
 		}
 	}
 
-	newRoomID, err := rsAPI.PerformRoomUpgrade(req.Context(), roomID, device.UserID, gomatrixserverlib.RoomVersion(r.NewVersion))
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("device UserID is invalid")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	newRoomID, err := rsAPI.PerformRoomUpgrade(req.Context(), roomID, *userID, gomatrixserverlib.RoomVersion(r.NewVersion))
 	switch e := err.(type) {
 	case nil:
 	case roomserverAPI.ErrNotAllowed:

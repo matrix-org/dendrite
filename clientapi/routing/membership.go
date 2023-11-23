@@ -22,10 +22,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -36,6 +32,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"
 )
@@ -57,7 +56,29 @@ func SendBan(
 		}
 	}
 
-	errRes := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to ban this user, bad userID"),
+		}
+	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
+	if err != nil || senderID == nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to ban this user, unknown senderID"),
+		}
+	}
+
+	errRes := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if errRes != nil {
 		return *errRes
 	}
@@ -66,7 +87,7 @@ func SendBan(
 	if errRes != nil {
 		return *errRes
 	}
-	allowedToBan := pl.UserLevel(device.UserID) >= pl.Ban
+	allowedToBan := pl.UserLevel(*senderID) >= pl.Ban
 	if !allowedToBan {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -133,16 +154,46 @@ func SendKick(
 		}
 	}
 
-	errRes := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
+		}
+	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("RoomID is invalid"),
+		}
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(req.Context(), *validRoomID, *deviceUserID)
+	if err != nil || senderID == nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, unknown senderID"),
+		}
+	}
+
+	errRes := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if errRes != nil {
 		return *errRes
+	}
+
+	bodyUserID, err := spec.NewUserID(body.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("body userID is invalid"),
+		}
 	}
 
 	pl, errRes := getPowerlevels(req, rsAPI, roomID)
 	if errRes != nil {
 		return *errRes
 	}
-	allowedToKick := pl.UserLevel(device.UserID) >= pl.Kick
+	allowedToKick := pl.UserLevel(*senderID) >= pl.Kick || bodyUserID.String() == deviceUserID.String()
 	if !allowedToKick {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -151,9 +202,9 @@ func SendKick(
 	}
 
 	var queryRes roomserverAPI.QueryMembershipForUserResponse
-	err := rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		UserID: body.UserID,
+		UserID: *bodyUserID,
 	}, &queryRes)
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -185,15 +236,30 @@ func SendUnban(
 		}
 	}
 
-	errRes := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
+		}
+	}
+
+	errRes := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if errRes != nil {
 		return *errRes
 	}
 
+	bodyUserID, err := spec.NewUserID(body.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("body userID is invalid"),
+		}
+	}
 	var queryRes roomserverAPI.QueryMembershipForUserResponse
-	err := rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+	err = rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		UserID: body.UserID,
+		UserID: *bodyUserID,
 	}, &queryRes)
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -244,7 +310,15 @@ func SendInvite(
 		}
 	}
 
-	errRes := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
+		}
+	}
+
+	errRes := checkMemberInRoom(req.Context(), rsAPI, *deviceUserID, roomID)
 	if errRes != nil {
 		return *errRes
 	}
@@ -264,22 +338,55 @@ func sendInvite(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI, evTime time.Time,
 ) (util.JSONResponse, error) {
-	event, err := buildMembershipEvent(
-		ctx, userID, reason, profileAPI, device, spec.Invite,
-		roomID, false, cfg, evTime, rsAPI, asAPI,
-	)
+	validRoomID, err := spec.NewRoomID(roomID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("RoomID is invalid"),
+		}, err
+	}
+	inviter, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}, err
 	}
-
+	invitee, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("UserID is invalid"),
+		}, err
+	}
+	profile, err := loadProfile(ctx, userID, cfg, profileAPI, asAPI)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
+	}
+	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}, err
+	}
 	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
-		Event:           event,
+		InviteInput: roomserverAPI.InviteInput{
+			RoomID:      *validRoomID,
+			Inviter:     *inviter,
+			Invitee:     *invitee,
+			DisplayName: profile.DisplayName,
+			AvatarURL:   profile.AvatarURL,
+			Reason:      reason,
+			IsDirect:    false,
+			KeyID:       identity.KeyID,
+			PrivateKey:  identity.PrivateKey,
+			EventTime:   evTime,
+		},
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
-		RoomVersion:     event.Version(),
 		SendAsServer:    string(device.UserDomain()),
 	})
 
@@ -312,17 +419,18 @@ func sendInvite(
 
 func buildMembershipEventDirect(
 	ctx context.Context,
-	targetUserID, reason string, userDisplayName, userAvatarURL string,
-	sender string, senderDomain spec.ServerName,
+	targetSenderID spec.SenderID, reason string, userDisplayName, userAvatarURL string,
+	sender spec.SenderID, senderDomain spec.ServerName,
 	membership, roomID string, isDirect bool,
 	keyID gomatrixserverlib.KeyID, privateKey ed25519.PrivateKey, evTime time.Time,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) (*types.HeaderedEvent, error) {
+	targetSenderString := string(targetSenderID)
 	proto := gomatrixserverlib.ProtoEvent{
-		Sender:   sender,
+		SenderID: string(sender),
 		RoomID:   roomID,
 		Type:     "m.room.member",
-		StateKey: &targetUserID,
+		StateKey: &targetSenderString,
 	}
 
 	content := gomatrixserverlib.MemberContent{
@@ -358,13 +466,39 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return nil, err
+	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return nil, err
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
+	if err != nil {
+		return nil, err
+	} else if senderID == nil {
+		return nil, fmt.Errorf("no sender ID for %s in %s", *userID, *validRoomID)
+	}
+
+	targetID, err := spec.NewUserID(targetUserID, true)
+	if err != nil {
+		return nil, err
+	}
+	targetSenderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *targetID)
+	if err != nil {
+		return nil, err
+	} else if targetSenderID == nil {
+		return nil, fmt.Errorf("no sender ID for %s in %s", *targetID, *validRoomID)
+	}
+
+	identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *userID)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildMembershipEventDirect(ctx, targetUserID, reason, profile.DisplayName, profile.AvatarURL,
-		device.UserID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
+	return buildMembershipEventDirect(ctx, *targetSenderID, reason, profile.DisplayName, profile.AvatarURL,
+		*senderID, device.UserDomain(), membership, roomID, isDirect, identity.KeyID, identity.PrivateKey, evTime, rsAPI)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -462,7 +596,7 @@ func checkAndProcessThreepid(
 	return
 }
 
-func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserverAPI, userID, roomID string) *util.JSONResponse {
+func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserverAPI, userID spec.UserID, roomID string) *util.JSONResponse {
 	var membershipRes roomserverAPI.QueryMembershipForUserResponse
 	err := rsAPI.QueryMembershipForUser(ctx, &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
@@ -490,12 +624,21 @@ func SendForget(
 ) util.JSONResponse {
 	ctx := req.Context()
 	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
+
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("You don't have permission to kick this user, bad userID"),
+		}
+	}
+
 	var membershipRes roomserverAPI.QueryMembershipForUserResponse
 	membershipReq := roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		UserID: device.UserID,
+		UserID: *deviceUserID,
 	}
-	err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes)
+	err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes)
 	if err != nil {
 		logger.WithError(err).Error("QueryMembershipForUser: could not query membership for user")
 		return util.JSONResponse{

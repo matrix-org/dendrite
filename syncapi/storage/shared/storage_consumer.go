@@ -99,7 +99,41 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*rstypes.He
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return d.StreamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(ctx, nil, streamEvents, nil), nil
+}
+
+func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Device, in []types.StreamEvent, rsAPI api.SyncRoomserverAPI) []*rstypes.HeaderedEvent {
+	out := make([]*rstypes.HeaderedEvent, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i].HeaderedEvent
+		if device != nil && in[i].TransactionID != nil {
+			userID, err := spec.NewUserID(device.UserID, true)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, in[i].RoomID(), *userID)
+			if err != nil || deviceSenderID == nil {
+				logrus.WithFields(logrus.Fields{
+					"event_id": out[i].EventID(),
+				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				continue
+			}
+			if *deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
+				err := out[i].SetUnsignedField(
+					"transaction_id", in[i].TransactionID.TransactionID,
+				)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"event_id": out[i].EventID(),
+					}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}
+			}
+		}
+	}
+	return out
 }
 
 // AddInviteEvent stores a new invite event for a user.
@@ -190,32 +224,12 @@ func (d *Database) UpsertAccountData(
 	return
 }
 
-func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*rstypes.HeaderedEvent {
-	out := make([]*rstypes.HeaderedEvent, len(in))
-	for i := 0; i < len(in); i++ {
-		out[i] = in[i].HeaderedEvent
-		if device != nil && in[i].TransactionID != nil {
-			if device.UserID == in[i].Sender() && device.SessionID == in[i].TransactionID.SessionID {
-				err := out[i].SetUnsignedField(
-					"transaction_id", in[i].TransactionID.TransactionID,
-				)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						"event_id": out[i].EventID(),
-					}).WithError(err).Warnf("Failed to add transaction ID to event")
-				}
-			}
-		}
-	}
-	return out
-}
-
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 // This function should always be called within a sqlutil.Writer for safety in SQLite.
 func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *rstypes.HeaderedEvent) error {
-	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
+	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID().String(), ev.EventID()); err != nil {
 		return err
 	}
 
@@ -236,7 +250,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.BackwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
+			if err = d.BackwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID().String(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -343,7 +357,7 @@ func (d *Database) PutFilter(
 	return filterID, err
 }
 
-func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent) error {
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *rstypes.HeaderedEvent, querier api.QuerySenderIDAPI) error {
 	redactedEvents, err := d.Events(ctx, []string{redactedEventID})
 	if err != nil {
 		return err
@@ -354,7 +368,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 	eventToRedact := redactedEvents[0].PDU
 	redactionEvent := redactedBecause.PDU
-	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
+	if err = eventutil.RedactEvent(ctx, redactionEvent, eventToRedact, querier); err != nil {
 		return err
 	}
 
@@ -405,7 +419,7 @@ func (d *Database) fetchStateEvents(
 		}
 		// we know we got them all otherwise an error would've been returned, so just loop the events
 		for _, ev := range evs {
-			roomID := ev.RoomID()
+			roomID := ev.RoomID().String()
 			stateBetween[roomID] = append(stateBetween[roomID], ev)
 		}
 	}
@@ -493,8 +507,20 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev gomatrixserverlib.PDU, userID string) (string, string) {
-	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
+func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userID string, rsAPI api.SyncRoomserverAPI) (string, string) {
+	if ev.StateKey() == nil || *ev.StateKey() == "" {
+		return "", ""
+	}
+	fullUser, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return "", ""
+	}
+	senderID, err := rsAPI.QuerySenderIDForUser(ctx, ev.RoomID(), *fullUser)
+	if err != nil || senderID == nil {
+		return "", ""
+	}
+
+	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(string(*senderID)) {
 		return "", ""
 	}
 	membership, err := ev.Membership()
@@ -557,7 +583,7 @@ func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types
 	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
 }
 
-func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
+func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
 
@@ -589,7 +615,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 	default:
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 			return d.Relations.InsertRelation(
-				ctx, txn, event.RoomID(), content.Relations.EventID,
+				ctx, txn, event.RoomID().String(), content.Relations.EventID,
 				event.EventID(), event.Type(), content.Relations.RelationType,
 			)
 		})

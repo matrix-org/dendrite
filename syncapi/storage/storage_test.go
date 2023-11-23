@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	rstypes "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -19,6 +20,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 )
 
 var ctx = context.Background()
@@ -41,6 +43,7 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.Header
 		var addStateEventIDs []string
 		var removeStateEventIDs []string
 		if ev.StateKey() != nil {
+			ev.StateKeyResolved = ev.StateKey()
 			addStateEvents = append(addStateEvents, ev)
 			addStateEventIDs = append(addStateEventIDs, ev.EventID())
 		}
@@ -210,12 +213,48 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 
 			// backpaginate 5 messages starting at the latest position.
 			filter := &synctypes.RoomEventFilter{Limit: 5}
-			paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
+			paginatedEvents, start, end, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 			if err != nil {
 				t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 			}
-			gots := snapshot.StreamEventsToEvents(nil, paginatedEvents)
+			gots := snapshot.StreamEventsToEvents(context.Background(), nil, paginatedEvents, nil)
 			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
+			assert.Equal(t, types.TopologyToken{Depth: 15, PDUPosition: 15}, start)
+			assert.Equal(t, types.TopologyToken{Depth: 11, PDUPosition: 11}, end)
+		})
+	})
+}
+
+// The purpose of this test is to ensure that backfilling returns no start/end if a given filter removes
+// all events.
+func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := MustCreateDatabase(t, dbType)
+		defer close()
+		alice := test.NewUser(t)
+		r := test.NewRoom(t, alice)
+		for i := 0; i < 10; i++ {
+			r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("hi %d", i)})
+		}
+		events := r.Events()
+		_ = MustWriteEvents(t, db, events)
+
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
+			t.Logf("max topo pos = %+v", from)
+			// head towards the beginning of time
+			to := types.TopologyToken{}
+
+			// backpaginate 20 messages starting at the latest position.
+			notTypes := []string{spec.MRoomRedaction}
+			senders := []string{alice.ID}
+			filter := &synctypes.RoomEventFilter{Limit: 20, NotTypes: &notTypes, Senders: &senders}
+			paginatedEvents, start, end, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
+			assert.NoError(t, err)
+			assert.Equal(t, 0, len(paginatedEvents))
+			// Even if we didn't get anything back due to the filter, we should still have start/end
+			assert.Equal(t, types.TopologyToken{Depth: 15, PDUPosition: 15}, start)
+			assert.Equal(t, types.TopologyToken{Depth: 1, PDUPosition: 1}, end)
 		})
 	})
 }
@@ -975,6 +1014,55 @@ func TestRecentEvents(t *testing.T) {
 			assert.Equal(t, true, recentEvents.Limited, "expected events to be limited")
 			assert.Equal(t, 1, len(recentEvents.Events), "unexpected recent events for room")
 			assert.Equal(t, origEvents[len(origEvents)-1].EventID(), recentEvents.Events[0].EventID())
+		}
+	})
+}
+
+type FakeQuerier struct {
+	api.QuerySenderIDAPI
+}
+
+func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return spec.NewUserID(string(senderID), true)
+}
+
+func TestRedaction(t *testing.T) {
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
+	redactionEvent := room.CreateEvent(t, alice, spec.MRoomRedaction, map[string]string{"redacts": redactedEvent.EventID()})
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := MustCreateDatabase(t, dbType)
+		t.Cleanup(close)
+		MustWriteEvents(t, db, room.Events())
+
+		err := db.RedactEvent(context.Background(), redactedEvent.EventID(), redactionEvent, &FakeQuerier{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		evs, err := db.Events(context.Background(), []string{redactedEvent.EventID()})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(evs) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(evs))
+		}
+
+		// check a few fields which shouldn't be there in unsigned
+		authEvs := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.auth_events")
+		if authEvs.Exists() {
+			t.Error("unexpected auth_events in redacted event")
+		}
+		prevEvs := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.prev_events")
+		if prevEvs.Exists() {
+			t.Error("unexpected auth_events in redacted event")
+		}
+		depth := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.depth")
+		if depth.Exists() {
+			t.Error("unexpected auth_events in redacted event")
 		}
 	})
 }

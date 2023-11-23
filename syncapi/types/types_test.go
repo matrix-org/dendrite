@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -8,7 +9,23 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
+
+type FakeRoomserverAPI struct{}
+
+func (f *FakeRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if senderID == "" {
+		return nil, nil
+	}
+
+	return spec.NewUserID(string(senderID), true)
+}
+
+func (f *FakeRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+	sender := spec.SenderID(userID.String())
+	return &sender, nil
+}
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
@@ -56,14 +73,18 @@ func TestNewInviteResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := NewInviteResponse(&types.HeaderedEvent{PDU: ev})
+	rsAPI := FakeRoomserverAPI{}
+	res, err := NewInviteResponse(context.Background(), &rsAPI, &types.HeaderedEvent{PDU: ev}, synctypes.FormatSync)
+	if err != nil {
+		t.Fatal(err)
+	}
 	j, err := json.Marshal(res)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if string(j) != expected {
-		t.Fatalf("Invite response didn't contain correct info")
+		t.Fatalf("Invite response didn't contain correct info, \nexpected: %s \ngot: %s", expected, string(j))
 	}
 }
 

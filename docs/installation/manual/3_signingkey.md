@@ -2,7 +2,7 @@
 title: Generating signing keys
 parent: Manual
 grand_parent: Installation
-nav_order: 4
+nav_order: 3
 permalink: /installation/manual/signingkeys
 ---
 

@@ -95,7 +95,7 @@ func Backfill(
 		}
 	}
 
-	// Query the roomserver.
+	// Query the Roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
 		return util.JSONResponse{
@@ -109,7 +109,7 @@ func Backfill(
 
 	var ev *types.HeaderedEvent
 	for _, ev = range res.Events {
-		if ev.RoomID() == roomID {
+		if ev.RoomID().String() == roomID {
 			evs = append(evs, ev.PDU)
 		}
 	}

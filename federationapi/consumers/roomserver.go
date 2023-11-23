@@ -16,7 +16,9 @@ package consumers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -174,7 +176,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	// Finally, work out if there are any more events missing.
 	if len(missingEventIDs) > 0 {
 		eventsReq := &api.QueryEventsByIDRequest{
-			RoomID:   ore.Event.RoomID(),
+			RoomID:   ore.Event.RoomID().String(),
 			EventIDs: missingEventIDs,
 		}
 		eventsRes := &api.QueryEventsByIDResponse{}
@@ -192,7 +194,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 		evs[i] = addsStateEvents[i].PDU
 	}
 
-	addsJoinedHosts, err := JoinedHostsFromEvents(evs)
+	addsJoinedHosts, err := JoinedHostsFromEvents(s.ctx, evs, s.rsAPI)
 	if err != nil {
 		return err
 	}
@@ -203,7 +205,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	// talking to the roomserver
 	oldJoinedHosts, err := s.db.UpdateRoom(
 		s.ctx,
-		ore.Event.RoomID(),
+		ore.Event.RoomID().String(),
 		addsJoinedHosts,
 		ore.RemovesStateEventIDs,
 		rewritesState, // if we're re-writing state, nuke all joined hosts before adding
@@ -216,7 +218,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	if s.cfg.Matrix.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == spec.MRoomMember && ore.Event.StateKey() != nil {
 		membership, _ := ore.Event.Membership()
 		if membership == spec.Join {
-			s.sendPresence(ore.Event.RoomID(), addsJoinedHosts)
+			s.sendPresence(ore.Event.RoomID().String(), addsJoinedHosts)
 		}
 	}
 
@@ -345,7 +347,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		return nil, err
 	}
 
-	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(combinedAddsEvents)
+	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(s.ctx, combinedAddsEvents, s.rsAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +376,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	}
 
 	// handle peeking hosts
-	inboundPeeks, err := s.db.GetInboundPeeks(s.ctx, ore.Event.PDU.RoomID())
+	inboundPeeks, err := s.db.GetInboundPeeks(s.ctx, ore.Event.PDU.RoomID().String())
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +396,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 // JoinedHostsFromEvents turns a list of state events into a list of joined hosts.
 // This errors if one of the events was invalid.
 // It should be impossible for an invalid event to get this far in the pipeline.
-func JoinedHostsFromEvents(evs []gomatrixserverlib.PDU) ([]types.JoinedHost, error) {
+func JoinedHostsFromEvents(ctx context.Context, evs []gomatrixserverlib.PDU, rsAPI api.FederationRoomserverAPI) ([]types.JoinedHost, error) {
 	var joinedHosts []types.JoinedHost
 	for _, ev := range evs {
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {
@@ -407,12 +409,26 @@ func JoinedHostsFromEvents(evs []gomatrixserverlib.PDU) ([]types.JoinedHost, err
 		if membership != spec.Join {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
+		var domain spec.ServerName
+		userID, err := rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
 		if err != nil {
-			return nil, err
+			if errors.As(err, new(base64.CorruptInputError)) {
+				// Fallback to using the "old" way of getting the user domain, avoids
+				// "illegal base64 data at input byte 0" errors
+				// FIXME: we should do this in QueryUserIDForSender instead
+				_, domain, err = gomatrixserverlib.SplitID('@', *ev.StateKey())
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
+		} else {
+			domain = userID.Domain()
 		}
+
 		joinedHosts = append(joinedHosts, types.JoinedHost{
-			MemberEventID: ev.EventID(), ServerName: serverName,
+			MemberEventID: ev.EventID(), ServerName: domain,
 		})
 	}
 	return joinedHosts, nil
@@ -490,7 +506,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	// At this point the missing events are neither the event itself nor are
 	// they present in our local database. Our only option is to fetch them
 	// from the roomserver using the query API.
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing, RoomID: event.RoomID()}
+	eventReq := api.QueryEventsByIDRequest{EventIDs: missing, RoomID: event.RoomID().String()}
 	var eventResp api.QueryEventsByIDResponse
 	if err := s.rsAPI.QueryEventsByID(s.ctx, &eventReq, &eventResp); err != nil {
 		return nil, err

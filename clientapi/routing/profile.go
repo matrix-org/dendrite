@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -104,12 +105,6 @@ func SetAvatarURL(
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
-	if r.AvatarURL == "" {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("'avatar_url' must be supplied."),
-		}
-	}
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -151,7 +146,7 @@ func SetAvatarURL(
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, evTime)
 	if err != nil {
 		return response
 	}
@@ -199,12 +194,6 @@ func SetDisplayName(
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
-	if r.DisplayName == "" {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("'displayname' must be supplied."),
-		}
-	}
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -246,7 +235,7 @@ func SetDisplayName(
 		}
 	}
 
-	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, cfg, evTime)
+	response, err := updateProfile(req.Context(), rsAPI, device, profile, userID, evTime)
 	if err != nil {
 		return response
 	}
@@ -260,19 +249,28 @@ func SetDisplayName(
 func updateProfile(
 	ctx context.Context, rsAPI api.ClientRoomserverAPI, device *userapi.Device,
 	profile *authtypes.Profile,
-	userID string, cfg *config.ClientAPI, evTime time.Time,
+	userID string, evTime time.Time,
 ) (util.JSONResponse, error) {
-	var res api.QueryRoomsForUserResponse
-	err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         device.UserID,
-		WantMembership: "join",
-	}, &res)
+	deviceUserID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}, err
+	}
+
+	rooms, err := rsAPI.QueryRoomsForUser(ctx, *deviceUserID, "join")
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}, err
+	}
+
+	roomIDStrs := make([]string, len(rooms))
+	for i, room := range rooms {
+		roomIDStrs[i] = room.String()
 	}
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
@@ -285,7 +283,7 @@ func updateProfile(
 	}
 
 	events, err := buildMembershipEvents(
-		ctx, device, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
+		ctx, roomIDStrs, *profile, userID, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -302,7 +300,7 @@ func updateProfile(
 		}, e
 	}
 
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, true); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -356,19 +354,33 @@ func getProfile(
 
 func buildMembershipEvents(
 	ctx context.Context,
-	device *userapi.Device,
 	roomIDs []string,
-	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
+	newProfile authtypes.Profile, userID string,
 	evTime time.Time, rsAPI api.ClientRoomserverAPI,
 ) ([]*types.HeaderedEvent, error) {
 	evs := []*types.HeaderedEvent{}
 
+	fullUserID, err := spec.NewUserID(userID, true)
+	if err != nil {
+		return nil, err
+	}
 	for _, roomID := range roomIDs {
+		validRoomID, err := spec.NewRoomID(roomID)
+		if err != nil {
+			return nil, err
+		}
+		senderID, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *fullUserID)
+		if err != nil {
+			return nil, err
+		} else if senderID == nil {
+			return nil, fmt.Errorf("sender ID not found for %s in %s", *fullUserID, *validRoomID)
+		}
+		senderIDString := string(*senderID)
 		proto := gomatrixserverlib.ProtoEvent{
-			Sender:   userID,
+			SenderID: senderIDString,
 			RoomID:   roomID,
 			Type:     "m.room.member",
-			StateKey: &userID,
+			StateKey: &senderIDString,
 		}
 
 		content := gomatrixserverlib.MemberContent{
@@ -378,16 +390,21 @@ func buildMembershipEvents(
 		content.DisplayName = newProfile.DisplayName
 		content.AvatarURL = newProfile.AvatarURL
 
-		if err := proto.SetContent(content); err != nil {
+		if err = proto.SetContent(content); err != nil {
 			return nil, err
 		}
 
-		identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+		user, err := spec.NewUserID(userID, true)
 		if err != nil {
 			return nil, err
 		}
 
-		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, identity, evTime, rsAPI, nil)
+		identity, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *user)
+		if err != nil {
+			return nil, err
+		}
+
+		event, err := eventutil.QueryAndBuildEvent(ctx, &proto, &identity, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

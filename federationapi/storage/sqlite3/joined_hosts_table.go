@@ -216,5 +216,5 @@ func joinedHostsFromStmt(
 		})
 	}
 
-	return result, nil
+	return result, rows.Err()
 }

@@ -44,6 +44,19 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
+type WellKnownClientHomeserver struct {
+	BaseUrl string `json:"base_url"`
+}
+
+type WellKnownSlidingSyncProxy struct {
+	Url string `json:"url"`
+}
+
+type WellKnownClientResponse struct {
+	Homeserver       WellKnownClientHomeserver  `json:"m.homeserver"`
+	SlidingSyncProxy *WellKnownSlidingSyncProxy `json:"org.matrix.msc3575.proxy,omitempty"`
+}
+
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 //
@@ -96,20 +109,22 @@ func Setup(
 
 	if cfg.Matrix.WellKnownClientName != "" {
 		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
+		if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
+		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
+			response := WellKnownClientResponse{
+				Homeserver: WellKnownClientHomeserver{cfg.Matrix.WellKnownClientName},
+			}
+			if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+				response.SlidingSyncProxy = &WellKnownSlidingSyncProxy{
+					Url: cfg.Matrix.WellKnownSlidingSyncProxy,
+				}
+			}
+
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: struct {
-					HomeserverName struct {
-						BaseUrl string `json:"base_url"`
-					} `json:"m.homeserver"`
-				}{
-					HomeserverName: struct {
-						BaseUrl string `json:"base_url"`
-					}{
-						BaseUrl: cfg.Matrix.WellKnownClientName,
-					},
-				},
+				JSON: response,
 			}
 		})).Methods(http.MethodGet, http.MethodOptions)
 	}
@@ -162,6 +177,36 @@ func Setup(
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
+	dendriteAdminRouter.Handle("/admin/registrationTokens/new",
+		httputil.MakeAdminAPI("admin_registration_tokens_new", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminCreateNewRegistrationToken(req, cfg, userAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/registrationTokens",
+		httputil.MakeAdminAPI("admin_list_registration_tokens", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminListRegistrationTokens(req, cfg, userAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/registrationTokens/{token}",
+		httputil.MakeAdminAPI("admin_get_registration_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			switch req.Method {
+			case http.MethodGet:
+				return AdminGetRegistrationToken(req, cfg, userAPI)
+			case http.MethodPut:
+				return AdminUpdateRegistrationToken(req, cfg, userAPI)
+			case http.MethodDelete:
+				return AdminDeleteRegistrationToken(req, cfg, userAPI)
+			default:
+				return util.MatrixErrorResponse(
+					404,
+					string(spec.ErrorNotFound),
+					"unknown method",
+				)
+			}
+		}),
+	).Methods(http.MethodGet, http.MethodPut, http.MethodDelete, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
 		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -257,6 +302,8 @@ func Setup(
 	// using ?: so the final regexp becomes what is below. We also need a trailing slash to stop 'v33333' matching.
 	// Note that 'apiversion' is chosen because it must not collide with a variable used in any of the routing!
 	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
+
+	v1mux := publicAPIMux.PathPrefix("/v1/").Subrouter()
 
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
@@ -474,6 +521,19 @@ func Setup(
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPut, http.MethodOptions)
+
+	// Defined outside of handler to persist between calls
+	// TODO: clear based on some criteria
+	roomHierarchyPaginationCache := NewRoomHierarchyPaginationCache()
+	v1mux.Handle("/rooms/{roomID}/hierarchy",
+		httputil.MakeAuthAPI("spaces", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return QueryRoomHierarchy(req, device, vars["roomID"], rsAPI, &roomHierarchyPaginationCache)
+		}, httputil.WithAllowGuests()),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		if r := rateLimits.Limit(req, nil); r != nil {
@@ -1211,7 +1271,7 @@ func Setup(
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
-			return GetCapabilities()
+			return GetCapabilities(rsAPI)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 

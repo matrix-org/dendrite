@@ -10,6 +10,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -17,6 +18,7 @@ import (
 
 type InviteStreamProvider struct {
 	DefaultStreamProvider
+	rsAPI api.SyncRoomserverAPI
 }
 
 func (p *InviteStreamProvider) Setup(
@@ -61,12 +63,27 @@ func (p *InviteStreamProvider) IncrementalSync(
 		return from
 	}
 
+	eventFormat := synctypes.FormatSync
+	if req.Filter.EventFormat == synctypes.EventFormatFederation {
+		eventFormat = synctypes.FormatSyncFederation
+	}
+
 	for roomID, inviteEvent := range invites {
+		user := spec.UserID{}
+		sender, err := p.rsAPI.QueryUserIDForSender(ctx, inviteEvent.RoomID(), inviteEvent.SenderID())
+		if err == nil && sender != nil {
+			user = *sender
+		}
+
 		// skip ignored user events
-		if _, ok := req.IgnoredUsers.List[inviteEvent.Sender()]; ok {
+		if _, ok := req.IgnoredUsers.List[user.String()]; ok {
 			continue
 		}
-		ir := types.NewInviteResponse(inviteEvent)
+		ir, err := types.NewInviteResponse(ctx, p.rsAPI, inviteEvent, eventFormat)
+		if err != nil {
+			req.Log.WithError(err).Error("failed creating invite response")
+			continue
+		}
 		req.Response.Rooms.Invite[roomID] = ir
 	}
 

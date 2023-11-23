@@ -28,7 +28,7 @@ import (
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(ctx context.Context, conMan sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
+func NewSyncServerDatasource(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(ctx, conMan, dbProperties)

@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -36,6 +37,7 @@ func CheckForSoftFail(
 	roomInfo *types.RoomInfo,
 	event *types.HeaderedEvent,
 	stateEventIDs []string,
+	querier api.QuerySenderIDAPI,
 ) (bool, error) {
 	rewritesState := len(stateEventIDs) > 1
 
@@ -49,7 +51,7 @@ func CheckForSoftFail(
 	} else {
 		// Then get the state entries for the current state snapshot.
 		// We'll use this to check if the event is allowed right now.
-		roomState := state.NewStateResolution(db, roomInfo)
+		roomState := state.NewStateResolution(db, roomInfo, querier)
 		authStateEntries, err = roomState.LoadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 		if err != nil {
 			return true, fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
@@ -76,7 +78,9 @@ func CheckForSoftFail(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return querier.QueryUserIDForSender(ctx, roomID, senderID)
+	}); err != nil {
 		// return true, nil
 		return true, err
 	}
@@ -137,8 +141,8 @@ func (ae *authEvents) JoinRules() (gomatrixserverlib.PDU, error) {
 }
 
 // Memmber implements gomatrixserverlib.AuthEventProvider
-func (ae *authEvents) Member(stateKey string) (gomatrixserverlib.PDU, error) {
-	return ae.lookupEvent(types.MRoomMemberNID, stateKey), nil
+func (ae *authEvents) Member(stateKey spec.SenderID) (gomatrixserverlib.PDU, error) {
+	return ae.lookupEvent(types.MRoomMemberNID, string(stateKey)), nil
 }
 
 // ThirdPartyInvite implements gomatrixserverlib.AuthEventProvider
@@ -214,9 +218,9 @@ func loadAuthEvents(
 	roomID := ""
 	for _, ev := range result.events {
 		if roomID == "" {
-			roomID = ev.RoomID()
+			roomID = ev.RoomID().String()
 		}
-		if ev.RoomID() != roomID {
+		if ev.RoomID().String() != roomID {
 			result.valid = false
 			break
 		}

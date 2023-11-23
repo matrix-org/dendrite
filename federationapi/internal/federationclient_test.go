@@ -65,7 +65,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -96,7 +96,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -126,7 +126,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -156,7 +156,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -187,7 +187,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{

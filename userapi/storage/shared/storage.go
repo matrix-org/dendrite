@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"golang.org/x/crypto/bcrypt"
 
+	clientapi "github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -43,6 +44,7 @@ import (
 type Database struct {
 	DB                    *sql.DB
 	Writer                sqlutil.Writer
+	RegistrationTokens    tables.RegistrationTokensTable
 	Accounts              tables.AccountsTable
 	Profiles              tables.ProfileTable
 	AccountDatas          tables.AccountDataTable
@@ -77,6 +79,42 @@ const (
 	deviceIDByteLength   = 6
 	loginTokenByteLength = 32
 )
+
+func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (bool, error) {
+	return d.RegistrationTokens.RegistrationTokenExists(ctx, nil, token)
+}
+
+func (d *Database) InsertRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (created bool, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		created, err = d.RegistrationTokens.InsertRegistrationToken(ctx, txn, registrationToken)
+		return err
+	})
+	return
+}
+
+func (d *Database) ListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]clientapi.RegistrationToken, error) {
+	return d.RegistrationTokens.ListRegistrationTokens(ctx, nil, returnAll, valid)
+}
+
+func (d *Database) GetRegistrationToken(ctx context.Context, tokenString string) (*clientapi.RegistrationToken, error) {
+	return d.RegistrationTokens.GetRegistrationToken(ctx, nil, tokenString)
+}
+
+func (d *Database) DeleteRegistrationToken(ctx context.Context, tokenString string) (err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		err = d.RegistrationTokens.DeleteRegistrationToken(ctx, nil, tokenString)
+		return err
+	})
+	return
+}
+
+func (d *Database) UpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (updatedToken *clientapi.RegistrationToken, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		updatedToken, err = d.RegistrationTokens.UpdateRegistrationToken(ctx, txn, tokenString, newAttributes)
+		return err
+	})
+	return
+}
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
@@ -644,7 +682,7 @@ func (d *Database) CreateDevice(
 		for i := 1; i <= 5; i++ {
 			newDeviceID, returnErr = generateDeviceID()
 			if returnErr != nil {
-				return
+				return nil, returnErr
 			}
 
 			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -653,7 +691,7 @@ func (d *Database) CreateDevice(
 				return err
 			})
 			if returnErr == nil {
-				return
+				return dev, nil
 			}
 		}
 	}

@@ -81,8 +81,9 @@ type Inputer struct {
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
 	ServerName          spec.ServerName
-	SigningIdentity     *fclient.SigningIdentity
+	SigningIdentity     func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
 	FSAPI               fedapi.RoomserverFederationAPI
+	RSAPI               api.RoomserverInternalAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
 	InputRoomEventTopic string
@@ -91,7 +92,7 @@ type Inputer struct {
 
 	Queryer       *query.Queryer
 	UserAPI       userapi.RoomserverUserAPI
-	enableMetrics bool
+	EnableMetrics bool
 }
 
 // If a room consumer is inactive for a while then we will allow NATS
@@ -178,7 +179,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
 func (r *Inputer) Start() error {
-	if r.enableMetrics {
+	if r.EnableMetrics {
 		prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
 	}
 	_, err := r.JetStream.Subscribe(
@@ -357,7 +358,7 @@ func (r *Inputer) queueInputRoomEvents(
 	// For each event, marshal the input room event and then
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
-		roomID := e.Event.RoomID()
+		roomID := e.Event.RoomID().String()
 		subj := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
 		msg := &nats.Msg{
 			Subject: subj,

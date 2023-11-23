@@ -171,7 +171,7 @@ func createRoom(
 
 	// Clobber keys: creator, room_version
 
-	roomVersion := roomserverVersion.DefaultRoomVersion()
+	roomVersion := rsAPI.DefaultRoomVersion()
 	if createRequest.RoomVersion != "" {
 		candidateVersion := gomatrixserverlib.RoomVersion(createRequest.RoomVersion)
 		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
@@ -224,6 +224,7 @@ func createRoom(
 		PrivateKey:      privateKey,
 		EventTime:       evTime,
 	}
+
 	roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, *userID, *roomID, &req)
 	if createRes != nil {
 		return *createRes

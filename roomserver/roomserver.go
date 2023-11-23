@@ -28,10 +28,13 @@ import (
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API.
+//
+// Many of the methods provided by this API depend on access to a federation API, and so
+// you may wish to call `SetFederationAPI` on the returned struct to avoid nil-dereference errors.
 func NewInternalAPI(
 	processContext *process.ProcessContext,
 	cfg *config.Dendrite,
-	cm sqlutil.Connections,
+	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	caches caching.RoomServerCaches,
 	enableMetrics bool,

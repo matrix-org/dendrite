@@ -43,9 +43,25 @@ func Relations(
 	req *http.Request, device *userapi.Device,
 	syncDB storage.Database,
 	rsAPI api.SyncRoomserverAPI,
-	roomID, eventID, relType, eventType string,
+	rawRoomID, eventID, relType, eventType string,
 ) util.JSONResponse {
-	var err error
+	roomID, err := spec.NewRoomID(rawRoomID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid room ID"),
+		}
+	}
+
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+
 	var from, to types.StreamPosition
 	var limit int
 	dir := req.URL.Query().Get("dir")
@@ -93,7 +109,7 @@ func Relations(
 	}
 	var events []types.StreamEvent
 	events, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
-		req.Context(), roomID, eventID, relType, eventType, from, to, dir == "b", limit,
+		req.Context(), roomID.String(), eventID, relType, eventType, from, to, dir == "b", limit,
 	)
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -105,7 +121,7 @@ func Relations(
 	}
 
 	// Apply history visibility to the result events.
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(req.Context(), snapshot, rsAPI, headeredEvents, nil, device.UserID, "relations")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(req.Context(), snapshot, rsAPI, headeredEvents, nil, *userID, "relations")
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
@@ -114,9 +130,16 @@ func Relations(
 	// type if it was specified.
 	res.Chunk = make([]synctypes.ClientEvent, 0, len(filteredEvents))
 	for _, event := range filteredEvents {
+		clientEvent, err := synctypes.ToClientEvent(event.PDU, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		})
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+			continue
+		}
 		res.Chunk = append(
 			res.Chunk,
-			synctypes.ToClientEvent(event.PDU, synctypes.FormatAll),
+			*clientEvent,
 		)
 	}
 

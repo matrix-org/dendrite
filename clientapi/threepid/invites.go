@@ -355,8 +355,22 @@ func emit3PIDInviteEvent(
 	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) error {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return err
+	}
+	validRoomID, err := spec.NewRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	sender, err := rsAPI.QuerySenderIDForUser(ctx, *validRoomID, *userID)
+	if err != nil {
+		return err
+	} else if sender == nil {
+		return fmt.Errorf("sender ID not found for %s in %s", *userID, *validRoomID)
+	}
 	proto := &gomatrixserverlib.ProtoEvent{
-		Sender:   device.UserID,
+		SenderID: string(*sender),
 		RoomID:   roomID,
 		Type:     "m.room.third_party_invite",
 		StateKey: &res.Token,
@@ -370,7 +384,7 @@ func emit3PIDInviteEvent(
 		PublicKeys:     res.PublicKeys,
 	}
 
-	if err := proto.SetContent(content); err != nil {
+	if err = proto.SetContent(content); err != nil {
 		return err
 	}
 

@@ -50,7 +50,7 @@ func MakeLeave(
 		RoomID:     roomID.String(),
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
-	if err := rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
+	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -59,24 +59,24 @@ func MakeLeave(
 	}
 
 	createLeaveTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
-		if err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Errorf("obtaining signing identity for %s failed", request.Destination())
+		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
+		if signErr != nil {
+			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 
 		queryRes := api.QueryLatestEventsAndStateResponse{}
-		event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
-		switch e := err.(type) {
+		event, buildErr := eventutil.QueryAndBuildEvent(httpReq.Context(), proto, identity, time.Now(), rsAPI, &queryRes)
+		switch e := buildErr.(type) {
 		case nil:
 		case eventutil.ErrRoomNoExists:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.NotFound("Room does not exist")
 		case gomatrixserverlib.BadJSONError:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.BadJSON(e.Error())
 		default:
-			util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+			util.GetLogger(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.InternalServerError{}
 		}
 
@@ -87,14 +87,33 @@ func MakeLeave(
 		return event, stateEvents, nil
 	}
 
+	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
+	if err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	} else if senderID == nil {
+		util.GetLogger(httpReq.Context()).WithField("roomID", roomID).WithField("userID", userID).Error("rsAPI.QuerySenderIDForUser returned nil sender ID")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
 	input := gomatrixserverlib.HandleMakeLeaveInput{
 		UserID:             userID,
+		SenderID:           *senderID,
 		RoomID:             roomID,
 		RoomVersion:        roomVersion,
 		RequestOrigin:      request.Origin(),
 		LocalServerName:    cfg.Matrix.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		BuildEventTemplate: createLeaveTemplate,
+		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(httpReq.Context(), roomID, senderID)
+		},
 	}
 
 	response, internalErr := gomatrixserverlib.HandleMakeLeave(input)
@@ -168,13 +187,15 @@ func SendLeave(
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.UnsupportedRoomVersion(err.Error()),
+			Code: http.StatusInternalServerError,
+			JSON: spec.UnsupportedRoomVersion(
+				fmt.Sprintf("QueryRoomVersionForRoom returned unknown version: %s", roomVersion),
+			),
 		}
 	}
 
-	// Decode the incomingEvent JSON from the request.
-	incomingEvent, err := verImpl.NewEventFromUntrustedJSON(request.Content())
+	// Decode the event JSON from the request.
+	event, err := verImpl.NewEventFromUntrustedJSON(request.Content())
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{

@@ -16,7 +16,9 @@ package storage
 
 import (
 	"context"
+	"crypto/ed25519"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -27,8 +29,10 @@ import (
 )
 
 type Database interface {
+	UserRoomKeys
 	// Do we support processing input events for more than one room at a time?
 	SupportsConcurrentRoomInputs() bool
+	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
 	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	RoomInfoByNID(ctx context.Context, roomNID types.RoomNID) (*types.RoomInfo, error)
@@ -129,7 +133,7 @@ type Database interface {
 	// in this room, along a boolean set to true if the user is still in this room,
 	// false if not.
 	// Returns an error if there was a problem talking to the database.
-	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
+	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
 	// Lookup the membership event numeric IDs for all user that are or have
 	// been members of a given room. Only lookup events of "join" membership if
 	// joinOnly is set to true.
@@ -154,7 +158,7 @@ type Database interface {
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
 	GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*types.HeaderedEvent, error)
 	// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
-	GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error)
+	GetRoomsByMembership(ctx context.Context, userID spec.UserID, membership string) ([]string, error)
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
@@ -183,15 +187,35 @@ type Database interface {
 		ctx context.Context, userNID types.EventStateKeyNID, info *types.RoomInfo, eventIDs ...string,
 	) (map[string]*types.HeaderedEvent, error)
 	GetOrCreateRoomInfo(ctx context.Context, event gomatrixserverlib.PDU) (*types.RoomInfo, error)
+	GetRoomVersion(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
 	GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error)
 	GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKey *string) (types.EventStateKeyNID, error)
 	MaybeRedactEvent(
-		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
+}
+
+type UserRoomKeys interface {
+	// InsertUserRoomPrivatePublicKey inserts the given private key as well as the public key for it. This should be used
+	// when creating keys locally.
+	InsertUserRoomPrivatePublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error)
+	// InsertUserRoomPublicKey inserts the given public key, this should be used for users NOT local to this server
+	InsertUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID, key ed25519.PublicKey) (result ed25519.PublicKey, err error)
+	// SelectUserRoomPrivateKey selects the private key for the given user and room combination
+	SelectUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PrivateKey, err error)
+	// SelectUserRoomPublicKey selects the public key for the given user and room combination
+	SelectUserRoomPublicKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (key ed25519.PublicKey, err error)
+	// SelectUserIDsForPublicKeys selects all userIDs for the requested senderKeys. Returns a map from roomID -> map from publicKey to userID.
+	// If a senderKey can't be found, it is omitted in the result.
+	// TODO: Why is the result map indexed by string not public key?
+	// TODO: Shouldn't the input & result map be changed to be indexed by string instead of the RoomID struct?
+	SelectUserIDsForPublicKeys(ctx context.Context, publicKeys map[spec.RoomID][]ed25519.PublicKey) (map[spec.RoomID]map[string]string, error)
 }
 
 type RoomDatabase interface {
 	EventDatabase
+	UserRoomKeys
+	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
 	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	RoomInfoByNID(ctx context.Context, roomNID types.RoomNID) (*types.RoomInfo, error)
@@ -228,7 +252,7 @@ type EventDatabase interface {
 	// MaybeRedactEvent returns the redaction event and the redacted event if this call resulted in a redaction, else an error
 	// (nil if there was nothing to do)
 	MaybeRedactEvent(
-		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver,
+		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 	StoreEvent(ctx context.Context, event gomatrixserverlib.PDU, roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.StateAtEvent, error)
 }

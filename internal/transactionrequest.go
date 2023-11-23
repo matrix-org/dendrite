@@ -161,13 +161,15 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if event.Type() == spec.MRoomCreate && event.StateKeyEquals("") {
 			continue
 		}
-		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID(), t.Origin) {
+		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID().String(), t.Origin) {
 			results[event.EventID()] = fclient.PDUResult{
 				Error: "Forbidden by server ACLs",
 			}
 			continue
 		}
-		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys); err != nil {
+		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),

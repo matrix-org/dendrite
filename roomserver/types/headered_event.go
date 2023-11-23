@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // HeaderedEvent is an Event which serialises to the headered form, which includes
@@ -25,6 +26,10 @@ import (
 type HeaderedEvent struct {
 	gomatrixserverlib.PDU
 	Visibility gomatrixserverlib.HistoryVisibility
+	// TODO: Remove this. This is a temporary workaround to store the userID in the syncAPI.
+	// 		It really should be the userKey instead.
+	UserID           spec.UserID
+	StateKeyResolved *string
 }
 
 func (h *HeaderedEvent) CacheCost() int {

@@ -60,7 +60,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.Outpu
 				"adds_state":     len(update.NewRoomEvent.AddsStateEventIDs),
 				"removes_state":  len(update.NewRoomEvent.RemovesStateEventIDs),
 				"send_as_server": update.NewRoomEvent.SendAsServer,
-				"sender":         update.NewRoomEvent.Event.Sender(),
+				"sender":         update.NewRoomEvent.Event.SenderID(),
 			})
 			if update.NewRoomEvent.Event.StateKey() != nil {
 				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
@@ -73,7 +73,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.Outpu
 				}
 			}
 
-			if eventType == "m.room.server_acl" && update.NewRoomEvent.Event.StateKeyEquals("") {
+			if eventType == acls.MRoomServerACL && update.NewRoomEvent.Event.StateKeyEquals("") {
 				ev := update.NewRoomEvent.Event.PDU
 				defer r.ACLs.OnServerACLUpdate(ev)
 			}

@@ -2,9 +2,11 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
@@ -59,6 +61,7 @@ type RoomserverInternalAPI struct {
 	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []spec.ServerName
 	enableMetrics          bool
+	defaultRoomVersion     gomatrixserverlib.RoomVersion
 }
 
 func NewRoomserverAPI(
@@ -89,14 +92,9 @@ func NewRoomserverAPI(
 		NATSClient:             nc,
 		Durable:                dendriteCfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
-		Queryer: &query.Queryer{
-			DB:                roomserverDB,
-			Cache:             caches,
-			IsLocalServerName: dendriteCfg.Global.IsLocalServerName,
-			ServerACLs:        serverACLs,
-		},
-		enableMetrics: enableMetrics,
-		// perform-er structs get initialised when we have a federation sender to use
+		enableMetrics:          enableMetrics,
+		defaultRoomVersion:     dendriteCfg.RoomServer.DefaultRoomVersion,
+		// perform-er structs + queryer struct get initialised when we have a federation sender to use
 	}
 	return a
 }
@@ -108,9 +106,13 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
-	identity, err := r.Cfg.Global.SigningIdentityFor(r.ServerName)
-	if err != nil {
-		logrus.Panic(err)
+	r.Queryer = &query.Queryer{
+		DB:                r.DB,
+		Cache:             r.Cache,
+		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
+		ServerACLs:        r.ServerACLs,
+		Cfg:               r.Cfg,
+		FSAPI:             fsAPI,
 	}
 
 	r.Inputer = &input.Inputer{
@@ -123,11 +125,13 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		NATSClient:          r.NATSClient,
 		Durable:             nats.Durable(r.Durable),
 		ServerName:          r.ServerName,
-		SigningIdentity:     identity,
+		SigningIdentity:     r.SigningIdentityFor,
 		FSAPI:               fsAPI,
+		RSAPI:               r,
 		KeyRing:             keyRing,
 		ACLs:                r.ServerACLs,
 		Queryer:             r.Queryer,
+		EnableMetrics:       r.enableMetrics,
 	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
@@ -175,6 +179,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		IsLocalServerName: r.Cfg.Global.IsLocalServerName,
 		DB:                r.DB,
 		FSAPI:             r.fsAPI,
+		Querier:           r.Queryer,
 		KeyRing:           r.KeyRing,
 		// Perspective servers are trusted to not lie about server keys, so we will also
 		// prefer these servers when backfilling (assuming they are in the room) rather
@@ -215,6 +220,10 @@ func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalA
 	r.asAPI = asAPI
 }
 
+func (r *RoomserverInternalAPI) DefaultRoomVersion() gomatrixserverlib.RoomVersion {
+	return r.defaultRoomVersion
+}
+
 func (r *RoomserverInternalAPI) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, error) {
 	return r.Inviter.IsKnownRoom(ctx, roomID)
 }
@@ -230,7 +239,7 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID().String(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(
@@ -268,4 +277,66 @@ func (r *RoomserverInternalAPI) PerformForget(
 	resp *api.PerformForgetResponse,
 ) error {
 	return r.Forgetter.PerformForget(ctx, req, resp)
+}
+
+// GetOrCreateUserRoomPrivateKey gets the user room key for the specified user. If no key exists yet, a new one is created.
+func (r *RoomserverInternalAPI) GetOrCreateUserRoomPrivateKey(ctx context.Context, userID spec.UserID, roomID spec.RoomID) (ed25519.PrivateKey, error) {
+	key, err := r.DB.SelectUserRoomPrivateKey(ctx, userID, roomID)
+	if err != nil {
+		return nil, err
+	}
+	// no key found, create one
+	if len(key) == 0 {
+		_, key, err = ed25519.GenerateKey(nil)
+		if err != nil {
+			return nil, err
+		}
+		key, err = r.DB.InsertUserRoomPrivatePublicKey(ctx, userID, roomID, key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return key, nil
+}
+
+func (r *RoomserverInternalAPI) StoreUserRoomPublicKey(ctx context.Context, senderID spec.SenderID, userID spec.UserID, roomID spec.RoomID) error {
+	pubKeyBytes, err := senderID.RawBytes()
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.InsertUserRoomPublicKey(ctx, userID, roomID, ed25519.PublicKey(pubKeyBytes))
+	return err
+}
+
+func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error) {
+	roomVersion, ok := r.Cache.GetRoomVersion(roomID.String())
+	if !ok {
+		roomInfo, err := r.DB.RoomInfo(ctx, roomID.String())
+		if err != nil {
+			return fclient.SigningIdentity{}, err
+		}
+		if roomInfo != nil {
+			roomVersion = roomInfo.RoomVersion
+		}
+	}
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
+		privKey, err := r.GetOrCreateUserRoomPrivateKey(ctx, senderID, roomID)
+		if err != nil {
+			return fclient.SigningIdentity{}, err
+		}
+		return fclient.SigningIdentity{
+			PrivateKey: privKey,
+			KeyID:      "ed25519:1",
+			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(privKey)),
+		}, nil
+	}
+	identity, err := r.Cfg.Global.SigningIdentityFor(senderID.Domain())
+	if err != nil {
+		return fclient.SigningIdentity{}, err
+	}
+	return *identity, err
+}
+
+func (r *RoomserverInternalAPI) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error) {
+	return r.DB.AssignRoomNID(ctx, roomID, roomVersion)
 }

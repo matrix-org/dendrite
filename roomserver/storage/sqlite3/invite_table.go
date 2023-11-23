@@ -126,6 +126,9 @@ func (s *inviteStatements) UpdateInviteRetired(
 		}
 		eventIDs = append(eventIDs, inviteEventID)
 	}
+	if err = rows.Err(); err != nil {
+		return
+	}
 	// now retire the invites
 	stmt = sqlutil.TxStmt(txn, s.updateInviteRetiredStmt)
 	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
@@ -157,5 +160,5 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 		result = append(result, types.EventStateKeyNID(senderUserNID))
 		eventIDs = append(eventIDs, eventID)
 	}
-	return result, eventIDs, eventJSON, nil
+	return result, eventIDs, eventJSON, rows.Err()
 }

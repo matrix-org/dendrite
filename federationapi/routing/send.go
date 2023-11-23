@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	// Event was passed to the roomserver
+	// Event was passed to the Roomserver
 	MetricsOutcomeOK = "ok"
 	// Event failed to be processed
 	MetricsOutcomeFail = "fail"

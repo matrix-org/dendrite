@@ -28,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -52,6 +51,7 @@ type sendServerNoticeRequest struct {
 	StateKey string `json:"state_key,omitempty"`
 }
 
+// nolint:gocyclo
 // SendServerNotice sends a message to a specific user. It can only be invoked by an admin.
 func SendServerNotice(
 	req *http.Request,
@@ -94,34 +94,42 @@ func SendServerNotice(
 		}
 	}
 
+	userID, err := spec.NewUserID(r.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("invalid user ID"),
+		}
+	}
+
 	// get rooms for specified user
-	allUserRooms := []string{}
-	userRooms := api.QueryRoomsForUserResponse{}
+	allUserRooms := []spec.RoomID{}
 	// Get rooms the user is either joined, invited or has left.
 	for _, membership := range []string{"join", "invite", "leave"} {
-		if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-			UserID:         r.UserID,
-			WantMembership: membership,
-		}, &userRooms); err != nil {
+		userRooms, queryErr := rsAPI.QueryRoomsForUser(ctx, *userID, membership)
+		if queryErr != nil {
 			return util.ErrorResponse(err)
 		}
-		allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
+		allUserRooms = append(allUserRooms, userRooms...)
 	}
 
 	// get rooms of the sender
-	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
-	senderRooms := api.QueryRoomsForUserResponse{}
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         senderUserID,
-		WantMembership: "join",
-	}, &senderRooms); err != nil {
+	senderUserID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName), true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown("internal server error"),
+		}
+	}
+	senderRooms, err := rsAPI.QueryRoomsForUser(ctx, *senderUserID, "join")
+	if err != nil {
 		return util.ErrorResponse(err)
 	}
 
 	// check if we have rooms in common
-	commonRooms := []string{}
+	commonRooms := []spec.RoomID{}
 	for _, userRoomID := range allUserRooms {
-		for _, senderRoomID := range senderRooms.RoomIDs {
+		for _, senderRoomID := range senderRooms {
 			if userRoomID == senderRoomID {
 				commonRooms = append(commonRooms, senderRoomID)
 			}
@@ -134,12 +142,12 @@ func SendServerNotice(
 
 	var (
 		roomID      string
-		roomVersion = version.DefaultRoomVersion()
+		roomVersion = rsAPI.DefaultRoomVersion()
 	)
 
 	// create a new room for the user
 	if len(commonRooms) == 0 {
-		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
+		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID.String())
 		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
 		pl, err := json.Marshal(powerLevelContent)
 		if err != nil {
@@ -187,9 +195,17 @@ func SendServerNotice(
 		}
 	} else {
 		// we've found a room in common, check the membership
-		roomID = commonRooms[0]
+		deviceUserID, err := spec.NewUserID(r.UserID, true)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
+			}
+		}
+
+		roomID = commonRooms[0].String()
 		membershipRes := api.QueryMembershipForUserResponse{}
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: r.UserID, RoomID: roomID}, &membershipRes)
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
 			return util.JSONResponse{
@@ -212,7 +228,7 @@ func SendServerNotice(
 		"body":    r.Content.Body,
 		"msgtype": r.Content.MsgType,
 	}
-	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
+	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
 		return *resErr
@@ -234,7 +250,7 @@ func SendServerNotice(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{PDU: e},
+			{PDU: e},
 		},
 		device.UserDomain(),
 		cfgClient.Matrix.ServerName,
@@ -341,7 +357,7 @@ func getSenderDevice(
 	if len(deviceRes.Devices) > 0 {
 		// If there were changes to the profile, create a new membership event
 		if displayNameChanged || avatarChanged {
-			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, cfg, time.Now())
+			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, time.Now())
 			if err != nil {
 				return nil, err
 			}

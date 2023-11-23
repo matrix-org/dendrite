@@ -36,7 +36,7 @@ If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or j
 See the [Planning your Installation](https://matrix-org.github.io/dendrite/installation/planning) page for
 more information on requirements.
 
-To build Dendrite, you will need Go 1.18 or later.
+To build Dendrite, you will need Go 1.20 or later.
 
 For a usable federating Dendrite deployment, you will also need:
 
@@ -47,7 +47,7 @@ For a usable federating Dendrite deployment, you will also need:
 Also recommended are:
 
 - A PostgreSQL database engine, which will perform better than SQLite with many users and/or larger rooms
-- A reverse proxy server, such as nginx, configured [like this sample](https://github.com/matrix-org/dendrite/blob/master/docs/nginx/monolith-sample.conf)
+- A reverse proxy server, such as nginx, configured [like this sample](https://github.com/matrix-org/dendrite/blob/main/docs/nginx/dendrite-sample.conf)
 
 The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
 

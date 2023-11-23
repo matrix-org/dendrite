@@ -29,10 +29,18 @@ func LeaveRoomByID(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("device userID is invalid"),
+		}
+	}
+
 	// Prepare to ask the roomserver to perform the room join.
 	leaveReq := roomserverAPI.PerformLeaveRequest{
 		RoomID: roomID,
-		UserID: device.UserID,
+		Leaver: *userID,
 	}
 	leaveRes := roomserverAPI.PerformLeaveResponse{}
 

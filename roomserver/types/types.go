@@ -22,7 +22,9 @@ import (
 	"strings"
 	"sync"
 
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/blake2b"
 )
@@ -42,6 +44,11 @@ type RoomNID int64
 type EventMetadata struct {
 	EventNID EventNID
 	RoomNID  RoomNID
+}
+
+type UserRoomKeyPair struct {
+	RoomNID          RoomNID
+	EventStateKeyNID EventStateKeyNID
 }
 
 // StateSnapshotNID is a numeric ID for the state at an event.
@@ -331,3 +338,36 @@ func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
 }
 
 var ErrorInvalidRoomInfo = fmt.Errorf("room info is invalid")
+
+// Struct to represent a device or a server name.
+//
+// May be used to designate a caller for functions that can be called
+// by a client (device) or by a server (server name).
+//
+// Exactly 1 of Device() and ServerName() will return a non-nil result.
+type DeviceOrServerName struct {
+	device     *userapi.Device
+	serverName *spec.ServerName
+}
+
+func NewDeviceNotServerName(device userapi.Device) DeviceOrServerName {
+	return DeviceOrServerName{
+		device:     &device,
+		serverName: nil,
+	}
+}
+
+func NewServerNameNotDevice(serverName spec.ServerName) DeviceOrServerName {
+	return DeviceOrServerName{
+		device:     nil,
+		serverName: &serverName,
+	}
+}
+
+func (s *DeviceOrServerName) Device() *userapi.Device {
+	return s.device
+}
+
+func (s *DeviceOrServerName) ServerName() *spec.ServerName {
+	return s.serverName
+}

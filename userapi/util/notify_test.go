@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/synctypes"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/bcrypt"
 
@@ -21,6 +22,14 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage"
 	userUtil "github.com/matrix-org/dendrite/userapi/util"
 )
+
+func queryUserIDForSender(senderID spec.SenderID) (*spec.UserID, error) {
+	if senderID == "" {
+		return nil, nil
+	}
+
+	return spec.NewUserID(string(senderID), true)
+}
 
 func TestNotifyUserCountsAsync(t *testing.T) {
 	alice := test.NewUser(t)
@@ -87,7 +96,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Prepare pusher with our test server URL
-		if err := db.UpsertPusher(ctx, api.Pusher{
+		if err = db.UpsertPusher(ctx, api.Pusher{
 			Kind:    api.HTTPKind,
 			AppID:   appID,
 			PushKey: pushKey,
@@ -99,8 +108,14 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 
 		// Insert a dummy event
+		ev, err := synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return queryUserIDForSender(senderID)
+		})
+		if err != nil {
+			t.Error(err)
+		}
 		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
-			Event: synctypes.ToClientEvent(dummyEvent, synctypes.FormatAll),
+			Event: *ev,
 		}); err != nil {
 			t.Error(err)
 		}

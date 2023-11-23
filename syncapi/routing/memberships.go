@@ -59,14 +59,21 @@ func GetMemberships(
 	syncDB storage.Database, rsAPI api.SyncRoomserverAPI,
 	joinedOnly bool, membership, notMembership *string, at string,
 ) util.JSONResponse {
+	userID, err := spec.NewUserID(device.UserID, true)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.InvalidParam("Device UserID is invalid"),
+		}
+	}
 	queryReq := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		UserID: device.UserID,
+		UserID: *userID,
 	}
 
 	var queryRes api.QueryMembershipForUserResponse
-	if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
+	if queryErr := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); queryErr != nil {
+		util.GetLogger(req.Context()).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -144,7 +151,22 @@ func GetMemberships(
 					JSON: spec.InternalServerError{},
 				}
 			}
-			res.Joined[ev.Sender()] = joinedMember(content)
+
+			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
+			if err != nil || userID == nil {
+				util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: spec.InternalServerError{},
+				}
+			}
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: spec.Forbidden("You don't have permission to kick this user, unknown senderID"),
+				}
+			}
+			res.Joined[userID.String()] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -153,6 +175,8 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll)},
+		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		})},
 	}
 }

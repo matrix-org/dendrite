@@ -215,8 +215,10 @@ type OutputNewInviteEvent struct {
 type OutputRetireInviteEvent struct {
 	// The ID of the "m.room.member" invite event.
 	EventID string
-	// The target user ID of the "m.room.member" invite event that was retired.
-	TargetUserID string
+	// The room ID of the "m.room.member" invite event.
+	RoomID string
+	// The target sender ID of the "m.room.member" invite event that was retired.
+	TargetSenderID spec.SenderID
 	// Optional event ID of the event that replaced the invite.
 	// This can be empty if the invite was rejected locally and we were unable
 	// to reach the server that originally sent the invite.

@@ -254,7 +254,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
-		needSet := stateNeeded[ev.RoomID()]
+		needSet := stateNeeded[ev.RoomID().String()]
 		if needSet == nil { // make set if required
 			needSet = make(map[string]bool)
 		}
@@ -264,7 +264,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		for _, id := range addIDs {
 			needSet[id] = true
 		}
-		stateNeeded[ev.RoomID()] = needSet
+		stateNeeded[ev.RoomID().String()] = needSet
 		ev.Visibility = historyVisibility
 
 		eventIDToEvent[eventID] = types.StreamEvent{
@@ -274,7 +274,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		}
 	}
 
-	return stateNeeded, eventIDToEvent, nil
+	return stateNeeded, eventIDToEvent, rows.Err()
 }
 
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
@@ -344,11 +344,11 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	_, err = insertStmt.ExecContext(
 		ctx,
 		streamPos,
-		event.RoomID(),
+		event.RoomID().String(),
 		event.EventID(),
 		headeredJSON,
 		event.Type(),
-		event.Sender(),
+		event.UserID.String(),
 		containsURL,
 		string(addStateJSON),
 		string(removeStateJSON),
@@ -520,7 +520,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			ExcludeFromSync: excludeFromSync,
 		})
 	}
-	return result, nil
+	return result, rows.Err()
 }
 func (s *outputRoomEventsStatements) SelectContextEvent(
 	ctx context.Context, txn *sql.Tx, roomID, eventID string,
