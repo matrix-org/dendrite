@@ -58,7 +58,7 @@ func (r *Inputer) updateLatestEvents(
 	transactionID *api.TransactionID,
 	rewritesState bool,
 	historyVisibility gomatrixserverlib.HistoryVisibility,
-) (err error) {
+) error {
 	trace, ctx := internal.StartRegion(ctx, "updateLatestEvents")
 	defer trace.EndRegion()
 
@@ -112,7 +112,7 @@ func (r *Inputer) updateLatestEvents(
 	}
 
 	succeeded = true
-	return
+	return nil
 }
 
 // latestEventsUpdater tracks the state used to update the latest events in the
