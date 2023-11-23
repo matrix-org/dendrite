@@ -189,9 +189,8 @@ func SendLeave(
 		}
 	}
 
-	leaveEvent, err := verImpl.HandleSendLeave(
-		httpReq.Context(), incomingEvent, request.Origin(), eventID, roomID, rsAPI, keys,
-	)
+	leaveEvent, err := gomatrixserverlib.HandleSendLeave(
+		httpReq.Context(), incomingEvent, request.Origin(), roomVersion, eventID, roomID, rsAPI, keys)
 
 	switch e := err.(type) {
 	case nil:
