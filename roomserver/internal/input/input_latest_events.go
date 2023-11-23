@@ -71,13 +71,12 @@ func (r *Inputer) updateLatestEvents(
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
 	u := latestEventsUpdater{
-		ctx:               ctx,
-		api:               r,
-		updater:           updater,
-		stateAtEvent:      stateAtEvent,
-		event:             event,
-		rewritesState:     rewritesState,
-		historyVisibility: historyVisibility,
+		ctx:           ctx,
+		api:           r,
+		updater:       updater,
+		stateAtEvent:  stateAtEvent,
+		event:         event,
+		rewritesState: rewritesState,
 	}
 
 	var updates []api.OutputEvent
@@ -86,7 +85,7 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
-	update, err := u.makeOutputNewRoomEvent(transactionID, sendAsServer, updater.LastEventIDSent())
+	update, err := u.makeOutputNewRoomEvent(transactionID, sendAsServer, updater.LastEventIDSent(), historyVisibility)
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
@@ -139,8 +138,6 @@ type latestEventsUpdater struct {
 	// The snapshots of current state before and after processing this event
 	oldStateNID types.StateSnapshotNID
 	newStateNID types.StateSnapshotNID
-	// The history visibility of the event itself (from the state before the event).
-	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents(roomInfo *types.RoomInfo) ([]api.OutputEvent, error) {
@@ -379,7 +376,12 @@ func (u *latestEventsUpdater) calculateLatest(
 	return true, nil
 }
 
-func (u *latestEventsUpdater) makeOutputNewRoomEvent(transactionID *api.TransactionID, sendAsServer string, lastEventIDSent string) (*api.OutputEvent, error) {
+func (u *latestEventsUpdater) makeOutputNewRoomEvent(
+	transactionID *api.TransactionID,
+	sendAsServer string,
+	lastEventIDSent string,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
+) (*api.OutputEvent, error) {
 	latestEventIDs := make([]string, len(u.latest))
 	for i := range u.latest {
 		latestEventIDs[i] = u.latest[i].EventID
@@ -392,7 +394,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent(transactionID *api.Transact
 		LatestEventIDs:    latestEventIDs,
 		TransactionID:     transactionID,
 		SendAsServer:      sendAsServer,
-		HistoryVisibility: u.historyVisibility,
+		HistoryVisibility: historyVisibility,
 	}
 
 	eventIDMap, err := u.stateEventMap()
