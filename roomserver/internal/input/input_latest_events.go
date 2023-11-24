@@ -69,6 +69,16 @@ func (r *Inputer) updateLatestEvents(
 
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
+	// If the event has already been written to the output log then we
+	// don't need to do anything, as we've handled it already.
+	hasBeenSent, err := updater.HasEventBeenSent(stateAtEvent.EventNID)
+	if err != nil {
+		return fmt.Errorf("u.updater.HasEventBeenSent: %w", err)
+	}
+	if hasBeenSent {
+		return nil
+	}
+
 	u := latestEventsUpdater{
 		api:           r,
 		updater:       updater,
@@ -152,14 +162,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context, roomInfo
 	if !u.rewritesState {
 		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 		u.oldLatest = u.updater.LatestEvents()
-	}
-
-	// If the event has already been written to the output log then we
-	// don't need to do anything, as we've handled it already.
-	if hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID); err != nil {
-		return nil, fmt.Errorf("u.updater.HasEventBeenSent: %w", err)
-	} else if hasBeenSent {
-		return nil, nil
 	}
 
 	// Work out what the latest events are. This will include the new
