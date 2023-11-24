@@ -107,6 +107,10 @@ func (r *Inputer) updateLatestEvents(
 		}
 	}
 
+	if err = u.updater.SetLatestEvents(roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
+	}
+
 	succeeded = true
 	return nil
 }
@@ -187,10 +191,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context, roomInfo
 		}
 	} else {
 		u.newStateNID = u.oldStateNID
-	}
-
-	if err = u.updater.SetLatestEvents(roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
-		return nil, fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
 	return membershipUpdates, nil
