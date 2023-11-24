@@ -114,6 +114,11 @@ func TestLogin(t *testing.T) {
 
 		ctx := context.Background()
 
+		// Inject a dummy application service, so we have a "m.login.application_service"
+		// in the login flows
+		as := &config.ApplicationService{}
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
+
 		t.Run("Supported log-in flows are returned", func(t *testing.T) {
 			req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/login")
 			rec := httptest.NewRecorder()
