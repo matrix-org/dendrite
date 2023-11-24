@@ -114,6 +114,44 @@ func TestLogin(t *testing.T) {
 
 		ctx := context.Background()
 
+		// Inject a dummy application service, so we have a "m.login.application_service"
+		// in the login flows
+		as := &config.ApplicationService{}
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
+
+		t.Run("Supported log-in flows are returned", func(t *testing.T) {
+			req := test.NewRequest(t, http.MethodGet, "/_matrix/client/v3/login")
+			rec := httptest.NewRecorder()
+			routers.Client.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("failed to get log-in flows: %s", rec.Body.String())
+			}
+
+			t.Logf("response: %s", rec.Body.String())
+			resp := flows{}
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+
+			appServiceFound := false
+			passwordFound := false
+			for _, flow := range resp.Flows {
+				if flow.Type == "m.login.password" {
+					passwordFound = true
+				} else if flow.Type == "m.login.application_service" {
+					appServiceFound = true
+				} else {
+					t.Fatalf("got unknown login flow: %s", flow.Type)
+				}
+			}
+			if !appServiceFound {
+				t.Fatal("m.login.application_service missing from login flows")
+			}
+			if !passwordFound {
+				t.Fatal("m.login.password missing from login flows")
+			}
+		})
+
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
