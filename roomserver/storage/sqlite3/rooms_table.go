@@ -128,7 +128,7 @@ func (s *roomStatements) SelectRoomIDsWithEvents(ctx context.Context, txn *sql.T
 		}
 		roomIDs = append(roomIDs, roomID)
 	}
-	return roomIDs, nil
+	return roomIDs, rows.Err()
 }
 
 func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
@@ -265,7 +265,7 @@ func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
 		}
 		result[roomNID] = roomVersion
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error) {
@@ -293,7 +293,7 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roo
 		}
 		roomIDs = append(roomIDs, roomID)
 	}
-	return roomIDs, nil
+	return roomIDs, rows.Err()
 }
 
 func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error) {
@@ -321,5 +321,5 @@ func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, ro
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
-	return roomNIDs, nil
+	return roomNIDs, rows.Err()
 }

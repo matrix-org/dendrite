@@ -165,6 +165,13 @@ func (r *Queryer) QueryStateAfterEvents(
 			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
 			},
+			func(eventID string) bool {
+				isRejected, rejectedErr := r.DB.IsEventRejected(ctx, info.RoomNID, eventID)
+				if rejectedErr != nil {
+					return true
+				}
+				return isRejected
+			},
 		)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
@@ -675,6 +682,13 @@ func (r *Queryer) QueryStateAndAuthChain(
 		stateEvents, err = gomatrixserverlib.ResolveConflicts(
 			info.RoomVersion, gomatrixserverlib.ToPDUs(stateEvents), gomatrixserverlib.ToPDUs(authEvents), func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return r.QueryUserIDForSender(ctx, roomID, senderID)
+			},
+			func(eventID string) bool {
+				isRejected, rejectedErr := r.DB.IsEventRejected(ctx, info.RoomNID, eventID)
+				if rejectedErr != nil {
+					return true
+				}
+				return isRejected
 			},
 		)
 		if err != nil {

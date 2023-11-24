@@ -98,7 +98,7 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 		var userID string
 		var keyID gomatrixserverlib.KeyID
 		var signature spec.Base64Bytes
-		if err := rows.Scan(&userID, &keyID, &signature); err != nil {
+		if err = rows.Scan(&userID, &keyID, &signature); err != nil {
 			return nil, err
 		}
 		if _, ok := r[userID]; !ok {
@@ -106,6 +106,7 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 		}
 		r[userID][keyID] = signature
 	}
+	err = rows.Err()
 	return
 }
 

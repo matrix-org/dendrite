@@ -310,6 +310,9 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		}
 		results = append(results, result)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if !excludeRejected && i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
@@ -377,7 +380,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 			return nil, err
 		}
 	}
-	return results[:i], err
+	return results[:i], rows.Err()
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
@@ -424,6 +427,9 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(eventIDs) {
 		return nil, types.MissingEventError(
@@ -507,6 +513,9 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
 		result.EventID = eventID
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
@@ -543,6 +552,9 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 			return nil, err
 		}
 		results[types.EventNID(eventNID)] = eventID
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
@@ -602,7 +614,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 			RoomNID:  types.RoomNID(roomNID),
 		}
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error) {
@@ -652,7 +664,7 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 		}
 		result[eventNID] = roomNID
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) string {

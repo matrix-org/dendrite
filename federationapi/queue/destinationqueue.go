@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -53,7 +52,6 @@ type destinationQueue struct {
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            map[spec.ServerName]*fclient.SigningIdentity
-	rsAPI              api.FederationRoomserverAPI
 	client             fclient.FederationClient        // federation client
 	origin             spec.ServerName                 // origin of requests
 	destination        spec.ServerName                 // destination of requests
