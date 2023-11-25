@@ -224,7 +224,7 @@ func SendEvent(
 		req.Context(), rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
-			&types.HeaderedEvent{PDU: e},
+			{PDU: e},
 		},
 		device.UserDomain(),
 		domain,
@@ -263,7 +263,11 @@ func SendEvent(
 }
 
 func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID string, rsAPI api.ClientRoomserverAPI) error {
-	userMap := r["users"].(map[string]interface{})
+	users, ok := r["users"]
+	if !ok {
+		return nil
+	}
+	userMap := users.(map[string]interface{})
 	validRoomID, err := spec.NewRoomID(roomID)
 	if err != nil {
 		return err
@@ -277,7 +281,8 @@ func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID strin
 		if err != nil {
 			return err
 		} else if senderID == nil {
-			return fmt.Errorf("sender ID not found for %s in %s", uID, *validRoomID)
+			util.GetLogger(req.Context()).Warnf("sender ID not found for %s in %s", uID, *validRoomID)
+			continue
 		}
 		userMap[string(*senderID)] = level
 		delete(userMap, user)

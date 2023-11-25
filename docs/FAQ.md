@@ -24,7 +24,7 @@ No, although a good portion of the Matrix specification has been implemented. Mo
 
 Dendrite development is currently supported by a small team of developers and due to those limited resources, the majority of the effort is focused on getting Dendrite to be 
 specification complete. If there are major features you're requesting (e.g. new administration endpoints), we'd like to strongly encourage you to join the community in supporting 
-the development efforts through [contributing](../development/contributing). 
+the development efforts through [contributing](./development/CONTRIBUTING.md). 
 
 ## Is there a migration path from Synapse to Dendrite?
 
@@ -105,7 +105,7 @@ This can be done by performing a room upgrade. Use the command `/upgraderoom <ve
 
 ## How do I reset somebody's password on my server?
 
-Use the admin endpoint [resetpassword](./administration/adminapi#post-_dendriteadminresetpassworduserid)
+Use the admin endpoint [resetpassword](./administration/4_adminapi.md#post-_dendriteadminresetpassworduserid)
 
 ## Should I use PostgreSQL or SQLite for my databases?
 

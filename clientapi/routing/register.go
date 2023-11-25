@@ -236,7 +236,7 @@ type authDict struct {
 	// TODO: Lots of custom keys depending on the type
 }
 
-// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
+// https://spec.matrix.org/v1.7/client-server-api/#user-interactive-authentication-api
 type userInteractiveResponse struct {
 	Flows     []authtypes.Flow       `json:"flows"`
 	Completed []authtypes.LoginType  `json:"completed"`
@@ -256,7 +256,7 @@ func newUserInteractiveResponse(
 	}
 }
 
-// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
+// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
 type registerResponse struct {
 	UserID      string `json:"user_id"`
 	AccessToken string `json:"access_token,omitempty"`
@@ -462,7 +462,7 @@ func validateApplicationService(
 }
 
 // Register processes a /register request.
-// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
+// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
 func Register(
 	req *http.Request,
 	userAPI userapi.ClientUserAPI,
@@ -647,6 +647,16 @@ func handleGuestRegistration(
 	}
 }
 
+// localpartMatchesExclusiveNamespaces will check if a given username matches any
+// application service's exclusive users namespace
+func localpartMatchesExclusiveNamespaces(
+	cfg *config.ClientAPI,
+	localpart string,
+) bool {
+	userID := userutil.MakeUserID(localpart, cfg.Matrix.ServerName)
+	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
+}
+
 // handleRegistrationFlow will direct and complete registration flow stages
 // that the client has requested.
 // nolint: gocyclo
@@ -695,7 +705,7 @@ func handleRegistrationFlow(
 	// If an access token is provided, ignore this check this is an appservice
 	// request and we will validate in validateApplicationService
 	if len(cfg.Derived.ApplicationServices) != 0 &&
-		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
+		localpartMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.ASExclusive("This username is reserved by an application service."),
@@ -772,7 +782,7 @@ func handleApplicationServiceRegistration(
 
 	// Check application service register user request is valid.
 	// The application service's ID is returned if so.
-	appserviceID, err := validateApplicationService(
+	appserviceID, err := internal.ValidateApplicationServiceRequest(
 		cfg, r.Username, accessToken,
 	)
 	if err != nil {

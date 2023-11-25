@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -95,6 +96,7 @@ func (s *accountDataStatements) SelectAccountData(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectAccountData: failed to close rows")
 
 	global := map[string]json.RawMessage{}
 	rooms := map[string]map[string]json.RawMessage{}
@@ -118,7 +120,7 @@ func (s *accountDataStatements) SelectAccountData(
 		}
 	}
 
-	return global, rooms, nil
+	return global, rooms, rows.Err()
 }
 
 func (s *accountDataStatements) SelectAccountDataByType(

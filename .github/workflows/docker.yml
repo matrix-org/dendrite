@@ -32,10 +32,6 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
-          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
-          [ ${BRANCH} == "main" ] && BRANCH=""
-          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -60,7 +56,6 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:buildcache,mode=max
           context: .
-          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
@@ -75,7 +70,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
@@ -109,10 +103,6 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
-          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
-          [ ${BRANCH} == "main" ] && BRANCH=""
-          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -137,7 +127,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           file: ./build/docker/Dockerfile.demo-pinecone
           platforms: ${{ env.PLATFORMS }}
           push: true
@@ -153,7 +142,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           file: ./build/docker/Dockerfile.demo-pinecone
           platforms: ${{ env.PLATFORMS }}
           push: true
@@ -176,10 +164,6 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
-          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
-          [ ${BRANCH} == "main" ] && BRANCH=""
-          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -204,7 +188,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           file: ./build/docker/Dockerfile.demo-yggdrasil
           platforms: ${{ env.PLATFORMS }}
           push: true
@@ -220,7 +203,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           file: ./build/docker/Dockerfile.demo-yggdrasil
           platforms: ${{ env.PLATFORMS }}
           push: true

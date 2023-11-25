@@ -583,7 +583,7 @@ func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types
 	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
 }
 
-func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
+func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
 

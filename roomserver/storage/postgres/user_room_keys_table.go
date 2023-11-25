@@ -162,6 +162,7 @@ func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(ctx context.Context,
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectAllPublicKeysForUser: failed to close rows")
 
 	resultMap := make(map[types.RoomNID]ed25519.PublicKey)
 
@@ -173,5 +174,5 @@ func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(ctx context.Context,
 		}
 		resultMap[roomNID] = pubkey
 	}
-	return resultMap, err
+	return resultMap, rows.Err()
 }

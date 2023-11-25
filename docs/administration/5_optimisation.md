@@ -95,7 +95,7 @@ Consider enabling the DNS cache by modifying the `global` section of your config
 ## Time synchronisation
 
 Matrix relies heavily on TLS which requires the system time to be correct. If the clock
-drifts then you may find that federation no works reliably (or at all) and clients may
+drifts then you may find that federation will not work reliably (or at all) and clients may
 struggle to connect to your Dendrite server.
 
 Ensure that the time is synchronised on your system by enabling NTP sync.

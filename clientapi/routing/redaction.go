@@ -34,7 +34,8 @@ import (
 )
 
 type redactionContent struct {
-	Reason string `json:"reason"`
+	Reason  string `json:"reason"`
+	Redacts string `json:"redacts"`
 }
 
 type redactionResponse struct {
@@ -151,6 +152,11 @@ func SendRedaction(
 		Type:     spec.MRoomRedaction,
 		Redacts:  eventID,
 	}
+
+	// Room version 11 expects the "redacts" field on the
+	// content field, so add it here as well
+	r.Redacts = eventID
+
 	err = proto.SetContent(r)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
