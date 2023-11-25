@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -116,8 +117,14 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
 	// Check that client well-known has a proper format
-	if c.WellKnownClientName != "" && !(strings.HasPrefix(c.WellKnownClientName, "http://") || strings.HasPrefix(c.WellKnownClientName, "https://")) {
-		logrus.Warn("The configuration for well_known_client_name does not have a proper format, consider adding http:// or https://. Some clients may fail to connect.")
+
+	if c.WellKnownClientName != "" {
+		parsedURL, err := url.Parse(c.WellKnownClientName)
+		if err != nil {
+			logrus.WithError(err).Warn("The configuration for well_known_client_name does not have a proper format, consider adding http:// or https://. Some clients may fail to connect.")
+		} else {
+			c.WellKnownClientName = parsedURL.String()
+		}
 	}
 
 	for _, v := range c.VirtualHosts {
