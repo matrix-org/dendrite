@@ -129,10 +129,6 @@ func Setup(
 		})).Methods(http.MethodGet, http.MethodOptions)
 	}
 
-	if !strings.HasPrefix(string(cfg.Matrix.ServerName), "http://") || !strings.HasPrefix(string(cfg.Matrix.ServerName), "https://") {
-		logrus.Warn("The well_known_server_name does not start with http:// or https:// does not start with 'http://' or 'https://'. Some clients may fail to connect.")
-	}
-
 	publicAPIMux.Handle("/versions",
 		httputil.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{

@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -113,6 +114,11 @@ func (c *Global) Defaults(opts DefaultOpts) {
 func (c *Global) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
+
+	// Check that client well-known has a proper format
+	if c.WellKnownClientName != "" && !(strings.HasPrefix(c.WellKnownClientName, "http://") || strings.HasPrefix(c.WellKnownClientName, "https://")) {
+		logrus.Warn("The configuration for well_known_client_name does not have a proper format, consider adding http:// or https://. Some clients may fail to connect.")
+	}
 
 	for _, v := range c.VirtualHosts {
 		v.Verify(configErrs)
