@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/userapi"
@@ -1188,5 +1189,45 @@ func TestStateReset(t *testing.T) {
 				t.Fatalf("Expected displayname to be %q, got %q", expectedDisplayname, dn)
 			}
 		}
+	})
+}
+
+func TestNewServerACLs(t *testing.T) {
+	alice := test.NewUser(t)
+	roomWithACL := test.NewRoom(t, alice)
+
+	roomWithACL.CreateAndInsert(t, alice, acls.MRoomServerACL, acls.ServerACL{
+		Allowed:         []string{"*"},
+		Denied:          []string{"localhost"},
+		AllowIPLiterals: false,
+	}, test.WithStateKey(""))
+
+	roomWithoutACL := test.NewRoom(t, alice)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		// start JetStream listeners
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		// let the RS create the events
+		err := api.SendEvents(context.Background(), rsAPI, api.KindNew, roomWithACL.Events(), "test", "test", "test", nil, false)
+		assert.NoError(t, err)
+		err = api.SendEvents(context.Background(), rsAPI, api.KindNew, roomWithoutACL.Events(), "test", "test", "test", nil, false)
+		assert.NoError(t, err)
+
+		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
+		assert.NoError(t, err)
+		// create new server ACLs and verify server is banned/not banned
+		serverACLs := acls.NewServerACLs(db)
+		banned := serverACLs.IsServerBannedFromRoom("localhost", roomWithACL.ID)
+		assert.Equal(t, true, banned)
+		banned = serverACLs.IsServerBannedFromRoom("localhost", roomWithoutACL.ID)
+		assert.Equal(t, false, banned)
 	})
 }

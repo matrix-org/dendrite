@@ -34,7 +34,6 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
-	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -63,15 +62,6 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase
 		db := test.NewInMemoryFederationDatabase()
 		return db, process.NewProcessContext(), func() {}
 	}
-}
-
-type stubFederationRoomServerAPI struct {
-	rsapi.FederationRoomserverAPI
-}
-
-func (r *stubFederationRoomServerAPI) QueryServerBannedFromRoom(ctx context.Context, req *rsapi.QueryServerBannedFromRoomRequest, res *rsapi.QueryServerBannedFromRoomResponse) error {
-	res.Banned = false
-	return nil
 }
 
 type stubFederationClient struct {
@@ -126,7 +116,6 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 		txCount:              *atomic.NewUint32(0),
 		txRelayCount:         *atomic.NewUint32(0),
 	}
-	rs := &stubFederationRoomServerAPI{}
 
 	stats := statistics.NewStatistics(db, failuresUntilBlacklist, failuresUntilAssumedOffline)
 	signingInfo := []*fclient.SigningIdentity{
@@ -136,7 +125,7 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 			ServerName: "localhost",
 		},
 	}
-	queues := NewOutgoingQueues(db, processContext, false, "localhost", fc, rs, &stats, signingInfo)
+	queues := NewOutgoingQueues(db, processContext, false, "localhost", fc, &stats, signingInfo)
 
 	return db, fc, queues, processContext, close
 }

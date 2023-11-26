@@ -70,7 +70,7 @@ func TestPerformWakeupServers(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -116,7 +116,7 @@ func TestQueryRelayServers(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -157,7 +157,7 @@ func TestRemoveRelayServers(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -197,7 +197,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -236,7 +236,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
