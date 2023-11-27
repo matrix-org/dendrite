@@ -571,6 +571,8 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 		return nil, "", "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user ID %q is invalid: %w", req.UserID, err)}
 	}
 
+	//TODO: CryptoIDs - what is provided & calculated senderIDs don't match?
+
 	// Look up the room NID for the supplied room ID.
 	var senderID spec.SenderID
 	checkInvitePending := false
@@ -583,13 +585,7 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 				checkInvitePending = true
 			}
 			if senderIDPtr == nil {
-				// create user room key if needed
-				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
-				if keyErr != nil {
-					util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
-					return nil, "", "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
-				}
-				senderID = spec.SenderIDFromPseudoIDKey(key)
+				senderID = req.SenderID
 			} else {
 				senderID = *senderIDPtr
 			}

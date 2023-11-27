@@ -40,10 +40,15 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type membershipCryptoIDsResponse struct {
+	PDU json.RawMessage `json:"pdu"`
+}
+
 func SendBan(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	body, evTime, reqErr := extractRequestData(req)
 	if reqErr != nil {
@@ -96,13 +101,14 @@ func SendBan(
 		}
 	}
 
-	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Ban, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Ban, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI, cryptoIDs)
 }
 
 func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID, membership, reason string, cfg *config.ClientAPI, targetUserID string, evTime time.Time,
-	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI) util.JSONResponse {
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI, cryptoIDs bool) util.JSONResponse {
 
+	// TODO: cryptoIDs - what about when we don't know the senderID for a user?
 	event, err := buildMembershipEvent(
 		ctx, targetUserID, reason, profileAPI, device, membership,
 		roomID, false, cfg, evTime, rsAPI, asAPI,
@@ -115,27 +121,33 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		}
 	}
 
-	serverName := device.UserDomain()
-	if err = roomserverAPI.SendEvents(
-		ctx, rsAPI,
-		roomserverAPI.KindNew,
-		[]*types.HeaderedEvent{event},
-		device.UserDomain(),
-		serverName,
-		serverName,
-		nil,
-		false,
-	); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+	var json interface{}
+	if !cryptoIDs {
+		serverName := device.UserDomain()
+		if err = roomserverAPI.SendEvents(
+			ctx, rsAPI,
+			roomserverAPI.KindNew,
+			[]*types.HeaderedEvent{event},
+			device.UserDomain(),
+			serverName,
+			serverName,
+			nil,
+			false,
+		); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
+		json = struct{}{}
+	} else {
+		json = membershipCryptoIDsResponse{PDU: event.JSON()}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: json,
 	}
 }
 
@@ -143,6 +155,7 @@ func SendKick(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	body, evTime, reqErr := extractRequestData(req)
 	if reqErr != nil {
@@ -217,13 +230,14 @@ func SendKick(
 		}
 	}
 	// TODO: should we be using SendLeave instead?
-	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI, cryptoIDs)
 }
 
 func SendUnban(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceInternalAPI,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	body, evTime, reqErr := extractRequestData(req)
 	if reqErr != nil {
@@ -273,7 +287,7 @@ func SendUnban(
 		}
 	}
 	// TODO: should we be using SendLeave instead?
-	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, spec.Leave, body.Reason, cfg, body.UserID, evTime, rsAPI, asAPI, cryptoIDs)
 }
 
 func SendInvite(

@@ -40,6 +40,7 @@ type PerformJoinRequest struct {
 	Content       map[string]interface{} `json:"content"`
 	ServerNames   []spec.ServerName      `json:"server_names"`
 	Unsigned      map[string]interface{} `json:"unsigned"`
+	SenderID      spec.SenderID
 }
 
 type PerformJoinRequestCryptoIDs struct {

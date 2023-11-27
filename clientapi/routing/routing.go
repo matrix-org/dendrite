@@ -490,14 +490,22 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/ban",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendBan(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
+			return SendBan(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, false)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/ban",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendBan(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, true)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/invite",
@@ -525,24 +533,40 @@ func Setup(
 			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, true)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
 	v3mux.Handle("/rooms/{roomID}/kick",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendKick(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
+			return SendKick(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, false)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	// TODO: update for cryptoIDs
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/kick",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendKick(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, true)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/unban",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendUnban(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
+			return SendUnban(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, false)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/unban",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendUnban(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI, true)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}",

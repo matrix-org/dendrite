@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"crypto/ed25519"
+	"fmt"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -328,7 +329,7 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 			roomVersion = roomInfo.RoomVersion
 		}
 	}
-	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs || roomVersion == gomatrixserverlib.RoomVersionCryptoIDs {
+	if roomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
 		privKey, err := r.GetOrCreateUserRoomPrivateKey(ctx, senderID, roomID)
 		if err != nil {
 			return fclient.SigningIdentity{}, err
@@ -337,6 +338,19 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 			PrivateKey: privKey,
 			KeyID:      "ed25519:1",
 			ServerName: spec.ServerName(spec.SenderIDFromPseudoIDKey(privKey)),
+		}, nil
+	}
+	if roomVersion == gomatrixserverlib.RoomVersionCryptoIDs {
+		sender, err := r.QuerySenderIDForUser(ctx, roomID, senderID)
+		if err != nil {
+			return fclient.SigningIdentity{}, err
+		} else if sender == nil {
+			return fclient.SigningIdentity{}, fmt.Errorf("no sender ID for %s in %s", senderID.String(), roomID.String())
+		}
+		return fclient.SigningIdentity{
+			PrivateKey: nil,
+			KeyID:      "ed25519:1",
+			ServerName: spec.ServerName(*sender),
 		}, nil
 	}
 	identity, err := r.Cfg.Global.SigningIdentityFor(senderID.Domain())

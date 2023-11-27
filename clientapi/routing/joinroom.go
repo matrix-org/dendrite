@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 func JoinRoomByIDOrAlias(
@@ -182,6 +183,17 @@ func JoinRoomByIDOrAliasCryptoIDs(
 	// in the request. It'll get used as a part of the membership
 	// event content.
 	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)
+
+	if senderid, ok := joinReq.Content["cryptoid"]; ok {
+		logrus.Errorf("CryptoID: %s", senderid.(string))
+		joinReq.SenderID = spec.SenderID(senderid.(string))
+	} else {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.Unknown("Missing cryptoid in request body"),
+		}
+	}
+	delete(joinReq.Content, "cryptoid")
 
 	// Work out our localpart for the client profile request.
 

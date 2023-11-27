@@ -48,7 +48,7 @@ type createRoomRequest struct {
 	RoomVersion               gomatrixserverlib.RoomVersion      `json:"room_version"`
 	PowerLevelContentOverride json.RawMessage                    `json:"power_level_content_override"`
 	IsDirect                  bool                               `json:"is_direct"`
-	SenderID                  string                             `json:"sender_id"`
+	CryptoID                  string                             `json:"cryptoid"`
 }
 
 func (r createRoomRequest) Validate() *util.JSONResponse {
@@ -225,7 +225,7 @@ func makeCreateRoomEvents(
 		PrivateKey:      privateKey,
 		EventTime:       evTime,
 
-		SenderID: createRequest.SenderID,
+		SenderID: createRequest.CryptoID,
 	}
 
 	createEvents, err := rsAPI.PerformCreateRoomCryptoIDs(ctx, *userID, *roomID, &req)
