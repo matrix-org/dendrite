@@ -1,0 +1,23 @@
+<h1 id="how-to-build-a-dendrite-homeserver-modified-to-run-over-i2p">How
+to build a Dendrite Homeserver modified to run over I2P</h1>
+<ol type="1">
+<li>First, clone the <code>matrix-org/dendrite</code> implementation of
+dendrite into your GOPATH and change directory to the <code>main</code>
+checkout.</li>
+</ol>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/matrix-org/dendrite <span class="va">$HOME</span>/go/src/github.com/matrix-org/dendrite</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> <span class="va">$HOME</span>/go/src/github.com/matrix-org/dendrite</span></code></pre></div>
+<ol start="2" type="1">
+<li>Second, add my fork <code>eyedeekay/dendrite</code> as a remote and
+check out the i2p-demo branch.</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> remote add idk https://github.com/eyedeekay/dendrite</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> pull idk i2p-demo</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout i2p-demo</span></code></pre></div>
+<ol start="3" type="1">
+<li>Third, build the binary:</li>
+</ol>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">go</span> build <span class="at">-o</span> bin/dendrite-demo-i2p ./cmd/dendrite-demo-i2p</span></code></pre></div>
+<h2 id="or-do-it-automatically-using-just-a-curlpipe">Or, do it
+automatically using just a <code>curlpipe</code></h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="st">&#39;https://eyedeekay.github.io/dendrite/update-branch.sh&#39;</span> <span class="kw">|</span> <span class="fu">bash</span> <span class="at">-</span></span></code></pre></div>
