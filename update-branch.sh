@@ -7,7 +7,7 @@
 
 if [ "$(pwd)" != "$HOME/go/src/github.com/matrix-org/dendrite" ]; then
     if [ ! -d "$HOME/go/src/github.com/matrix-org/dendrite" ]; then
-        git clone https://github.com/matrix-org/dendrite
+        git clone https://github.com/matrix-org/dendrite "$HOME/go/src/github.com/matrix-org/dendrite"
         cd "$HOME/go/src/github.com/matrix-org/dendrite"
         git remote add idk https://github.com/eyedeekay/dendrite
         git pull idk i2p-demo

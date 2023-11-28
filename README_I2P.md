@@ -8,7 +8,7 @@ git clone https://github.com/matrix-org/dendrite $HOME/go/src/github.com/matrix-
 cd $HOME/go/src/github.com/matrix-org/dendrite
 ```
 
-2. Second, add my fork `eyedeekay/dendrite` as a remote and check out the i2p-demo branch.
+2. Second, add my fork `eyedeekay/dendrite` as a remote and check out the i2p-demo branch. This is required because pseudonymous contributions to `dendrite` are not allowed, so I am not allowed to submit my changes to them.
 
 ```sh
 git remote add idk https://github.com/eyedeekay/dendrite
