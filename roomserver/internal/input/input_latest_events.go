@@ -279,22 +279,26 @@ func (u *latestEventsUpdater) latestState(ctx context.Context, roomInfo *types.R
 
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
-			"event_id":      u.event.EventID(),
-			"room_id":       u.event.RoomID().String(),
-			"old_state_nid": u.oldStateNID,
-			"new_state_nid": u.newStateNID,
-			"old_latest":    u.oldLatest.EventIDs(),
-			"new_latest":    u.latest.EventIDs(),
+			"event_id":       u.event.EventID(),
+			"room_id":        u.event.RoomID().String(),
+			"old_state_nid":  u.oldStateNID,
+			"new_state_nid":  u.newStateNID,
+			"old_latest":     u.oldLatest.EventIDs(),
+			"new_latest":     u.latest.EventIDs(),
+			"rewrites_state": u.rewritesState,
+			"state_at_event": fmt.Sprintf("%#v", u.stateAtEvent),
 		}).Warnf("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
 			scope.SetContext("State reset", map[string]interface{}{
-				"Event ID":      u.event.EventID(),
-				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
-				"New state NID": fmt.Sprintf("%d", u.newStateNID),
-				"Old latest":    u.oldLatest.EventIDs(),
-				"New latest":    u.latest.EventIDs(),
-				"State removed": removed,
+				"Event ID":        u.event.EventID(),
+				"Old state NID":   fmt.Sprintf("%d", u.oldStateNID),
+				"New state NID":   fmt.Sprintf("%d", u.newStateNID),
+				"Old latest":      u.oldLatest.EventIDs(),
+				"New latest":      u.latest.EventIDs(),
+				"State removed":   removed,
+				"State rewritten": fmt.Sprintf("%v", u.rewritesState),
+				"State at event":  fmt.Sprintf("%#v", u.stateAtEvent),
 			})
 			sentry.CaptureMessage("State reset detected")
 		})
