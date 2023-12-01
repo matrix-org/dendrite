@@ -423,12 +423,6 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 func TestOutputAppserviceEvent(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
-	room := test.NewRoom(t, alice)
-
-	// Invite Bob
-	room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
-		"membership": "invite",
-	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
@@ -453,6 +447,13 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 		clientapi.AddPublicRoutes(processCtx, routers, cfg, natsInstance, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, caching.DisableMetrics)
 		createAccessTokens(t, accessTokens, usrAPI, processCtx.Context(), routers)
+
+		room := test.NewRoom(t, alice)
+
+		// Invite Bob
+		room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
+			"membership": "invite",
+		}, test.WithStateKey(bob.ID))
 
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
