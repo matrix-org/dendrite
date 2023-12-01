@@ -119,7 +119,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 	for _, msg := range msgs {
 		// Only handle events we care about
 		receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
-		if receivedType != api.OutputTypeNewRoomEvent {
+		if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInviteEvent {
 			continue
 		}
 		// Parse out the event JSON

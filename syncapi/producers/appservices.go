@@ -16,7 +16,6 @@ package producers
 
 import (
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 )
 
 // AppserviceEventProducer produces events for the appservice API to consume
@@ -29,9 +28,6 @@ func (a *AppserviceEventProducer) ProduceRoomEvents(
 	msg *nats.Msg,
 ) error {
 	msg.Subject = a.Topic
-	if _, err := a.JetStream.PublishMsg(msg); err != nil {
-		logrus.WithError(err).Errorf("Failed to produce to topic '%s': %s", a.Topic, err)
-		return err
-	}
-	return nil
+	_, err := a.JetStream.PublishMsg(msg)
+	return err
 }
