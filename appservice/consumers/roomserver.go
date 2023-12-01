@@ -78,6 +78,7 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
+	durableNames := make([]string, 0, len(s.cfg.Derived.ApplicationServices))
 	for _, as := range s.cfg.Derived.ApplicationServices {
 		appsvc := as
 		state := &appserviceState{
@@ -94,6 +95,15 @@ func (s *OutputRoomEventConsumer) Start() error {
 			nats.DeliverNew(), nats.ManualAck(),
 		); err != nil {
 			return fmt.Errorf("failed to create %q consumer: %w", token, err)
+		}
+		durableNames = append(durableNames, s.cfg.Matrix.JetStream.Durable("Appservice_"+token))
+	}
+	// Cleanup any consumers still existing on the OutputRoomEvent stream
+	// to avoid messages not being deleted
+	for _, consumerName := range durableNames {
+		err := s.jetstream.DeleteConsumer(s.cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent), consumerName)
+		if err != nil && err != nats.ErrConsumerNotFound {
+			return err
 		}
 	}
 	return nil
