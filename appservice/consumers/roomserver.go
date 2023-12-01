@@ -101,7 +101,7 @@ func (s *OutputRoomEventConsumer) Start() error {
 	// Cleanup any consumers still existing on the OutputRoomEvent stream
 	// to avoid messages not being deleted
 	for _, consumerName := range durableNames {
-		err := s.jetstream.DeleteConsumer(s.cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent), consumerName)
+		err := s.jetstream.DeleteConsumer(s.cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent), consumerName+"Pull")
 		if err != nil && err != nats.ErrConsumerNotFound {
 			return err
 		}
