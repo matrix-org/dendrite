@@ -28,6 +28,7 @@ type AppserviceEventProducer struct {
 func (a *AppserviceEventProducer) ProduceRoomEvents(
 	msg *nats.Msg,
 ) error {
+	msg.Subject = a.Topic
 	if _, err := a.JetStream.PublishMsg(msg); err != nil {
 		logrus.WithError(err).Errorf("Failed to produce to topic '%s': %s", a.Topic, err)
 		return err
