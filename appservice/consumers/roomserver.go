@@ -71,7 +71,7 @@ func NewOutputRoomEventConsumer(
 		ctx:       process.Context(),
 		cfg:       cfg,
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
 		rsAPI:     rsAPI,
 	}
 }
@@ -109,7 +109,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 	for _, msg := range msgs {
 		// Only handle events we care about
 		receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
-		if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInviteEvent {
+		if receivedType != api.OutputTypeNewRoomEvent {
 			continue
 		}
 		// Parse out the event JSON
