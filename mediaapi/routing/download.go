@@ -63,6 +63,40 @@ type downloadRequest struct {
 	DownloadFilename   string
 }
 
+// Taken from: https://github.com/matrix-org/synapse/blob/c3627d0f99ed5a23479305dc2bd0e71ca25ce2b1/synapse/media/_base.py#L53C1-L84
+// A list of all content types that are "safe" to be rendered inline in a browser.
+var allowInlineTypes = map[types.ContentType]struct{}{
+	"text/css":            {},
+	"text/plain":          {},
+	"text/csv":            {},
+	"application/json":    {},
+	"application/ld+json": {},
+	// We allow some media files deemed as safe, which comes from the matrix-react-sdk.
+	// https://github.com/matrix-org/matrix-react-sdk/blob/a70fcfd0bcf7f8c85986da18001ea11597989a7c/src/utils/blobs.ts#L51
+	// SVGs are *intentionally* omitted.
+	"image/jpeg":      {},
+	"image/gif":       {},
+	"image/png":       {},
+	"image/apng":      {},
+	"image/webp":      {},
+	"image/avif":      {},
+	"video/mp4":       {},
+	"video/webm":      {},
+	"video/ogg":       {},
+	"video/quicktime": {},
+	"audio/mp4":       {},
+	"audio/webm":      {},
+	"audio/aac":       {},
+	"audio/mpeg":      {},
+	"audio/ogg":       {},
+	"audio/wave":      {},
+	"audio/wav":       {},
+	"audio/x-wav":     {},
+	"audio/x-pn-wav":  {},
+	"audio/flac":      {},
+	"audio/x-flac":    {},
+}
+
 // Download implements GET /download and GET /thumbnail
 // Files from this server (i.e. origin == cfg.ServerName) are served directly
 // Files from remote servers (i.e. origin != cfg.ServerName) are cached locally.
@@ -353,7 +387,7 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	}
 
 	if len(filename) == 0 {
-		w.Header().Set("Content-Disposition", "attachment")
+		w.Header().Set("Content-Disposition", contentDispositionFor(""))
 		return nil
 	}
 
@@ -383,20 +417,21 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
 	unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
 
+	disposition := contentDispositionFor(responseMetadata.ContentType)
 	if isASCII {
 		// For ASCII filenames, we should only quote the filename if
 		// it needs to be done, e.g. it contains a space or a character
 		// that would otherwise be parsed as a control character in the
 		// Content-Disposition header
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`attachment; filename=%s%s%s`,
-			quote, unescaped, quote,
+			`%s; filename=%s%s%s`,
+			disposition, quote, unescaped, quote,
 		))
 	} else {
 		// For UTF-8 filenames, we quote always, as that's the standard
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`attachment; filename*=utf-8''%s`,
-			url.QueryEscape(unescaped),
+			`%s; filename*=utf-8''%s`,
+			disposition, url.QueryEscape(unescaped),
 		))
 	}
 
@@ -807,4 +842,13 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 
 	return types.Path(finalPath), duplicate, nil
+}
+
+// contentDispositionFor returns the Content-Disposition for a given
+// content type.
+func contentDispositionFor(contentType types.ContentType) string {
+	if _, ok := allowInlineTypes[contentType]; ok {
+		return "inline"
+	}
+	return "attachment"
 }
