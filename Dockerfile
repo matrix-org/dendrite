@@ -3,7 +3,8 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.21-alpine AS base
+# Pinned to alpine3.18 until https://github.com/mattn/go-sqlite3/issues/1164 is solved
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.21-alpine3.18 AS base
 RUN apk --update --no-cache add bash build-base curl git
 
 #
