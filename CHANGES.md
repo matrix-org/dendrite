@@ -1,5 +1,29 @@
 # Changelog
 
+## Dendrite 0.13.5 (2023-12-12)
+
+Upgrading to this version is **highly** recommended, as it fixes several long-standing bugs in
+our CanonicalJSON implementation.
+
+### Fixes
+
+- Convert unicode escapes to lowercase (gomatrixserverlib)
+- Fix canonical json utf-16 surrogate pair detection logic (gomatrixserverlib)
+- Handle negative zero and exponential numbers in Canonical JSON verification (gomatrixserverlib)
+- Avoid logging unnecessary messages when unable to fetch server keys if multiple fetchers are used (gomatrixserverlib)
+- Issues around the device list updater have been fixed, which should ensure that there are always
+  workers available to process incoming device list updates.
+- A panic in the `/hierarchy` endpoints used for spaces has been fixed (client-server and server-server API)
+- Fixes around the way we handle database transactions (including a potential connection leak)
+- ACLs are now updated when received as outliers
+- A race condition, which could lead to bridges instantly leaving a room after joining it, between the SyncAPI and
+  Appservices has been fixed
+
+### Features
+
+- **Appservice login is now supported!**
+- Users can now kick themselves (used by some bridges)
+
 ## Dendrite 0.13.4 (2023-10-25)
 
 Upgrading to this version is **highly** recommended, as it fixes a long-standing bug in the state resolution
