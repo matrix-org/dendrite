@@ -142,7 +142,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 		// will linger around forever.
 
 		info, err := w.r.JetStream.ConsumerInfo(streamName, consumer)
-		if err != nil {
+		if err != nil && !errors.Is(err, nats.ErrConsumerNotFound) {
 			// log and return, we will retry anyway
 			logger.WithError(err).Errorf("failed to get consumer info")
 			return
