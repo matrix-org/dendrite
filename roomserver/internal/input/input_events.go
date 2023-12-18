@@ -49,7 +49,7 @@ import (
 )
 
 // TODO: Does this value make sense?
-const MaximumMissingProcessingTime = time.Minute * 2
+const MaximumMissingProcessingTime = time.Minute * 5
 
 var processRoomEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{

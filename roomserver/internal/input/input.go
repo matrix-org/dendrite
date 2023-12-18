@@ -160,14 +160,16 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 		// The consumer already exists, try to update if necessary.
 		if info != nil {
 			switch {
+			case info.Config.AckWait.Nanoseconds() != consumerConfig.AckWait.Nanoseconds():
+				fallthrough
 			case info.Config.AckPolicy != consumerConfig.AckPolicy:
 				logger.Warn("Consumer already exists, trying to update it.")
 				// Try updating the consumer first
 				if _, err = w.r.JetStream.UpdateConsumer(streamName, consumerConfig); err != nil {
 					// We failed to update the consumer, recreate it
-					logger.WithError(err).Warnf("Unable to update consumer %q, recreating...", consumer)
+					logger.WithError(err).Warn("Unable to update consumer, recreating...")
 					if err = w.r.JetStream.DeleteConsumer(streamName, consumer); err != nil {
-						logger.WithError(err).Fatalf("Unable to delete consumer %q", consumer)
+						logger.WithError(err).Fatal("Unable to delete consumer")
 						return
 					}
 					info = nil
