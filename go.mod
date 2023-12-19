@@ -42,7 +42,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.6
 	go.uber.org/atomic v1.10.0
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20230809150735-7b3493d9a819
 	golang.org/x/image v0.10.0
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
