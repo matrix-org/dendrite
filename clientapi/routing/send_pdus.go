@@ -187,6 +187,33 @@ func SendPDUs(
 						continue // NOTE: don't send this event on to the roomserver
 					}
 				}
+			case membership.Membership == spec.Invite:
+				stateKey := pdu.StateKey()
+				if stateKey == nil {
+					return util.JSONResponse{
+						Code: http.StatusForbidden,
+						JSON: spec.Forbidden("invalid state_key for membership event"),
+					}
+				}
+				userID, err := rsAPI.QueryUserIDForSender(req.Context(), pdu.RoomID(), spec.SenderID(*stateKey))
+				if err != nil || userID == nil {
+					return util.JSONResponse{
+						Code: http.StatusNotFound,
+						JSON: spec.NotFound("cannot find userID for invite event"),
+					}
+				}
+				if !cfg.Matrix.IsLocalServerName(spec.ServerName(userID.Domain())) {
+					inviteReq := roomserverAPI.PerformInviteRequestCryptoIDs{
+						RoomID:      pdu.RoomID().String(),
+						UserID:      *userID,
+						InviteEvent: pdu,
+					}
+					err := rsAPI.PerformSendInviteCryptoIDs(req.Context(), &inviteReq)
+					if err != nil {
+						util.GetLogger(req.Context()).Errorf("Failed processing %s event (%s): %v", pdu.Type(), pdu.EventID(), err)
+					}
+					continue // NOTE: don't send this event on to the roomserver
+				}
 			}
 		}
 

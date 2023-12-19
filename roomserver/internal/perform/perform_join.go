@@ -431,6 +431,23 @@ func (r *Joiner) PerformSendJoinCryptoIDs(
 	return nil
 }
 
+func (r *Joiner) PerformSendInviteCryptoIDs(
+	ctx context.Context,
+	req *rsAPI.PerformInviteRequestCryptoIDs,
+) error {
+	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
+		"room_id": req.RoomID,
+		"user_id": req.UserID,
+	})
+	logger.Info("performing send invite")
+	err := r.FSAPI.SendInviteCryptoIDs(ctx, req.InviteEvent, req.UserID, req.InviteEvent.Version())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // PerformJoin handles joining matrix rooms, including over federation by talking to the federationapi.
 func (r *Joiner) PerformJoinCryptoIDs(
 	ctx context.Context,

@@ -501,6 +501,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/ban",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/ban")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -544,6 +545,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/kick",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/kick")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -562,6 +564,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc4080/rooms/{roomID}/unban",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			logrus.Info("Processing request to /org.matrix.msc4080/rooms/{roomID}/unban")
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)

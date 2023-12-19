@@ -44,13 +44,19 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinRequestCryptoIDs struct {
-	RoomID      string                 `json:"room_id"`
-	UserID      string                 `json:"user_id"`
-	IsGuest     bool                   `json:"is_guest"`
-	Content     map[string]interface{} `json:"content"`
-	ServerNames []spec.ServerName      `json:"server_names"`
-	Unsigned    map[string]interface{} `json:"unsigned"`
+	RoomID      string
+	UserID      string
+	IsGuest     bool
+	Content     map[string]interface{}
+	ServerNames []spec.ServerName
+	Unsigned    map[string]interface{}
 	JoinEvent   gomatrixserverlib.PDU
+}
+
+type PerformInviteRequestCryptoIDs struct {
+	RoomID      string
+	UserID      spec.UserID
+	InviteEvent gomatrixserverlib.PDU
 }
 
 type PerformLeaveRequest struct {

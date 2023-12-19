@@ -247,6 +247,7 @@ type ClientRoomserverAPI interface {
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, cryptoIDs bool) (gomatrixserverlib.PDU, error)
 	PerformJoin(ctx context.Context, req *PerformJoinRequest) (roomID string, joinedVia spec.ServerName, err error)
 	PerformSendJoinCryptoIDs(ctx context.Context, req *PerformJoinRequestCryptoIDs) error
+	PerformSendInviteCryptoIDs(ctx context.Context, req *PerformInviteRequestCryptoIDs) error
 	PerformJoinCryptoIDs(ctx context.Context, req *PerformJoinRequest) (join gomatrixserverlib.PDU, roomID string, version gomatrixserverlib.RoomVersion, serverName spec.ServerName, err error)
 	PerformLeave(ctx context.Context, req *PerformLeaveRequest, res *PerformLeaveResponse, cryptoIDs bool) (gomatrixserverlib.PDU, error)
 	PerformPublish(ctx context.Context, req *PerformPublishRequest) error
