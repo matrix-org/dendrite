@@ -283,7 +283,6 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 
 type fakeUserInternalAPI struct {
 	uapi.ClientUserAPI
-	UserInternalAPIForLogin
 	DeletedTokens []string
 }
 

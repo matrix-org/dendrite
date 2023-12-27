@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/setup/config"
@@ -38,7 +39,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	defer natsLock.Unlock()
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
-		return setupNATS(cfg, nil)
+		return setupNATS(process, cfg, nil)
 	}
 	if s.Server == nil {
 		var err error
@@ -81,7 +82,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	if err != nil {
 		logrus.Fatalln("Failed to create NATS client")
 	}
-	js, _ := setupNATS(cfg, nc)
+	js, _ := setupNATS(process, cfg, nc)
 	s.js = js
 	s.nc = nc
 	return js, nc
@@ -89,6 +90,8 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 
 // nolint:gocyclo
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
+	var s nats.JetStreamContext
+	var err error
 	if nc == nil {
 		opts := []natsclient.Option{
 			natsclient.DisconnectErrHandler(func(c *natsclient.Conn, err error) {
@@ -222,7 +225,7 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 					process.Degraded(err)
 				}
 			}
-			// // Kozi's changes that are not in the original dendrite code
+			// Kozi's code, which defers from the original dendrite code
 			// err = configureStream(stream, cfg, s)
 			// if err != nil {
 			// 	logrus.WithError(err).WithField("stream", stream.Name).Fatal("unable to configure a stream")

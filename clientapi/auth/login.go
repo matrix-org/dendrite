@@ -32,9 +32,13 @@ import (
 // called after authorization has completed, with the result of the authorization.
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
+// func LoginFromJSONReader(ctx context.Context, r io.Reader,
+//
+//	useraccountAPI uapi.ClientUserAPI,
+//	cfg *config.ClientAPI, rt *ratelimit.RtFailedLogin) (*Login, LoginCleanupFunc, *util.JSONResponse) {
 func LoginFromJSONReader(
 	req *http.Request,
-	useraccountAPI uapi.UserLoginAPI,
+	useraccountAPI uapi.ClientUserAPI,
 	userAPI UserInternalAPIForLogin,
 	cfg *config.ClientAPI,
 	rt *ratelimit.RtFailedLogin,
@@ -68,7 +72,6 @@ func LoginFromJSONReader(
 			Config:        cfg,
 			Rt:            rt,
 			InhibitDevice: header.InhibitDevice,
-			UserLoginAPI:  useraccountAPI,
 		}
 	case authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{
@@ -88,6 +91,7 @@ func LoginFromJSONReader(
 		typ = &LoginTypeApplicationService{
 			Config: cfg,
 			Token:  token,
+		}
 	case authtypes.LoginTypeJwt:
 		typ = &LoginTypeTokenJwt{
 			Config: cfg,

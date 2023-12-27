@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -44,11 +45,10 @@ const email = "email"
 
 // LoginTypePassword implements https://matrix.org/docs/spec/client_server/r0.6.1#password-based
 type LoginTypePassword struct {
-	UserApi       api.ClientUserAPI
+	UserApi       uapi.ClientUserAPI
 	Config        *config.ClientAPI
 	Rt            *ratelimit.RtFailedLogin
 	InhibitDevice bool
-	UserLoginAPI  api.UserLoginAPI
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -195,7 +195,7 @@ func (t *LoginTypePassword) authenticateDb(ctx context.Context, localpart string
 	// If we couldn't find the user by the lower cased localpart, try the provided
 	// localpart as is.
 	if !res.Exists {
-		err = t.UserLoginAPI.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+		err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
 			ServerName:        domain,
 			PlaintextPassword: password,
@@ -339,7 +339,7 @@ func (t *LoginTypePassword) isLdapAdmin(conn *ldap.Conn, username string) (bool,
 
 func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart string, domain spec.ServerName, admin bool) (*api.Account, *util.JSONResponse) {
 	var existing api.QueryAccountByLocalpartResponse
-	err := t.UserLoginAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
+	err := t.UserApi.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
 		Localpart:  localpart,
 		ServerName: domain,
 	}, &existing)
@@ -359,7 +359,7 @@ func (t *LoginTypePassword) getOrCreateAccount(ctx context.Context, localpart st
 		accountType = api.AccountTypeAdmin
 	}
 	var created api.PerformAccountCreationResponse
-	err = t.UserLoginAPI.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
+	err = t.UserApi.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
 		AppServiceID: "ldap",
 		Localpart:    localpart,
 		Password:     uuid.New().String(),
