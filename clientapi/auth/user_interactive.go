@@ -66,6 +66,7 @@ type LoginIdentifier struct {
 type Login struct {
 	LoginIdentifier                 // Flat fields deprecated in favour of `identifier`.
 	Identifier      LoginIdentifier `json:"identifier"`
+	InhibitDevice   bool            `json:"inhibit_device,omitempty"`
 
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
@@ -75,7 +76,7 @@ type Login struct {
 
 // Username returns the user localpart/user_id in this request, if it exists.
 func (r *Login) Username() string {
-	if r.Identifier.Type == "m.id.user" {
+	if r.Identifier.Type == mIdUser {
 		return r.Identifier.User
 	}
 	// deprecated but without it Element iOS won't log in
@@ -88,8 +89,8 @@ func (r *Login) ThirdPartyID() (medium, address string) {
 		return r.Identifier.Medium, r.Identifier.Address
 	}
 	// deprecated
-	if r.Medium == "email" {
-		return "email", r.Address
+	if r.Medium == email {
+		return email, r.Address
 	}
 	return "", ""
 }
@@ -111,10 +112,11 @@ type UserInteractive struct {
 	Sessions map[string][]string
 }
 
-func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) *UserInteractive {
+func NewUserInteractive(userAccountAPI api.ClientUserAPI, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
-		GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
-		Config:               cfg,
+		UserApi:      userAccountAPI,
+		UserLoginAPI: userAccountAPI,
+		Config:       cfg,
 	}
 	return &UserInteractive{
 		Flows: []userInteractiveFlow{
@@ -140,7 +142,7 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 	return false
 }
 
-func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
+func (u *UserInteractive) AddCompletedStage(sessionID, _ string) {
 	u.Lock()
 	// TODO: Handle multi-stage flows
 	delete(u.Sessions, sessionID)
@@ -220,7 +222,7 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
 // Returns the login that was verified for additional checks if required.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, _ *api.Device) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"

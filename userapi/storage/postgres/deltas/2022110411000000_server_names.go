@@ -35,6 +35,7 @@ var serverNamesDropPK = map[string]string{
 var serverNamesDropIndex = []string{
 	"userapi_pusher_localpart_idx",
 	"userapi_pusher_app_id_pushkey_localpart_idx",
+	"userapi_pusher_app_id_pushkey_idx",
 }
 
 // I know what you're thinking: you're wondering "why doesn't this use $1

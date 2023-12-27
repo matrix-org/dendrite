@@ -144,6 +144,8 @@ type QueryAcccessTokenAPI interface {
 
 type UserLoginAPI interface {
 	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
+	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) error
+	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -238,6 +240,7 @@ type PerformDeviceUpdateRequest struct {
 }
 type PerformDeviceUpdateResponse struct {
 	DeviceExists bool
+	Forbidden    bool
 }
 
 type PerformDeviceDeletionRequest struct {
@@ -291,6 +294,12 @@ type QueryAccountDataRequest struct {
 type QueryAccountDataResponse struct {
 	GlobalAccountData map[string]json.RawMessage            // type -> data
 	RoomAccountData   map[string]map[string]json.RawMessage // room -> type -> data
+}
+
+// Custom Connnect AccountData information
+type AccountData struct {
+	IsProfileFilled    bool  `json:"isProfileFilled"`
+	LatestKeysUploadTs int64 `json:"latestKeysUploadTs"`
 }
 
 // QueryDevicesRequest is the request for QueryDevices

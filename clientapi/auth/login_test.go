@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
@@ -116,6 +117,9 @@ func TestLoginFromJSONReader(t *testing.T) {
 						},
 					},
 				},
+				RtFailedLogin: ratelimit.RtFailedLoginConfig{
+					Enabled: false,
+				},
 			}
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tst.Body))
@@ -123,7 +127,7 @@ func TestLoginFromJSONReader(t *testing.T) {
 				req.Header.Add("Authorization", "Bearer "+tst.Token)
 			}
 
-			login, cleanup, jsonErr := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
+			login, cleanup, jsonErr := LoginFromJSONReader(req, &userAPI, &userAPI, cfg, nil)
 			if jsonErr != nil {
 				t.Fatalf("LoginFromJSONReader failed: %+v", jsonErr)
 			}
@@ -266,7 +270,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 				req.Header.Add("Authorization", "Bearer "+tst.Token)
 			}
 
-			_, cleanup, errRes := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
+			_, cleanup, errRes := LoginFromJSONReader(req, &userAPI, &userAPI, cfg, nil)
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
@@ -278,6 +282,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 }
 
 type fakeUserInternalAPI struct {
+	uapi.ClientUserAPI
 	UserInternalAPIForLogin
 	DeletedTokens []string
 }

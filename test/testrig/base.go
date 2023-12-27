@@ -85,7 +85,6 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "roomserver.db"))
 		cfg.SyncAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "syncapi.db"))
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
-		cfg.RelayAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "relayapi.db"))
 
 		return &cfg, ctx, func() {
 			ctx.ShutdownDendrite()

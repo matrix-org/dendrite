@@ -17,6 +17,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -58,6 +59,13 @@ func SendToDevice(
 					JSON: spec.InternalServerError{},
 				}
 			}
+			logrus.WithFields(logrus.Fields{
+				"to_device_id":   deviceID,
+				"to_user_id":     userID,
+				"from_user_id":   device.UserID,
+				"from_device_id": device.ID,
+				"type":           eventType,
+			}).Debug("to-device-message sent")
 		}
 	}
 

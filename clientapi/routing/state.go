@@ -120,7 +120,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
-		if !membershipRes.HasBeenInRoom {
+		if !membershipRes.HasBeenInRoom && membershipRes.Membership != spec.Invite {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
@@ -198,6 +198,8 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
 // If eventFormat=true, sends the whole event else just the content.
+//
+//nolint:gocyclo
 func OnIncomingStateTypeRequest(
 	ctx context.Context, device *userapi.Device, rsAPI api.ClientRoomserverAPI,
 	roomID, evType, stateKey string, eventFormat bool,
@@ -320,7 +322,7 @@ func OnIncomingStateTypeRequest(
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
-		if !membershipRes.HasBeenInRoom || membershipRes.Membership == spec.Ban {
+		if (!membershipRes.HasBeenInRoom && membershipRes.Membership != spec.Invite) || membershipRes.Membership == spec.Ban {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),

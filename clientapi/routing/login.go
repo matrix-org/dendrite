@@ -28,9 +28,10 @@ import (
 )
 
 type loginResponse struct {
-	UserID      string `json:"user_id"`
-	AccessToken string `json:"access_token"`
-	DeviceID    string `json:"device_id"`
+	UserID      string          `json:"user_id"`
+	AccessToken string          `json:"access_token"`
+	HomeServer  spec.ServerName `json:"home_server"`
+	DeviceID    string          `json:"device_id"`
 }
 
 type flows struct {
@@ -45,6 +46,7 @@ type flow struct {
 func Login(
 	req *http.Request, userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
+	rt *ratelimit.RtFailedLogin,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
 		loginFlows := []flow{{Type: authtypes.LoginTypePassword}}
@@ -59,9 +61,20 @@ func Login(
 			},
 		}
 	} else if req.Method == http.MethodPost {
-		login, cleanup, authErr := auth.LoginFromJSONReader(req, userAPI, userAPI, cfg)
+		login, cleanup, authErr := auth.LoginFromJSONReader(req, userAPI, userAPI, cfg, rt)
 		if authErr != nil {
 			return *authErr
+		}
+		if login.InhibitDevice {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: loginResponse{
+					UserID:      login.User,
+					AccessToken: "",
+					HomeServer:  cfg.Matrix.ServerName,
+					DeviceID:    "",
+				},
+			}
 		}
 		// make a device/access token
 		authErr2 := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
@@ -118,6 +131,7 @@ func completeAuth(
 		JSON: loginResponse{
 			UserID:      performRes.Device.UserID,
 			AccessToken: performRes.Device.AccessToken,
+			HomeServer:  serverName,
 			DeviceID:    performRes.Device.ID,
 		},
 	}

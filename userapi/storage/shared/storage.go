@@ -638,12 +638,11 @@ func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, serverName spec.ServerName,
 	deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
-	if deviceID != nil {
+	if deviceID != nil && *deviceID != "" {
 		_, ok := d.Writer.(*sqlutil.ExclusiveWriter)
 		if ok { // we're using most likely using SQLite, so do things a little different
 			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 				var err error
-
 				devices, err := d.Devices.SelectDevicesByLocalpart(ctx, txn, localpart, serverName, "")
 				if err != nil && !errors.Is(err, sql.ErrNoRows) {
 					return err

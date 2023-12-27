@@ -283,6 +283,11 @@ func (r *Queryer) queryMembershipForOptionalSenderID(ctx context.Context, roomID
 		return err
 	}
 
+	if membershipState == tables.MembershipStateInvite {
+		response.Membership = spec.Invite
+		response.IsInRoom = true
+	}
+
 	response.IsRoomForgotten = isRoomforgotten
 
 	if membershipEventNID == 0 {
@@ -441,7 +446,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 		return nil
 	}
 
-	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.SenderID)
+	membershipEventNID, _, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.SenderID)
 	if err != nil {
 		return err
 	}
@@ -989,7 +994,7 @@ func (r *Queryer) CurrentStateEvent(ctx context.Context, roomID spec.RoomID, eve
 }
 
 func (r *Queryer) UserJoinedToRoom(ctx context.Context, roomNID types.RoomNID, senderID spec.SenderID) (bool, error) {
-	_, isIn, _, err := r.DB.GetMembership(ctx, roomNID, senderID)
+	_, _, isIn, _, err := r.DB.GetMembership(ctx, roomNID, senderID)
 	return isIn, err
 }
 

@@ -19,14 +19,13 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a new database
 func NewDatabase(
-	conMan sqlutil.Connections,
+	conMan *sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,

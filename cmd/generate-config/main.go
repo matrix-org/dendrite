@@ -42,7 +42,6 @@ func main() {
 				"roomserver":    &cfg.RoomServer.Database,
 				"syncapi":       &cfg.SyncAPI.Database,
 				"userapi":       &cfg.UserAPI.AccountDatabase,
-				"relayapi":      &cfg.RelayAPI.Database,
 			} {
 				if uri == "" {
 					path := filepath.Join(*dirPath, fmt.Sprintf("dendrite_%s.db", name))

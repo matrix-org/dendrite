@@ -115,18 +115,23 @@ func CheckAssociation(
 	ctx context.Context, creds Credentials, cfg *config.ClientAPI,
 	client *fclient.Client,
 ) (bool, string, string, error) {
-	if err := isTrusted(creds.IDServer, cfg); err != nil {
-		return false, "", "", err
-	}
 
-	requestURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", creds.IDServer, creds.SID, creds.Secret)
+	requestURL := fmt.Sprintf("%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", cfg.ThreePidDelegate, creds.SID, creds.Secret)
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
 		return false, "", "", err
 	}
-	resp, err := client.DoHTTPRequest(ctx, req)
-	if err != nil {
-		return false, "", "", err
+	var resp *http.Response
+	if client != nil {
+		resp, err = client.DoHTTPRequest(ctx, req)
+		if err != nil {
+			return false, "", "", err
+		}
+	} else {
+		resp, err = http.DefaultClient.Do(req.WithContext(ctx))
+		if err != nil {
+			return false, "", "", err
+		}
 	}
 
 	var respBody GetValidatedResponse

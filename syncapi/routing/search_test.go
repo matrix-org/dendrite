@@ -217,7 +217,7 @@ func TestSearch(t *testing.T) {
 		assert.NotNil(t, fts)
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
+		db, _, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
 		assert.NoError(t, err)
 
 		elements := []fulltext.IndexElement{}
