@@ -108,16 +108,12 @@ type worker struct {
 	r            *Inputer
 	roomID       string
 	subscription *nats.Subscription
-	sentryHub    *sentry.Hub
 }
 
 func (r *Inputer) startWorkerForRoom(roomID string) {
 	v, loaded := r.workers.LoadOrStore(roomID, &worker{
 		r:      r,
 		roomID: roomID,
-		// We're cloning the CurrentHub, as we otherwise get total garbage
-		// in sentry, with i.e. mismatching rooms and event_ids.
-		sentryHub: sentry.CurrentHub().Clone(),
 	})
 	w := v.(*worker)
 	w.Lock()
@@ -269,7 +265,7 @@ func (w *worker) _next() {
 	// Look up what the next event is that's waiting to be processed.
 	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
 	defer cancel()
-	if scope := w.sentryHub.Scope(); scope != nil {
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
 		scope.SetTag("room_id", w.roomID)
 	}
 	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
@@ -327,7 +323,7 @@ func (w *worker) _next() {
 		return
 	}
 
-	if scope := w.sentryHub.Scope(); scope != nil {
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
 		scope.SetTag("event_id", inputRoomEvent.Event.EventID())
 	}
 
@@ -351,7 +347,7 @@ func (w *worker) _next() {
 			}).Warn("Roomserver rejected event")
 		default:
 			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-				w.sentryHub.CaptureException(err)
+				sentry.CaptureException(err)
 			}
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"room_id":  w.roomID,
