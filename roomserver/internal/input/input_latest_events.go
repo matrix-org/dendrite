@@ -79,12 +79,26 @@ func (r *Inputer) updateLatestEvents(
 		return nil
 	}
 
+	// Attempt to get Sentry hub
+	w, loaded := r.workers.Load(event.RoomID())
+	if !loaded {
+		// this _should_ never happen...
+		logrus.Panicf("failed to load worker on existing room")
+	}
+
+	s, ok := w.(*worker)
+	if !ok {
+		// this _should_ never happen as well...
+		logrus.Panicf("failed to get sentry hub from worker")
+	}
+
 	u := latestEventsUpdater{
 		api:           r,
 		updater:       updater,
 		stateAtEvent:  stateAtEvent,
 		event:         event,
 		rewritesState: rewritesState,
+		sentryHub:     s.sentryHub,
 	}
 
 	var updates []api.OutputEvent
@@ -149,6 +163,7 @@ type latestEventsUpdater struct {
 	// The snapshots of current state before and after processing this event
 	oldStateNID types.StateSnapshotNID
 	newStateNID types.StateSnapshotNID
+	sentryHub   *sentry.Hub
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context, roomInfo *types.RoomInfo) ([]api.OutputEvent, error) {
@@ -288,7 +303,7 @@ func (u *latestEventsUpdater) latestState(ctx context.Context, roomInfo *types.R
 			"rewrites_state": u.rewritesState,
 			"state_at_event": fmt.Sprintf("%#v", u.stateAtEvent),
 		}).Warnf("State reset detected (removing %d events)", removed)
-		sentry.WithScope(func(scope *sentry.Scope) {
+		u.sentryHub.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
 			scope.SetContext("State reset", map[string]interface{}{
 				"Event ID":        u.event.EventID(),
@@ -300,7 +315,7 @@ func (u *latestEventsUpdater) latestState(ctx context.Context, roomInfo *types.R
 				"State rewritten": fmt.Sprintf("%v", u.rewritesState),
 				"State at event":  fmt.Sprintf("%#v", u.stateAtEvent),
 			})
-			sentry.CaptureMessage("State reset detected")
+			u.sentryHub.CaptureMessage("State reset detected")
 		})
 	}
 
