@@ -15,7 +15,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -33,8 +32,18 @@ import (
 // called after authorization has completed, with the result of the authorization.
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
-func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.ClientUserAPI, cfg *config.ClientAPI, rt *ratelimit.RtFailedLogin) (*Login, LoginCleanupFunc, *util.JSONResponse) {
-	reqBytes, err := io.ReadAll(r)
+// func LoginFromJSONReader(ctx context.Context, r io.Reader,
+//
+//	useraccountAPI uapi.ClientUserAPI,
+//	cfg *config.ClientAPI, rt *ratelimit.RtFailedLogin) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+func LoginFromJSONReader(
+	req *http.Request,
+	useraccountAPI uapi.ClientUserAPI,
+	userAPI UserInternalAPIForLogin,
+	cfg *config.ClientAPI,
+	rt *ratelimit.RtFailedLogin,
+) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+	reqBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		err := &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -63,12 +72,25 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 			Config:        cfg,
 			Rt:            rt,
 			InhibitDevice: header.InhibitDevice,
-			UserLoginAPI:  useraccountAPI,
 		}
 	case authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{
 			UserAPI: useraccountAPI,
 			Config:  cfg,
+		}
+	case authtypes.LoginTypeApplicationService:
+		token, err := ExtractAccessToken(req)
+		if err != nil {
+			err := &util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: spec.MissingToken(err.Error()),
+			}
+			return nil, nil, err
+		}
+
+		typ = &LoginTypeApplicationService{
+			Config: cfg,
+			Token:  token,
 		}
 	case authtypes.LoginTypeJwt:
 		typ = &LoginTypeTokenJwt{
@@ -82,7 +104,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 		return nil, nil, &err
 	}
 
-	return typ.LoginFromJSON(ctx, reqBytes)
+	return typ.LoginFromJSON(req.Context(), reqBytes)
 }
 
 // UserInternalAPIForLogin contains the aspects of UserAPI required for logging in.

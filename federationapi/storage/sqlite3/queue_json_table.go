@@ -135,5 +135,5 @@ func (s *queueJSONStatements) SelectQueueJSON(
 		}
 		blobs[nid] = blob
 	}
-	return blobs, err
+	return blobs, rows.Err()
 }

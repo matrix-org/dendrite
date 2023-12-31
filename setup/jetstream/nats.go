@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/setup/config"
@@ -38,7 +39,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	defer natsLock.Unlock()
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
-		return setupNATS(cfg, nil)
+		return setupNATS(process, cfg, nil)
 	}
 	if s.Server == nil {
 		var err error
@@ -70,7 +71,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			process.ComponentFinished()
 		}()
 	}
-	if !s.ReadyForConnections(time.Second * 10) {
+	if !s.ReadyForConnections(time.Second * 60) {
 		logrus.Fatalln("NATS did not start in time")
 	}
 	// reuse existing connections
@@ -81,13 +82,14 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	if err != nil {
 		logrus.Fatalln("Failed to create NATS client")
 	}
-	js, _ := setupNATS(cfg, nc)
+	js, _ := setupNATS(process, cfg, nc)
 	s.js = js
 	s.nc = nc
 	return js, nc
 }
 
-func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
+// nolint:gocyclo
+func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	var s nats.JetStreamContext
 	var err error
 	if nc == nil {
@@ -131,9 +133,102 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 	}
 
 	for _, stream := range streams { // streams are defined in streams.go
-		err = configureStream(stream, cfg, s)
-		if err != nil {
-			logrus.WithError(err).WithField("stream", stream.Name).Fatal("unable to configure a stream")
+		name := cfg.Prefixed(stream.Name)
+		info, err := s.StreamInfo(name)
+		if err != nil && err != natsclient.ErrStreamNotFound {
+			logrus.WithError(err).Fatal("Unable to get stream info")
+		}
+		subjects := stream.Subjects
+		if len(subjects) == 0 {
+			// By default we want each stream to listen for the subjects
+			// that are either an exact match for the stream name, or where
+			// the first part of the subject is the stream name. ">" is a
+			// wildcard in NATS for one or more subject tokens. In the case
+			// that the stream is called "Foo", this will match any message
+			// with the subject "Foo", "Foo.Bar" or "Foo.Bar.Baz" etc.
+			subjects = []string{name, name + ".>"}
+		}
+		if info != nil {
+			// If the stream config doesn't match what we expect, try to update
+			// it. If that doesn't work then try to blow it away and we'll then
+			// recreate it in the next section.
+			// Each specific option that we set must be checked by hand, as if
+			// you DeepEqual the whole config struct, it will always show that
+			// there's a difference because the NATS Server will return defaults
+			// in the stream info.
+			switch {
+			case !reflect.DeepEqual(info.Config.Subjects, subjects):
+				fallthrough
+			case info.Config.Retention != stream.Retention:
+				fallthrough
+			case info.Config.Storage != stream.Storage:
+				fallthrough
+			case info.Config.MaxAge != stream.MaxAge:
+				// Try updating the stream first, as many things can be updated
+				// non-destructively.
+				if info, err = s.UpdateStream(stream); err != nil {
+					logrus.WithError(err).Warnf("Unable to update stream %q, recreating...", name)
+					// We failed to update the stream, this is a last attempt to get
+					// things working but may result in data loss.
+					if err = s.DeleteStream(name); err != nil {
+						logrus.WithError(err).Fatalf("Unable to delete stream %q", name)
+					}
+					info = nil
+				}
+			}
+		}
+		if info == nil {
+			// If we're trying to keep everything in memory (e.g. unit tests)
+			// then overwrite the storage policy.
+			if cfg.InMemory {
+				stream.Storage = natsclient.MemoryStorage
+			}
+
+			// Namespace the streams without modifying the original streams
+			// array, otherwise we end up with namespaces on namespaces.
+			namespaced := *stream
+			namespaced.Name = name
+			namespaced.Subjects = subjects
+			if _, err = s.AddStream(&namespaced); err != nil {
+				logger := logrus.WithError(err).WithFields(logrus.Fields{
+					"stream":   namespaced.Name,
+					"subjects": namespaced.Subjects,
+				})
+
+				// If the stream was supposed to be in-memory to begin with
+				// then an error here is fatal so we'll give up.
+				if namespaced.Storage == natsclient.MemoryStorage {
+					logger.WithError(err).Fatal("Unable to add in-memory stream")
+				}
+
+				// The stream was supposed to be on disk. Let's try starting
+				// Dendrite with the stream in-memory instead. That'll mean that
+				// we can't recover anything that was queued on the disk but we
+				// will still be able to start and run hopefully in the meantime.
+				logger.WithError(err).Error("Unable to add stream")
+				sentry.CaptureException(fmt.Errorf("Unable to add stream %q: %w", namespaced.Name, err))
+
+				namespaced.Storage = natsclient.MemoryStorage
+				if _, err = s.AddStream(&namespaced); err != nil {
+					// We tried to add the stream in-memory instead but something
+					// went wrong. That's an unrecoverable situation so we will
+					// give up at this point.
+					logger.WithError(err).Fatal("Unable to add in-memory stream")
+				}
+
+				if stream.Storage != namespaced.Storage {
+					// We've managed to add the stream in memory.  What's on the
+					// disk will be left alone, but our ability to recover from a
+					// future crash will be limited. Yell about it.
+					err := fmt.Errorf("Stream %q is running in-memory; this may be due to data corruption in the JetStream storage directory", namespaced.Name)
+					sentry.CaptureException(err)
+					process.Degraded(err)
+				}
+			}
+			// Kozi's code, which defers from the original dendrite code
+			// err = configureStream(stream, cfg, s)
+			// if err != nil {
+			// 	logrus.WithError(err).WithField("stream", stream.Name).Fatal("unable to configure a stream")
 		}
 	}
 

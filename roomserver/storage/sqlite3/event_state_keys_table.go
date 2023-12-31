@@ -136,7 +136,7 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 		}
 		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *eventStateKeyStatements) BulkSelectEventStateKey(
@@ -167,5 +167,5 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKey(
 		}
 		result[types.EventStateKeyNID(stateKeyNID)] = stateKey
 	}
-	return result, nil
+	return result, rows.Err()
 }

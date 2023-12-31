@@ -55,7 +55,7 @@ type LoginCleanupFunc func(context.Context, *util.JSONResponse)
 // https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
 type LoginIdentifier struct {
 	Type string `json:"type"`
-	// when type = m.id.user
+	// when type = m.id.user or m.id.application_service
 	User string `json:"user"`
 	// when type = m.id.thirdparty
 	Medium  string `json:"medium"`
@@ -114,9 +114,8 @@ type UserInteractive struct {
 
 func NewUserInteractive(userAccountAPI api.ClientUserAPI, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
-		UserApi:      userAccountAPI,
-		UserLoginAPI: userAccountAPI,
-		Config:       cfg,
+		UserApi: userAccountAPI,
+		Config:  cfg,
 	}
 	return &UserInteractive{
 		Flows: []userInteractiveFlow{

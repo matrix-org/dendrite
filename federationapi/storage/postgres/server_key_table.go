@@ -94,12 +94,14 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectServerKeys: rows.close() failed")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+
+	var serverName string
+	var keyID string
+	var key string
+	var validUntilTS int64
+	var expiredTS int64
+	var vk gomatrixserverlib.VerifyKey
 	for rows.Next() {
-		var serverName string
-		var keyID string
-		var key string
-		var validUntilTS int64
-		var expiredTS int64
 		if err = rows.Scan(&serverName, &keyID, &validUntilTS, &expiredTS, &key); err != nil {
 			return nil, err
 		}
@@ -107,7 +109,6 @@ func (s *serverSigningKeyStatements) BulkSelectServerKeys(
 			ServerName: spec.ServerName(serverName),
 			KeyID:      gomatrixserverlib.KeyID(keyID),
 		}
-		vk := gomatrixserverlib.VerifyKey{}
 		err = vk.Key.Decode(key)
 		if err != nil {
 			return nil, err
