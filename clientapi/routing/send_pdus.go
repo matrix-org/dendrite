@@ -43,6 +43,7 @@ type sendPDUsRequest struct {
 }
 
 // SendPDUs implements /sendPDUs
+// nolint:gocyclo
 func SendPDUs(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
@@ -195,17 +196,17 @@ func SendPDUs(
 						JSON: spec.Forbidden("invalid state_key for membership event"),
 					}
 				}
-				userID, err := rsAPI.QueryUserIDForSender(req.Context(), pdu.RoomID(), spec.SenderID(*stateKey))
-				if err != nil || userID == nil {
+				invitedUserID, err := rsAPI.QueryUserIDForSender(req.Context(), pdu.RoomID(), spec.SenderID(*stateKey))
+				if err != nil || invitedUserID == nil {
 					return util.JSONResponse{
 						Code: http.StatusNotFound,
 						JSON: spec.NotFound("cannot find userID for invite event"),
 					}
 				}
-				if !cfg.Matrix.IsLocalServerName(spec.ServerName(userID.Domain())) {
+				if !cfg.Matrix.IsLocalServerName(spec.ServerName(invitedUserID.Domain())) {
 					inviteReq := roomserverAPI.PerformInviteRequestCryptoIDs{
 						RoomID:      pdu.RoomID().String(),
-						UserID:      *userID,
+						UserID:      *invitedUserID,
 						InviteEvent: pdu,
 					}
 					err := rsAPI.PerformSendInviteCryptoIDs(req.Context(), &inviteReq)

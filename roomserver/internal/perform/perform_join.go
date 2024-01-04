@@ -663,8 +663,8 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 
 	// If we should do a forced federated join then do that.
 	if forceFederatedJoin {
-		joinEvent, version, serverName, err := r.performFederatedMakeJoinByIDCryptoIDs(ctx, req)
-		return joinEvent, req.RoomIDOrAlias, version, serverName, err
+		joinEvent, version, serverName, federatedJoinErr := r.performFederatedMakeJoinByIDCryptoIDs(ctx, req)
+		return joinEvent, req.RoomIDOrAlias, version, serverName, federatedJoinErr
 	}
 
 	// Try to construct an actual join event from the template.
@@ -746,8 +746,8 @@ func (r *Joiner) performJoinRoomByIDCryptoIDs(
 		}
 
 		// Perform a federated room join.
-		joinEvent, version, serverName, err := r.performFederatedMakeJoinByIDCryptoIDs(ctx, req)
-		return joinEvent, req.RoomIDOrAlias, version, serverName, err
+		joinEvent, version, serverName, federatedJoinErr := r.performFederatedMakeJoinByIDCryptoIDs(ctx, req)
+		return joinEvent, req.RoomIDOrAlias, version, serverName, federatedJoinErr
 
 	default:
 		// Something else went wrong.

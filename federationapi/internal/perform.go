@@ -310,7 +310,7 @@ func (r *FederationInternalAPI) PerformMakeJoin(
 			WrappedError: nil,
 			Message:      "Unknown HTTP error",
 		}
-		if lastError != nil {
+		if lastErr != nil {
 			lastError.Message = lastErr.Error()
 		}
 	}
@@ -451,7 +451,7 @@ func (r *FederationInternalAPI) PerformSendJoin(
 			WrappedError: nil,
 			Message:      "Unknown HTTP error",
 		}
-		if lastError != nil {
+		if lastErr != nil {
 			lastError.Message = lastErr.Error()
 		}
 	}
@@ -460,7 +460,6 @@ func (r *FederationInternalAPI) PerformSendJoin(
 		"failed to join user %q to room %q through %d server(s): last error %s",
 		request.UserID, request.RoomID, len(request.ServerNames), lastError,
 	)
-	return
 }
 
 func (r *FederationInternalAPI) performSendJoinUsingServer(

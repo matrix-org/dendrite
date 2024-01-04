@@ -535,8 +535,8 @@ func generateSendEvent(
 
 	var identity fclient.SigningIdentity
 	if !cryptoIDs {
-		id, err := rsAPI.SigningIdentityFor(ctx, *validRoomID, *fullUserID)
-		if err != nil {
+		id, idErr := rsAPI.SigningIdentityFor(ctx, *validRoomID, *fullUserID)
+		if idErr != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
