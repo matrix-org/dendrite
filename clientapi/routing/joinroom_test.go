@@ -67,7 +67,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			Preset:        spec.PresetPublicChat,
 			RoomAliasName: "alias",
 			Invite:        []string{bob.ID},
-		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
+		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now(), false)
 		crResp, ok := resp.JSON.(createRoomResponse)
 		if !ok {
 			t.Fatalf("response is not a createRoomResponse: %+v", resp)
@@ -81,7 +81,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			Visibility: "public",
 			Preset:     spec.PresetPublicChat,
 			Invite:     []string{charlie.ID},
-		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
+		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now(), false)
 		crRespWithGuestAccess, ok := resp.JSON.(createRoomResponse)
 		if !ok {
 			t.Fatalf("response is not a createRoomResponse: %+v", resp)

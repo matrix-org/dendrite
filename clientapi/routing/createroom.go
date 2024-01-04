@@ -108,147 +108,6 @@ type createRoomResponse struct {
 	RoomAlias string `json:"room_alias,omitempty"` // in synapse not spec
 }
 
-// CreateRoomCryptoIDs implements /createRoom
-func CreateRoomCryptoIDs(
-	req *http.Request, device *api.Device,
-	cfg *config.ClientAPI,
-	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceInternalAPI,
-) util.JSONResponse {
-	var createRequest createRoomRequest
-	resErr := httputil.UnmarshalJSONRequest(req, &createRequest)
-	if resErr != nil {
-		return *resErr
-	}
-	if resErr = createRequest.Validate(); resErr != nil {
-		return *resErr
-	}
-	evTime, err := httputil.ParseTSParam(req)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.InvalidParam(err.Error()),
-		}
-	}
-
-	return makeCreateRoomEvents(req.Context(), createRequest, device, cfg, profileAPI, rsAPI, asAPI, evTime)
-}
-
-func makeCreateRoomEvents(
-	ctx context.Context,
-	createRequest createRoomRequest, device *api.Device,
-	cfg *config.ClientAPI,
-	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceInternalAPI,
-	evTime time.Time,
-) util.JSONResponse {
-	userID, err := spec.NewUserID(device.UserID, true)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid userID")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-	if !cfg.Matrix.IsLocalServerName(userID.Domain()) {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userID.Domain())),
-		}
-	}
-
-	logger := util.GetLogger(ctx)
-
-	// TODO: Check room ID doesn't clash with an existing one, and we
-	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID, err := spec.NewRoomID(fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain()))
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid roomID")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-
-	// Clobber keys: creator, room_version
-
-	roomVersion := rsAPI.DefaultRoomVersion()
-	if createRequest.RoomVersion != "" {
-		candidateVersion := gomatrixserverlib.RoomVersion(createRequest.RoomVersion)
-		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
-		if roomVersionError != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: spec.UnsupportedRoomVersion(roomVersionError.Error()),
-			}
-		}
-		roomVersion = candidateVersion
-	}
-
-	logger.WithFields(log.Fields{
-		"userID":      userID.String(),
-		"roomID":      roomID.String(),
-		"roomVersion": roomVersion,
-	}).Info("Creating new room")
-
-	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-
-	userDisplayName := profile.DisplayName
-	userAvatarURL := profile.AvatarURL
-
-	keyID := cfg.Matrix.KeyID
-	privateKey := cfg.Matrix.PrivateKey
-
-	req := roomserverAPI.PerformCreateRoomRequest{
-		InvitedUsers:              createRequest.Invite,
-		RoomName:                  createRequest.Name,
-		Visibility:                createRequest.Visibility,
-		Topic:                     createRequest.Topic,
-		StatePreset:               createRequest.Preset,
-		CreationContent:           createRequest.CreationContent,
-		InitialState:              createRequest.InitialState,
-		RoomAliasName:             createRequest.RoomAliasName,
-		RoomVersion:               roomVersion,
-		PowerLevelContentOverride: createRequest.PowerLevelContentOverride,
-		IsDirect:                  createRequest.IsDirect,
-
-		UserDisplayName: userDisplayName,
-		UserAvatarURL:   userAvatarURL,
-		KeyID:           keyID,
-		PrivateKey:      privateKey,
-		EventTime:       evTime,
-
-		SenderID: createRequest.CryptoID,
-	}
-
-	createEvents, err := rsAPI.PerformCreateRoomCryptoIDs(ctx, *userID, *roomID, &req)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("MakeCreateRoomEvents failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{Err: err.Error()},
-		}
-	}
-
-	response := createRoomCryptoIDsResponse{
-		RoomID:  roomID.String(),
-		Version: string(roomVersion),
-		PDUs:    ToProtoEvents(ctx, createEvents, rsAPI),
-	}
-
-	return util.JSONResponse{
-		Code: 200,
-		JSON: response,
-	}
-}
-
 type createRoomCryptoIDsResponse struct {
 	RoomID  string            `json:"room_id"`
 	Version string            `json:"room_version"`
@@ -269,6 +128,7 @@ func CreateRoom(
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	var createRequest createRoomRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &createRequest)
@@ -285,7 +145,7 @@ func CreateRoom(
 			JSON: spec.InvalidParam(err.Error()),
 		}
 	}
-	return createRoom(req.Context(), createRequest, device, cfg, profileAPI, rsAPI, asAPI, evTime)
+	return createRoom(req.Context(), createRequest, device, cfg, profileAPI, rsAPI, asAPI, evTime, cryptoIDs)
 }
 
 func createRoom(
@@ -295,6 +155,7 @@ func createRoom(
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	evTime time.Time,
+	cryptoIDs bool,
 ) util.JSONResponse {
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
@@ -380,18 +241,42 @@ func createRoom(
 		EventTime:       evTime,
 	}
 
-	roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, *userID, *roomID, &req)
-	if createRes != nil {
-		return *createRes
+	if !cryptoIDs {
+		roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, *userID, *roomID, &req)
+		if createRes != nil {
+			return *createRes
+		}
+
+		response := createRoomResponse{
+			RoomID:    roomID.String(),
+			RoomAlias: roomAlias,
+		}
+
+		return util.JSONResponse{
+			Code: 200,
+			JSON: response,
+		}
+	} else {
+		req.SenderID = createRequest.CryptoID
+		createEvents, err := rsAPI.PerformCreateRoomCryptoIDs(ctx, *userID, *roomID, &req)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("MakeCreateRoomEvents failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{Err: err.Error()},
+			}
+		}
+
+		response := createRoomCryptoIDsResponse{
+			RoomID:  roomID.String(),
+			Version: string(roomVersion),
+			PDUs:    ToProtoEvents(ctx, createEvents, rsAPI),
+		}
+
+		return util.JSONResponse{
+			Code: 200,
+			JSON: response,
+		}
 	}
 
-	response := createRoomResponse{
-		RoomID:    roomID.String(),
-		RoomAlias: roomAlias,
-	}
-
-	return util.JSONResponse{
-		Code: 200,
-		JSON: response,
-	}
 }

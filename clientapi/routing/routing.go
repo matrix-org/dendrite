@@ -309,13 +309,13 @@ func Setup(
 
 	v3mux.Handle("/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return CreateRoom(req, device, cfg, userAPI, rsAPI, asAPI)
+			return CreateRoom(req, device, cfg, userAPI, rsAPI, asAPI, false)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc4080/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			logrus.Info("Processing request to /org.matrix.msc4080/createRoom")
-			return CreateRoomCryptoIDs(req, device, cfg, userAPI, rsAPI, asAPI)
+			return CreateRoom(req, device, cfg, userAPI, rsAPI, asAPI, true)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	unstableMux.Handle("/org.matrix.msc4080/send_pdus/{txnID}",
