@@ -17,6 +17,7 @@ package routing
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	clienthttputil "github.com/matrix-org/dendrite/clientapi/httputil"
@@ -202,7 +203,13 @@ func NotaryKeys(
 	fsAPI federationAPI.FederationInternalAPI,
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
-	serverName := spec.ServerName(httpReq.Host) // TODO: this is not ideal
+	// strip any additional :PORT from httpReq.Host
+	s := httpReq.Host
+	if i := strings.Index(s, ":"); i > 0 {
+		s = httpReq.Host[:i]
+	}
+
+	serverName := spec.ServerName(s)
 	if !cfg.Matrix.IsLocalServerName(serverName) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -224,6 +231,7 @@ func NotaryKeys(
 
 	for serverName, kidToCriteria := range req.ServerKeys {
 		var keyList []gomatrixserverlib.ServerKeys
+		// Returns _all_ of our keys, incl. old keys, no matter what was requested.
 		if serverName == cfg.Matrix.ServerName {
 			if k, err := localKeys(cfg, serverName); err == nil {
 				keyList = append(keyList, *k)
