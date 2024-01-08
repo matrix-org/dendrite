@@ -221,7 +221,9 @@ func NotaryKeys(
 		}
 	}
 
-	response := NotaryKeysResponse{}
+	response := NotaryKeysResponse{
+		ServerKeys: []json.RawMessage{},
+	}
 
 	for serverName, kidToCriteria := range req.ServerKeys {
 		var keyList []gomatrixserverlib.ServerKeys

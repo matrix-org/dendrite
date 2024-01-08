@@ -370,8 +370,6 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 }
 
 func TestNotaryServer(t *testing.T) {
-
-	// Start a server we are going to request keys from
 	testCases := []struct {
 		name          string
 		httpBody      string
@@ -381,11 +379,10 @@ func TestNotaryServer(t *testing.T) {
 		{
 			name: "empty httpBody",
 			validateFunc: func(t *testing.T, resp util.JSONResponse) {
-				want := util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: spec.BadJSON("The request body could not be decoded into valid JSON. unexpected end of JSON input"),
-				}
-				assert.Equal(t, want, resp)
+				assert.Equal(t, http.StatusBadRequest, resp.Code)
+				nk, ok := resp.JSON.(spec.MatrixError)
+				assert.True(t, ok)
+				assert.Equal(t, spec.ErrorBadJSON, nk.ErrCode)
 			},
 		},
 		{
@@ -394,14 +391,25 @@ func TestNotaryServer(t *testing.T) {
 			validateFunc: func(t *testing.T, resp util.JSONResponse) {
 				want := util.JSONResponse{
 					Code: http.StatusOK,
-					JSON: routing.NotaryKeysResponse{},
+					JSON: routing.NotaryKeysResponse{ServerKeys: []json.RawMessage{}},
 				}
 				assert.Equal(t, want, resp)
 			},
 		},
 		{
-			name:     "request all keys",
+			name:     "request all keys using an empty criteria",
 			httpBody: `{"server_keys":{"servera":{}}}`,
+			validateFunc: func(t *testing.T, resp util.JSONResponse) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+				nk, ok := resp.JSON.(routing.NotaryKeysResponse)
+				assert.True(t, ok)
+				assert.Equal(t, "servera", gjson.GetBytes(nk.ServerKeys[0], "server_name").Str)
+				assert.True(t, gjson.GetBytes(nk.ServerKeys[0], "verify_keys.ed25519:someID").Exists())
+			},
+		},
+		{
+			name:     "request all keys using null as the criteria",
+			httpBody: `{"server_keys":{"servera":null}}`,
 			validateFunc: func(t *testing.T, resp util.JSONResponse) {
 				assert.Equal(t, http.StatusOK, resp.Code)
 				nk, ok := resp.JSON.(routing.NotaryKeysResponse)
