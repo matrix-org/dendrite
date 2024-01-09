@@ -135,13 +135,6 @@ func OnIncomingMessagesRequest(
 	var fromStream *types.StreamingToken
 	fromQuery := req.URL.Query().Get("from")
 	toQuery := req.URL.Query().Get("to")
-	emptyFromSupplied := fromQuery == ""
-	if emptyFromSupplied {
-		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
-		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
-		currPos := srp.Notifier.CurrentPosition()
-		fromQuery = currPos.String()
-	}
 
 	// Direction to return events from.
 	dir := req.URL.Query().Get("dir")
@@ -154,6 +147,23 @@ func OnIncomingMessagesRequest(
 	// A boolean is easier to handle in this case, especially since dir is sure
 	// to have one of the two accepted values (so dir == "f" <=> !backwardOrdering).
 	backwardOrdering := (dir == "b")
+
+	emptyFromSupplied := fromQuery == ""
+	if emptyFromSupplied {
+		// If "from" isn't provided, it defaults to either the earliest stream
+		// position (if we're going forward) or to the latest one (if we're
+		// going backward).
+
+		var from types.TopologyToken
+		if backwardOrdering {
+			from = types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
+		} else {
+			// go 1 earlier than the first event so we correctly fetch the earliest event
+			// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
+			from = types.TopologyToken{}
+		}
+		fromQuery = from.String()
+	}
 
 	from, err := types.NewTopologyTokenFromString(fromQuery)
 	if err != nil {
