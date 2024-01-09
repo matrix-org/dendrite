@@ -55,7 +55,7 @@ func DirectoryRoom(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("Room alias must be in the form '#localpart:domain'"),
+			JSON: spec.InvalidParam("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
 
@@ -134,7 +134,7 @@ func SetLocalAlias(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("Room alias must be in the form '#localpart:domain'"),
+			JSON: spec.InvalidParam("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
 
