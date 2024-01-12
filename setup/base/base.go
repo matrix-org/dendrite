@@ -164,7 +164,7 @@ func SetupAndServeHTTP(
 	// We only need the files beneath the static/client/login folder.
 	sub, err := fs.Sub(loginFallback, "static/client/login")
 	if err != nil {
-		logrus.Warnf("unable to read dir: %s", err)
+		logrus.Panic("unable to read embedded files, this should never happen: %s", err)
 	}
 	// Serve a static page for login fallback
 	routers.Static.PathPrefix("/client/login/").Handler(http.StripPrefix("/_matrix/static/client/login/", http.FileServer(http.FS(sub))))
