@@ -299,6 +299,7 @@ func (u *latestEventsUpdater) latestState() error {
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
 			scope.SetContext("State reset", map[string]interface{}{
+				"Room ID":       u.event.RoomID().String(),
 				"Event ID":      u.event.EventID(),
 				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
 				"New state NID": fmt.Sprintf("%d", u.newStateNID),
