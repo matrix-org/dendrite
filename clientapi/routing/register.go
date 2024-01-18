@@ -624,12 +624,13 @@ func handleGuestRegistration(
 	//we don't allow guests to specify their own device_id
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(req.Context(), &userapi.PerformDeviceCreationRequest{
-		Localpart:         res.Account.Localpart,
-		ServerName:        res.Account.ServerName,
-		DeviceDisplayName: r.InitialDisplayName,
-		AccessToken:       token,
-		IPAddr:            req.RemoteAddr,
-		UserAgent:         req.UserAgent(),
+		Localpart:          res.Account.Localpart,
+		ServerName:         res.Account.ServerName,
+		DeviceDisplayName:  r.InitialDisplayName,
+		AccessToken:        token,
+		IPAddr:             req.RemoteAddr,
+		UserAgent:          req.UserAgent(),
+		NoDeviceListUpdate: true,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
@@ -912,13 +913,14 @@ func completeRegistration(
 
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
-		Localpart:         username,
-		ServerName:        serverName,
-		AccessToken:       token,
-		DeviceDisplayName: deviceDisplayName,
-		DeviceID:          deviceID,
-		IPAddr:            ipAddr,
-		UserAgent:         userAgent,
+		Localpart:          username,
+		ServerName:         serverName,
+		AccessToken:        token,
+		DeviceDisplayName:  deviceDisplayName,
+		DeviceID:           deviceID,
+		IPAddr:             ipAddr,
+		UserAgent:          userAgent,
+		NoDeviceListUpdate: true,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
