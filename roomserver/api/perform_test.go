@@ -26,15 +26,17 @@ func benchPrevEventIDs(b *testing.B, count int) {
 	})
 }
 
+const randomIDCharsCount = 10
+
 func generateBackwardsExtremities(b *testing.B, count int) map[string][]string {
 	b.Helper()
 	result := make(map[string][]string, count)
 	for i := 0; i < count; i++ {
-		eventID := randomEventId(int64(i), 10)
+		eventID := randomEventId(int64(i), randomIDCharsCount)
 		result[eventID] = []string{
-			randomEventId(int64(i+1), 10),
-			randomEventId(int64(i+2), 10),
-			randomEventId(int64(i+3), 10),
+			randomEventId(int64(i+1), randomIDCharsCount),
+			randomEventId(int64(i+2), randomIDCharsCount),
+			randomEventId(int64(i+3), randomIDCharsCount),
 		}
 	}
 	return result
