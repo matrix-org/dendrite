@@ -93,11 +93,19 @@ type PerformBackfillRequest struct {
 
 // PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
 func (r *PerformBackfillRequest) PrevEventIDs() []string {
-	var prevEventIDs []string
+	// Collect 1k eventIDs, if possible, they may be cleared out below
+	prevEventIDs := make([]string, 0, len(r.BackwardsExtremities)*3)
 	for _, pes := range r.BackwardsExtremities {
 		prevEventIDs = append(prevEventIDs, pes...)
+		if len(prevEventIDs) > 1000 {
+			break
+		}
 	}
 	prevEventIDs = util.UniqueStrings(prevEventIDs)
+	// If we still have > 100 eventIDs, only return the first 100
+	if len(prevEventIDs) > 100 {
+		return prevEventIDs[:100]
+	}
 	return prevEventIDs
 }
 
