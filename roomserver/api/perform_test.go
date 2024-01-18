@@ -32,11 +32,11 @@ func generateBackwardsExtremities(b *testing.B, count int) map[string][]string {
 	b.Helper()
 	result := make(map[string][]string, count)
 	for i := 0; i < count; i++ {
-		eventID := randomEventId(int64(i), randomIDCharsCount)
+		eventID := randomEventId(int64(i))
 		result[eventID] = []string{
-			randomEventId(int64(i+1), randomIDCharsCount),
-			randomEventId(int64(i+2), randomIDCharsCount),
-			randomEventId(int64(i+3), randomIDCharsCount),
+			randomEventId(int64(i + 1)),
+			randomEventId(int64(i + 2)),
+			randomEventId(int64(i + 3)),
 		}
 	}
 	return result
@@ -45,9 +45,9 @@ func generateBackwardsExtremities(b *testing.B, count int) map[string][]string {
 const alphanumerics = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 // RandomString generates a pseudo-random string of length n.
-func randomEventId(src int64, n int) string {
+func randomEventId(src int64) string {
 	randSrc := rand.NewSource(src)
-	b := make([]byte, n)
+	b := make([]byte, randomIDCharsCount)
 	for i := range b {
 		b[i] = alphanumerics[randSrc.Int63()%int64(len(alphanumerics))]
 	}
