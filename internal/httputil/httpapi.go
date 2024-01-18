@@ -76,7 +76,7 @@ func MakeAuthAPI(
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
-			// clone the hub, so we don't sent garbage events with e.g. mismatching rooms/event_ids
+			// clone the hub, so we don't send garbage events with e.g. mismatching rooms/event_ids
 			hub = hub.Clone()
 			hub.Scope().SetUser(sentry.User{
 				Username: device.UserID,
