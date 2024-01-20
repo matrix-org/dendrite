@@ -8,7 +8,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 )
 
 type PerformCreateRoomRequest struct {
@@ -91,26 +90,39 @@ type PerformBackfillRequest struct {
 	VirtualHost spec.ServerName `json:"virtual_host"`
 }
 
-// PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
+// PrevEventIDs returns the prev_event IDs of either 100 backwards extremities or
+// len(r.BackwardsExtremities). Limited to 100, due to Synapse stopping after reaching
+// this limit. (which sounds sane)
 func (r *PerformBackfillRequest) PrevEventIDs() []string {
-	// Collect 1k eventIDs, if possible, they may be cleared out below
-	maxPrevEventIDs := len(r.BackwardsExtremities) * 3
-	if maxPrevEventIDs > 2000 {
-		maxPrevEventIDs = 2000
+	var uniqueIDs map[string]struct{}
+
+	// Create a unique eventID map of either 100 or len(r.BackwardsExtremities).
+	// 100 since Synapse stops after reaching 100 events.
+	if len(r.BackwardsExtremities) > 100 {
+		uniqueIDs = make(map[string]struct{}, 100)
+	} else {
+		uniqueIDs = make(map[string]struct{}, len(r.BackwardsExtremities))
 	}
-	prevEventIDs := make([]string, 0, maxPrevEventIDs)
+
+outerLoop:
 	for _, pes := range r.BackwardsExtremities {
-		prevEventIDs = append(prevEventIDs, pes...)
-		if len(prevEventIDs) > 1000 {
-			break
+		for _, evID := range pes {
+			uniqueIDs[evID] = struct{}{}
+			// We found enough unique eventIDs.
+			if len(uniqueIDs) >= 100 {
+				break outerLoop
+			}
 		}
 	}
-	prevEventIDs = util.UniqueStrings(prevEventIDs)
-	// If we still have > 100 eventIDs, only return the first 100
-	if len(prevEventIDs) > 100 {
-		return prevEventIDs[:100]
+
+	// map -> []string
+	result := make([]string, len(uniqueIDs))
+	i := 0
+	for evID := range uniqueIDs {
+		result[i] = evID
 	}
-	return prevEventIDs
+
+	return result
 }
 
 // PerformBackfillResponse is a response to PerformBackfill.
