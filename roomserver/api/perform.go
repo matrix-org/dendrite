@@ -91,13 +91,13 @@ type PerformBackfillRequest struct {
 }
 
 // PrevEventIDs returns the prev_event IDs of either 100 backwards extremities or
-// len(r.BackwardsExtremities). Limited to 100, due to Synapse stopping after reaching
+// len(r.BackwardsExtremities). Limited to 100, due to Synapse/Dendrite stopping after reaching
 // this limit. (which sounds sane)
 func (r *PerformBackfillRequest) PrevEventIDs() []string {
 	var uniqueIDs map[string]struct{}
 
 	// Create a unique eventID map of either 100 or len(r.BackwardsExtremities).
-	// 100 since Synapse stops after reaching 100 events.
+	// 100 since Synapse/Dendrite stops after reaching 100 events.
 	if len(r.BackwardsExtremities) > 100 {
 		uniqueIDs = make(map[string]struct{}, 100)
 	} else {
