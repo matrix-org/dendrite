@@ -62,17 +62,20 @@ func randomEventId(src int64) string {
 }
 
 func TestPrevEventIDs(t *testing.T) {
+	// generate 10 backwards extremities
 	bwExtrems := generateBackwardsExtremities(t, 10)
 	backfiller := PerformBackfillRequest{
 		BackwardsExtremities: bwExtrems,
 	}
 
-	// prevIDs as generated for 10 backwards extremities
 	prevIDs := backfiller.PrevEventIDs()
+	// Given how "generateBackwardsExtremities" works, this
+	// generates 12 unique event IDs
 	assert.Equal(t, 12, len(prevIDs))
 
-	// prevIDs as generated for 100 backwards extremities
-	backfiller.BackwardsExtremities = generateBackwardsExtremities(t, 100)
+	// generate 200 backwards extremities
+	backfiller.BackwardsExtremities = generateBackwardsExtremities(t, 200)
 	prevIDs = backfiller.PrevEventIDs()
+	// PrevEventIDs returns at max 100 event IDs
 	assert.Equal(t, 100, len(prevIDs))
 }
