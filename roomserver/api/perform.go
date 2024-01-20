@@ -120,6 +120,7 @@ outerLoop:
 	i := 0
 	for evID := range uniqueIDs {
 		result[i] = evID
+		i++
 	}
 
 	return result

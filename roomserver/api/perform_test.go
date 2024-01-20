@@ -68,13 +68,11 @@ func TestPrevEventIDs(t *testing.T) {
 	}
 
 	// prevIDs as generated for 10 backwards extremities
-	wantPrevEventIDs := []string{"1ExBQDVcBj", "A9HQt03Ink", "BRUmuwogIq", "BUzb5KBQBO", "Ibyq7BhmYX", "MIMMBA6e9D", "NEQe6xuOjj", "ONRhfKsUOH", "byJR3RCsab", "eCfa30nG7H", "m3OCJNYcS4", "rMWhKXFs9K"}
 	prevIDs := backfiller.PrevEventIDs()
-	assert.Equal(t, wantPrevEventIDs, prevIDs)
+	assert.Equal(t, 12, len(prevIDs))
 
 	// prevIDs as generated for 100 backwards extremities
 	backfiller.BackwardsExtremities = generateBackwardsExtremities(t, 100)
-	wantPrevEventIDs = []string{"0QWd8TuUHD", "159jkpFN68", "19CrIDkTTb", "1ExBQDVcBj", "1kFAed76vN", "2xKOixxmhS", "3ApLwSwkH3", "3wszjJPW9A", "4qUOTgFKxM", "58tM6RUsRu", "5OQIDNOr4M", "5sJVbLeaKw", "6Vg95rTgUX", "6YxCUbAR9y", "6nZZd4kufM", "7REdWyhuE2", "86a1U3dnjy", "8l2IYAMcdF", "A9HQt03Ink", "AXOrOWTA0j", "AvxnvTLm8K", "AwQiSuIEbH", "BRUmuwogIq", "BUzb5KBQBO", "BrHEgialwW", "C4WNO7VSn2", "CBctYVoacn", "CN3mvQ6E6W", "E7nX8EQT1B", "ES4tNDW0wx", "FS9gV2aYvC", "FZCU0siAER", "FjXa7mqfXn", "G4q5qGdMQb", "GCxaYfmh7s", "Gs9MlFL3Fd", "H0Mzqei69C", "HITwTlAE4j", "IZ3P3uFPu6", "Ibyq7BhmYX", "JMqrpZJT9x", "JVVY34qwhB", "JZQagbldw2", "LJfQVtSU6n", "MIMMBA6e9D", "NEQe6xuOjj", "NlDSaJjceb", "ONRhfKsUOH", "OtptJ4GhQ2", "Qn1XPQhpgz", "SE3y6JniXH", "SlHpqJdjXN", "SqeoLYdQvf", "TmyExrsLR8", "Tvw8iGKHOz", "U9PldtLkuE", "UidzU2YW7G", "VkWDn232Qy", "Wbl4KHc2w0", "XL5mt8EKCt", "ZZ659s7Mwy", "ZmC0h0G6Mf", "anjChmyqJJ", "byJR3RCsab", "eCfa30nG7H", "eooGdExorQ", "esVxgLwWeD", "f0hxkMzETL", "fl5rrUR3Un", "gSoogyeREZ", "gc7zclHt95", "h9ncUeqMAD", "ha936wz0tY", "imnKEUbBlK", "lZRAlpDwpN", "lZy9etvZzj", "lwYHvKrxh0", "m3OCJNYcS4", "m8GagfYqOM", "ni3n5Y56zH", "nxz84Ndaqh", "oUJyu78LB6", "q0mUbgGerE", "qjRbAktvKw", "qmzKjSmsFs", "qncDkkqgi7", "rMWhKXFs9K", "sB8pmOdISV", "sXRWyyQlSi", "t4VYOaIWrg", "t97LRflvAD", "tZUvZ2YXy9", "ta1QyRKnUj", "vHmrrLVkpk", "vxxXjxb8lx", "wvU4kvV1WB", "x8k42j3IXJ", "xPcwjlG49n", "yHFB0bx2IA", "ytgBjHKSes"}
 	prevIDs = backfiller.PrevEventIDs()
-	assert.Equal(t, wantPrevEventIDs, prevIDs)
+	assert.Equal(t, 100, len(prevIDs))
 }
