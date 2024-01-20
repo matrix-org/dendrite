@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,30 +16,14 @@ func BenchmarkPrevEventIDs(b *testing.B) {
 
 func benchPrevEventIDs(b *testing.B, count int) {
 	bwExtrems := generateBackwardsExtremities(b, count)
-	backfiller := testPerformBackfillRequest{
+	backfiller := PerformBackfillRequest{
 		BackwardsExtremities: bwExtrems,
 	}
 
 	b.Run(fmt.Sprintf("Original%d", count), func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			prevIDs := backfiller.originalPrevEventIDs()
-			_ = prevIDs
-		}
-	})
-
-	b.Run(fmt.Sprintf("FirstAttempt%d", count), func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			prevIDs := backfiller.firstAttemptPrevEventIDs()
-			_ = prevIDs
-		}
-	})
-
-	b.Run(fmt.Sprintf("UsingMap%d", count), func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			prevIDs := backfiller.prevEventIDsUsingMap()
+			prevIDs := backfiller.PrevEventIDs()
 			_ = prevIDs
 		}
 	})
@@ -63,68 +46,6 @@ func generateBackwardsExtremities(t testLike, count int) map[string][]string {
 			randomEventId(int64(i + 3)),
 		}
 	}
-	return result
-}
-
-// PerformBackfillRequest is a request to PerformBackfill.
-type testPerformBackfillRequest struct {
-	BackwardsExtremities map[string][]string `json:"backwards_extremities"`
-}
-
-func (r *testPerformBackfillRequest) originalPrevEventIDs() []string {
-	var prevEventIDs []string
-	for _, pes := range r.BackwardsExtremities {
-		prevEventIDs = append(prevEventIDs, pes...)
-	}
-	prevEventIDs = util.UniqueStrings(prevEventIDs)
-	return prevEventIDs
-}
-
-func (r *testPerformBackfillRequest) firstAttemptPrevEventIDs() []string {
-	// Collect 1k eventIDs, if possible, they may be cleared out below
-	maxPrevEventIDs := len(r.BackwardsExtremities) * 3
-	if maxPrevEventIDs > 2000 {
-		maxPrevEventIDs = 2000
-	}
-	prevEventIDs := make([]string, 0, maxPrevEventIDs)
-	for _, pes := range r.BackwardsExtremities {
-		prevEventIDs = append(prevEventIDs, pes...)
-		if len(prevEventIDs) > 1000 {
-			break
-		}
-	}
-	prevEventIDs = util.UniqueStrings(prevEventIDs)
-	// If we still have > 100 eventIDs, only return the first 100
-	if len(prevEventIDs) > 100 {
-		return prevEventIDs[:100]
-	}
-	return prevEventIDs
-}
-
-func (r *testPerformBackfillRequest) prevEventIDsUsingMap() []string {
-	var uniqueIDs map[string]struct{}
-	if len(r.BackwardsExtremities) > 100 {
-		uniqueIDs = make(map[string]struct{}, 100)
-	} else {
-		uniqueIDs = make(map[string]struct{}, len(r.BackwardsExtremities))
-	}
-
-outerLoop:
-	for _, pes := range r.BackwardsExtremities {
-		for _, evID := range pes {
-			uniqueIDs[evID] = struct{}{}
-			if len(uniqueIDs) >= 100 {
-				break outerLoop
-			}
-		}
-	}
-
-	result := make([]string, len(uniqueIDs))
-	i := 0
-	for evID := range uniqueIDs {
-		result[i] = evID
-	}
-
 	return result
 }
 
