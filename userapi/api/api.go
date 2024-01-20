@@ -379,6 +379,10 @@ type PerformDeviceCreationRequest struct {
 	// update for this account. Generally the only reason to do this is if the account
 	// is an appservice account.
 	NoDeviceListUpdate bool
+
+	// FromRegistration determines if this request comes from registering a new account
+	// and is in most cases false.
+	FromRegistration bool
 }
 
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation
@@ -803,6 +807,10 @@ type PerformUploadKeysRequest struct {
 	// itself doesn't change but it's easier to pretend upload new keys and reuse the same code paths.
 	// Without this flag, requests to modify device display names would delete device keys.
 	OnlyDisplayNameUpdates bool
+
+	// FromRegistration is set if this key upload comes right after creating an account
+	// and determines if we need to inform downstream components.
+	FromRegistration bool
 }
 
 // PerformUploadKeysResponse is the response to PerformUploadKeys
