@@ -95,6 +95,12 @@ func Backfill(
 		}
 	}
 
+	// Enforce a limit of 100 events, as not to hit the DB to hard.
+	// Synapse has a hard limit of 100 events as well.
+	if req.Limit > 100 {
+		req.Limit = 100
+	}
+
 	// Query the Roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
