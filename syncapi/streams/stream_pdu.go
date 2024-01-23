@@ -203,7 +203,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
-	dbEvents, err := p.getRecentEvents(ctx, stateDeltas, r, eventFilter, req, snapshot)
+	dbEvents, err := p.getRecentEvents(ctx, stateDeltas, r, eventFilter, snapshot)
 	if err != nil {
 		req.Log.WithError(err).Error("unable to get recent events")
 		return r.From
@@ -249,7 +249,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
-func (p *PDUStreamProvider) getRecentEvents(ctx context.Context, stateDeltas []types.StateDelta, r types.Range, eventFilter synctypes.RoomEventFilter, req *types.SyncRequest, snapshot storage.DatabaseTransaction) (map[string]types.RecentEvents, error) {
+func (p *PDUStreamProvider) getRecentEvents(ctx context.Context, stateDeltas []types.StateDelta, r types.Range, eventFilter synctypes.RoomEventFilter, snapshot storage.DatabaseTransaction) (map[string]types.RecentEvents, error) {
 	var roomIDs []string
 	var newlyJoinedRoomIDs []string
 	for _, delta := range stateDeltas {
