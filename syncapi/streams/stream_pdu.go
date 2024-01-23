@@ -208,9 +208,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 		req.Log.WithError(err).Error("unable to get recent events")
 		return r.From
 	}
-	if len(dbEvents) == 0 {
-		return r.To
-	}
 
 	newPos = from
 	for _, delta := range stateDeltas {
