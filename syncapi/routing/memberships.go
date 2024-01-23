@@ -68,13 +68,6 @@ func GetMemberships(
 		}
 	}
 
-	if !queryRes.IsInRoom {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
-		}
-	}
-
 	db, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		return util.JSONResponse{
