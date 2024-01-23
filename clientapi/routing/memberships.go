@@ -97,11 +97,11 @@ func GetJoinedMembers(
 	}
 
 	// Get the current membership events
-	var membershipsForRoomResp *api.QueryMembershipsForRoomResponse
+	var membershipsForRoomResp api.QueryMembershipsForRoomResponse
 	if err = rsAPI.QueryMembershipsForRoom(req.Context(), &api.QueryMembershipsForRoomRequest{
 		JoinedOnly: true,
 		RoomID:     validRoomID.String(),
-	}, membershipsForRoomResp); err != nil {
+	}, &membershipsForRoomResp); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -121,7 +121,7 @@ func GetJoinedMembers(
 			}
 		}
 
-		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, ev.SenderKey)
+		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, spec.SenderID(ev.Sender))
 		if err != nil || userID == nil {
 			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
 			return util.JSONResponse{
