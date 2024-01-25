@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )
@@ -50,26 +51,30 @@ func UploadCrossSigningDeviceKeys(
 	if sessionID == "" {
 		sessionID = util.RandomString(sessionIDLength)
 	}
-	if uploadReq.Auth.Type != authtypes.LoginTypePassword {
-		return util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: newUserInteractiveResponse(
-				sessionID,
-				[]authtypes.Flow{
-					{
-						Stages: []authtypes.LoginType{authtypes.LoginTypePassword},
+
+	//! GlobeKeeper Customization: If user was registered with appservice (like BridgeAS), then we allow it to upload keys without a password
+	if device.AccountType != userapi.AccountTypeAppService {
+		if uploadReq.Auth.Type != authtypes.LoginTypePassword {
+			return util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: newUserInteractiveResponse(
+					sessionID,
+					[]authtypes.Flow{
+						{
+							Stages: []authtypes.LoginType{authtypes.LoginTypePassword},
+						},
 					},
-				},
-				nil,
-			),
+					nil,
+				),
+			}
 		}
-	}
-	typePassword := auth.LoginTypePassword{
-		UserApi: accountAPI,
-		Config:  cfg,
-	}
-	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {
-		return *authErr
+		typePassword := auth.LoginTypePassword{
+			UserApi: accountAPI,
+			Config:  cfg,
+		}
+		if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {
+			return *authErr
+		}
 	}
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
