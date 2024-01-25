@@ -225,6 +225,9 @@ type registerRequest struct {
 	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
 	Type authtypes.LoginType `json:"type"`
+
+	// GlobeKeeper custom
+	Email string `json:"email"`
 }
 
 type authDict struct {
@@ -818,6 +821,21 @@ func handleApplicationServiceRegistration(
 		return *err
 	}
 
+	//! Custom GlobeKeeper logic to support AS registration with email (3pid) & password.
+	if r.Email != "" && r.Password != "" {
+		// If no error, application service was successfully validated.
+		// Don't need to worry about appending to registration stages as
+		// application service registration is entirely separate.
+		return completeRegistration(
+			req.Context(), userAPI, r.Username, r.ServerName, "", r.Password, appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService, &authtypes.ThreePID{
+				Address:     r.Email,
+				Medium:      "email",
+				AddedAt:     time.Now().Unix(),
+				ValidatedAt: time.Now().Unix(),
+			},
+		)
+	}
 	// If no error, application service was successfully validated.
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
