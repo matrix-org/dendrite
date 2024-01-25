@@ -2184,7 +2184,8 @@ func TestGetMembership(t *testing.T) {
 					"access_token": accessToken,
 				}))
 			},
-			wantOK: true,
+			wantOK:          true,
+			wantMemberCount: 1,
 		},
 		{
 			name: "/joined_members - Alice leaves, shouldn't be able to see members ",
@@ -2200,6 +2201,22 @@ func TestGetMembership(t *testing.T) {
 				}, test.WithStateKey(alice.ID))
 			},
 			wantOK: false,
+		},
+		{
+			name: "/joined_members - Bob joins, Alice sees two members",
+			user: alice,
+			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": accessToken,
+				}))
+			},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+			wantOK:          true,
+			wantMemberCount: 2,
 		},
 	}
 
@@ -2252,7 +2269,7 @@ func TestGetMembership(t *testing.T) {
 
 				// check we got the expected events
 				if tc.wantOK {
-					memberCount := len(gjson.GetBytes(w.Body.Bytes(), "chunk").Array())
+					memberCount := len(gjson.GetBytes(w.Body.Bytes(), "joined").Map())
 					if memberCount != tc.wantMemberCount {
 						t.Fatalf("expected %d members, got %d", tc.wantMemberCount, memberCount)
 					}
