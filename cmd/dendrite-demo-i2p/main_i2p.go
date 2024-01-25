@@ -85,7 +85,7 @@ func SetupAndServeHTTPS(
 
 	http.DefaultClient = httpClient
 
-	garlic, err := onramp.NewGarlic("dendrite", *samAddr, onramp.OPT_WIDE)
+	garlic, err := onramp.NewGarlic("dendrite", *samAddr, onramp.OPT_HUGE)
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to create garlic")
 	}
