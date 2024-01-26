@@ -9,15 +9,15 @@ Upgrading to this version is **highly** recommended, as it contains several QoL 
 - Use `AckExplicitPolicy` for JetStream consumers, so messages don't pile up in NATS
 - A rare panic when assigning a state key NID has been fixed
 - A rare panic when checking powerlevels has been fixed
-- Notary keys request for all keys now work correctly
+- Notary keys requests for all keys now work correctly
 - Spec compliance:
-  - Return `M_INVALID_PARAM` querying room aliases
+  - Return `M_INVALID_PARAM` when querying room aliases
   - Handle empty `from` parameter when requesting `/messages`
   - Add CORP headers on media endpoints
   - Remove `aliases` from `/publicRooms` responses
   - Allow `+` in MXIDs (Contributed by [RosstheRoss](https://github.com/RosstheRoss))
 - Fixes membership transitions from `knock` to `join` in `knock_restricted` rooms
-- Incremental syncs now batch query events (Contributed by [recht](https://github.com/recht))
+- Incremental syncs now batch querying events (Contributed by [recht](https://github.com/recht))
 - Move `/joined_members` back to the clientAPI/roomserver, which should make bridges happier again
 - Backfilling from other servers now only uses at max 100 events instead of potentially thousands
 
