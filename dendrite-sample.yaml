@@ -154,6 +154,13 @@ app_service_api:
   # to be sent to an insecure endpoint.
   disable_tls_validation: false
 
+  # Send the access_token query parameter with appservice requests in addition
+  # to the Authorization header. This can cause hs_tokens to be saved to logs,
+  # so it should not be enabled unless absolutely necessary.
+  legacy_auth: false
+  # Use the legacy unprefixed paths for appservice requests.
+  legacy_paths: false
+
   # Appservice configuration files to load into this homeserver.
   config_files:
   #  - /path/to/appservice_registration.yaml
