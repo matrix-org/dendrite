@@ -122,7 +122,14 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 
 // set a unix timestamp of when it last saw the types
 // this way it can filter based on time
-var lastPresence map[string]map[int]int64 = make(map[string]map[int]int64)
+type PresenceMap struct {
+	mu   sync.Mutex
+	seen map[string]map[int]int64
+}
+
+var lastPresence PresenceMap
+
+// lastPresence.presence = make(map[string]map[int]int64)
 
 // how long before the online status expires
 // should be long enough that any client will have another sync before expiring
@@ -135,6 +142,9 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 }
 
 func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence string, userID string, check_again bool) {
+
+	//lock the map to this thread
+	lastPresence.mu.Lock()
 
 	//grab time for caching
 	workingTime := time.Now().Unix()
@@ -157,26 +167,31 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 		LastActiveTS: spec.AsTimestamp(time.Now()),
 	}
 
-	//update time for each presence
-	if lastPresence[userID] == nil {
-		lastPresence[userID] = make(map[int]int64)
+	//make sure that the map is defined correctly as needed
+	if lastPresence.seen == nil {
+		lastPresence.seen = make(map[string]map[int]int64)
 	}
-	lastPresence[userID][int(presenceID)] = workingTime
+	if lastPresence.seen[userID] == nil {
+		lastPresence.seen[userID] = make(map[int]int64)
+	}
+
+	//update time for each presence
+	lastPresence.seen[userID][int(presenceID)] = workingTime
 
 	var presenceToSet types.Presence
 
 	//online will always get priority
-	if (workingTime - lastPresence[userID][int(types.PresenceOnline)]) < presenceTimeout {
+	if (workingTime - lastPresence.seen[userID][int(types.PresenceOnline)]) < presenceTimeout {
 		presenceToSet = types.PresenceOnline
 
 		//idle gets secondary priority because your presence shouldnt be idle if you are on a different device
 		//kinda copying discord presence
-	} else if (workingTime - lastPresence[userID][int(types.PresenceUnavailable)]) < presenceTimeout {
+	} else if (workingTime - lastPresence.seen[userID][int(types.PresenceUnavailable)]) < presenceTimeout {
 		presenceToSet = types.PresenceUnavailable
 
 		//only set offline status if there is no known online devices
 		//clients may set offline to attempt to not alter the online status of the user
-	} else if (workingTime - lastPresence[userID][int(types.PresenceOffline)]) < presenceTimeout {
+	} else if (workingTime - lastPresence.seen[userID][int(types.PresenceOffline)]) < presenceTimeout {
 		presenceToSet = types.PresenceOffline
 
 		if check_again {
@@ -188,6 +203,11 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 	} else {
 		presenceToSet = types.PresenceUnknown
 	}
+
+	//the map is no longer being written to or read from
+	//i assume let the rest happen without being held up as to keep things heading through
+	//as fast and smoothly as possible
+	lastPresence.mu.Unlock()
 
 	// ensure we also send the current status_msg to federated servers and not nil
 	dbPresence, err := db.GetPresences(context.Background(), []string{userID})
@@ -220,6 +240,7 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 		context.Background(), userID, presenceToSet, newPresence.ClientFields.StatusMsg,
 		spec.AsTimestamp(time.Now()), true,
 	)
+
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
