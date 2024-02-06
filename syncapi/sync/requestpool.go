@@ -174,6 +174,9 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	} else if (workingTime - lastPresence[userID][int(types.PresenceOffline)]) < presenceTimeout {
 		presenceToSet = types.PresenceOffline
 
+		//after a timeout, check presence again to make sure it gets set as offline sooner or later
+		time.AfterFunc(time.Second*time.Duration(presenceTimeout), func() { rp.updatePresence(db, types.PresenceOffline.String(), userID) })
+
 		//set unknown if there is truly no devices that we know the state of
 	} else {
 		presenceToSet = types.PresenceUnknown
