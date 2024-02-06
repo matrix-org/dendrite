@@ -153,6 +153,9 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	}
 
 	//update time for each presence
+	if lastPresence[userID] == nil {
+		lastPresence[userID] = make(map[int]int64)
+	}
 	lastPresence[userID][int(presenceID)] = workingTime
 
 	var presenceToSet types.Presence
