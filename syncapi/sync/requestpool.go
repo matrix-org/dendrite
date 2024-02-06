@@ -129,8 +129,6 @@ type PresenceMap struct {
 
 var lastPresence PresenceMap
 
-// lastPresence.presence = make(map[string]map[int]int64)
-
 // how long before the online status expires
 // should be long enough that any client will have another sync before expiring
 const presenceTimeout int64 = 10
