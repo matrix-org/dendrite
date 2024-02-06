@@ -37,6 +37,14 @@ type presenceReq struct {
 	StatusMsg *string `json:"status_msg,omitempty"`
 }
 
+// set a unix timestamp of when it last saw the types
+// this way it can filter based on time
+var lastPresence map[int]int64 = make(map[int]int64)
+
+// how long before the online status expires
+// should be long enough that any client will have another sync before expiring
+const presenceTimeout int64 = 10
+
 func SetPresence(
 	req *http.Request,
 	cfg *config.ClientAPI,
@@ -44,6 +52,10 @@ func SetPresence(
 	producer *producers.SyncAPIProducer,
 	userID string,
 ) util.JSONResponse {
+
+	//grab time for caching
+	workingTime := time.Now().Unix()
+
 	if !cfg.Matrix.Presence.EnableOutbound {
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -69,12 +81,54 @@ func SetPresence(
 			JSON: spec.Unknown(fmt.Sprintf("Unknown presence '%s'.", presence.Presence)),
 		}
 	}
-	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
-	if err != nil {
-		log.WithError(err).Errorf("failed to update presence")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+
+	//update time for each presence
+	lastPresence[int(presenceStatus)] = workingTime
+
+	//online will always get priority
+	if (workingTime - lastPresence[int(types.PresenceOnline)]) < presenceTimeout {
+		err := producer.SendPresence(req.Context(), userID, types.PresenceOnline, presence.StatusMsg)
+		if err != nil {
+			log.WithError(err).Errorf("failed to update presence to Online")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+
+		//idle gets secondary priority because your presence shouldnt be idle if you are on a different device
+		//kinda copying discord presence
+	} else if (workingTime - lastPresence[int(types.PresenceUnavailable)]) < presenceTimeout {
+		err := producer.SendPresence(req.Context(), userID, types.PresenceUnavailable, presence.StatusMsg)
+		if err != nil {
+			log.WithError(err).Errorf("failed to update presence to Unavailable (~idle)")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+
+		//only set offline status if there is no known online devices
+		//clients may set offline to attempt to not alter the online status of the user
+	} else if (workingTime - lastPresence[int(types.PresenceOffline)]) < presenceTimeout {
+		err := producer.SendPresence(req.Context(), userID, types.PresenceOffline, presence.StatusMsg)
+		if err != nil {
+			log.WithError(err).Errorf("failed to update presence to Offline")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+
+		//set unknown if there is truly no devices that we know the state of
+	} else {
+		err := producer.SendPresence(req.Context(), userID, types.PresenceUnknown, presence.StatusMsg)
+		if err != nil {
+			log.WithError(err).Errorf("failed to update presence as Unknown")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
 		}
 	}
 
