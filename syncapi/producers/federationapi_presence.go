@@ -33,7 +33,6 @@ type FederationAPIPresenceProducer struct {
 func (f *FederationAPIPresenceProducer) SendPresence(
 	userID string, presence types.Presence, statusMsg *string,
 ) error {
-	println("setting presence for", userID, " as ", presence.String())
 	msg := nats.NewMsg(f.Topic)
 	msg.Header.Set(jetstream.UserID, userID)
 	msg.Header.Set("presence", presence.String())
