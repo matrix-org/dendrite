@@ -130,6 +130,11 @@ const presenceTimeout int64 = 10
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
 func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
+	//allow checking back on presence to set offline if needed
+	rp.updatePresenceInternal(db, presence, userID, true)
+}
+
+func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence string, userID string, check_again bool) {
 
 	//grab time for caching
 	workingTime := time.Now().Unix()
@@ -174,8 +179,10 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	} else if (workingTime - lastPresence[userID][int(types.PresenceOffline)]) < presenceTimeout {
 		presenceToSet = types.PresenceOffline
 
-		//after a timeout, check presence again to make sure it gets set as offline sooner or later
-		time.AfterFunc(time.Second*time.Duration(presenceTimeout), func() { rp.updatePresence(db, types.PresenceOffline.String(), userID) })
+		if check_again {
+			//after a timeout, check presence again to make sure it gets set as offline sooner or later
+			time.AfterFunc(time.Second*time.Duration(presenceTimeout), func() { rp.updatePresenceInternal(db, types.PresenceOffline.String(), userID, false) })
+		}
 
 		//set unknown if there is truly no devices that we know the state of
 	} else {
