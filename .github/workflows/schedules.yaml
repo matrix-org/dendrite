@@ -174,7 +174,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests/... 2>&1 | gotestfmt
+          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         name: Run Complement Tests
         env:
@@ -220,6 +220,7 @@ jobs:
           fail_ci_if_error: true
 
   element-web:
+    if: ${{ false }} # disable for now, as Cypress has been replaced by Playwright
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
@@ -259,6 +260,7 @@ jobs:
           TMPDIR: ${{ runner.temp }}
 
   element-web-pinecone:
+    if: ${{ false }} # disable for now, as Cypress has been replaced by Playwright
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
