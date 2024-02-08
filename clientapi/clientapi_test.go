@@ -2278,3 +2278,64 @@ func TestGetMembership(t *testing.T) {
 		}
 	})
 }
+
+func TestCreateRoomInvite(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+
+		// Use an actual roomserver for this
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		reqBody := map[string]any{
+			"invite": []string{bob.ID},
+		}
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/_matrix/client/v3/createRoom", strings.NewReader(string(body)))
+		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+		routers.Client.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected room creation to be successful, got HTTP %d instead: %s", w.Code, w.Body.String())
+		}
+
+		roomID := gjson.GetBytes(w.Body.Bytes(), "room_id").Str
+		validRoomID, _ := spec.NewRoomID(roomID)
+		// Now ask the roomserver about the membership event of Bob
+		ev, err := rsAPI.CurrentStateEvent(context.Background(), *validRoomID, spec.MRoomMember, bob.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Validate that there is NO displayname in content
+		if gjson.GetBytes(ev.Content(), "displayname").Exists() {
+			t.Fatal("Found displayname in invite")
+		}
+	})
+}
