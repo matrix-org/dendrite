@@ -2333,6 +2333,10 @@ func TestCreateRoomInvite(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if ev == nil {
+			t.Fatal("Membership event for Bob does not exist")
+		}
+
 		// Validate that there is NO displayname in content
 		if gjson.GetBytes(ev.Content(), "displayname").Exists() {
 			t.Fatal("Found displayname in invite")
