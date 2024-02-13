@@ -50,16 +50,14 @@ type PerformLeaveResponse struct {
 }
 
 type InviteInput struct {
-	RoomID      spec.RoomID
-	Inviter     spec.UserID
-	Invitee     spec.UserID
-	DisplayName string
-	AvatarURL   string
-	Reason      string
-	IsDirect    bool
-	KeyID       gomatrixserverlib.KeyID
-	PrivateKey  ed25519.PrivateKey
-	EventTime   time.Time
+	RoomID     spec.RoomID
+	Inviter    spec.UserID
+	Invitee    spec.UserID
+	Reason     string
+	IsDirect   bool
+	KeyID      gomatrixserverlib.KeyID
+	PrivateKey ed25519.PrivateKey
+	EventTime  time.Time
 }
 
 type PerformInviteRequest struct {
