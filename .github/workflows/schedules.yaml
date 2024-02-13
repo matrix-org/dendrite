@@ -93,8 +93,8 @@ jobs:
     timeout-minutes: 5
     name: "Sytest Coverage"
     runs-on: ubuntu-latest
-    needs: sytest # only run once Sytest is done
-    if: ${{ always() }}
+    needs: [ sytest, check_date ] # only run once Sytest is done and there was a commit
+    if: ${{ always() && needs.check_date.outputs.should_run != 'false' }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Go
@@ -217,7 +217,7 @@ jobs:
     timeout-minutes: 5
     name: "Complement Coverage"
     runs-on: ubuntu-latest
-    needs: complement # only run once Complement is done
+    needs: [ complement, check_date ] # only run once Complements is done and there was a commit
     if: ${{ always() }}
     steps:
       - uses: actions/checkout@v4
