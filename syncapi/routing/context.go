@@ -109,8 +109,13 @@ func Context(
 		}
 	}
 
-	stateFilter := synctypes.DefaultStateFilter()
-	stateFilter = synctypes.StateFilter{
+	// Default to a sane state filter limit
+	limit := filter.Limit
+	if limit > 100 {
+		limit = 100
+	}
+	stateFilter := synctypes.StateFilter{
+		Limit:                   limit,
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,
