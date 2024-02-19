@@ -1136,7 +1136,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 		},
 		{
 			name:             "events are not limited",
-			wantBeforeLength: 7,
+			wantBeforeLength: 5,
 		},
 		{
 			name: "all events are limited",

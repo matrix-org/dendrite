@@ -128,6 +128,7 @@ func DefaultEventFilter() EventFilter {
 // is provided in the request
 func DefaultStateFilter() StateFilter {
 	return StateFilter{
+		Limit:                   10,
 		NotSenders:              nil,
 		NotTypes:                nil,
 		Senders:                 nil,

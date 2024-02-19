@@ -109,7 +109,8 @@ func Context(
 		}
 	}
 
-	stateFilter := synctypes.StateFilter{
+	stateFilter := synctypes.DefaultStateFilter()
+	stateFilter = synctypes.StateFilter{
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,
