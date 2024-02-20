@@ -159,7 +159,7 @@ func Context(
 	}
 
 	// Limit is split up for before/after events
-	if limit > 1 {
+	if filter.Limit > 1 {
 		filter.Limit = filter.Limit / 2
 	}
 
