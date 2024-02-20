@@ -164,7 +164,9 @@ func Context(
 	}
 
 	// Limit is split up for before/after events
-	filter.Limit = filter.Limit / 2
+	if limit > 1 {
+		filter.Limit = filter.Limit / 2
+	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
