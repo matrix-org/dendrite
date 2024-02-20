@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
@@ -34,10 +34,10 @@ const MRoomServerACL = "m.room.server_acl"
 type ServerACLDatabase interface {
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
-	// GetStateEvent returns the state event of a given type for a given room with a given state key
-	// If no event could be found, returns nil
-	// If there was an issue during the retrieval, returns an error
-	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*types.HeaderedEvent, error)
+
+	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
+	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
+	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
 }
 
 type ServerACLs struct {
@@ -58,15 +58,14 @@ func NewServerACLs(db ServerACLDatabase) *ServerACLs {
 	// For each room, let's see if we have a server ACL state event. If we
 	// do then we'll process it into memory so that we have the regexes to
 	// hand.
-	for _, room := range rooms {
-		state, err := db.GetStateEvent(ctx, room, MRoomServerACL, "")
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to get server ACLs for room %q", room)
-			continue
-		}
-		if state != nil {
-			acls.OnServerACLUpdate(state.PDU)
-		}
+
+	events, err := db.GetBulkStateContent(ctx, rooms, []gomatrixserverlib.StateKeyTuple{{EventType: MRoomServerACL, StateKey: ""}}, false)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to get server ACLs for all rooms: %q", err)
+	}
+
+	for _, event := range events {
+		acls.OnServerACLUpdate(event)
 	}
 	return acls
 }
@@ -90,9 +89,9 @@ func compileACLRegex(orig string) (*regexp.Regexp, error) {
 	return regexp.Compile(escaped)
 }
 
-func (s *ServerACLs) OnServerACLUpdate(state gomatrixserverlib.PDU) {
+func (s *ServerACLs) OnServerACLUpdate(strippedEvent tables.StrippedEvent) {
 	acls := &serverACL{}
-	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
+	if err := json.Unmarshal([]byte(strippedEvent.ContentValue), &acls.ServerACL); err != nil {
 		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")
 		return
 	}
@@ -118,10 +117,10 @@ func (s *ServerACLs) OnServerACLUpdate(state gomatrixserverlib.PDU) {
 		"allow_ip_literals": acls.AllowIPLiterals,
 		"num_allowed":       len(acls.allowedRegexes),
 		"num_denied":        len(acls.deniedRegexes),
-	}).Debugf("Updating server ACLs for %q", state.RoomID())
+	}).Debugf("Updating server ACLs for %q", strippedEvent.RoomID)
 	s.aclsMutex.Lock()
 	defer s.aclsMutex.Unlock()
-	s.acls[state.RoomID().String()] = acls
+	s.acls[strippedEvent.RoomID] = acls
 }
 
 func (s *ServerACLs) IsServerBannedFromRoom(serverName spec.ServerName, roomID string) bool {

@@ -235,6 +235,8 @@ func ExtractContentValue(ev *types.HeaderedEvent) string {
 		key = "topic"
 	case "m.room.guest_access":
 		key = "guest_access"
+	case "m.room.server_acl":
+		return string(content)
 	}
 	result := gjson.GetBytes(content, key)
 	if !result.Exists() {
