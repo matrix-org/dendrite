@@ -236,6 +236,8 @@ func ExtractContentValue(ev *types.HeaderedEvent) string {
 	case "m.room.guest_access":
 		key = "guest_access"
 	case "m.room.server_acl":
+		// We need the entire content and not only one key, so we can use it
+		// on startup to generate the ACLs. This is merely a workaround.
 		return string(content)
 	}
 	result := gjson.GetBytes(content, key)
