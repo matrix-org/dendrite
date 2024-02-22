@@ -150,6 +150,11 @@ func (s *ServerACLs) OnServerACLUpdate(strippedEvent tables.StrippedEvent) {
 		"num_allowed":       len(acls.allowedRegexes),
 		"num_denied":        len(acls.deniedRegexes),
 	}).Debugf("Updating server ACLs for %q", strippedEvent.RoomID)
+
+	// Clear out Denied and Allowed, now that we have the compiled regexes.
+	// They are not needed anymore from this point on.
+	acls.Denied = nil
+	acls.Allowed = nil
 	s.aclsMutex.Lock()
 	defer s.aclsMutex.Unlock()
 	s.acls[strippedEvent.RoomID] = acls
