@@ -4,25 +4,32 @@
 # base installs required dependencies and runs go mod download to cache dependencies
 #
 # Pinned to alpine3.18 until https://github.com/mattn/go-sqlite3/issues/1164 is solved
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.21-alpine3.18 AS base
+ARG BUILDPLATFORM=${BUILDPLATFORM}
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.21-alpine3.18 AS base
 RUN apk --update --no-cache add bash build-base curl git
 
 #
 # build creates all needed binaries
 #
-FROM --platform=${BUILDPLATFORM} base AS build
+FROM --platform=$BUILDPLATFORM base AS build
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
-RUN --mount=target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    USERARCH=`go env GOARCH` \
-    GOARCH="$TARGETARCH" \
-    GOOS="linux" \
-    CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
-    go build -v -trimpath -o /out/ ./cmd/...
+ARG FLAGS
 
+# Not mounting volumes using the --mount flag to avoid requiring BuildKit which is not easily supported using cloudbuild.
+COPY . .
+RUN mkdir -p /root/.cache/go-build && \
+    mkdir -p /go/pkg/mod
+VOLUME /root/.cache/go-build
+VOLUME /go/pkg/mod
+
+# Run the build command in multiple RUN commands
+RUN USERARCH=`go env GOARCH`
+RUN GOARCH="$TARGETARCH"
+RUN GOOS="linux"
+RUN CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0")
+RUN go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
 
 #
 # Builds the Dendrite image containing all required binaries
@@ -46,4 +53,3 @@ WORKDIR /etc/dendrite
 
 ENTRYPOINT ["/usr/bin/dendrite"]
 EXPOSE 8008 8448
-

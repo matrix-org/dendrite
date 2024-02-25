@@ -32,6 +32,7 @@ var (
 	RequestPresence         = "GetPresence"
 	OutputPresenceEvent     = "OutputPresenceEvent"
 	InputFulltextReindex    = "InputFulltextReindex"
+	OutputMultiRoomCast     = "OutputMultiRoomCast"
 )
 
 var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
@@ -107,5 +108,10 @@ var streams = []*nats.StreamConfig{
 		Retention: nats.InterestPolicy,
 		Storage:   nats.MemoryStorage,
 		MaxAge:    time.Minute * 5,
+	},
+	{
+		Name:      OutputMultiRoomCast,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
 	},
 }

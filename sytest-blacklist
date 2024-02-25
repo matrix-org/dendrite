@@ -18,3 +18,14 @@ Leaves are present in non-gapped incremental syncs
 
 # We don't have any state to calculate m.room.guest_access when accepting invites
 Guest users can accept invites to private rooms over federation
+
+Guest users can join guest_access rooms
+
+
+# For notifications extension on iOS
+/event/ does not allow access to events before the user joined
+
+# Still not sure what's gone wrong here. Probably our custom presence logics.
+User sees their own presence in a sync
+User is offline if they set_presence=offline in their sync
+User sees updates to presence from other users in the incremental sync.
