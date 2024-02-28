@@ -130,8 +130,23 @@ func Test_validateUsername(t *testing.T) {
 			domain:    "localhost",
 		},
 		{
+			name:      "special characters are allowed 3",
+			localpart: "+55555555555",
+			domain:    "localhost",
+		},
+		{
 			name:      "not all special characters are allowed",
 			localpart: "notallowed#", // contains #
+			domain:    "localhost",
+			wantErr:   ErrUsernameInvalid,
+			wantJSON: &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.InvalidUsername(ErrUsernameInvalid.Error()),
+			},
+		},
+		{
+			name:      "not all special characters are allowed 2",
+			localpart: "<notallowed", // contains <
 			domain:    "localhost",
 			wantErr:   ErrUsernameInvalid,
 			wantJSON: &util.JSONResponse{

@@ -8,7 +8,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 )
 
 type PerformCreateRoomRequest struct {
@@ -91,14 +90,44 @@ type PerformBackfillRequest struct {
 	VirtualHost spec.ServerName `json:"virtual_host"`
 }
 
-// PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
+// limitPrevEventIDs is the maximum of eventIDs we
+// return when calling PrevEventIDs.
+const limitPrevEventIDs = 100
+
+// PrevEventIDs returns the prev_event IDs of either 100 backwards extremities or
+// len(r.BackwardsExtremities). Limited to 100, due to Synapse/Dendrite stopping after reaching
+// this limit. (which sounds sane)
 func (r *PerformBackfillRequest) PrevEventIDs() []string {
-	var prevEventIDs []string
-	for _, pes := range r.BackwardsExtremities {
-		prevEventIDs = append(prevEventIDs, pes...)
+	var uniqueIDs map[string]struct{}
+
+	// Create a unique eventID map of either 100 or len(r.BackwardsExtremities).
+	// 100 since Synapse/Dendrite stops after reaching 100 events.
+	if len(r.BackwardsExtremities) > limitPrevEventIDs {
+		uniqueIDs = make(map[string]struct{}, limitPrevEventIDs)
+	} else {
+		uniqueIDs = make(map[string]struct{}, len(r.BackwardsExtremities))
 	}
-	prevEventIDs = util.UniqueStrings(prevEventIDs)
-	return prevEventIDs
+
+outerLoop:
+	for _, pes := range r.BackwardsExtremities {
+		for _, evID := range pes {
+			uniqueIDs[evID] = struct{}{}
+			// We found enough unique eventIDs.
+			if len(uniqueIDs) >= limitPrevEventIDs {
+				break outerLoop
+			}
+		}
+	}
+
+	// map -> []string
+	result := make([]string, len(uniqueIDs))
+	i := 0
+	for evID := range uniqueIDs {
+		result[i] = evID
+		i++
+	}
+
+	return result
 }
 
 // PerformBackfillResponse is a response to PerformBackfill.

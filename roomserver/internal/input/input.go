@@ -108,20 +108,27 @@ type worker struct {
 	r            *Inputer
 	roomID       string
 	subscription *nats.Subscription
+	sentryHub    *sentry.Hub
 }
 
 func (r *Inputer) startWorkerForRoom(roomID string) {
 	v, loaded := r.workers.LoadOrStore(roomID, &worker{
-		r:      r,
-		roomID: roomID,
+		r:         r,
+		roomID:    roomID,
+		sentryHub: sentry.CurrentHub().Clone(),
 	})
 	w := v.(*worker)
 	w.Lock()
 	defer w.Unlock()
 	if !loaded || w.subscription == nil {
+		streamName := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent)
 		consumer := r.Cfg.Matrix.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(w.roomID))
 		subject := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(w.roomID))
 
+		logger := logrus.WithFields(logrus.Fields{
+			"stream_name": streamName,
+			"consumer":    consumer,
+		})
 		// Create the consumer. We do this as a specific step rather than
 		// letting PullSubscribe create it for us because we need the consumer
 		// to outlive the subscription. If we do it this way, we can Bind in the
@@ -135,19 +142,60 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 		// before it. This is necessary because otherwise our consumer will never
 		// acknowledge things we filtered out for other subjects and therefore they
 		// will linger around forever.
-		if _, err := w.r.JetStream.AddConsumer(
-			r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
-			&nats.ConsumerConfig{
-				Durable:           consumer,
-				AckPolicy:         nats.AckAllPolicy,
-				DeliverPolicy:     nats.DeliverAllPolicy,
-				FilterSubject:     subject,
-				AckWait:           MaximumMissingProcessingTime + (time.Second * 10),
-				InactiveThreshold: inactiveThreshold,
-			},
-		); err != nil {
-			logrus.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
+
+		info, err := w.r.JetStream.ConsumerInfo(streamName, consumer)
+		if err != nil && !errors.Is(err, nats.ErrConsumerNotFound) {
+			// log and return, we will retry anyway
+			logger.WithError(err).Errorf("failed to get consumer info")
 			return
+		}
+
+		consumerConfig := &nats.ConsumerConfig{
+			Durable:           consumer,
+			AckPolicy:         nats.AckExplicitPolicy,
+			DeliverPolicy:     nats.DeliverAllPolicy,
+			FilterSubject:     subject,
+			AckWait:           MaximumMissingProcessingTime + (time.Second * 10),
+			InactiveThreshold: inactiveThreshold,
+		}
+
+		// The consumer already exists, try to update if necessary.
+		if info != nil {
+			// Not using reflect.DeepEqual here, since consumerConfig does not explicitly set
+			// e.g. the consumerName, which is added by NATS later. So this would result
+			// in constantly updating/recreating the consumer.
+			switch {
+			case info.Config.AckWait.Nanoseconds() != consumerConfig.AckWait.Nanoseconds():
+				// Initially we had a AckWait of 2m 10s, now we have 5m 10s, so we need to update
+				// existing consumers.
+				fallthrough
+			case info.Config.AckPolicy != consumerConfig.AckPolicy:
+				// We've changed the AckPolicy from AckAll to AckExplicit, this needs a
+				// recreation of the consumer. (Note: Only a few changes actually need a recreat)
+				logger.Warn("Consumer already exists, trying to update it.")
+				// Try updating the consumer first
+				if _, err = w.r.JetStream.UpdateConsumer(streamName, consumerConfig); err != nil {
+					// We failed to update the consumer, recreate it
+					logger.WithError(err).Warn("Unable to update consumer, recreating...")
+					if err = w.r.JetStream.DeleteConsumer(streamName, consumer); err != nil {
+						logger.WithError(err).Fatal("Unable to delete consumer")
+						return
+					}
+					// Set info to nil, so it can be recreated with the correct config.
+					info = nil
+				}
+			}
+		}
+
+		if info == nil {
+			// Create the consumer with the correct config
+			if _, err = w.r.JetStream.AddConsumer(
+				r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
+				consumerConfig,
+			); err != nil {
+				logger.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
+				return
+			}
 		}
 
 		// Bind to our durable consumer. We want to receive all messages waiting
@@ -162,7 +210,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 			nats.InactiveThreshold(inactiveThreshold),
 		)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to subscribe to stream for room %q", w.roomID)
+			logger.WithError(err).Errorf("Failed to subscribe to stream for room %q", w.roomID)
 			return
 		}
 
@@ -219,9 +267,9 @@ func (w *worker) _next() {
 	// Look up what the next event is that's waiting to be processed.
 	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
 	defer cancel()
-	if scope := sentry.CurrentHub().Scope(); scope != nil {
+	w.sentryHub.ConfigureScope(func(scope *sentry.Scope) {
 		scope.SetTag("room_id", w.roomID)
-	}
+	})
 	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
 	switch err {
 	case nil:
@@ -263,21 +311,23 @@ func (w *worker) _next() {
 		return
 	}
 
+	// Since we either Ack() or Term() the message at this point, we can defer decrementing the room backpressure
+	defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Dec()
+
 	// Try to unmarshal the input room event. If the JSON unmarshalling
 	// fails then we'll terminate the message — this notifies NATS that
 	// we are done with the message and never want to see it again.
 	msg := msgs[0]
 	var inputRoomEvent api.InputRoomEvent
 	if err = json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
-		_ = msg.Term()
+		// using AckWait here makes the call synchronous; 5 seconds is the default value used by NATS
+		_ = msg.Term(nats.AckWait(time.Second * 5))
 		return
 	}
 
-	if scope := sentry.CurrentHub().Scope(); scope != nil {
+	w.sentryHub.ConfigureScope(func(scope *sentry.Scope) {
 		scope.SetTag("event_id", inputRoomEvent.Event.EventID())
-	}
-	roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Inc()
-	defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Dec()
+	})
 
 	// Process the room event. If something goes wrong then we'll tell
 	// NATS to terminate the message. We'll store the error result as
@@ -299,7 +349,7 @@ func (w *worker) _next() {
 			}).Warn("Roomserver rejected event")
 		default:
 			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-				sentry.CaptureException(err)
+				w.sentryHub.CaptureException(err)
 			}
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"room_id":  w.roomID,
@@ -307,10 +357,15 @@ func (w *worker) _next() {
 				"type":     inputRoomEvent.Event.Type(),
 			}).Warn("Roomserver failed to process event")
 		}
-		_ = msg.Term()
+		// Even though we failed to process this message (e.g. due to Dendrite restarting and receiving a context canceled),
+		// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
+		// after restarting. We only Ack if the context was not yet canceled.
+		if w.r.ProcessContext.Context().Err() == nil {
+			_ = msg.AckSync()
+		}
 		errString = err.Error()
 	} else {
-		_ = msg.Ack()
+		_ = msg.AckSync()
 	}
 
 	// If it was a synchronous input request then the "sync" field
@@ -381,6 +436,9 @@ func (r *Inputer) queueInputRoomEvents(
 			}).Error("Roomserver failed to queue async event")
 			return nil, fmt.Errorf("r.JetStream.PublishMsg: %w", err)
 		}
+
+		// Now that the event is queued, increment the room backpressure
+		roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 	}
 	return
 }

@@ -123,6 +123,7 @@ func makeDownloadAPI(
 
 		// Set internal headers returned regardless of the outcome of the request
 		util.SetCORSHeaders(w)
+		w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
 

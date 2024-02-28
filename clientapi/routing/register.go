@@ -635,6 +635,7 @@ func handleGuestRegistration(
 		AccessToken:       token,
 		IPAddr:            req.RemoteAddr,
 		UserAgent:         req.UserAgent(),
+		FromRegistration:  true,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
@@ -982,6 +983,7 @@ func completeRegistration(
 		DeviceID:          deviceID,
 		IPAddr:            ipAddr,
 		UserAgent:         userAgent,
+		FromRegistration:  true,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{

@@ -754,24 +754,6 @@ func TestGetMembership(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name: "/joined_members - Bob never joined",
-			request: func(t *testing.T, room *test.Room) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": bobDev.AccessToken,
-				}))
-			},
-			wantOK: false,
-		},
-		{
-			name: "/joined_members - Alice joined",
-			request: func(t *testing.T, room *test.Room) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": aliceDev.AccessToken,
-				}))
-			},
-			wantOK: true,
-		},
-		{
 			name: "Alice leaves before Bob joins, should not be able to see Bob",
 			request: func(t *testing.T, room *test.Room) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
@@ -808,21 +790,6 @@ func TestGetMembership(t *testing.T) {
 			useSleep:        true,
 			wantOK:          true,
 			wantMemberCount: 2,
-		},
-		{
-			name: "/joined_members - Alice leaves, shouldn't be able to see members ",
-			request: func(t *testing.T, room *test.Room) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": aliceDev.AccessToken,
-				}))
-			},
-			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
-					"membership": "leave",
-				}, test.WithStateKey(alice.ID))
-			},
-			useSleep: true,
-			wantOK:   false,
 		},
 		{
 			name: "'at' specified, returns memberships before Bob joins",

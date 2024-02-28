@@ -889,10 +889,10 @@ func (d *Database) assignRoomNID(
 	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// We don't have a numeric ID so insert one into the database.
 		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// We raced with another insert so run the select again.
 			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 		}
@@ -914,10 +914,10 @@ func (d *Database) assignEventTypeNID(
 	}
 	// Check if we already have a numeric ID in the database.
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// We don't have a numeric ID so insert one into the database.
 		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, txn, eventType)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// We raced with another insert so run the select again.
 			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
 		}
@@ -938,16 +938,19 @@ func (d *EventDatabase) assignStateKeyNID(
 	}
 	// Check if we already have a numeric ID in the database.
 	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// We don't have a numeric ID so insert one into the database.
 		eventStateKeyNID, err = d.EventStateKeysTable.InsertEventStateKeyNID(ctx, txn, eventStateKey)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// We raced with another insert so run the select again.
 			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
 	}
+	if err != nil {
+		return 0, err
+	}
 	d.Cache.StoreEventStateKey(eventStateKeyNID, eventStateKey)
-	return eventStateKeyNID, err
+	return eventStateKeyNID, nil
 }
 
 func extractRoomVersionFromCreateEvent(event gomatrixserverlib.PDU) (
