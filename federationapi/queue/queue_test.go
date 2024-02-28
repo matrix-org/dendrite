@@ -117,7 +117,7 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 		txRelayCount:         *atomic.NewUint32(0),
 	}
 
-	stats := statistics.NewStatistics(db, failuresUntilBlacklist, failuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(db, failuresUntilBlacklist, failuresUntilAssumedOffline, false)
 	signingInfo := []*fclient.SigningIdentity{
 		{
 			KeyID:      "ed21019:auto",

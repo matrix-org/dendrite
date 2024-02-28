@@ -18,6 +18,13 @@ type FederationAPI struct {
 	// The default value is 16 if not specified, which is circa 18 hours.
 	FederationMaxRetries uint32 `yaml:"send_max_retries"`
 
+	// P2P Feature: Whether relaying to specific nodes should be enabled.
+	// Defaults to false.
+	// Note: Enabling relays introduces a huge startup delay, if you are not using
+	// relays and have many servers to re-hydrate on start. Only enable this
+	// if you are using relays!
+	EnableRelays bool `yaml:"enable_relays"`
+
 	// P2P Feature: How many consecutive failures that we should tolerate when
 	// sending federation requests to a specific server until we should assume they
 	// are offline. If we assume they are offline then we will attempt to send
