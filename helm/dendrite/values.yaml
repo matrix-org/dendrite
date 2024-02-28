@@ -92,7 +92,7 @@ extraVolumeMounts: []
 strategy:
   # -- Strategy to use for rolling updates (e.g. Recreate, RollingUpdate)
   # If you are using ReadWriteOnce volumes, you should probably use Recreate
-  type: RollingUpdate
+  type: Recreate
   rollingUpdate:
     # -- Maximum number of pods that can be unavailable during the update process
     maxUnavailable: 25%
