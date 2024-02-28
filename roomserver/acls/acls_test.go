@@ -44,8 +44,8 @@ func TestOpenACLsWithBlacklist(t *testing.T) {
 		ServerACL: ServerACL{
 			AllowIPLiterals: true,
 		},
-		allowedRegexes: []*regexp.Regexp{allowRegex},
-		deniedRegexes:  []*regexp.Regexp{denyRegex},
+		allowedRegexes: []**regexp.Regexp{&allowRegex},
+		deniedRegexes:  []**regexp.Regexp{&denyRegex},
 	}
 
 	if acls.IsServerBannedFromRoom("1.2.3.4", roomID) {
@@ -83,8 +83,8 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 		ServerACL: ServerACL{
 			AllowIPLiterals: false,
 		},
-		allowedRegexes: []*regexp.Regexp{allowRegex},
-		deniedRegexes:  []*regexp.Regexp{},
+		allowedRegexes: []**regexp.Regexp{&allowRegex},
+		deniedRegexes:  []**regexp.Regexp{},
 	}
 
 	if !acls.IsServerBannedFromRoom("1.2.3.4", roomID) {
