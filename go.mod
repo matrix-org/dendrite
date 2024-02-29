@@ -8,9 +8,12 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/blevesearch/bleve/v2 v2.3.8
 	github.com/codeclysm/extract v2.2.0+incompatible
+	github.com/cretz/bine v0.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/eyedeekay/goSam v0.32.54
+	github.com/eyedeekay/onramp v0.33.7
 	github.com/getsentry/sentry-go v0.14.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.9
@@ -78,14 +81,11 @@ require (
 	github.com/blevesearch/zapx/v14 v14.3.7 // indirect
 	github.com/blevesearch/zapx/v15 v15.3.10 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cretz/bine v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eyedeekay/goSam v0.32.54 // indirect
 	github.com/eyedeekay/i2pkeys v0.33.7 // indirect
-	github.com/eyedeekay/onramp v0.33.7 // indirect
 	github.com/eyedeekay/sam3 v0.33.7 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
