@@ -43,6 +43,15 @@ func (a *FederationInternalAPI) fetchServerKeysFromCache(
 	ctx context.Context, req *api.QueryServerKeysRequest,
 ) ([]gomatrixserverlib.ServerKeys, error) {
 	var results []gomatrixserverlib.ServerKeys
+
+	// We got a request for _all_ server keys, return them.
+	if len(req.KeyIDToCriteria) == 0 {
+		serverKeysResponses, _ := a.db.GetNotaryKeys(ctx, req.ServerName, []gomatrixserverlib.KeyID{})
+		if len(serverKeysResponses) == 0 {
+			return nil, fmt.Errorf("failed to find server key response for server %s", req.ServerName)
+		}
+		return serverKeysResponses, nil
+	}
 	for keyID, criteria := range req.KeyIDToCriteria {
 		serverKeysResponses, _ := a.db.GetNotaryKeys(ctx, req.ServerName, []gomatrixserverlib.KeyID{keyID})
 		if len(serverKeysResponses) == 0 {

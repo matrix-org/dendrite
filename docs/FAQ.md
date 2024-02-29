@@ -117,6 +117,7 @@ The list of files that need to be stored is:
 - matrix-key.pem
 - dendrite.yaml
 - the postgres or sqlite DB
+- the jetstream directory
 - the media store
 - the search index (although this can be regenerated)
 

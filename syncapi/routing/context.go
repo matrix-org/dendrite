@@ -110,6 +110,7 @@ func Context(
 	}
 
 	stateFilter := synctypes.StateFilter{
+		Limit:                   filter.Limit,
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,
@@ -155,6 +156,11 @@ func Context(
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("User is not allowed to query context"),
 		}
+	}
+
+	// Limit is split up for before/after events
+	if filter.Limit > 1 {
+		filter.Limit = filter.Limit / 2
 	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)

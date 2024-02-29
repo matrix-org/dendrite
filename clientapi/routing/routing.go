@@ -1513,4 +1513,14 @@ func Setup(
 			return GetPresence(req, device, natsClient, cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/joined_members",
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetJoinedMembers(req, device, vars["roomID"], rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
