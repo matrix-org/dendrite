@@ -1,7 +1,7 @@
 
 # dendrite
 
-![Version: 0.13.6](https://img.shields.io/badge/Version-0.13.6-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.13.5](https://img.shields.io/badge/AppVersion-0.13.5-informational?style=flat-square)
+![Version: 0.14.0](https://img.shields.io/badge/Version-0.14.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.13.6](https://img.shields.io/badge/AppVersion-0.13.6-informational?style=flat-square)
 Dendrite Matrix Homeserver
 
 Status: **NOT PRODUCTION READY**
@@ -37,7 +37,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://charts.bitnami.com/bitnami | postgresql | 12.1.7 |
+| https://charts.bitnami.com/bitnami | postgresql | 14.2.3 |
 ## Values
 
 | Key | Type | Default | Description |
@@ -48,16 +48,19 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | signing_key.create | bool | `true` | Create a new signing key, if not exists |
 | signing_key.existingSecret | string | `""` | Use an existing secret |
 | resources | object | sets some sane default values | Default resource requests/limits. |
-| persistence.jetstream | object | `{"capacity":"1Gi","existingClaim":""}` | The storage class to use for volume claims. Used unless specified at the specific component. Defaults to the cluster default storage class. # If defined, storageClassName: <storageClass> # If set to "-", storageClassName: "", which disables dynamic provisioning # If undefined (the default) or set to null, no storageClassName spec is #   set, choosing the default provisioner.  (gp2 on AWS, standard on #   GKE, AWS & OpenStack) # storageClass: "" |
+| persistence.storageClass | string | `nil` | The storage class to use for volume claims. Used unless specified at the specific component. Defaults to the cluster default storage class. If defined, storageClassName: <storageClass> If set to "-", storageClassName: "", which disables dynamic provisioning If undefined (the default) or set to null, no storageClassName spec is   set, choosing the default provisioner.  (gp2 on AWS, standard on   GKE, AWS & OpenStack)  |
 | persistence.jetstream.existingClaim | string | `""` | Use an existing volume claim for jetstream |
 | persistence.jetstream.capacity | string | `"1Gi"` | PVC Storage Request for the jetstream volume |
+| persistence.jetstream.storageClass | string | `nil` | The storage class to use for volume claims. Defaults to persistence.storageClass If defined, storageClassName: <storageClass> If set to "-", storageClassName: "", which disables dynamic provisioning If undefined (the default) or set to null, no storageClassName spec is   set, choosing the default provisioner.  (gp2 on AWS, standard on   GKE, AWS & OpenStack) |
 | persistence.media.existingClaim | string | `""` | Use an existing volume claim for media files |
 | persistence.media.capacity | string | `"1Gi"` | PVC Storage Request for the media volume |
+| persistence.media.storageClass | string | `nil` | The storage class to use for volume claims. Defaults to persistence.storageClass If defined, storageClassName: <storageClass> If set to "-", storageClassName: "", which disables dynamic provisioning If undefined (the default) or set to null, no storageClassName spec is   set, choosing the default provisioner.  (gp2 on AWS, standard on   GKE, AWS & OpenStack) |
 | persistence.search.existingClaim | string | `""` | Use an existing volume claim for the fulltext search index |
 | persistence.search.capacity | string | `"1Gi"` | PVC Storage Request for the search volume |
+| persistence.search.storageClass | string | `nil` | The storage class to use for volume claims. Defaults to persistence.storageClass If defined, storageClassName: <storageClass> If set to "-", storageClassName: "", which disables dynamic provisioning If undefined (the default) or set to null, no storageClassName spec is   set, choosing the default provisioner.  (gp2 on AWS, standard on   GKE, AWS & OpenStack) |
 | extraVolumes | list | `[]` | Add additional volumes to the Dendrite Pod |
 | extraVolumeMounts | list | `[]` | Configure additional mount points volumes in the Dendrite Pod |
-| strategy.type | string | `"RollingUpdate"` | Strategy to use for rolling updates (e.g. Recreate, RollingUpdate) If you are using ReadWriteOnce volumes, you should probably use Recreate |
+| strategy.type | string | `"Recreate"` | Strategy to use for rolling updates (e.g. Recreate, RollingUpdate) If you are using ReadWriteOnce volumes, you should probably use Recreate |
 | strategy.rollingUpdate.maxUnavailable | string | `"25%"` | Maximum number of pods that can be unavailable during the update process |
 | strategy.rollingUpdate.maxSurge | string | `"25%"` | Maximum number of pods that can be scheduled above the desired number of pods |
 | dendrite_config.version | int | `2` |  |
@@ -139,7 +142,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | dendrite_config.logging | list | `[{"level":"info","type":"std"}]` | Default logging configuration |
 | postgresql.enabled | bool | See value.yaml | Enable and configure postgres as the database for dendrite. |
 | postgresql.image.repository | string | `"bitnami/postgresql"` |  |
-| postgresql.image.tag | string | `"15.1.0"` |  |
+| postgresql.image.tag | string | `"16.2.0"` |  |
 | postgresql.auth.username | string | `"dendrite"` |  |
 | postgresql.auth.password | string | `"changeme"` |  |
 | postgresql.auth.database | string | `"dendrite"` |  |
@@ -186,3 +189,5 @@ grafana:
 ```
 PS: The label `release=kube-prometheus-stack` is setup with the helmchart of the Prometheus Operator. For Grafana Dashboards it may be necessary to enable scanning in the correct namespaces (or ALL), enabled by `sidecar.dashboards.searchNamespace` in [Helmchart of grafana](https://artifacthub.io/packages/helm/grafana/grafana) (which is part of PrometheusOperator, so `grafana.sidecar.dashboards.searchNamespace`)
 
+----------------------------------------------
+Autogenerated from chart metadata using [helm-docs v1.13.0](https://github.com/norwoodj/helm-docs/releases/v1.13.0)

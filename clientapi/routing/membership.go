@@ -324,19 +324,18 @@ func SendInvite(
 	}
 
 	// We already received the return value, so no need to check for an error here.
-	response, _ := sendInvite(req.Context(), profileAPI, device, roomID, body.UserID, body.Reason, cfg, rsAPI, asAPI, evTime)
+	response, _ := sendInvite(req.Context(), device, roomID, body.UserID, body.Reason, cfg, rsAPI, evTime)
 	return response
 }
 
 // sendInvite sends an invitation to a user. Returns a JSONResponse and an error
 func sendInvite(
 	ctx context.Context,
-	profileAPI userapi.ClientUserAPI,
 	device *userapi.Device,
 	roomID, userID, reason string,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceInternalAPI, evTime time.Time,
+	evTime time.Time,
 ) (util.JSONResponse, error) {
 	validRoomID, err := spec.NewRoomID(roomID)
 	if err != nil {
@@ -359,13 +358,7 @@ func sendInvite(
 			JSON: spec.InvalidParam("UserID is invalid"),
 		}, err
 	}
-	profile, err := loadProfile(ctx, userID, cfg, profileAPI, asAPI)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}, err
-	}
+
 	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
 	if err != nil {
 		return util.JSONResponse{
@@ -375,16 +368,14 @@ func sendInvite(
 	}
 	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
 		InviteInput: roomserverAPI.InviteInput{
-			RoomID:      *validRoomID,
-			Inviter:     *inviter,
-			Invitee:     *invitee,
-			DisplayName: profile.DisplayName,
-			AvatarURL:   profile.AvatarURL,
-			Reason:      reason,
-			IsDirect:    false,
-			KeyID:       identity.KeyID,
-			PrivateKey:  identity.PrivateKey,
-			EventTime:   evTime,
+			RoomID:     *validRoomID,
+			Inviter:    *inviter,
+			Invitee:    *invitee,
+			Reason:     reason,
+			IsDirect:   false,
+			KeyID:      identity.KeyID,
+			PrivateKey: identity.PrivateKey,
+			EventTime:  evTime,
 		},
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
 		SendAsServer:    string(device.UserDomain()),

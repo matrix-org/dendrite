@@ -40,6 +40,9 @@ type AppServiceAPI struct {
 	// on appservice endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
+	LegacyAuth  bool `yaml:"legacy_auth"`
+	LegacyPaths bool `yaml:"legacy_paths"`
+
 	ConfigFiles []string `yaml:"config_files"`
 }
 

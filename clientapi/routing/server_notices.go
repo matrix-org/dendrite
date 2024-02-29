@@ -215,7 +215,7 @@ func SendServerNotice(
 		}
 		if !membershipRes.IsInRoom {
 			// re-invite the user
-			res, err := sendInvite(ctx, userAPI, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			res, err := sendInvite(ctx, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, time.Now())
 			if err != nil {
 				return res
 			}

@@ -10,8 +10,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_date: # https://stackoverflow.com/questions/63014786/how-to-schedule-a-github-actions-nightly-build-but-run-it-only-when-there-where
+    runs-on: ubuntu-latest
+    name: Check latest commit
+    outputs:
+      should_run: ${{ steps.should_run.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: print latest_commit
+        run: echo ${{ github.sha }}
+
+      - id: should_run
+        continue-on-error: true
+        name: check latest commit is less than a day
+        if: ${{ github.event_name == 'schedule' }}
+        run: test -z $(git rev-list  --after="24 hours"  ${{ github.sha }}) && echo "::set-output name=should_run::false"
+
   # run Sytest in different variations
   sytest:
+    needs: check_date
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
     timeout-minutes: 60
     name: "Sytest (${{ matrix.label }})"
     runs-on: ubuntu-latest
@@ -38,8 +56,8 @@ jobs:
         RACE_DETECTION: 1
         COVER: 1
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -62,7 +80,7 @@ jobs:
         run: /src/are-we-synapse-yet.py /logs/results.tap -v
         continue-on-error: true # not fatal
       - name: Upload Sytest logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: Sytest Logs - ${{ job.status }} - (Dendrite ${{ join(matrix.*, ' ') }})
@@ -75,31 +93,34 @@ jobs:
     timeout-minutes: 5
     name: "Sytest Coverage"
     runs-on: ubuntu-latest
-    needs: sytest # only run once Sytest is done
-    if: ${{ always() }}
+    needs: [ sytest, check_date ] # only run once Sytest is done and there was a commit
+    if: ${{ always() && needs.check_date.outputs.should_run != 'false' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: 'stable'
           cache: true
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Collect coverage
         run: |
           go tool covdata textfmt -i="$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o sytest.cov
           grep -Ev 'relayapi|setup/mscs|api_trace' sytest.cov > final.cov
           go tool covdata func -i="$(find Sytest* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./final.cov
           flags: sytest
           fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # run Complement
   complement:
+    needs: check_date
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
     name: "Complement (${{ matrix.label }})"
     timeout-minutes: 60
     runs-on: ubuntu-latest
@@ -129,8 +150,8 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
           go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
-      - name: Run actions/checkout@v3 for dendrite
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for dendrite
+        uses: actions/checkout@v4
         with:
           path: dendrite
 
@@ -174,7 +195,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests/... 2>&1 | gotestfmt
+          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         name: Run Complement Tests
         env:
@@ -185,7 +206,7 @@ jobs:
         working-directory: complement
 
       - name: Upload Complement logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: Complement Logs - (Dendrite ${{ join(matrix.*, ' ') }})
@@ -196,30 +217,32 @@ jobs:
     timeout-minutes: 5
     name: "Complement Coverage"
     runs-on: ubuntu-latest
-    needs: complement # only run once Complement is done
-    if: ${{ always() }}
+    needs: [ complement, check_date ] # only run once Complements is done and there was a commit
+    if: ${{ always() && needs.check_date.outputs.should_run != 'false' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: 'stable'
           cache: true
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Collect coverage
         run: |
           go tool covdata textfmt -i="$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)" -o complement.cov
           grep -Ev 'relayapi|setup/mscs|api_trace' complement.cov > final.cov
           go tool covdata func -i="$(find Complement* -name 'covmeta*' -type f -exec dirname {} \; | uniq | paste -s -d ',' -)"
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./final.cov
           flags: complement
           fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }} # required
 
   element-web:
+    if: ${{ false }} # disable for now, as Cypress has been replaced by Playwright
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
@@ -228,7 +251,7 @@ jobs:
           # Our test suite includes some screenshot tests with unusual diacritics, which are
           # supposed to be covered by STIXGeneral.
           tools: fonts-stix
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           repository: matrix-org/matrix-react-sdk
       - uses: actions/setup-node@v3
@@ -259,6 +282,7 @@ jobs:
           TMPDIR: ${{ runner.temp }}
 
   element-web-pinecone:
+    if: ${{ false }} # disable for now, as Cypress has been replaced by Playwright
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
@@ -267,7 +291,7 @@ jobs:
           # Our test suite includes some screenshot tests with unusual diacritics, which are
           # supposed to be covered by STIXGeneral.
           tools: fonts-stix
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           repository: matrix-org/matrix-react-sdk
       - uses: actions/setup-node@v3

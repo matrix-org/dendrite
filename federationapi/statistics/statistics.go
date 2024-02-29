@@ -34,12 +34,15 @@ type Statistics struct {
 	// mark the destination as offline. At this point we should attempt
 	// to send messages to the user's async relay servers if we know them.
 	FailuresUntilAssumedOffline uint32
+
+	enableRelays bool
 }
 
 func NewStatistics(
 	db storage.Database,
 	failuresUntilBlacklist uint32,
 	failuresUntilAssumedOffline uint32,
+	enableRelays bool,
 ) Statistics {
 	return Statistics{
 		DB:                          db,
@@ -47,6 +50,7 @@ func NewStatistics(
 		FailuresUntilAssumedOffline: failuresUntilAssumedOffline,
 		backoffTimers:               make(map[spec.ServerName]*time.Timer),
 		servers:                     make(map[spec.ServerName]*ServerStatistics),
+		enableRelays:                enableRelays,
 	}
 }
 
@@ -73,6 +77,13 @@ func (s *Statistics) ForServer(serverName spec.ServerName) *ServerStatistics {
 		} else {
 			server.blacklisted.Store(blacklisted)
 		}
+
+		// Don't bother hitting the database 2 additional times
+		// if we don't want to use relays.
+		if !s.enableRelays {
+			return server
+		}
+
 		assumedOffline, err := s.DB.IsServerAssumedOffline(context.Background(), serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get assumed offline entry %q", serverName)

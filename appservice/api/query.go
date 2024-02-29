@@ -82,9 +82,17 @@ type UserIDExistsResponse struct {
 }
 
 const (
-	ASProtocolPath = "/_matrix/app/unstable/thirdparty/protocol/"
-	ASUserPath     = "/_matrix/app/unstable/thirdparty/user"
-	ASLocationPath = "/_matrix/app/unstable/thirdparty/location"
+	ASProtocolLegacyPath        = "/_matrix/app/unstable/thirdparty/protocol/"
+	ASUserLegacyPath            = "/_matrix/app/unstable/thirdparty/user"
+	ASLocationLegacyPath        = "/_matrix/app/unstable/thirdparty/location"
+	ASRoomAliasExistsLegacyPath = "/rooms/"
+	ASUserExistsLegacyPath      = "/users/"
+
+	ASProtocolPath        = "/_matrix/app/v1/thirdparty/protocol/"
+	ASUserPath            = "/_matrix/app/v1/thirdparty/user"
+	ASLocationPath        = "/_matrix/app/v1/thirdparty/location"
+	ASRoomAliasExistsPath = "/_matrix/app/v1/rooms/"
+	ASUserExistsPath      = "/_matrix/app/v1/users/"
 )
 
 type ProtocolRequest struct {

@@ -197,19 +197,7 @@ func Setup(
 			}
 
 			at := req.URL.Query().Get("at")
-			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, false, membership, notMembership, at)
+			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, membership, notMembership, at)
 		}, httputil.WithAllowGuests()),
-	).Methods(http.MethodGet, http.MethodOptions)
-
-	v3mux.Handle("/rooms/{roomID}/joined_members",
-		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			at := req.URL.Query().Get("at")
-			membership := spec.Join
-			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, true, &membership, nil, at)
-		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 }

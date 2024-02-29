@@ -197,6 +197,10 @@ func localKeys(cfg *config.FederationAPI, serverName spec.ServerName) (*gomatrix
 	return &keys, err
 }
 
+type NotaryKeysResponse struct {
+	ServerKeys []json.RawMessage `json:"server_keys"`
+}
+
 func NotaryKeys(
 	httpReq *http.Request, cfg *config.FederationAPI,
 	fsAPI federationAPI.FederationInternalAPI,
@@ -217,10 +221,9 @@ func NotaryKeys(
 		}
 	}
 
-	var response struct {
-		ServerKeys []json.RawMessage `json:"server_keys"`
+	response := NotaryKeysResponse{
+		ServerKeys: []json.RawMessage{},
 	}
-	response.ServerKeys = []json.RawMessage{}
 
 	for serverName, kidToCriteria := range req.ServerKeys {
 		var keyList []gomatrixserverlib.ServerKeys

@@ -647,6 +647,8 @@ func MakeFedAPI(
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
+			// clone the hub, so we don't send garbage events with e.g. mismatching rooms/event_ids
+			hub = hub.Clone()
 			hub.Scope().SetTag("origin", string(fedReq.Origin()))
 			hub.Scope().SetTag("uri", fedReq.RequestURI())
 		}
