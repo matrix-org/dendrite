@@ -15,6 +15,6 @@ sources:
   - https://github.com/matrix-org/dendrite
 dependencies:
   - name: postgresql
-    version: 13.2.24
+    version: 14.2.3
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
