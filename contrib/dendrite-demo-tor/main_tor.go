@@ -48,7 +48,7 @@ func Dial(network, addr string) (net.Conn, error) {
 		return nil, terr
 	}
 	if (tderr != nil) || (tdialer == nil) {
-		return nil, tderr	
+		return nil, tderr
 	}
 	if network == "unix" {
 		return net.Dial(network, addr)
@@ -87,12 +87,12 @@ func SetupAndServeHTTPS(
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to create onion")
 	}
-	defer onion.Close()
+	defer onion.Close() // nolint: errcheck
 	listener, err := onion.ListenTLS()
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to serve HTTPS")
 	}
-	defer listener.Close()
+	defer listener.Close() // nolint: errcheck
 
 	externalHTTPSAddr := config.ServerAddress{}
 	https, err := config.HTTPAddress("https://" + listener.Addr().String())
