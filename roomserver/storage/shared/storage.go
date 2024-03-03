@@ -1625,11 +1625,6 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
 }
 
-// GetKnownRooms returns a list of all rooms we know about.
-func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
-	return d.RoomsTable.SelectRoomIDsWithEvents(ctx, nil)
-}
-
 func (d *Database) RoomsWithACLs(ctx context.Context) ([]string, error) {
 
 	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, "m.room.server_acl")
