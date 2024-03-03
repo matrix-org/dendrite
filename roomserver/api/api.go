@@ -86,6 +86,9 @@ type RoomserverInternalAPI interface {
 		req *QueryAuthChainRequest,
 		res *QueryAuthChainResponse,
 	) error
+
+	// RoomsWithACLs returns all room IDs for rooms with ACLs
+	RoomsWithACLs(ctx context.Context) ([]string, error)
 }
 
 type UserRoomPrivateKeyCreator interface {

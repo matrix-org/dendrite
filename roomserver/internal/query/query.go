@@ -1099,3 +1099,8 @@ func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, 
 
 	return nil, nil
 }
+
+// RoomsWithACLs returns all room IDs for rooms with ACLs
+func (r *Queryer) RoomsWithACLs(ctx context.Context) ([]string, error) {
+	return r.DB.RoomsWithACLs(ctx)
+}
