@@ -193,6 +193,9 @@ type Database interface {
 	MaybeRedactEvent(
 		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
+
+	// RoomsWithACLs returns all room IDs for rooms with ACLs
+	RoomsWithACLs(ctx context.Context) ([]string, error)
 }
 
 type UserRoomKeys interface {

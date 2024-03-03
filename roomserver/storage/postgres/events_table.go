@@ -147,6 +147,8 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
+const selectRoomsWithACLsSQL = `select distinct room_nid from roomserver_events where event_type_nid = $1`
+
 type eventStatements struct {
 	insertEventStmt                               *sql.Stmt
 	selectEventStmt                               *sql.Stmt
@@ -166,6 +168,7 @@ type eventStatements struct {
 	selectMaxEventDepthStmt                       *sql.Stmt
 	selectRoomNIDsForEventNIDsStmt                *sql.Stmt
 	selectEventRejectedStmt                       *sql.Stmt
+	selectRoomsWithACLsStmt                       *sql.Stmt
 }
 
 func CreateEventsTable(db *sql.DB) error {
@@ -206,6 +209,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
 		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
+		{&s.selectRoomsWithACLsStmt, selectRoomsWithACLsSQL},
 	}.Prepare(db)
 }
 
@@ -581,4 +585,26 @@ func (s *eventStatements) SelectEventRejected(
 	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
 	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
+}
+
+func (s *eventStatements) SelectRoomsWithEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventTypeNID types.EventTypeNID,
+) ([]types.RoomNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithACLsStmt)
+	rows, err := stmt.QueryContext(ctx, eventTypeNID)
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithEventTypeNID: rows.close() failed")
+	if err != nil {
+		return nil, err
+	}
+
+	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
+	for rows.Next() {
+		if err := rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+
+	return roomNIDs, rows.Err()
 }

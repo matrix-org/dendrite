@@ -1630,6 +1630,26 @@ func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
 	return d.RoomsTable.SelectRoomIDsWithEvents(ctx, nil)
 }
 
+func (d *Database) RoomsWithACLs(ctx context.Context) ([]string, error) {
+
+	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, "m.room.server_acl")
+	if err != nil {
+		return nil, err
+	}
+
+	roomNIDs, err := d.EventsTable.SelectRoomsWithEventTypeNID(ctx, nil, eventTypeNID)
+	if err != nil {
+		return nil, err
+	}
+
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, roomNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return roomIDs, nil
+}
+
 // ForgetRoom sets a users room to forgotten
 func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error {
 	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, nil, []string{roomID})

@@ -120,6 +120,8 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
+const selectRoomsWithACLsSQL = `select distinct room_nid from roomserver_events where event_type_nid = $1`
+
 type eventStatements struct {
 	db                                            *sql.DB
 	insertEventStmt                               *sql.Stmt
@@ -135,6 +137,7 @@ type eventStatements struct {
 	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
 	bulkSelectEventIDStmt                         *sql.Stmt
 	selectEventRejectedStmt                       *sql.Stmt
+	selectRoomsWithACLsStmt                       *sql.Stmt
 	//bulkSelectEventNIDStmt               *sql.Stmt
 	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
 	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
@@ -192,6 +195,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
 		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
+		{&s.selectRoomsWithACLsStmt, selectRoomsWithACLsSQL},
 	}.Prepare(db)
 }
 
@@ -681,4 +685,26 @@ func (s *eventStatements) SelectEventRejected(
 	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
 	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
+}
+
+func (s *eventStatements) SelectRoomsWithEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventTypeNID types.EventTypeNID,
+) ([]types.RoomNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithACLsStmt)
+	rows, err := stmt.QueryContext(ctx, eventTypeNID)
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithEventTypeNID: rows.close() failed")
+	if err != nil {
+		return nil, err
+	}
+
+	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
+	for rows.Next() {
+		if err := rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+
+	return roomNIDs, rows.Err()
 }
