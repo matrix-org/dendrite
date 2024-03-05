@@ -66,7 +66,7 @@ func TestPerformWakeupServers(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, true)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -112,7 +112,7 @@ func TestQueryRelayServers(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -153,7 +153,7 @@ func TestRemoveRelayServers(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -193,7 +193,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -232,7 +232,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, true)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
