@@ -44,6 +44,14 @@ const eventsSchema = `
 	auth_event_nids TEXT NOT NULL DEFAULT '[]',
 	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
   );
+
+-- Create an index which helps in resolving membership events (event_type_nid = 5) - (used for history visibility)
+CREATE INDEX IF NOT EXISTS roomserver_events_memberships_idx ON roomserver_events (room_nid, event_state_key_nid) WHERE (event_type_nid = 5);
+
+-- The following indexes are used by bulkSelectStateEventByNIDSQL 
+CREATE INDEX IF NOT EXISTS roomserver_event_event_type_nid_idx ON roomserver_events (event_type_nid);
+CREATE INDEX IF NOT EXISTS roomserver_event_state_key_nid_idx ON roomserver_events (event_state_key_nid);
+
 `
 
 const insertEventSQL = `
