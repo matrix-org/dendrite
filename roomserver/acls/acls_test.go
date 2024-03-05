@@ -116,7 +116,7 @@ var (
 
 type dummyACLDB struct{}
 
-func (d dummyACLDB) GetKnownRooms(ctx context.Context) ([]string, error) {
+func (d dummyACLDB) RoomsWithACLs(ctx context.Context) ([]string, error) {
 	return []string{"1", "2"}, nil
 }
 

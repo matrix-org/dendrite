@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS roomserver_events (
 
 -- Create an index which helps in resolving membership events (event_type_nid = 5) - (used for history visibility)
 CREATE INDEX IF NOT EXISTS roomserver_events_memberships_idx ON roomserver_events (room_nid, event_state_key_nid) WHERE (event_type_nid = 5);
+
+-- The following indexes are used by bulkSelectStateEventByNIDSQL 
+CREATE INDEX IF NOT EXISTS roomserver_event_event_type_nid_idx ON roomserver_events (event_type_nid);
+CREATE INDEX IF NOT EXISTS roomserver_event_state_key_nid_idx ON roomserver_events (event_state_key_nid);
 `
 
 const insertEventSQL = "" +
@@ -147,6 +151,8 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
+const selectRoomsWithEventTypeNIDSQL = `SELECT DISTINCT room_nid FROM roomserver_events WHERE event_type_nid = $1`
+
 type eventStatements struct {
 	insertEventStmt                               *sql.Stmt
 	selectEventStmt                               *sql.Stmt
@@ -166,6 +172,7 @@ type eventStatements struct {
 	selectMaxEventDepthStmt                       *sql.Stmt
 	selectRoomNIDsForEventNIDsStmt                *sql.Stmt
 	selectEventRejectedStmt                       *sql.Stmt
+	selectRoomsWithEventTypeNIDStmt               *sql.Stmt
 }
 
 func CreateEventsTable(db *sql.DB) error {
@@ -206,6 +213,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
 		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
+		{&s.selectRoomsWithEventTypeNIDStmt, selectRoomsWithEventTypeNIDSQL},
 	}.Prepare(db)
 }
 
@@ -581,4 +589,26 @@ func (s *eventStatements) SelectEventRejected(
 	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
 	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
+}
+
+func (s *eventStatements) SelectRoomsWithEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventTypeNID types.EventTypeNID,
+) ([]types.RoomNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithEventTypeNIDStmt)
+	rows, err := stmt.QueryContext(ctx, eventTypeNID)
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithEventTypeNID: rows.close() failed")
+	if err != nil {
+		return nil, err
+	}
+
+	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
+	for rows.Next() {
+		if err := rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+
+	return roomNIDs, rows.Err()
 }

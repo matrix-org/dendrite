@@ -1284,3 +1284,38 @@ func TestRoomConsumerRecreation(t *testing.T) {
 	wantAckWait := input.MaximumMissingProcessingTime + (time.Second * 10)
 	assert.Equal(t, wantAckWait, info.Config.AckWait)
 }
+
+func TestRoomsWithACLs(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
+	noACLRoom := test.NewRoom(t, alice)
+	aclRoom := test.NewRoom(t, alice)
+
+	aclRoom.CreateAndInsert(t, alice, "m.room.server_acl", map[string]any{
+		"deny":  []string{"evilhost.test"},
+		"allow": []string{"*"},
+	}, test.WithStateKey(""))
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		// start JetStream listeners
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		for _, room := range []*test.Room{noACLRoom, aclRoom} {
+			// Create the rooms
+			err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+			assert.NoError(t, err)
+		}
+
+		// Validate that we only have one ACLd room.
+		roomsWithACLs, err := rsAPI.RoomsWithACLs(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{aclRoom.ID}, roomsWithACLs)
+	})
+}
