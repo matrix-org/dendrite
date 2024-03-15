@@ -26,7 +26,7 @@ import (
 
 type reportEventRequest struct {
 	Reason string `json:"reason"`
-	Score  int    `json:"score"`
+	Score  int64  `json:"score"`
 }
 
 func ReportEvent(
@@ -79,6 +79,14 @@ func ReportEvent(
 	}
 
 	// TODO: Store the event
+
+	_, err = rsAPI.InsertReportedEvent(req.Context(), roomID, eventID, device.UserID, report.Reason, report.Score)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{Err: err.Error()},
+		}
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
