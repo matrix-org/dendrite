@@ -1523,4 +1523,14 @@ func Setup(
 			return GetJoinedMembers(req, device, vars["roomID"], rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/report/{eventID}",
+		httputil.MakeAuthAPI("report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return ReportEvent(req, device, vars["roomID"], vars["eventID"], rsAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 }
