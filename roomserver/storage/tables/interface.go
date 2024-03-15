@@ -127,6 +127,18 @@ type Invites interface {
 	SelectInviteActiveForUserInRoom(ctx context.Context, txn *sql.Tx, targetUserNID types.EventStateKeyNID, roomNID types.RoomNID) ([]types.EventStateKeyNID, []string, []byte, error)
 }
 
+type ReportedEvents interface {
+	InsertReportedEvent(
+		ctx context.Context,
+		txn *sql.Tx,
+		roomNID types.RoomNID,
+		eventNID types.EventNID,
+		reportingUserID string,
+		reason string,
+		score int64,
+	) (int64, error)
+}
+
 type MembershipState int64
 
 const (
