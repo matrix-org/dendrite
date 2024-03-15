@@ -26,16 +26,15 @@ import (
 )
 
 const reportedEventsScheme = `
-CREATE SEQUENCE IF NOT EXISTS roomserver_reported_events_id_seq;
 CREATE TABLE IF NOT EXISTS roomserver_reported_events
 (
-	id 			BIGINT PRIMARY KEY DEFAULT nextval('roomserver_reported_events_id_seq'),
-    room_nid 	BIGINT NOT NULL,
-	event_nid 	BIGINT NOT NULL,
+    id			INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_nid 	INTEGER NOT NULL,
+	event_nid 	INTEGER NOT NULL,
     user_id     TEXT NOT NULL,
     reason      TEXT,
     score       INTEGER,
-    received_ts BIGINT NOT NULL
+    received_ts INTEGER NOT NULL
 );`
 
 const insertReportedEventSQL = `
