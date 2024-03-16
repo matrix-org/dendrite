@@ -78,8 +78,6 @@ func ReportEvent(
 		}
 	}
 
-	// TODO: Store the event
-
 	_, err = rsAPI.InsertReportedEvent(req.Context(), roomID, eventID, device.UserID, report.Reason, report.Score)
 	if err != nil {
 		return util.JSONResponse{
