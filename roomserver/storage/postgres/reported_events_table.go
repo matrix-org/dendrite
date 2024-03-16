@@ -53,7 +53,7 @@ func CreateReportedEventsTable(db *sql.DB) error {
 	return err
 }
 
-func PrepareReportEventsTable(db *sql.DB) (tables.ReportedEvents, error) {
+func PrepareReportedEventsTable(db *sql.DB) (tables.ReportedEvents, error) {
 	s := &reportedEventsStatements{}
 
 	return s, sqlutil.StatementList{

@@ -208,7 +208,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	reportedEvents, err := PrepareReportEventsTable(db)
+	reportedEvents, err := PrepareReportedEventsTable(db)
 	if err != nil {
 		return err
 	}
