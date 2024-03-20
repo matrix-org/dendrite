@@ -1905,9 +1905,28 @@ func (d *Database) InsertReportedEvent(
 		return 0, fmt.Errorf("unable to find requested event")
 	}
 
+	stateKeyNIDs, err := d.EventStateKeyNIDs(ctx, []string{reportingUserID, events[0].SenderID().ToUserID().String()})
+	if err != nil {
+		return 0, fmt.Errorf("failed to query eventStateKeyNIDs: %w", err)
+	}
+
+	// We expect exactly 2 stateKeyNIDs
+	if len(stateKeyNIDs) != 2 {
+		return 0, fmt.Errorf("expected 2 stateKeyNIDs, received %d", len(stateKeyNIDs))
+	}
+
 	var reportID int64
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		reportID, err = d.ReportedEventsTable.InsertReportedEvent(ctx, txn, roomInfo.RoomNID, events[0].EventNID, reportingUserID, reason, score)
+		reportID, err = d.ReportedEventsTable.InsertReportedEvent(
+			ctx,
+			txn,
+			roomInfo.RoomNID,
+			events[0].EventNID,
+			stateKeyNIDs[reportingUserID],
+			stateKeyNIDs[events[0].SenderID().ToUserID().String()],
+			reason,
+			score,
+		)
 		if err != nil {
 			return err
 		}

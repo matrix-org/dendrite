@@ -133,7 +133,8 @@ type ReportedEvents interface {
 		txn *sql.Tx,
 		roomNID types.RoomNID,
 		eventNID types.EventNID,
-		reportingUserID string,
+		reportingUserID types.EventStateKeyNID,
+		eventSenderID types.EventStateKeyNID,
 		reason string,
 		score int64,
 	) (int64, error)

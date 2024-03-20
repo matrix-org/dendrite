@@ -29,18 +29,19 @@ const reportedEventsScheme = `
 CREATE SEQUENCE IF NOT EXISTS roomserver_reported_events_id_seq;
 CREATE TABLE IF NOT EXISTS roomserver_reported_events
 (
-	id 			BIGINT PRIMARY KEY DEFAULT nextval('roomserver_reported_events_id_seq'),
-    room_nid 	BIGINT NOT NULL,
-	event_nid 	BIGINT NOT NULL,
-    user_id     TEXT NOT NULL,
-    reason      TEXT,
-    score       INTEGER,
-    received_ts BIGINT NOT NULL
+	id 					BIGINT PRIMARY KEY DEFAULT nextval('roomserver_reported_events_id_seq'),
+    room_nid 			BIGINT NOT NULL,
+	event_nid 			BIGINT NOT NULL,
+    reporting_user_nid	INTEGER NOT NULL, -- the user reporting the event
+    event_sender_nid	INTEGER NOT NULL, -- the user who sent the reported event
+    reason      		TEXT,
+    score       		INTEGER,
+    received_ts 		BIGINT NOT NULL
 );`
 
 const insertReportedEventSQL = `
-	INSERT INTO roomserver_reported_events (room_nid, event_nid, user_id, reason, score, received_ts) 
-	VALUES ($1, $2, $3, $4, $5, $6)
+	INSERT INTO roomserver_reported_events (room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts) 
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id
 `
 
@@ -66,7 +67,8 @@ func (r *reportedEventsStatements) InsertReportedEvent(
 	txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventNID types.EventNID,
-	reportingUserID string,
+	reportingUserID types.EventStateKeyNID,
+	eventSenderID types.EventStateKeyNID,
 	reason string,
 	score int64,
 ) (int64, error) {
@@ -77,6 +79,7 @@ func (r *reportedEventsStatements) InsertReportedEvent(
 		roomNID,
 		eventNID,
 		reportingUserID,
+		eventSenderID,
 		reason,
 		score,
 		spec.AsTimestamp(time.Now()),
