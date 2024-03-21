@@ -1936,6 +1936,131 @@ func (d *Database) InsertReportedEvent(
 	return reportID, err
 }
 
+// QueryAdminEventReports returns event reports given a filter.
+func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limit uint64, backwards bool, userID string, roomID string) ([]api.QueryAdminEventReportsResponse, int64, error) {
+	// Filter on roomID, if requested
+	var roomNID types.RoomNID
+	if roomID != "" {
+		roomInfo, err := d.RoomInfo(ctx, roomID)
+		if err != nil {
+			return nil, 0, err
+		}
+		roomNID = roomInfo.RoomNID
+	}
+
+	// Same as above, but for userID
+	var userNID types.EventStateKeyNID
+	if userID != "" {
+		stateKeysMap, err := d.EventStateKeyNIDs(ctx, []string{userID})
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(stateKeysMap) != 1 {
+			return nil, 0, fmt.Errorf("failed to get eventStateKeyNID for %s", userID)
+		}
+		userNID = stateKeysMap[userID]
+	}
+
+	// Query all reported events matching the filters
+	reports, count, err := d.ReportedEventsTable.SelectReportedEvents(ctx, nil, from, limit, backwards, userNID, roomNID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to SelectReportedEvents: %w", err)
+	}
+
+	// TODO: The below code may be inefficient due to many DB round trips and needs to be revisited.
+	// 	For the time being, this is "good enough".
+	qryRoomNIDs := make([]types.RoomNID, 0, len(reports))
+	qryEventNIDs := make([]types.EventNID, 0, len(reports))
+	qryStateKeyNIDs := make([]types.EventStateKeyNID, 0, len(reports))
+	for _, report := range reports {
+		qryRoomNIDs = append(qryRoomNIDs, report.RoomNID)
+		qryEventNIDs = append(qryEventNIDs, report.EventNID)
+		qryStateKeyNIDs = append(qryStateKeyNIDs, report.ReportingUserNID, report.SenderNID)
+	}
+
+	// This also de-dupes the roomIDs, otherwise we would query the same
+	// roomIDs in GetBulkStateContent multiple times
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, qryRoomNIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// TODO: replace this with something more efficient, as it loads the entire state snapshot.
+	stateContent, err := d.GetBulkStateContent(ctx, roomIDs, []gomatrixserverlib.StateKeyTuple{
+		{EventType: spec.MRoomName, StateKey: ""},
+		{EventType: spec.MRoomCanonicalAlias, StateKey: ""},
+	}, false)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	eventIDMap, err := d.EventIDs(ctx, qryEventNIDs)
+	if err != nil {
+		logrus.WithError(err).Error("unable to map eventNIDs to eventIDs")
+		return nil, 0, err
+	}
+	if len(eventIDMap) != len(qryEventNIDs) {
+		return nil, 0, fmt.Errorf("expected %d eventIDs, got %d", len(qryEventNIDs), len(eventIDMap))
+	}
+
+	// Get a map from EventStateKeyNID to userID
+	userNIDMap, err := d.EventStateKeys(ctx, qryStateKeyNIDs)
+	if err != nil {
+		logrus.WithError(err).Error("unable to map userNIDs to userIDs")
+		return nil, 0, err
+	}
+
+	// Create a cache from roomNID to roomID to avoid hitting the DB again
+	roomNIDIDCache := make(map[types.RoomNID]string, len(roomIDs))
+	for i := 0; i < len(reports); i++ {
+		cachedRoomID := roomNIDIDCache[reports[i].RoomNID]
+		if cachedRoomID == "" {
+			// We need to query this again, as we otherwise don't have a way to match roomNID -> roomID
+			roomIDs, err = d.RoomsTable.BulkSelectRoomIDs(ctx, nil, []types.RoomNID{reports[i].RoomNID})
+			if err != nil {
+				return nil, 0, err
+			}
+			if len(roomIDs) == 0 || len(roomIDs) > 1 {
+				logrus.Warnf("unable to map roomNID %d to a roomID, was this room deleted?", roomNID)
+				continue
+			}
+			roomNIDIDCache[reports[i].RoomNID] = roomIDs[0]
+			cachedRoomID = roomIDs[0]
+		}
+
+		reports[i].EventID = eventIDMap[reports[i].EventNID]
+		reports[i].RoomID = cachedRoomID
+		roomName, canonicalAlias := findRoomNameAndCanonicalAlias(stateContent, cachedRoomID)
+		reports[i].RoomName = roomName
+		reports[i].CanonicalAlias = canonicalAlias
+		reports[i].Sender = userNIDMap[reports[i].SenderNID]
+		reports[i].UserID = userNIDMap[reports[i].ReportingUserNID]
+	}
+
+	return reports, count, nil
+}
+
+// findRoomNameAndCanonicalAlias loops over events to find the corresponding room name and canonicalAlias
+// for a given roomID.
+func findRoomNameAndCanonicalAlias(events []tables.StrippedEvent, roomID string) (name, canonicalAlias string) {
+	for _, ev := range events {
+		if ev.RoomID != roomID {
+			continue
+		}
+		if ev.EventType == spec.MRoomName {
+			name = ev.ContentValue
+		}
+		if ev.EventType == spec.MRoomCanonicalAlias {
+			canonicalAlias = ev.ContentValue
+		}
+		// We found both wanted values, break the loop
+		if name != "" && canonicalAlias != "" {
+			break
+		}
+	}
+	return name, canonicalAlias
+}
+
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops
 // it should live in this package!
 

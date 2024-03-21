@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
@@ -138,6 +139,7 @@ type ReportedEvents interface {
 		reason string,
 		score int64,
 	) (int64, error)
+	SelectReportedEvents(ctx context.Context, txn *sql.Tx, from, limit uint64, backwards bool, reportingUserID types.EventStateKeyNID, roomNID types.RoomNID) ([]api.QueryAdminEventReportsResponse, int64, error)
 }
 
 type MembershipState int64
