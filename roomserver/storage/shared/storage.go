@@ -61,6 +61,7 @@ type EventDatabase struct {
 	EventStateKeysTable tables.EventStateKeys
 	PrevEventsTable     tables.PreviousEvents
 	RedactionsTable     tables.Redactions
+	ReportedEventsTable tables.ReportedEvents
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {
@@ -1880,6 +1881,59 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys ma
 		result[roomID] = resMap
 	}
 	return result, err
+}
+
+// InsertReportedEvent stores a reported event.
+func (d *Database) InsertReportedEvent(
+	ctx context.Context,
+	roomID, eventID, reportingUserID, reason string,
+	score int64,
+) (int64, error) {
+	roomInfo, err := d.roomInfo(ctx, nil, roomID)
+	if err != nil {
+		return 0, err
+	}
+	if roomInfo == nil {
+		return 0, fmt.Errorf("room does not exist")
+	}
+
+	events, err := d.eventsFromIDs(ctx, nil, roomInfo, []string{eventID}, NoFilter)
+	if err != nil {
+		return 0, err
+	}
+	if len(events) == 0 {
+		return 0, fmt.Errorf("unable to find requested event")
+	}
+
+	stateKeyNIDs, err := d.EventStateKeyNIDs(ctx, []string{reportingUserID, events[0].SenderID().ToUserID().String()})
+	if err != nil {
+		return 0, fmt.Errorf("failed to query eventStateKeyNIDs: %w", err)
+	}
+
+	// We expect exactly 2 stateKeyNIDs
+	if len(stateKeyNIDs) != 2 {
+		return 0, fmt.Errorf("expected 2 stateKeyNIDs, received %d", len(stateKeyNIDs))
+	}
+
+	var reportID int64
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		reportID, err = d.ReportedEventsTable.InsertReportedEvent(
+			ctx,
+			txn,
+			roomInfo.RoomNID,
+			events[0].EventNID,
+			stateKeyNIDs[reportingUserID],
+			stateKeyNIDs[events[0].SenderID().ToUserID().String()],
+			reason,
+			score,
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return reportID, err
 }
 
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops

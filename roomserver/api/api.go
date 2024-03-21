@@ -223,6 +223,7 @@ type ClientRoomserverAPI interface {
 	UserRoomPrivateKeyCreator
 	QueryRoomHierarchyAPI
 	DefaultRoomVersionAPI
+
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error)
@@ -264,6 +265,12 @@ type ClientRoomserverAPI interface {
 	RemoveRoomAlias(ctx context.Context, senderID spec.SenderID, alias string) (aliasFound bool, aliasRemoved bool, err error)
 
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
+
+	InsertReportedEvent(
+		ctx context.Context,
+		roomID, eventID, reportingUserID, reason string,
+		score int64,
+	) (int64, error)
 }
 
 type UserRoomserverAPI interface {
