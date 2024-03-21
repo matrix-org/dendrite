@@ -120,7 +120,14 @@ func (r *reportedEventsStatements) InsertReportedEvent(
 	return reportID, err
 }
 
-func (r *reportedEventsStatements) SelectReportedEvents(ctx context.Context, txn *sql.Tx, from, limit uint64, backwards bool, reportingUserID types.EventStateKeyNID, roomNID types.RoomNID) ([]api.QueryAdminEventReportsResponse, int64, error) {
+func (r *reportedEventsStatements) SelectReportedEvents(
+	ctx context.Context,
+	txn *sql.Tx,
+	from, limit uint64,
+	backwards bool,
+	reportingUserID types.EventStateKeyNID,
+	roomNID types.RoomNID,
+) ([]api.QueryAdminEventReportsResponse, int64, error) {
 
 	var stmt *sql.Stmt
 	if backwards {

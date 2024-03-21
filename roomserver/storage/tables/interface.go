@@ -139,7 +139,14 @@ type ReportedEvents interface {
 		reason string,
 		score int64,
 	) (int64, error)
-	SelectReportedEvents(ctx context.Context, txn *sql.Tx, from, limit uint64, backwards bool, reportingUserID types.EventStateKeyNID, roomNID types.RoomNID) ([]api.QueryAdminEventReportsResponse, int64, error)
+	SelectReportedEvents(
+		ctx context.Context,
+		txn *sql.Tx,
+		from, limit uint64,
+		backwards bool,
+		reportingUserID types.EventStateKeyNID,
+		roomNID types.RoomNID,
+	) ([]api.QueryAdminEventReportsResponse, int64, error)
 }
 
 type MembershipState int64
