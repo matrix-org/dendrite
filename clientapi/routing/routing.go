@@ -1533,4 +1533,18 @@ func Setup(
 			return ReportEvent(req, device, vars["roomID"], vars["eventID"], rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports",
+		httputil.MakeAdminAPI("admin_report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			from := parseUint64OrDefault(req.URL.Query().Get("from"), 0)
+			limit := parseUint64OrDefault(req.URL.Query().Get("limit"), 100)
+			dir := req.URL.Query().Get("dir")
+			userID := req.URL.Query().Get("user_id")
+			roomID := req.URL.Query().Get("room_id")
+
+			// Go backwards if direction is empty or "b"
+			backwards := dir == "" || dir == "b"
+			return GetEventReports(req, rsAPI, from, limit, backwards, userID, roomID)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
