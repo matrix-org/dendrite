@@ -2102,6 +2102,12 @@ func (d *Database) QueryAdminEventReport(ctx context.Context, reportID uint64) (
 	return report, nil
 }
 
+func (d *Database) AdminDeleteEventReport(ctx context.Context, reportID uint64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.ReportedEventsTable.DeleteReportedEvent(ctx, txn, reportID)
+	})
+}
+
 // findRoomNameAndCanonicalAlias loops over events to find the corresponding room name and canonicalAlias
 // for a given roomID.
 func findRoomNameAndCanonicalAlias(events []tables.StrippedEvent, roomID string) (name, canonicalAlias string) {

@@ -273,6 +273,7 @@ type ClientRoomserverAPI interface {
 	) (int64, error)
 	QueryAdminEventReports(ctx context.Context, from, limit uint64, backwards bool, userID, roomID string) ([]QueryAdminEventReportsResponse, int64, error)
 	QueryAdminEventReport(ctx context.Context, reportID uint64) (QueryAdminEventReportResponse, error)
+	PerformAdminDeleteEventReport(ctx context.Context, reportID uint64) error
 }
 
 type UserRoomserverAPI interface {

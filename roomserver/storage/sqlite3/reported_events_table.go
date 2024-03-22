@@ -80,11 +80,14 @@ FROM roomserver_reported_events
 WHERE id = $1
 `
 
+const deleteReportedEventSQL = `DELETE FROM roomserver_reported_events WHERE id = $1`
+
 type reportedEventsStatements struct {
 	insertReportedEventsStmt     *sql.Stmt
 	selectReportedEventsDescStmt *sql.Stmt
 	selectReportedEventsAscStmt  *sql.Stmt
 	selectReportedEventStmt      *sql.Stmt
+	deleteReportedEventStmt      *sql.Stmt
 }
 
 func CreateReportedEventsTable(db *sql.DB) error {
@@ -100,6 +103,7 @@ func PrepareReportedEventsTable(db *sql.DB) (tables.ReportedEvents, error) {
 		{&s.selectReportedEventsDescStmt, selectReportedEventsDescSQL},
 		{&s.selectReportedEventsAscStmt, selectReportedEventsAscSQL},
 		{&s.selectReportedEventStmt, selectReportedEventSQL},
+		{&s.deleteReportedEventStmt, deleteReportedEventSQL},
 	}.Prepare(db)
 }
 
@@ -208,4 +212,10 @@ func (r *reportedEventsStatements) SelectReportedEvent(
 		return api.QueryAdminEventReportResponse{}, err
 	}
 	return row, nil
+}
+
+func (r *reportedEventsStatements) DeleteReportedEvent(ctx context.Context, txn *sql.Tx, reportID uint64) error {
+	stmt := sqlutil.TxStmt(txn, r.deleteReportedEventStmt)
+	_, err := stmt.ExecContext(ctx, reportID)
+	return err
 }

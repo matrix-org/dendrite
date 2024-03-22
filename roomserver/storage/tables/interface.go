@@ -152,6 +152,7 @@ type ReportedEvents interface {
 		txn *sql.Tx,
 		reportID uint64,
 	) (api.QueryAdminEventReportResponse, error)
+	DeleteReportedEvent(ctx context.Context, txn *sql.Tx, reportID uint64) error
 }
 
 type MembershipState int64
