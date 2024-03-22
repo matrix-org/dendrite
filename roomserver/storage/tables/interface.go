@@ -147,6 +147,11 @@ type ReportedEvents interface {
 		reportingUserID types.EventStateKeyNID,
 		roomNID types.RoomNID,
 	) ([]api.QueryAdminEventReportsResponse, int64, error)
+	SelectReportedEvent(
+		ctx context.Context,
+		txn *sql.Tx,
+		reportID uint64,
+	) (api.QueryAdminEventReportResponse, error)
 }
 
 type MembershipState int64

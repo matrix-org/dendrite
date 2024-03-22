@@ -75,10 +75,17 @@ OFFSET $3
 LIMIT $4
 `
 
+const selectReportedEventSQL = `
+SELECT id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
+FROM roomserver_reported_events
+WHERE id = $1
+`
+
 type reportedEventsStatements struct {
 	insertReportedEventsStmt     *sql.Stmt
 	selectReportedEventsDescStmt *sql.Stmt
 	selectReportedEventsAscStmt  *sql.Stmt
+	selectReportedEventStmt      *sql.Stmt
 }
 
 func CreateReportedEventsTable(db *sql.DB) error {
@@ -93,6 +100,7 @@ func PrepareReportedEventsTable(db *sql.DB) (tables.ReportedEvents, error) {
 		{&s.insertReportedEventsStmt, insertReportedEventSQL},
 		{&s.selectReportedEventsDescStmt, selectReportedEventsDescSQL},
 		{&s.selectReportedEventsAscStmt, selectReportedEventsAscSQL},
+		{&s.selectReportedEventStmt, selectReportedEventSQL},
 	}.Prepare(db)
 }
 
@@ -177,4 +185,27 @@ func (r *reportedEventsStatements) SelectReportedEvents(
 	}
 
 	return result, count, rows.Err()
+}
+
+func (r *reportedEventsStatements) SelectReportedEvent(
+	ctx context.Context,
+	txn *sql.Tx,
+	reportID uint64,
+) (api.QueryAdminEventReportResponse, error) {
+	stmt := sqlutil.TxStmt(txn, r.selectReportedEventStmt)
+
+	var row api.QueryAdminEventReportResponse
+	if err := stmt.QueryRowContext(ctx, reportID).Scan(
+		&row.ID,
+		&row.RoomNID,
+		&row.EventNID,
+		&row.ReportingUserNID,
+		&row.SenderNID,
+		&row.Reason,
+		&row.Score,
+		&row.ReceivedTS,
+	); err != nil {
+		return api.QueryAdminEventReportResponse{}, err
+	}
+	return row, nil
 }

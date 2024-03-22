@@ -363,6 +363,11 @@ type QueryAdminEventReportsResponse struct {
 	ReceivedTS       spec.Timestamp         `json:"received_ts"`
 }
 
+type QueryAdminEventReportResponse struct {
+	QueryAdminEventReportsResponse
+	EventJSON json.RawMessage `json:"event_json"`
+}
+
 // MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
 func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
 	se := make(map[string]string)

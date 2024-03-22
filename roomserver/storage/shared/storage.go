@@ -2040,6 +2040,68 @@ func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limi
 	return reports, count, nil
 }
 
+func (d *Database) QueryAdminEventReport(ctx context.Context, reportID uint64) (api.QueryAdminEventReportResponse, error) {
+
+	report, err := d.ReportedEventsTable.SelectReportedEvent(ctx, nil, reportID)
+	if err != nil {
+		return api.QueryAdminEventReportResponse{}, err
+	}
+
+	// Get a map from EventStateKeyNID to userID
+	userNIDMap, err := d.EventStateKeys(ctx, []types.EventStateKeyNID{report.ReportingUserNID, report.SenderNID})
+	if err != nil {
+		logrus.WithError(err).Error("unable to map userNIDs to userIDs")
+		return report, err
+	}
+
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, []types.RoomNID{report.RoomNID})
+	if err != nil {
+		return report, err
+	}
+
+	if len(roomIDs) != 1 {
+		return report, fmt.Errorf("expected one roomID, got %d", len(roomIDs))
+	}
+
+	// TODO: replace this with something more efficient, as it loads the entire state snapshot.
+	stateContent, err := d.GetBulkStateContent(ctx, roomIDs, []gomatrixserverlib.StateKeyTuple{
+		{EventType: spec.MRoomName, StateKey: ""},
+		{EventType: spec.MRoomCanonicalAlias, StateKey: ""},
+	}, false)
+	if err != nil {
+		return report, err
+	}
+
+	eventIDMap, err := d.EventIDs(ctx, []types.EventNID{report.EventNID})
+	if err != nil {
+		logrus.WithError(err).Error("unable to map eventNIDs to eventIDs")
+		return report, err
+	}
+	if len(eventIDMap) != 1 {
+		return report, fmt.Errorf("expected %d eventIDs, got %d", 1, len(eventIDMap))
+	}
+
+	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{report.EventNID})
+	if err != nil {
+		return report, err
+	}
+	if len(eventJSONs) != 1 {
+		return report, fmt.Errorf("expected %d eventJSONs, got %d", 1, len(eventJSONs))
+	}
+
+	roomName, canonicalAlias := findRoomNameAndCanonicalAlias(stateContent, roomIDs[0])
+
+	report.Sender = userNIDMap[report.SenderNID]
+	report.UserID = userNIDMap[report.ReportingUserNID]
+	report.RoomID = roomIDs[0]
+	report.RoomName = roomName
+	report.CanonicalAlias = canonicalAlias
+	report.EventID = eventIDMap[report.EventNID]
+	report.EventJSON = eventJSONs[0].EventJSON
+
+	return report, nil
+}
+
 // findRoomNameAndCanonicalAlias loops over events to find the corresponding room name and canonicalAlias
 // for a given roomID.
 func findRoomNameAndCanonicalAlias(events []tables.StrippedEvent, roomID string) (name, canonicalAlias string) {

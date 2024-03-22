@@ -1109,3 +1109,8 @@ func (r *Queryer) RoomsWithACLs(ctx context.Context) ([]string, error) {
 func (r *Queryer) QueryAdminEventReports(ctx context.Context, from uint64, limit uint64, backwards bool, userID, roomID string) ([]api.QueryAdminEventReportsResponse, int64, error) {
 	return r.DB.QueryAdminEventReports(ctx, from, limit, backwards, userID, roomID)
 }
+
+// QueryAdminEventReport returns a single event report.
+func (r *Queryer) QueryAdminEventReport(ctx context.Context, reportID uint64) (api.QueryAdminEventReportResponse, error) {
+	return r.DB.QueryAdminEventReport(ctx, reportID)
+}
