@@ -19,7 +19,9 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -44,8 +46,38 @@ const insertReportedEventSQL = `
 	RETURNING id
 `
 
+const selectReportedEventsDescSQL = `
+WITH countReports AS (
+    SELECT count(*) as report_count
+    FROM roomserver_reported_events
+    WHERE ($1 IS NULL OR room_nid = $1) AND ($2 IS NULL OR reporting_user_nid = $2)
+)
+SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
+FROM roomserver_reported_events, countReports
+WHERE ($1 IS NULL OR room_nid = $1) AND ($2 IS NULL OR reporting_user_nid = $2)
+ORDER BY received_ts DESC
+LIMIT $3
+OFFSET $4
+`
+
+const selectReportedEventsAscSQL = `
+WITH countReports AS (
+    SELECT count(*) as report_count
+    FROM roomserver_reported_events
+    WHERE ($1 IS NULL OR room_nid = $1) AND ($2 IS NULL OR reporting_user_nid = $2)
+)
+SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
+FROM roomserver_reported_events, countReports
+WHERE ($1 IS NULL OR room_nid = $1) AND ($2 IS NULL OR reporting_user_nid = $2)
+ORDER BY received_ts ASC
+LIMIT $3
+OFFSET $4
+`
+
 type reportedEventsStatements struct {
-	insertReportedEventsStmt *sql.Stmt
+	insertReportedEventsStmt     *sql.Stmt
+	selectReportedEventsDescStmt *sql.Stmt
+	selectReportedEventsAscStmt  *sql.Stmt
 }
 
 func CreateReportedEventsTable(db *sql.DB) error {
@@ -58,6 +90,8 @@ func PrepareReportedEventsTable(db *sql.DB) (tables.ReportedEvents, error) {
 
 	return s, sqlutil.StatementList{
 		{&s.insertReportedEventsStmt, insertReportedEventSQL},
+		{&s.selectReportedEventsDescStmt, selectReportedEventsDescSQL},
+		{&s.selectReportedEventsAscStmt, selectReportedEventsAscSQL},
 	}.Prepare(db)
 }
 
@@ -84,4 +118,63 @@ func (r *reportedEventsStatements) InsertReportedEvent(
 		spec.AsTimestamp(time.Now()),
 	).Scan(&reportID)
 	return reportID, err
+}
+
+func (r *reportedEventsStatements) SelectReportedEvents(
+	ctx context.Context,
+	txn *sql.Tx,
+	from, limit uint64,
+	backwards bool,
+	reportingUserID types.EventStateKeyNID,
+	roomNID types.RoomNID,
+) ([]api.QueryAdminEventReportsResponse, int64, error) {
+
+	var stmt *sql.Stmt
+	if backwards {
+		stmt = sqlutil.TxStmt(txn, r.selectReportedEventsDescStmt)
+	} else {
+		stmt = sqlutil.TxStmt(txn, r.selectReportedEventsAscStmt)
+	}
+
+	var qryRoomNID *types.RoomNID
+	if roomNID > 0 {
+		qryRoomNID = &roomNID
+	}
+	var qryReportingUser *types.EventStateKeyNID
+	if reportingUserID > 0 {
+		qryReportingUser = &reportingUserID
+	}
+
+	rows, err := stmt.QueryContext(ctx,
+		qryRoomNID,
+		qryReportingUser,
+		limit,
+		from,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectReportedEvents: failed to close rows")
+
+	var result []api.QueryAdminEventReportsResponse
+	var row api.QueryAdminEventReportsResponse
+	var count int64
+	for rows.Next() {
+		if err = rows.Scan(
+			&count,
+			&row.ID,
+			&row.RoomNID,
+			&row.EventNID,
+			&row.ReportingUserNID,
+			&row.SenderNID,
+			&row.Reason,
+			&row.Score,
+			&row.ReceivedTS,
+		); err != nil {
+			return nil, 0, err
+		}
+		result = append(result, row)
+	}
+
+	return result, count, rows.Err()
 }

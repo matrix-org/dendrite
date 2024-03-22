@@ -271,6 +271,7 @@ type ClientRoomserverAPI interface {
 		roomID, eventID, reportingUserID, reason string,
 		score int64,
 	) (int64, error)
+	QueryAdminEventReports(ctx context.Context, from, limit uint64, backwards bool, userID, roomID string) ([]QueryAdminEventReportsResponse, int64, error)
 }
 
 type UserRoomserverAPI interface {
