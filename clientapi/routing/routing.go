@@ -1535,7 +1535,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	synapseAdminRouter.Handle("/admin/v1/event_reports",
-		httputil.MakeAdminAPI("admin_report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAdminAPI("admin_report_events", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			from := parseUint64OrDefault(req.URL.Query().Get("from"), 0)
 			limit := parseUint64OrDefault(req.URL.Query().Get("limit"), 100)
 			dir := req.URL.Query().Get("dir")
@@ -1547,4 +1547,24 @@ func Setup(
 			return GetEventReports(req, rsAPI, from, limit, backwards, userID, roomID)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports/{reportID}",
+		httputil.MakeAdminAPI("admin_report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetEventReport(req, rsAPI, vars["reportID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports/{reportID}",
+		httputil.MakeAdminAPI("admin_report_event_delete", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return DeleteEventReport(req, rsAPI, vars["reportID"])
+		}),
+	).Methods(http.MethodDelete, http.MethodOptions)
 }
