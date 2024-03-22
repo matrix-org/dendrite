@@ -1547,4 +1547,14 @@ func Setup(
 			return GetEventReports(req, rsAPI, from, limit, backwards, userID, roomID)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports/{reportID}",
+		httputil.MakeAdminAPI("admin_report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetEventReport(req, rsAPI, vars["reportID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }

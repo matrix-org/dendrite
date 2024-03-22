@@ -530,6 +530,30 @@ func GetEventReports(
 	}
 }
 
+func GetEventReport(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, reportID string) util.JSONResponse {
+	parsedReportID, err := strconv.ParseUint(reportID, 10, 64)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			// Given this is an admin endpoint, let them know what didn't work.
+			JSON: spec.InvalidParam(err.Error()),
+		}
+	}
+
+	report, err := rsAPI.QueryAdminEventReport(req.Context(), parsedReportID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown(err.Error()),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: report,
+	}
+}
+
 func parseUint64OrDefault(input string, defaultValue uint64) uint64 {
 	v, err := strconv.ParseUint(input, 10, 64)
 	if err != nil {

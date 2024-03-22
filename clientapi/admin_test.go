@@ -1336,3 +1336,117 @@ func TestAdminQueryEventReports(t *testing.T) {
 		})
 	})
 }
+
+func TestEventReportsGetDelete(t *testing.T) {
+	alice := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	// Add a name and alias
+	roomName := "Testing"
+	alias := "#testing"
+	room.CreateAndInsert(t, alice, spec.MRoomName, map[string]string{"name": roomName}, test.WithStateKey(""))
+	room.CreateAndInsert(t, alice, spec.MRoomCanonicalAlias, map[string]string{"alias": alias}, test.WithStateKey(""))
+
+	// Join the rooms with Bob
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+
+	// Create a few events to report
+
+	eventIDToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+
+		// Use an actual roomserver for this
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+
+		if err := api.SendEvents(context.Background(), rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+			bob:   {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		reqBody := map[string]any{
+			"reason": "baaad",
+			"score":  -100,
+		}
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w := httptest.NewRecorder()
+
+		var req *http.Request
+		// Report the event
+		req = httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/report/%s", room.ID, eventIDToReport.EventID()), strings.NewReader(string(body)))
+		req.Header.Set("Authorization", "Bearer "+accessTokens[bob].accessToken)
+
+		routers.Client.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+		}
+
+		t.Run("Can not query with invalid ID", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports/abc", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("Can query with valid ID", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports/1", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+			t.Logf("%s", w.Body.String())
+			resp := api.QueryAdminEventReportResponse{}
+			if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			// test a few things
+			if resp.EventID != eventIDToReport.EventID() {
+				t.Fatalf("expected eventID to be %s, got %s instead", eventIDToReport.EventID(), resp.EventID)
+			}
+			if resp.RoomName != roomName {
+				t.Fatalf("expected roomName to be %s, got %s instead", roomName, resp.RoomName)
+			}
+			if resp.CanonicalAlias != alias {
+				t.Fatalf("expected alias to be %s, got %s instead", alias, resp.CanonicalAlias)
+			}
+			if reflect.DeepEqual(resp.EventJSON, eventIDToReport.JSON()) {
+				t.Fatal("mismatching eventJSON")
+			}
+		})
+	})
+}
