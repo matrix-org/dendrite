@@ -554,6 +554,30 @@ func GetEventReport(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, 
 	}
 }
 
+func DeleteEventReport(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, reportID string) util.JSONResponse {
+	parsedReportID, err := strconv.ParseUint(reportID, 10, 64)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			// Given this is an admin endpoint, let them know what didn't work.
+			JSON: spec.InvalidParam(err.Error()),
+		}
+	}
+
+	err = rsAPI.PerformAdminDeleteEventReport(req.Context(), parsedReportID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown(err.Error()),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
 func parseUint64OrDefault(input string, defaultValue uint64) uint64 {
 	v, err := strconv.ParseUint(input, 10, 64)
 	if err != nil {

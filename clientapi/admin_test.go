@@ -1429,7 +1429,6 @@ func TestEventReportsGetDelete(t *testing.T) {
 			if w.Code != http.StatusOK {
 				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
-			t.Logf("%s", w.Body.String())
 			resp := api.QueryAdminEventReportResponse{}
 			if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 				t.Fatal(err)
@@ -1446,6 +1445,30 @@ func TestEventReportsGetDelete(t *testing.T) {
 			}
 			if reflect.DeepEqual(resp.EventJSON, eventIDToReport.JSON()) {
 				t.Fatal("mismatching eventJSON")
+			}
+		})
+
+		t.Run("Can delete with a valid ID", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodDelete, "/_synapse/admin/v1/event_reports/1", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("Can not query deleted report", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports/1", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code == http.StatusOK {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 	})
