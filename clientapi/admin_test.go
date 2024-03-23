@@ -2,10 +2,12 @@ package clientapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -1090,5 +1092,384 @@ func TestAdminMarkAsStale(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestAdminQueryEventReports(t *testing.T) {
+	alice := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+	room2 := test.NewRoom(t, alice)
+
+	// room2 has a name and canonical alias
+	room2.CreateAndInsert(t, alice, spec.MRoomName, map[string]string{"name": "Testing"}, test.WithStateKey(""))
+	room2.CreateAndInsert(t, alice, spec.MRoomCanonicalAlias, map[string]string{"alias": "#testing"}, test.WithStateKey(""))
+
+	// Join the rooms with Bob
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+	room2.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+
+	// Create a few events to report
+	eventsToReportPerRoom := make(map[string][]string)
+	for i := 0; i < 10; i++ {
+		ev1 := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
+		ev2 := room2.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
+		eventsToReportPerRoom[room.ID] = append(eventsToReportPerRoom[room.ID], ev1.EventID())
+		eventsToReportPerRoom[room2.ID] = append(eventsToReportPerRoom[room2.ID], ev2.EventID())
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		/*if dbType == test.DBTypeSQLite {
+			t.Skip()
+		}*/
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+
+		// Use an actual roomserver for this
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+
+		if err := api.SendEvents(context.Background(), rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+		if err := api.SendEvents(context.Background(), rsAPI, api.KindNew, room2.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+			bob:   {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		reqBody := map[string]any{
+			"reason": "baaad",
+			"score":  -100,
+		}
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w := httptest.NewRecorder()
+
+		var req *http.Request
+		// Report all events
+		for roomID, eventIDs := range eventsToReportPerRoom {
+			for _, eventID := range eventIDs {
+				req = httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/report/%s", roomID, eventID), strings.NewReader(string(body)))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[bob].accessToken)
+
+				routers.Client.ServeHTTP(w, req)
+
+				if w.Code != http.StatusOK {
+					t.Fatalf("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+				}
+			}
+		}
+
+		type response struct {
+			EventReports []api.QueryAdminEventReportsResponse `json:"event_reports"`
+			Total        int64                                `json:"total"`
+			NextToken    *int64                               `json:"next_token,omitempty"`
+		}
+
+		t.Run("Can query all reports", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+			var resp response
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 20
+			// Only validating the count
+			if len(resp.EventReports) != wantCount {
+				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+			}
+			if resp.Total != int64(wantCount) {
+				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+			}
+		})
+
+		t.Run("Can filter on room", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/_synapse/admin/v1/event_reports?room_id=%s", room.ID), strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+			var resp response
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 10
+			// Only validating the count
+			if len(resp.EventReports) != wantCount {
+				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+			}
+			if resp.Total != int64(wantCount) {
+				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+			}
+		})
+
+		t.Run("Can filter on user_id", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/_synapse/admin/v1/event_reports?user_id=%s", "@doesnotexist:test"), strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+			var resp response
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+
+			// The user does not exist, so we expect no results
+			wantCount := 0
+			// Only validating the count
+			if len(resp.EventReports) != wantCount {
+				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+			}
+			if resp.Total != int64(wantCount) {
+				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+			}
+		})
+
+		t.Run("Can set direction=f", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/_synapse/admin/v1/event_reports?room_id=%s&dir=f", room.ID), strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+			var resp response
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 10
+			// Only validating the count
+			if len(resp.EventReports) != wantCount {
+				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+			}
+			if resp.Total != int64(wantCount) {
+				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+			}
+			// we now should have the first reported event
+			wantEventID := eventsToReportPerRoom[room.ID][0]
+			gotEventID := resp.EventReports[0].EventID
+			if gotEventID != wantEventID {
+				t.Fatalf("expected eventID to be %v, got %v", wantEventID, gotEventID)
+			}
+		})
+
+		t.Run("Can limit and paginate", func(t *testing.T) {
+			var from int64 = 0
+			var limit int64 = 5
+			var wantTotal int64 = 10 // We expect there to be 10 events in total
+			var resp response
+			for from+limit <= wantTotal {
+				resp = response{}
+				t.Logf("Getting reports starting from %d", from)
+				w = httptest.NewRecorder()
+				req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/_synapse/admin/v1/event_reports?room_id=%s&limit=%d&from=%d", room2.ID, limit, from), strings.NewReader(string(body)))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+				routers.SynapseAdmin.ServeHTTP(w, req)
+
+				if w.Code != http.StatusOK {
+					t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+				}
+
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+
+				wantCount := 5 // we are limited to 5
+				if len(resp.EventReports) != wantCount {
+					t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+				}
+				if resp.Total != int64(wantTotal) {
+					t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+				}
+
+				// We've reached the end
+				if (from + int64(len(resp.EventReports))) == wantTotal {
+					return
+				}
+
+				// The next_token should be set
+				if resp.NextToken == nil {
+					t.Fatal("expected nextToken to be set")
+				}
+				from = *resp.NextToken
+			}
+		})
+	})
+}
+
+func TestEventReportsGetDelete(t *testing.T) {
+	alice := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	// Add a name and alias
+	roomName := "Testing"
+	alias := "#testing"
+	room.CreateAndInsert(t, alice, spec.MRoomName, map[string]string{"name": roomName}, test.WithStateKey(""))
+	room.CreateAndInsert(t, alice, spec.MRoomCanonicalAlias, map[string]string{"alias": alias}, test.WithStateKey(""))
+
+	// Join the rooms with Bob
+	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+		"membership": "join",
+	}, test.WithStateKey(bob.ID))
+
+	// Create a few events to report
+
+	eventIDToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		defer close()
+		natsInstance := jetstream.NATSInstance{}
+		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+
+		// Use an actual roomserver for this
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+
+		if err := api.SendEvents(context.Background(), rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
+		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
+
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+			bob:   {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, processCtx.Context(), routers)
+
+		reqBody := map[string]any{
+			"reason": "baaad",
+			"score":  -100,
+		}
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w := httptest.NewRecorder()
+
+		var req *http.Request
+		// Report the event
+		req = httptest.NewRequest(http.MethodPost, fmt.Sprintf("/_matrix/client/v3/rooms/%s/report/%s", room.ID, eventIDToReport.EventID()), strings.NewReader(string(body)))
+		req.Header.Set("Authorization", "Bearer "+accessTokens[bob].accessToken)
+
+		routers.Client.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+		}
+
+		t.Run("Can not query with invalid ID", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports/abc", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("Can query with valid ID", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports/1", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+			resp := api.QueryAdminEventReportResponse{}
+			if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			// test a few things
+			if resp.EventID != eventIDToReport.EventID() {
+				t.Fatalf("expected eventID to be %s, got %s instead", eventIDToReport.EventID(), resp.EventID)
+			}
+			if resp.RoomName != roomName {
+				t.Fatalf("expected roomName to be %s, got %s instead", roomName, resp.RoomName)
+			}
+			if resp.CanonicalAlias != alias {
+				t.Fatalf("expected alias to be %s, got %s instead", alias, resp.CanonicalAlias)
+			}
+			if reflect.DeepEqual(resp.EventJSON, eventIDToReport.JSON()) {
+				t.Fatal("mismatching eventJSON")
+			}
+		})
+
+		t.Run("Can delete with a valid ID", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodDelete, "/_synapse/admin/v1/event_reports/1", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("Can not query deleted report", func(t *testing.T) {
+			w = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/_synapse/admin/v1/event_reports/1", strings.NewReader(string(body)))
+			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+
+			routers.SynapseAdmin.ServeHTTP(w, req)
+
+			if w.Code == http.StatusOK {
+				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+			}
+		})
 	})
 }

@@ -495,3 +495,93 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 		JSON: struct{}{},
 	}
 }
+
+// GetEventReports returns reported events for a given user/room.
+func GetEventReports(
+	req *http.Request,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	from, limit uint64,
+	backwards bool,
+	userID, roomID string,
+) util.JSONResponse {
+
+	eventReports, count, err := rsAPI.QueryAdminEventReports(req.Context(), from, limit, backwards, userID, roomID)
+	if err != nil {
+		logrus.WithError(err).Error("failed to query event reports")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	resp := map[string]any{
+		"event_reports": eventReports,
+		"total":         count,
+	}
+
+	// Add a next_token if there are still reports
+	if int64(from+limit) < count {
+		resp["next_token"] = int(from) + len(eventReports)
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: resp,
+	}
+}
+
+func GetEventReport(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, reportID string) util.JSONResponse {
+	parsedReportID, err := strconv.ParseUint(reportID, 10, 64)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			// Given this is an admin endpoint, let them know what didn't work.
+			JSON: spec.InvalidParam(err.Error()),
+		}
+	}
+
+	report, err := rsAPI.QueryAdminEventReport(req.Context(), parsedReportID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown(err.Error()),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: report,
+	}
+}
+
+func DeleteEventReport(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, reportID string) util.JSONResponse {
+	parsedReportID, err := strconv.ParseUint(reportID, 10, 64)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			// Given this is an admin endpoint, let them know what didn't work.
+			JSON: spec.InvalidParam(err.Error()),
+		}
+	}
+
+	err = rsAPI.PerformAdminDeleteEventReport(req.Context(), parsedReportID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.Unknown(err.Error()),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+func parseUint64OrDefault(input string, defaultValue uint64) uint64 {
+	v, err := strconv.ParseUint(input, 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return v
+}

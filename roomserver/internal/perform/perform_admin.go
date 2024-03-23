@@ -354,3 +354,7 @@ func (r *Admin) PerformAdminDownloadState(
 
 	return nil
 }
+
+func (r *Admin) PerformAdminDeleteEventReport(ctx context.Context, reportID uint64) error {
+	return r.DB.AdminDeleteEventReport(ctx, reportID)
+}

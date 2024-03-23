@@ -32,8 +32,8 @@ import (
 const MRoomServerACL = "m.room.server_acl"
 
 type ServerACLDatabase interface {
-	// GetKnownRooms returns a list of all rooms we know about.
-	GetKnownRooms(ctx context.Context) ([]string, error)
+	// RoomsWithACLs returns all room IDs for rooms with ACLs
+	RoomsWithACLs(ctx context.Context) ([]string, error)
 
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
@@ -57,7 +57,7 @@ func NewServerACLs(db ServerACLDatabase) *ServerACLs {
 	}
 
 	// Look up all of the rooms that the current state server knows about.
-	rooms, err := db.GetKnownRooms(ctx)
+	rooms, err := db.RoomsWithACLs(ctx)
 	if err != nil {
 		logrus.WithError(err).Fatalf("Failed to get known rooms")
 	}
