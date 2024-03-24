@@ -177,6 +177,8 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 		JSON: fclient.RoomHierarchyResponse{
 			Room:     discoveredRooms[0],
 			Children: discoveredRooms[1:],
+			// TODO: Actually check which rooms the requesting server/user is not allowed to see.
+			InaccessibleChildren: []string{},
 		},
 	}
 }
