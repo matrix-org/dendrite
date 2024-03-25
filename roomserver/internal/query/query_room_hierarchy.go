@@ -39,9 +39,14 @@ import (
 //
 // If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
 // can be cached.
-func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker roomserver.RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *roomserver.RoomHierarchyWalker, error) {
+func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker roomserver.RoomHierarchyWalker, limit int) (
+	[]fclient.RoomHierarchyRoom,
+	[]string,
+	*roomserver.RoomHierarchyWalker,
+	error,
+) {
 	if authorised, _ := authorised(ctx, querier, walker.Caller, walker.RootRoomID, nil); !authorised {
-		return nil, nil, roomserver.ErrRoomUnknownOrNotAllowed{Err: fmt.Errorf("room is unknown/forbidden")}
+		return nil, []string{}, nil, roomserver.ErrRoomUnknownOrNotAllowed{Err: fmt.Errorf("room is unknown/forbidden")}
 	}
 
 	discoveredRooms := []fclient.RoomHierarchyRoom{}
@@ -173,7 +178,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 
 	if len(unvisited) == 0 {
 		// If no more rooms to walk, then don't return a walker for future pages
-		return discoveredRooms, nil, nil
+		return discoveredRooms, []string{}, nil, nil
 	} else {
 		// If there are more rooms to walk, then return a new walker to resume walking from (for querying more pages)
 		newWalker := roomserver.RoomHierarchyWalker{
@@ -185,7 +190,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			Processed:     processed,
 		}
 
-		return discoveredRooms, &newWalker, nil
+		return discoveredRooms, []string{}, &newWalker, nil
 	}
 
 }
