@@ -199,9 +199,11 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 func authorised(ctx context.Context, querier *Queryer, caller types.DeviceOrServerName, roomID spec.RoomID, parentRoomID *spec.RoomID) (authed, isJoinedOrInvited bool) {
 	if clientCaller := caller.Device(); clientCaller != nil {
 		return authorisedUser(ctx, querier, clientCaller, roomID, parentRoomID)
-	} else {
-		return authorisedServer(ctx, querier, roomID, *caller.ServerName()), false
 	}
+	if serverCaller := caller.ServerName(); serverCaller != nil {
+		return authorisedServer(ctx, querier, roomID, *serverCaller), false
+	}
+	return false, false
 }
 
 // authorisedServer returns true iff the server is joined this room or the room is world_readable, public, or knockable
