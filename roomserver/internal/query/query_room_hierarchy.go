@@ -142,6 +142,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			}
 		} else if !authorised {
 			inaccessible = append(inaccessible, queuedRoom.RoomID.String())
+			continue
 		} else {
 			// room exists but user is not authorised
 			continue
@@ -158,6 +159,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 		// We need to invert the order here because the child events are lo->hi on the timestamp,
 		// so we need to ensure we pop in the same lo->hi order, which won't be the case if we
 		// insert the highest timestamp last in a stack.
+	extendQueueLoop:
 		for i := len(discoveredChildEvents) - 1; i >= 0; i-- {
 			spaceContent := struct {
 				Via []string `json:"via"`
@@ -170,6 +172,12 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).WithField("invalid_room_id", ev.StateKey).WithField("parent_room_id", queuedRoom.RoomID).Warn("Invalid room ID in m.space.child state event")
 			} else {
+				// Make sure not to queue inaccessible rooms
+				for _, inaccessibleRoomID := range inaccessible {
+					if inaccessibleRoomID == childRoomID.String() {
+						continue extendQueueLoop
+					}
+				}
 				unvisited = append(unvisited, roomserver.RoomHierarchyWalkerQueuedRoom{
 					RoomID:       *childRoomID,
 					ParentRoomID: &queuedRoom.RoomID,
@@ -257,7 +265,7 @@ func authorisedServer(ctx context.Context, querier *Queryer, roomID spec.RoomID,
 			return true, []string{}
 		}
 
-		if rule == spec.Restricted {
+		if rule == spec.Restricted || rule == spec.KnockRestricted {
 			allowJoinedToRoomIDs = append(allowJoinedToRoomIDs, restrictedJoinRuleAllowedRooms(ctx, joinRuleEv)...)
 		}
 	}
