@@ -1,6 +1,6 @@
 # Changelog
 
-# Dendrite 0.13.7 (2024-04-01?)
+# Dendrite 0.13.7 (2024-04-08)
 
 ### Fixes
 
@@ -10,12 +10,13 @@
   - ACL regexes are cached (also reducing memory footprint, as only one instance of a regex is stored)
   - unnecessary Relay related queries are removed (**Note**: If you want to use relays, you now need to enable them explicitly using the `federation_api.enable_relays` config)
 - Space summaries over federation have been fixed
-- When using external NATS JetStream, an existing connection is reused instead of opening unnecessary connections
+- When using external NATS JetStream, an existing connection is reused instead of opening unnecessary new connections
 
 ### Features
 
 - Appservices have been modernized (contributed by [tulir](https://github.com/tulir))
-- Event reporting has been added (incl. Synapse endpoints to query them) 
+- Event reporting has been added (incl. Synapse Admin endpoints to query them)
+- Dependencies have been updated
  
 ## Dendrite 0.13.6 (2024-01-26)
 
