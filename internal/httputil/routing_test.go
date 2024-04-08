@@ -17,7 +17,7 @@ func TestRoutersError(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("unexpected status code: %d - %s", rec.Code, rec.Body.String())
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+	if ct := rec.Result().Header.Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("unexpected content-type: %s", ct)
 	}
 
@@ -32,7 +32,7 @@ func TestRoutersError(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("unexpected status code: %d - %s", rec.Code, rec.Body.String())
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+	if ct := rec.Result().Header.Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("unexpected content-type: %s", ct)
 	}
 }
