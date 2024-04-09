@@ -294,6 +294,10 @@ func (oq *destinationQueue) checkNotificationsOnClose() {
 
 // backgroundSend is the worker goroutine for sending events.
 func (oq *destinationQueue) backgroundSend() {
+	// Don't try to send transactions if we are shutting down.
+	if oq.process.Context().Err() != nil {
+		return
+	}
 	// Check if a worker is already running, and if it isn't, then
 	// mark it as started.
 	if !oq.running.CompareAndSwap(false, true) {
