@@ -141,7 +141,12 @@ type QueryRoomHierarchyAPI interface {
 	//
 	// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
 	// can be cached.
-	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *RoomHierarchyWalker, error)
+	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) (
+		hierarchyRooms []fclient.RoomHierarchyRoom,
+		inaccessibleRooms []string,
+		hierarchyWalker *RoomHierarchyWalker,
+		err error,
+	)
 }
 
 type QueryMembershipAPI interface {

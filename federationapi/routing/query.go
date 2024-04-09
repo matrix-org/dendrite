@@ -146,7 +146,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	}
 
 	walker := roomserverAPI.NewRoomHierarchyWalker(types.NewServerNameNotDevice(request.Origin()), roomID, suggestedOnly, 1)
-	discoveredRooms, _, err := rsAPI.QueryNextRoomHierarchyPage(httpReq.Context(), walker, -1)
+	discoveredRooms, inaccessibleRooms, _, err := rsAPI.QueryNextRoomHierarchyPage(httpReq.Context(), walker, -1)
 
 	if err != nil {
 		switch err.(type) {
@@ -175,8 +175,9 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	return util.JSONResponse{
 		Code: 200,
 		JSON: fclient.RoomHierarchyResponse{
-			Room:     discoveredRooms[0],
-			Children: discoveredRooms[1:],
+			Room:                 discoveredRooms[0],
+			Children:             discoveredRooms[1:],
+			InaccessibleChildren: inaccessibleRooms,
 		},
 	}
 }
