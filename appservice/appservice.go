@@ -79,7 +79,7 @@ func NewInternalAPI(
 	return appserviceQueryAPI
 }
 
-// generateAppServiceAccounts creates a dummy account based off the
+// generateAppServiceAccount creates a dummy account based off the
 // `sender_localpart` field of each application service if it doesn't
 // exist already
 func generateAppServiceAccount(
