@@ -1,5 +1,22 @@
 # Changelog
 
+## Dendrite 0.13.7 (2024-04-09)
+
+### Fixes
+
+- Fixed an issue where the displayname/avatar of an invited user was replaced with the inviter's details
+- Improved server startup performance by avoiding unnecessary room ACL queries
+  - This change reduces memory footprint as it caches ACL regex patterns once instead of for each room
+  - Unnecessary Relay related queries have been removed. **Note**: To use relays, you now need to explicitly enable them using the `federation_api.enable_relays` config
+- Fixed space summaries over federation
+- Improved usage of external NATS JetStream by reusing existing connections instead of opening new ones unnecessarily
+
+### Features
+
+- Modernized Appservices (contributed by [tulir](https://github.com/tulir))
+- Added event reporting with Synapse Admin endpoints for querying them
+- Updated dependencies
+
 ## Dendrite 0.13.6 (2024-01-26)
 
 Upgrading to this version is **highly** recommended, as it contains several QoL improvements.
