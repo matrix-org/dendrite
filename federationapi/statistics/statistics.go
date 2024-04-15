@@ -5,10 +5,10 @@ import (
 	"math"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -169,7 +169,7 @@ func (s *ServerStatistics) Success(method SendMethod) {
 	// NOTE : Sending to the final destination vs. a relay server has
 	// slightly different semantics.
 	if method == SendDirect {
-		s.successCounter.Inc()
+		s.successCounter.Add(1)
 		if s.blacklisted.Load() && s.statistics.DB != nil {
 			if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
 				logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
@@ -195,7 +195,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	// start a goroutine which will wait out the backoff and
 	// unset the backoffStarted flag when done.
 	if s.backoffStarted.CompareAndSwap(false, true) {
-		backoffCount := s.backoffCount.Inc()
+		backoffCount := s.backoffCount.Add(1)
 
 		if backoffCount >= s.statistics.FailuresUntilAssumedOffline {
 			s.assumedOffline.CompareAndSwap(false, true)
