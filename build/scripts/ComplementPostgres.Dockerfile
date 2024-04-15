@@ -1,19 +1,19 @@
 #syntax=docker/dockerfile:1.2
 
-FROM golang:1.20-bullseye as build
+FROM golang:1.22-bookworm as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
 # No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/13/main/pg_hba.conf && \
+RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/15/main/pg_hba.conf && \
     # Bump up max conns for moar concurrency
-    sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/13/main/postgresql.conf
+    sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/15/main/postgresql.conf
 
 # This entry script starts postgres, waits for it to be up then starts dendrite
 RUN echo '\
     #!/bin/bash -eu \n\
     pg_lsclusters \n\
-    pg_ctlcluster 13 main start \n\
+    pg_ctlcluster 15 main start \n\
     \n\
     until pg_isready \n\
     do \n\
