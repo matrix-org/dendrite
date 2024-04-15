@@ -5,7 +5,8 @@ RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
 # No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/15/main/pg_hba.conf && \
+RUN sed -i "s%127.0.0.1/32            scram-sha-256%127.0.0.1/32            trust%g" /etc/postgresql/15/main/pg_hba.conf && \
+    sed -i "s%::1/128                 scram-sha-256%::1/128                 trust%g" /etc/postgresql/15/main/pg_hba.conf && \
     # Bump up max conns for moar concurrency
     sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/15/main/postgresql.conf
 
