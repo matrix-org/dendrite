@@ -622,6 +622,23 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 		if err := s.fts.Index(e); err != nil {
 			return err
 		}
+		// If the event is an edited message we remove the original event from the index
+		// to avoid duplicates in the search results.
+		relatesTo := gjson.GetBytes(ev.Content(), "m\\.relates_to")
+		if relatesTo.Exists() {
+			relatedData := relatesTo.Value().(map[string]interface{})
+			if _, ok := relatedData["rel_type"]; ok && relatedData["rel_type"] == "m.replace" {
+				// We remove the original event from the index
+				if srcEventID, ok := relatedData["event_id"]; ok {
+					if err := s.fts.Delete(srcEventID.(string)); err != nil {
+						log.WithFields(log.Fields{
+							"event_id": ev.EventID(),
+							"src_id":   srcEventID,
+						}).WithError(err).Error("Failed to delete edited message from fulltext index")
+					}
+				}
+			}
+		}
 	}
 	return nil
 }
