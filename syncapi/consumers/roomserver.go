@@ -634,7 +634,7 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 						log.WithFields(log.Fields{
 							"event_id": ev.EventID(),
 							"src_id":   srcEventID,
-						}).WithError(err).Error("Failed to delete edited message from fulltext index")
+						}).WithError(err).Error("Failed to delete edited message from the fulltext index")
 					}
 				}
 			}
