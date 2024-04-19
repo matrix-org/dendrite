@@ -124,7 +124,7 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
