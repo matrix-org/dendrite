@@ -649,7 +649,7 @@ func (r *FederationInternalAPI) SendInviteV3(
 	return inviteEvent, nil
 }
 
-// PerformServersAlive implements api.FederationInternalAPI
+// PerformBroadcastEDU implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformBroadcastEDU(
 	ctx context.Context,
 	request *api.PerformBroadcastEDURequest,

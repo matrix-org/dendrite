@@ -145,7 +145,7 @@ func (d *Database) CleanPDUs(
 	})
 }
 
-// GetPendingServerNames returns the server names that have PDUs
+// GetPendingPDUServerNames returns the server names that have PDUs
 // waiting to be sent.
 func (d *Database) GetPendingPDUServerNames(
 	ctx context.Context,
