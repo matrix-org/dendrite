@@ -400,6 +400,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			reasonablePositions := findReasonableIncrementalSyncWindow(
 				syncReq.Since, rp.Notifier.CurrentPosition(),
 			)
+			// Also update the currentPos, which is used for the retry logic below.
+			// Otherwise we may skip over some events.
+			currentPos = reasonablePositions
 			syncReq.Response.NextBatch = types.StreamingToken{
 				PDUPosition: withTransaction(
 					syncReq.Since.PDUPosition,
