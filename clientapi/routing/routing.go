@@ -888,9 +888,9 @@ func Setup(
 	).Methods(http.MethodPut)
 
 	// Element user settings
-
+	// GK-CUSTOMIZATION: Make /profile endpoints authenticated
 	v3mux.Handle("/profile/{userID}",
-		httputil.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
+		httputil.MakeAuthAPI("profile", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)

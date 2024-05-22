@@ -447,6 +447,7 @@ func TestSetDisplayname(t *testing.T) {
 				// check profile after initial account creation
 				rec := httptest.NewRecorder()
 				req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID, strings.NewReader(""))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 				t.Logf("%s", req.URL.String())
 				routers.Client.ServeHTTP(rec, req)
 
@@ -559,6 +560,7 @@ func TestSetAvatarURL(t *testing.T) {
 				// check profile after initial account creation
 				rec := httptest.NewRecorder()
 				req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID, strings.NewReader(""))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 				t.Logf("%s", req.URL.String())
 				routers.Client.ServeHTTP(rec, req)
 
