@@ -103,12 +103,13 @@ type userInteractiveFlow struct {
 // the user already has a valid access token, but we want to double-check
 // that it isn't stolen by re-authenticating them.
 type UserInteractive struct {
-	sync.RWMutex
-	Flows []userInteractiveFlow
+	flows []userInteractiveFlow
 	// Map of login type to implementation
-	Types map[string]Type
+	types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
-	Sessions map[string][]string
+
+	mutex    sync.RWMutex
+	sessions map[string][]string
 }
 
 func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) *UserInteractive {
@@ -117,22 +118,20 @@ func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) 
 		Config:               cfg,
 	}
 	return &UserInteractive{
-		Flows: []userInteractiveFlow{
+		flows: []userInteractiveFlow{
 			{
 				Stages: []string{typePassword.Name()},
 			},
 		},
-		Types: map[string]Type{
+		types: map[string]Type{
 			typePassword.Name(): typePassword,
 		},
-		Sessions: make(map[string][]string),
+		sessions: make(map[string][]string),
 	}
 }
 
 func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
-	u.RLock()
-	defer u.RUnlock()
-	for _, f := range u.Flows {
+	for _, f := range u.flows {
 		if len(f.Stages) == 1 && f.Stages[0] == authType {
 			return true
 		}
@@ -141,10 +140,10 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 }
 
 func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
-	u.Lock()
+	u.mutex.Lock()
 	// TODO: Handle multi-stage flows
-	delete(u.Sessions, sessionID)
-	u.Unlock()
+	delete(u.sessions, sessionID)
+	u.mutex.Unlock()
 }
 
 type Challenge struct {
@@ -157,10 +156,11 @@ type Challenge struct {
 
 // Challenge returns an HTTP 401 with the supported flows for authenticating
 func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
-	u.RLock()
-	completed := u.Sessions[sessionID]
-	flows := u.Flows
-	u.RUnlock()
+	u.mutex.RLock()
+	completed := u.sessions[sessionID]
+	u.mutex.RUnlock()
+
+	flows := u.flows
 
 	return &util.JSONResponse{
 		Code: 401,
@@ -183,9 +183,9 @@ func (u *UserInteractive) NewSession() *util.JSONResponse {
 			JSON: spec.InternalServerError{},
 		}
 	}
-	u.Lock()
-	u.Sessions[sessionID] = []string{}
-	u.Unlock()
+	u.mutex.Lock()
+	u.sessions[sessionID] = []string{}
+	u.mutex.Unlock()
 	return u.challenge(sessionID)
 }
 
@@ -233,9 +233,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	// extract the type so we know which login type to use
 	authType := gjson.GetBytes(bodyBytes, "auth.type").Str
 
-	u.RLock()
-	loginType, ok := u.Types[authType]
-	u.RUnlock()
+	loginType, ok := u.types[authType]
 
 	if !ok {
 		return nil, &util.JSONResponse{
@@ -247,9 +245,9 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	// retrieve the session
 	sessionID := gjson.GetBytes(bodyBytes, "auth.session").Str
 
-	u.RLock()
-	_, ok = u.Sessions[sessionID]
-	u.RUnlock()
+	u.mutex.RLock()
+	_, ok = u.sessions[sessionID]
+	u.mutex.RUnlock()
 
 	if !ok {
 		// if the login type is part of a single stage flow then allow them to omit the session ID
