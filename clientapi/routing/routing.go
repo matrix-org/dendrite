@@ -900,7 +900,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/profile/{userID}/avatar_url",
-		httputil.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
+		httputil.MakeAuthAPI("profile_avatar_url", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -925,7 +925,7 @@ func Setup(
 	// PUT requests, so we need to allow this method
 
 	v3mux.Handle("/profile/{userID}/displayname",
-		httputil.MakeExternalAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
+		httputil.MakeAuthAPI("profile_displayname", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
