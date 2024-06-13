@@ -475,6 +475,7 @@ func TestSetDisplayname(t *testing.T) {
 				// now only get the display name
 				rec = httptest.NewRecorder()
 				req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID+"/displayname", strings.NewReader(""))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
@@ -580,6 +581,7 @@ func TestSetAvatarURL(t *testing.T) {
 				req = httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatar_url", tc.changeReq)
 				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
@@ -589,6 +591,7 @@ func TestSetAvatarURL(t *testing.T) {
 				rec = httptest.NewRecorder()
 				req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatar_url", strings.NewReader(""))
 
+				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
