@@ -70,7 +70,7 @@ func GetPushRulesByKind(ctx context.Context, scope, kind string, device *userapi
 	}
 	rulesPtr := pushRuleSetKindPointer(ruleSet, pushrules.Kind(kind))
 	// Even if rulesPtr is not nil, there may not be any rules for this kind
-	if rulesPtr == nil || (rulesPtr != nil && len(*rulesPtr) == 0) {
+	if rulesPtr == nil || len(*rulesPtr) == 0 {
 		return errorResponse(ctx, spec.InvalidParam("invalid push rules kind"), "pushRuleSetKindPointer failed")
 	}
 	return util.JSONResponse{

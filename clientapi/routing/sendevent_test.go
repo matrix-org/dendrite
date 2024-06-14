@@ -265,7 +265,7 @@ func createEvents(eventsJSON []string, roomVer gomatrixserverlib.RoomVersion) ([
 	for i, eventJSON := range eventsJSON {
 		pdu, evErr := roomVerImpl.NewEventFromTrustedJSON([]byte(eventJSON), false)
 		if evErr != nil {
-			return nil, fmt.Errorf("failed to make event: %s", err.Error())
+			return nil, fmt.Errorf("failed to make event: %s", evErr.Error())
 		}
 		ev := types.HeaderedEvent{PDU: pdu}
 		events[i] = &ev
