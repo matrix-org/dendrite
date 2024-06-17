@@ -45,7 +45,7 @@ type configResponse struct {
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router,
+	routers httputil.Routers,
 	cfg *config.Dendrite,
 	db storage.Database,
 	userAPI userapi.MediaUserAPI,
@@ -53,7 +53,7 @@ func Setup(
 ) {
 	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
 
-	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v1|v3)}/").Subrouter()
+	v3mux := routers.Media.PathPrefix("/{apiversion:(?:r0|v1|v3)}/").Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},

@@ -15,7 +15,7 @@
 package mediaapi
 
 import (
-	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
@@ -27,7 +27,7 @@ import (
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
-	mediaRouter *mux.Router,
+	routers httputil.Routers,
 	cm *sqlutil.Connections,
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
@@ -39,6 +39,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		mediaRouter, cfg, mediaDB, userAPI, client,
+		routers, cfg, mediaDB, userAPI, client,
 	)
 }
