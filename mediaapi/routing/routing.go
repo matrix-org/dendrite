@@ -54,6 +54,7 @@ func Setup(
 	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
 
 	v3mux := routers.Media.PathPrefix("/{apiversion:(?:r0|v1|v3)}/").Subrouter()
+	v1mux := routers.Client.PathPrefix("/v1/media/").Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
@@ -96,6 +97,15 @@ func Setup(
 
 	v3mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	// v1 client endpoints requiring auth
+	v1mux.Handle("/config", configHandler).Methods(http.MethodGet, http.MethodOptions)
+	v1mux.Handle("/download/{serverName}/{mediaId}", httputil.MakeHTMLAPI("download", userAPI, cfg.Global.Metrics.Enabled, downloadHandler, httputil.WithAuth())).Methods(http.MethodGet, http.MethodOptions)
+	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", httputil.MakeHTMLAPI("download", userAPI, cfg.Global.Metrics.Enabled, downloadHandler, httputil.WithAuth())).Methods(http.MethodGet, http.MethodOptions)
+
+	v1mux.Handle("/thumbnail/{serverName}/{mediaId}",
+		httputil.MakeHTMLAPI("thumbnail", userAPI, cfg.Global.Metrics.Enabled, makeDownloadAPI("thumbnail", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration), httputil.WithAuth()),
 	).Methods(http.MethodGet, http.MethodOptions)
 }
 
