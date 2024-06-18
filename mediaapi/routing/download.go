@@ -21,7 +21,9 @@ import (
 	"io"
 	"io/fs"
 	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,6 +33,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/google/uuid"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
@@ -61,6 +64,7 @@ type downloadRequest struct {
 	ThumbnailSize      types.ThumbnailSize
 	Logger             *log.Entry
 	DownloadFilename   string
+	forFederation      bool // whether we need to return a multipart/mixed response
 }
 
 // Taken from: https://github.com/matrix-org/synapse/blob/c3627d0f99ed5a23479305dc2bd0e71ca25ce2b1/synapse/media/_base.py#L53C1-L84
@@ -115,7 +119,12 @@ func Download(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	isThumbnailRequest bool,
 	customFilename string,
+	forFederation bool,
 ) {
+	// This happens if we call Download for a federation request
+	if forFederation && origin == "" {
+		origin = cfg.Matrix.ServerName
+	}
 	dReq := &downloadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaID,
@@ -127,6 +136,7 @@ func Download(
 			"MediaID": mediaID,
 		}),
 		DownloadFilename: customFilename,
+		forFederation:    forFederation,
 	}
 
 	if dReq.IsThumbnailRequest {
@@ -369,8 +379,49 @@ func (r *downloadRequest) respondFromLocalFile(
 		" object-src 'self';"
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
-	if _, err := io.Copy(w, responseFile); err != nil {
-		return nil, fmt.Errorf("io.Copy: %w", err)
+	if !r.forFederation {
+		if _, err := io.Copy(w, responseFile); err != nil {
+			return nil, fmt.Errorf("io.Copy: %w", err)
+		}
+	} else {
+		// Update the header to be multipart/mixed; boundary=$randomBoundary
+		boundary := uuid.NewString()
+		w.Header().Set("Content-Type", "multipart/mixed; boundary="+boundary)
+
+		w.Header().Del("Content-Length")          // let Go handle the content length
+		w.Header().Del("Content-Security-Policy") // S-S request, so does not really matter?
+		mw := multipart.NewWriter(w)
+		defer func() {
+			if err = mw.Close(); err != nil {
+				r.Logger.WithError(err).Error("Failed to close multipart writer")
+			}
+		}()
+
+		if err = mw.SetBoundary(boundary); err != nil {
+			return nil, fmt.Errorf("failed to set multipart boundary: %w", err)
+		}
+
+		// JSON object part
+		jsonWriter, err := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type": {"application/json"},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create json writer: %w", err)
+		}
+		if _, err = jsonWriter.Write([]byte("{}")); err != nil {
+			return nil, fmt.Errorf("failed to write to json writer: %w", err)
+		}
+
+		// media part
+		mediaWriter, err := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type": {string(responseMetadata.ContentType)},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create media writer: %w", err)
+		}
+		if _, err = io.Copy(mediaWriter, responseFile); err != nil {
+			return nil, fmt.Errorf("failed to write to media writer: %w", err)
+		}
 	}
 	return responseMetadata, nil
 }

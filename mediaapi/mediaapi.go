@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 )
@@ -32,6 +33,7 @@ func AddPublicRoutes(
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
+	keyRing gomatrixserverlib.JSONVerifier,
 ) {
 	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
 	if err != nil {
@@ -39,6 +41,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		routers, cfg, mediaDB, userAPI, client,
+		routers, cfg, mediaDB, userAPI, client, keyRing,
 	)
 }
