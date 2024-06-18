@@ -52,6 +52,7 @@ func Setup(
 	db storage.Database,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
+	federationClient fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) {
 	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
@@ -95,12 +96,12 @@ func Setup(
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 
-	downloadHandler := makeDownloadAPI("download_unauthed", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration, false)
+	downloadHandler := makeDownloadAPI("download_unauthed", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, false)
 	v3mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 	v3mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/thumbnail/{serverName}/{mediaId}",
-		makeDownloadAPI("thumbnail_unauthed", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration, false),
+		makeDownloadAPI("thumbnail_unauthed", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, false),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	// v1 client endpoints requiring auth
@@ -110,15 +111,15 @@ func Setup(
 	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandlerAuthed).Methods(http.MethodGet, http.MethodOptions)
 
 	v1mux.Handle("/thumbnail/{serverName}/{mediaId}",
-		httputil.MakeHTMLAPI("thumbnail", userAPI, cfg.Global.Metrics.Enabled, makeDownloadAPI("thumbnail_authed_client", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration, false), httputil.WithAuth()),
+		httputil.MakeHTMLAPI("thumbnail", userAPI, cfg.Global.Metrics.Enabled, makeDownloadAPI("thumbnail_authed_client", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, false), httputil.WithAuth()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	// same, but for federation
 	v1fedMux.Handle("/download/{mediaId}", routing.MakeFedAPIHTML(cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
-		makeDownloadAPI("download_authed_federation", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration, true),
+		makeDownloadAPI("download_authed_federation", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, true),
 	)).Methods(http.MethodGet, http.MethodOptions)
 	v1fedMux.Handle("/thumbnail/{mediaId}", routing.MakeFedAPIHTML(cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
-		makeDownloadAPI("thumbnail_authed_federation", &cfg.MediaAPI, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration, true),
+		makeDownloadAPI("thumbnail_authed_federation", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, true),
 	)).Methods(http.MethodGet, http.MethodOptions)
 }
 
@@ -170,6 +171,7 @@ func makeDownloadAPI(
 	rateLimits *httputil.RateLimits,
 	db storage.Database,
 	client *fclient.Client,
+	fedClient fclient.FederationClient,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	forFederation bool,
@@ -235,6 +237,7 @@ func makeDownloadAPI(
 			cfg,
 			db,
 			client,
+			fedClient,
 			activeRemoteRequests,
 			activeThumbnailGeneration,
 			strings.HasPrefix(name, "thumbnail"),

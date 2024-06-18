@@ -33,6 +33,7 @@ func AddPublicRoutes(
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
+	fedClient fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) {
 	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
@@ -41,6 +42,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		routers, cfg, mediaDB, userAPI, client, keyRing,
+		routers, cfg, mediaDB, userAPI, client, fedClient, keyRing,
 	)
 }
