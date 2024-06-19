@@ -124,32 +124,30 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 // this way it can filter based on time
 type PresenceMap struct {
 	mu   sync.Mutex
-	seen map[string]map[int]int64
+	seen map[string]map[types.Presence]time.Time
 }
 
 var lastPresence PresenceMap
 
 // how long before the online status expires
 // should be long enough that any client will have another sync before expiring
-const presenceTimeout int64 = 10
+const presenceTimeout = time.Second * 10
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
 func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
-	//allow checking back on presence to set offline if needed
+	// allow checking back on presence to set offline if needed
 	rp.updatePresenceInternal(db, presence, userID, true)
 }
 
-func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence string, userID string, check_again bool) {
-
-	//lock the map to this thread
-	lastPresence.mu.Lock()
-
-	//grab time for caching
-	workingTime := time.Now().Unix()
-
+func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence string, userID string, checkAgain bool) {
 	if !rp.cfg.Matrix.Presence.EnableOutbound {
 		return
 	}
+
+	// lock the map to this thread
+	lastPresence.mu.Lock()
+	defer lastPresence.mu.Unlock()
+
 	if presence == "" {
 		presence = types.PresenceOnline.String()
 	}
@@ -165,47 +163,40 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 		LastActiveTS: spec.AsTimestamp(time.Now()),
 	}
 
-	//make sure that the map is defined correctly as needed
+	// make sure that the map is defined correctly as needed
 	if lastPresence.seen == nil {
-		lastPresence.seen = make(map[string]map[int]int64)
+		lastPresence.seen = make(map[string]map[types.Presence]time.Time)
 	}
 	if lastPresence.seen[userID] == nil {
-		lastPresence.seen[userID] = make(map[int]int64)
+		lastPresence.seen[userID] = make(map[types.Presence]time.Time)
 	}
 
-	//update time for each presence
-	lastPresence.seen[userID][int(presenceID)] = workingTime
+	now := time.Now()
+	// update time for each presence
+	lastPresence.seen[userID][presenceID] = now
 
-	var presenceToSet types.Presence
-
-	//online will always get priority
-	if (workingTime - lastPresence.seen[userID][int(types.PresenceOnline)]) < presenceTimeout {
+	// Default to unknown presence
+	presenceToSet := types.PresenceUnknown
+	switch {
+	case now.Sub(lastPresence.seen[userID][types.PresenceOnline]) < presenceTimeout:
+		// online will always get priority
 		presenceToSet = types.PresenceOnline
-
-		//idle gets secondary priority because your presence shouldnt be idle if you are on a different device
-		//kinda copying discord presence
-	} else if (workingTime - lastPresence.seen[userID][int(types.PresenceUnavailable)]) < presenceTimeout {
+	case now.Sub(lastPresence.seen[userID][types.PresenceUnavailable]) < presenceTimeout:
+		// idle gets secondary priority because your presence shouldnt be idle if you are on a different device
+		// kinda copying discord presence
 		presenceToSet = types.PresenceUnavailable
-
-		//only set offline status if there is no known online devices
-		//clients may set offline to attempt to not alter the online status of the user
-	} else if (workingTime - lastPresence.seen[userID][int(types.PresenceOffline)]) < presenceTimeout {
+	case now.Sub(lastPresence.seen[userID][types.PresenceOffline]) < presenceTimeout:
+		// only set offline status if there is no known online devices
+		// clients may set offline to attempt to not alter the online status of the user
 		presenceToSet = types.PresenceOffline
 
-		if check_again {
-			//after a timeout, check presence again to make sure it gets set as offline sooner or later
-			time.AfterFunc(time.Second*time.Duration(presenceTimeout), func() { rp.updatePresenceInternal(db, types.PresenceOffline.String(), userID, false) })
+		if checkAgain {
+			// after a timeout, check presence again to make sure it gets set as offline sooner or later
+			time.AfterFunc(time.Second*time.Duration(presenceTimeout), func() {
+				rp.updatePresenceInternal(db, types.PresenceOffline.String(), userID, false)
+			})
 		}
-
-		//set unknown if there is truly no devices that we know the state of
-	} else {
-		presenceToSet = types.PresenceUnknown
 	}
-
-	//the map is no longer being written to or read from
-	//i assume let the rest happen without being held up as to keep things heading through
-	//as fast and smoothly as possible
-	lastPresence.mu.Unlock()
 
 	// ensure we also send the current status_msg to federated servers and not nil
 	dbPresence, err := db.GetPresences(context.Background(), []string{userID})
