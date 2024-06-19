@@ -192,7 +192,7 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 
 		if checkAgain {
 			// after a timeout, check presence again to make sure it gets set as offline sooner or later
-			time.AfterFunc(time.Second*time.Duration(presenceTimeout), func() {
+			time.AfterFunc(presenceTimeout, func() {
 				rp.updatePresenceInternal(db, types.PresenceOffline.String(), userID, false)
 			})
 		}
