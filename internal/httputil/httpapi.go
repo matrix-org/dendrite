@@ -226,7 +226,7 @@ func MakeHTMLAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 			if jsonErr != nil {
 				logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, jsonErr.Code)
 				w.WriteHeader(jsonErr.Code)
-				if err := json.NewEncoder(w).Encode(jsonErr); err != nil {
+				if err := json.NewEncoder(w).Encode(jsonErr.JSON); err != nil {
 					logger.WithError(err).Error("failed to encode JSON response")
 				}
 				return
