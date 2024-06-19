@@ -370,7 +370,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		}).Trace("Responding with file")
 		responseFile = file
 		responseMetadata = r.MediaMetadata
-		if err := r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
+		if err = r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
 			return nil, err
 		}
 	}
@@ -385,7 +385,7 @@ func (r *downloadRequest) respondFromLocalFile(
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 	if !r.forFederation {
-		if _, err := io.Copy(w, responseFile); err != nil {
+		if _, err = io.Copy(w, responseFile); err != nil {
 			return nil, fmt.Errorf("io.Copy: %w", err)
 		}
 	} else {
@@ -814,6 +814,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 	return contentLength, reader, nil
 }
 
+// nolint: gocyclo
 func (r *downloadRequest) fetchRemoteFile(
 	ctx context.Context,
 	client *fclient.Client,
@@ -844,7 +845,8 @@ func (r *downloadRequest) fetchRemoteFile(
 	var parseErr error
 	if isMultiPart {
 		r.Logger.Info("Downloaded file using authenticated endpoint")
-		_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		var params map[string]string
+		_, params, err = mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			panic(err)
 		}
@@ -855,7 +857,8 @@ func (r *downloadRequest) fetchRemoteFile(
 
 		first := true
 		for {
-			p, err := mr.NextPart()
+			var p *multipart.Part
+			p, err = mr.NextPart()
 			if err == io.EOF {
 				break
 			}
