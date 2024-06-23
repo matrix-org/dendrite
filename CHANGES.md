@@ -1,5 +1,11 @@
 # Changelog
 
+## Dendrite 0.xx.x
+
+### Other
+
+  - Bump required Go version to 1.21
+
 ## Dendrite 0.13.7 (2024-04-09)
 
 ### Fixes
