@@ -840,6 +840,10 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
+	// If this wasn't a multipart response, set the Content-Type now. Will be overwritten
+	// by the multipart Content-Type below.
+	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
+
 	var contentLength int64
 	var reader io.Reader
 	var parseErr error
@@ -869,6 +873,8 @@ func (r *downloadRequest) fetchRemoteFile(
 			if !first {
 				readCloser := io.NopCloser(p)
 				contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), readCloser, maxFileSizeBytes)
+				// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
+				r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
 				break
 			}
 
@@ -890,7 +896,6 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
-	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
 
 	dispositionHeader := resp.Header.Get("Content-Disposition")
 	if _, params, e := mime.ParseMediaType(dispositionHeader); e == nil {
