@@ -233,6 +233,9 @@ type authDict struct {
 
 	// Recaptcha
 	Response string `json:"response"`
+
+	// Registration token
+	Token string `json:"token"`
 	// TODO: Lots of custom keys depending on the type
 }
 
@@ -272,9 +275,12 @@ type recaptchaResponse struct {
 }
 
 var (
-	ErrInvalidCaptcha  = errors.New("invalid captcha response")
-	ErrMissingResponse = errors.New("captcha response is required")
-	ErrCaptchaDisabled = errors.New("captcha registration is disabled")
+	ErrInvalidCaptcha            = errors.New("invalid captcha response")
+	ErrMissingResponse           = errors.New("captcha response is required")
+	ErrCaptchaDisabled           = errors.New("captcha registration is disabled")
+	ErrRegistrationTokenDisabled = errors.New("token registration is disabled")
+	ErrMissingToken              = errors.New("registration token is required")
+	ErrInvalidToken              = errors.New("invalid registration token")
 )
 
 // validateRecaptcha returns an error response if the captcha response is invalid
@@ -323,6 +329,34 @@ func validateRecaptcha(
 	if !r.Success {
 		return ErrInvalidCaptcha
 	}
+	return nil
+}
+
+// validateToken returns an error response if the token is invalid
+func validateToken(
+	req *http.Request,
+	userAPI userapi.ClientUserAPI,
+	cfg *config.ClientAPI,
+	token string,
+) error {
+	if !cfg.RegistrationRequiresToken {
+		return ErrRegistrationTokenDisabled
+	}
+
+	if token == "" {
+		return ErrMissingToken
+	}
+
+	exists, err := userAPI.ValidateRegistrationToken(req.Context(), token)
+
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return ErrInvalidToken
+	}
+
 	return nil
 }
 
@@ -732,6 +766,25 @@ func handleRegistrationFlow(
 
 		// Add Recaptcha to the list of completed registration stages
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
+
+	case authtypes.LoginTypeRegistrationToken:
+		// Check given token response
+		err := validateToken(req, userAPI, cfg, r.Auth.Token)
+		switch err {
+		case ErrRegistrationTokenDisabled:
+			return util.JSONResponse{Code: http.StatusForbidden, JSON: spec.Unknown(err.Error())}
+		case ErrMissingToken:
+			return util.JSONResponse{Code: http.StatusBadRequest, JSON: spec.BadJSON(err.Error())}
+		case ErrInvalidToken:
+			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: spec.BadJSON(err.Error())}
+		case nil:
+		default:
+			util.GetLogger(req.Context()).WithError(err).Error("failed to validate token")
+			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}}
+		}
+
+		// Add RegistrationToken to the list of completed registration stages
+		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeRegistrationToken)
 
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do

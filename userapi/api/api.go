@@ -117,6 +117,7 @@ type ClientUserAPI interface {
 	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
 	PerformForgetThreePID(ctx context.Context, req *PerformForgetThreePIDRequest, res *struct{}) error
 	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
+	ValidateRegistrationToken(ctx context.Context, registrationToken string) (bool, error)
 }
 
 type KeyBackupAPI interface {

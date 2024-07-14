@@ -978,3 +978,11 @@ func (a *UserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context, re
 }
 
 const pushRulesAccountDataType = "m.push_rules"
+
+func (a *UserInternalAPI) ValidateRegistrationToken(ctx context.Context, registrationToken string) (bool, error) {
+	exists, err := a.DB.RegistrationTokenExists(ctx, registrationToken)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
