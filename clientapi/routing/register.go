@@ -332,8 +332,8 @@ func validateRecaptcha(
 	return nil
 }
 
-// validateToken returns an error response if the token is invalid
-func validateToken(
+// authenticateToken returns an error response if the token is invalid
+func authenticateToken(
 	req *http.Request,
 	userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
@@ -347,14 +347,23 @@ func validateToken(
 		return ErrMissingToken
 	}
 
-	exists, err := userAPI.ValidateRegistrationToken(req.Context(), token)
+	registrationToken, err := userAPI.ValidateRegistrationToken(req.Context(), token)
 
 	if err != nil {
 		return err
 	}
 
-	if !exists {
+	if registrationToken == nil {
 		return ErrInvalidToken
+	}
+
+	// Decrease available uses
+	newAttributes := make(map[string]interface{})
+	newAttributes["usesAllowed"] = *registrationToken.UsesAllowed - 1
+	_, updateErr := userAPI.PerformAdminUpdateRegistrationToken(req.Context(), token, newAttributes)
+
+	if updateErr != nil {
+		return updateErr
 	}
 
 	return nil
@@ -769,7 +778,7 @@ func handleRegistrationFlow(
 
 	case authtypes.LoginTypeRegistrationToken:
 		// Check given token response
-		err := validateToken(req, userAPI, cfg, r.Auth.Token)
+		err := authenticateToken(req, userAPI, cfg, r.Auth.Token)
 		switch err {
 		case ErrRegistrationTokenDisabled:
 			return util.JSONResponse{Code: http.StatusForbidden, JSON: spec.Unknown(err.Error())}

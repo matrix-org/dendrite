@@ -979,10 +979,15 @@ func (a *UserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context, re
 
 const pushRulesAccountDataType = "m.push_rules"
 
-func (a *UserInternalAPI) ValidateRegistrationToken(ctx context.Context, registrationToken string) (bool, error) {
-	exists, err := a.DB.RegistrationTokenExists(ctx, registrationToken)
+func (a *UserInternalAPI) ValidateRegistrationToken(ctx context.Context, token string) (*clientapi.RegistrationToken, error) {
+	registrationToken, err := a.DB.GetRegistrationToken(ctx, token)
+
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return exists, nil
+	if registrationToken == nil || *registrationToken.UsesAllowed == 0 || *registrationToken.ExpiryTime > int64(spec.AsTimestamp(time.Now())) {
+		return nil, nil
+	}
+
+	return registrationToken, nil
 }
