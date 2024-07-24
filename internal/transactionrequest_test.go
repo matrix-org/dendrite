@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
 
 	"github.com/matrix-org/dendrite/federationapi/producers"
@@ -228,7 +228,7 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 	ctx := process.NewProcessContext()
 	defer ctx.ShutdownDendrite()
 	txn, js, cfg := createTransactionWithEDU(ctx, edus)
-	received := atomic.NewBool(false)
+	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 		room := msg.Header.Get(jetstream.RoomID)
@@ -294,7 +294,7 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 	ctx := process.NewProcessContext()
 	defer ctx.ShutdownDendrite()
 	txn, js, cfg := createTransactionWithEDU(ctx, edus)
-	received := atomic.NewBool(false)
+	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 
@@ -371,7 +371,7 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 	ctx := process.NewProcessContext()
 	defer ctx.ShutdownDendrite()
 	txn, js, cfg := createTransactionWithEDU(ctx, edus)
-	received := atomic.NewBool(false)
+	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 
@@ -468,7 +468,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	ctx := process.NewProcessContext()
 	defer ctx.ShutdownDendrite()
 	txn, js, cfg := createTransactionWithEDU(ctx, edus)
-	received := atomic.NewBool(false)
+	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 
@@ -512,7 +512,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 	ctx := process.NewProcessContext()
 	defer ctx.ShutdownDendrite()
 	txn, js, cfg := createTransactionWithEDU(ctx, edus)
-	received := atomic.NewBool(false)
+	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 
@@ -569,7 +569,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 	ctx := process.NewProcessContext()
 	defer ctx.ShutdownDendrite()
 	txn, js, cfg := createTransactionWithEDU(ctx, edus)
-	received := atomic.NewBool(false)
+	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -113,8 +113,8 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,
 		shouldTxRelaySucceed: shouldTxRelaySucceed,
-		txCount:              *atomic.NewUint32(0),
-		txRelayCount:         *atomic.NewUint32(0),
+		txCount:              atomic.Uint32{},
+		txRelayCount:         atomic.Uint32{},
 	}
 
 	stats := statistics.NewStatistics(db, failuresUntilBlacklist, failuresUntilAssumedOffline, false)

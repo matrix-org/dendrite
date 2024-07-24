@@ -17,13 +17,13 @@ package relay
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 const (
@@ -54,7 +54,7 @@ func NewRelayServerRetriever(
 		federationAPI:       federationAPI,
 		relayAPI:            relayAPI,
 		relayServersQueried: make(map[spec.ServerName]bool),
-		running:             *atomic.NewBool(false),
+		running:             atomic.Bool{},
 		quit:                quit,
 	}
 }
