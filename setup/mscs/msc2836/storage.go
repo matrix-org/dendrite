@@ -43,19 +43,23 @@ type Database interface {
 	ChildMetadata(ctx context.Context, eventID string) (count int, hash []byte, explored bool, err error)
 	// MarkChildrenExplored sets the 'explored' flag on this event to `true`.
 	MarkChildrenExplored(ctx context.Context, eventID string) error
+
+	GetChildrensByRoomId(ctx context.Context, roomID string, recentFirst bool) ([]eventInfo, error)
 }
 
 type DB struct {
-	db                                     *sql.DB
-	writer                                 sqlutil.Writer
-	insertEdgeStmt                         *sql.Stmt
-	insertNodeStmt                         *sql.Stmt
-	selectChildrenForParentOldestFirstStmt *sql.Stmt
-	selectChildrenForParentRecentFirstStmt *sql.Stmt
-	selectParentForChildStmt               *sql.Stmt
-	updateChildMetadataStmt                *sql.Stmt
-	selectChildMetadataStmt                *sql.Stmt
-	updateChildMetadataExploredStmt        *sql.Stmt
+	db                                             *sql.DB
+	writer                                         sqlutil.Writer
+	insertEdgeStmt                                 *sql.Stmt
+	insertNodeStmt                                 *sql.Stmt
+	selectChildrenByRoomIdForParentOldestFirstStmt *sql.Stmt
+	selectChildrenByRoomIdForParentRecentFirstStmt *sql.Stmt
+	selectChildrenForParentOldestFirstStmt         *sql.Stmt
+	selectChildrenForParentRecentFirstStmt         *sql.Stmt
+	selectParentForChildStmt                       *sql.Stmt
+	updateChildMetadataStmt                        *sql.Stmt
+	selectChildMetadataStmt                        *sql.Stmt
+	updateChildMetadataExploredStmt                *sql.Stmt
 }
 
 // NewDatabase loads the database for msc2836
@@ -141,6 +145,18 @@ func newPostgresDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOpt
 	`); err != nil {
 		return nil, err
 	}
+	selectChildrenByRoomIdQuery := `
+	SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
+		LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
+		WHERE room_id = $1
+		ORDER BY origin_server_ts`
+	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC"); err != nil {
+		return nil, err
+	}
+	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "DESC"); err != nil {
+		return nil, err
+	}
+
 	return &d, err
 }
 
@@ -217,6 +233,17 @@ func newSQLiteDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOptio
 	if d.updateChildMetadataExploredStmt, err = d.db.Prepare(`
 		UPDATE msc2836_nodes SET explored=$1 WHERE event_id=$2
 	`); err != nil {
+		return nil, err
+	}
+	selectChildrenByRoomIdQuery := `
+	SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
+		LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
+		WHERE room_id = $1
+		ORDER BY origin_server_ts`
+	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC"); err != nil {
+		return nil, err
+	}
+	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "DESC"); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -313,6 +340,30 @@ func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*even
 		return nil, err
 	}
 	return &ei, nil
+}
+
+func (p *DB) GetChildrensByRoomId(ctx context.Context, roomID string, recentFirst bool) ([]eventInfo, error) {
+	var rows *sql.Rows
+	var err error
+	if recentFirst {
+		rows, err = p.selectChildrenForParentRecentFirstStmt.QueryContext(ctx, roomID)
+	} else {
+		rows, err = p.selectChildrenByRoomIdForParentOldestFirstStmt.QueryContext(ctx, roomID)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close() // nolint: errcheck
+	var children []eventInfo
+	for rows.Next() {
+		var evInfo eventInfo
+		if err := rows.Scan(&evInfo.EventID, &evInfo.OriginServerTS, &evInfo.RoomID); err != nil {
+			return nil, err
+		}
+		children = append(children, evInfo)
+	}
+	return children, rows.Err()
 }
 
 func parentChildEventIDs(ev *types.HeaderedEvent) (parent, child, relType string) {

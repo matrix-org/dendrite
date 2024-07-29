@@ -23,10 +23,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -146,6 +148,43 @@ func Enable(
 			return federatedEventRelationship(req.Context(), fedReq, db, rsAPI, fsAPI)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
+
+	if slices.Contains(cfg.MSCs.MSCs, "MSC3856") {
+		routers.Client.Handle("/unstable/org.matrix.msc3856/rooms/{roomID}/threads", httputil.MakeAuthAPI(
+			"msc3856_thread_list", userAPI, func(req *http.Request, d *userapi.Device) util.JSONResponse {
+				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+				if err != nil {
+					return util.ErrorResponse(err)
+				}
+
+				roomID := vars["roomID"]
+
+				childrens, err := db.GetChildrensByRoomId(req.Context(), roomID, true)
+				if err != nil {
+					return util.ErrorResponse(err)
+				}
+
+				chunks := make([]map[string]any, 0)
+				for _, child := range childrens {
+					chunks = append(chunks,
+						map[string]any{
+							"event_id":         child.EventID,
+							"origin_server_ts": child.OriginServerTS,
+							"room_id":          child.RoomID,
+						},
+					)
+				}
+
+				return util.JSONResponse{
+					Code: 200,
+					JSON: map[string]any{
+						"chunk":      chunks,
+						"next_batch": "next_batch_token",
+					},
+				}
+			},
+		))
+	}
 	return nil
 }
 
