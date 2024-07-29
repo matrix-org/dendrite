@@ -104,6 +104,46 @@ If successfully sent, the API will return the following response:
 Shared secret registration — please see the [user creation page](createusers) for
 guidance on configuring and using this endpoint.
 
+
+## GET `/_synapse/admin/v1/event_reports`
+
+This will respond with room reports that your homeserver users had made.
+This method accepts the following query
+
+- from: reports starting from (defaults to 0)
+- limit: the limit of the returning reports (default to 100)
+- dir: if it is empty or "b" the search direction will go backwards
+- user_id: the user id
+- room_id: the room id
+
+The response should be something like this
+```json
+{
+    "event_reports": [
+        {
+            "id": number,
+            "score": number,
+            "room_id": string,
+            "user_id": string,
+            "reason": string,
+            "sender": string,
+            "canonical_alias": string,
+            "name": string,
+            "received_ts": whatever this is,
+        }
+    ],
+    "total": number
+}
+```
+
+## GET `/_synapse/admin/v1/event_reports/{reportID}`
+
+
+
+## DELETE `/_synapse/admin/v1/event_reports/{reportID}`
+
+
+
 ## GET `/_matrix/client/v3/admin/whois/{userId}`
 
 From the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3adminwhoisuserid). 
