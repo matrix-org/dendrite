@@ -150,7 +150,7 @@ func Enable(
 	)).Methods(http.MethodPost, http.MethodOptions)
 
 	if slices.Contains(cfg.MSCs.MSCs, "MSC3856") {
-		routers.Client.Handle("/unstable/org.matrix.msc3856/rooms/{roomID}/threads", httputil.MakeAuthAPI(
+		routers.Client.Handle("/v1/rooms/{roomId}/threads", httputil.MakeAuthAPI(
 			"msc3856_thread_list", userAPI, func(req *http.Request, d *userapi.Device) util.JSONResponse {
 				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 				if err != nil {
