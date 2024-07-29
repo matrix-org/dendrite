@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,8 +159,15 @@ func Enable(
 				}
 
 				roomID := vars["roomID"]
-
-				childrens, err := db.GetChildrensByRoomId(req.Context(), roomID, true)
+				limit, err := strconv.ParseUint(req.URL.Query().Get("limit"), 10, 64)
+				if err != nil {
+					limit = 50
+				}
+				offset, err := strconv.ParseUint(req.URL.Query().Get("from"), 10, 64)
+				if err != nil {
+					offset = 0
+				}
+				childrens, err := db.GetChildrensByRoomId(req.Context(), roomID, true, limit, offset)
 				if err != nil {
 					return util.ErrorResponse(err)
 				}
@@ -179,7 +187,7 @@ func Enable(
 					Code: 200,
 					JSON: map[string]any{
 						"chunk":      chunks,
-						"next_batch": "next_batch_token",
+						"next_batch": strconv.FormatUint(uint64(len(chunks))+offset, 10),
 					},
 				}
 			},

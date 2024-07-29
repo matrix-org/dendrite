@@ -44,7 +44,7 @@ type Database interface {
 	// MarkChildrenExplored sets the 'explored' flag on this event to `true`.
 	MarkChildrenExplored(ctx context.Context, eventID string) error
 
-	GetChildrensByRoomId(ctx context.Context, roomID string, recentFirst bool) ([]eventInfo, error)
+	GetChildrensByRoomId(ctx context.Context, roomID string, recentFirst bool, limit uint64, offset uint64) ([]eventInfo, error)
 }
 
 type DB struct {
@@ -150,10 +150,10 @@ func newPostgresDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOpt
 		LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
 		WHERE room_id = $1
 		ORDER BY origin_server_ts`
-	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC"); err != nil {
+	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
 	}
-	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "DESC"); err != nil {
+	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "DESC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
 	}
 
@@ -342,13 +342,13 @@ func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*even
 	return &ei, nil
 }
 
-func (p *DB) GetChildrensByRoomId(ctx context.Context, roomID string, recentFirst bool) ([]eventInfo, error) {
+func (p *DB) GetChildrensByRoomId(ctx context.Context, roomID string, recentFirst bool, limit uint64, offset uint64) ([]eventInfo, error) {
 	var rows *sql.Rows
 	var err error
 	if recentFirst {
-		rows, err = p.selectChildrenForParentRecentFirstStmt.QueryContext(ctx, roomID)
+		rows, err = p.selectChildrenForParentRecentFirstStmt.QueryContext(ctx, roomID, limit, offset)
 	} else {
-		rows, err = p.selectChildrenByRoomIdForParentOldestFirstStmt.QueryContext(ctx, roomID)
+		rows, err = p.selectChildrenByRoomIdForParentOldestFirstStmt.QueryContext(ctx, roomID, limit, offset)
 	}
 	if err != nil {
 		return nil, err
