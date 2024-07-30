@@ -242,10 +242,10 @@ func newSQLiteDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOptio
 		WHERE room_id = $1
 		ORDER BY origin_server_ts
 		`
-	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " ASC"); err != nil {
+	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " ASC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
 	}
-	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " DESC"); err != nil {
+	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " DESC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -348,7 +348,7 @@ func (p *DB) GetChildrensByRoomId(ctx context.Context, roomID string, recentFirs
 	var rows *sql.Rows
 	var err error
 	if recentFirst {
-		rows, err = p.selectChildrenForParentRecentFirstStmt.QueryContext(ctx, roomID, limit, offset)
+		rows, err = p.selectChildrenByRoomIdForParentRecentFirstStmt.QueryContext(ctx, roomID, limit, offset)
 	} else {
 		rows, err = p.selectChildrenByRoomIdForParentOldestFirstStmt.QueryContext(ctx, roomID, limit, offset)
 	}
