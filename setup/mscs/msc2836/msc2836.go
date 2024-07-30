@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -150,49 +149,47 @@ func Enable(
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
-	if slices.Contains(cfg.MSCs.MSCs, "MSC3856") {
-		routers.Client.Handle("/v1/rooms/{roomId}/threads", httputil.MakeAuthAPI(
-			"msc3856_thread_list", userAPI, func(req *http.Request, d *userapi.Device) util.JSONResponse {
-				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-				if err != nil {
-					return util.ErrorResponse(err)
-				}
+	routers.Client.Handle("/v1/rooms/{roomId}/threads", httputil.MakeAuthAPI(
+		"msc3856_thread_list", userAPI, func(req *http.Request, d *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
 
-				roomID := vars["roomID"]
-				limit, err := strconv.ParseUint(req.URL.Query().Get("limit"), 10, 64)
-				if err != nil {
-					limit = 50
-				}
-				offset, err := strconv.ParseUint(req.URL.Query().Get("from"), 10, 64)
-				if err != nil {
-					offset = 0
-				}
-				childrens, err := db.GetChildrensByRoomId(req.Context(), roomID, true, limit, offset)
-				if err != nil {
-					return util.ErrorResponse(err)
-				}
+			roomID := vars["roomID"]
+			limit, err := strconv.ParseUint(req.URL.Query().Get("limit"), 10, 64)
+			if err != nil {
+				limit = 50
+			}
+			offset, err := strconv.ParseUint(req.URL.Query().Get("from"), 10, 64)
+			if err != nil {
+				offset = 0
+			}
+			childrens, err := db.GetChildrensByRoomId(req.Context(), roomID, true, limit, offset)
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
 
-				chunks := make([]map[string]any, 0)
-				for _, child := range childrens {
-					chunks = append(chunks,
-						map[string]any{
-							"event_id":         child.EventID,
-							"origin_server_ts": child.OriginServerTS,
-							"room_id":          child.RoomID,
-						},
-					)
-				}
-
-				return util.JSONResponse{
-					Code: 200,
-					JSON: map[string]any{
-						"chunk":      chunks,
-						"next_batch": strconv.FormatUint(uint64(len(chunks))+offset, 10),
+			chunks := make([]map[string]any, 0)
+			for _, child := range childrens {
+				chunks = append(chunks,
+					map[string]any{
+						"event_id":         child.EventID,
+						"origin_server_ts": child.OriginServerTS,
+						"room_id":          child.RoomID,
 					},
-				}
-			},
-		))
-	}
+				)
+			}
+
+			return util.JSONResponse{
+				Code: 200,
+				JSON: map[string]any{
+					"chunk":      chunks,
+					"next_batch": strconv.FormatUint(uint64(len(chunks))+offset, 10),
+				},
+			}
+		},
+	))
 	return nil
 }
 
