@@ -151,10 +151,10 @@ func newPostgresDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOpt
 		WHERE room_id = $1
 		ORDER BY origin_server_ts 
 	`
-	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC LIMIT $2 OFFSET $3"); err != nil {
+	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " ASC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
 	}
-	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "DESC LIMIT $2 OFFSET $3"); err != nil {
+	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " DESC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
 	}
 
