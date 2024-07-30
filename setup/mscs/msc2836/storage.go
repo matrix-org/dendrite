@@ -149,7 +149,7 @@ func newPostgresDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOpt
 	SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
 		LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
 		WHERE room_id = $1
-		ORDER BY origin_server_ts
+		ORDER BY origin_server_ts 
 		`
 	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC LIMIT $2 OFFSET $3"); err != nil {
 		return nil, err
