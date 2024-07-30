@@ -241,10 +241,10 @@ func newSQLiteDatabase(conMan *sqlutil.Connections, dbOpts *config.DatabaseOptio
 		WHERE room_id = $1
 		ORDER BY origin_server_ts
 		`
-	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "ASC"); err != nil {
+	if d.selectChildrenByRoomIdForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " ASC"); err != nil {
 		return nil, err
 	}
-	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + "DESC"); err != nil {
+	if d.selectChildrenByRoomIdForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenByRoomIdQuery + " DESC"); err != nil {
 		return nil, err
 	}
 	return &d, nil
