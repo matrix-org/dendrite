@@ -86,6 +86,9 @@ type RoomserverInternalAPI interface {
 		req *QueryAuthChainRequest,
 		res *QueryAuthChainResponse,
 	) error
+
+	// RoomsWithACLs returns all room IDs for rooms with ACLs
+	RoomsWithACLs(ctx context.Context) ([]string, error)
 }
 
 type UserRoomPrivateKeyCreator interface {
@@ -138,7 +141,12 @@ type QueryRoomHierarchyAPI interface {
 	//
 	// If returned walker is nil, then there are no more rooms left to traverse. This method does not modify the provided walker, so it
 	// can be cached.
-	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) ([]fclient.RoomHierarchyRoom, *RoomHierarchyWalker, error)
+	QueryNextRoomHierarchyPage(ctx context.Context, walker RoomHierarchyWalker, limit int) (
+		hierarchyRooms []fclient.RoomHierarchyRoom,
+		inaccessibleRooms []string,
+		hierarchyWalker *RoomHierarchyWalker,
+		err error,
+	)
 }
 
 type QueryMembershipAPI interface {
@@ -220,6 +228,7 @@ type ClientRoomserverAPI interface {
 	UserRoomPrivateKeyCreator
 	QueryRoomHierarchyAPI
 	DefaultRoomVersionAPI
+
 	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomsForUser(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error)
@@ -261,6 +270,15 @@ type ClientRoomserverAPI interface {
 	RemoveRoomAlias(ctx context.Context, senderID spec.SenderID, alias string) (aliasFound bool, aliasRemoved bool, err error)
 
 	SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
+
+	InsertReportedEvent(
+		ctx context.Context,
+		roomID, eventID, reportingUserID, reason string,
+		score int64,
+	) (int64, error)
+	QueryAdminEventReports(ctx context.Context, from, limit uint64, backwards bool, userID, roomID string) ([]QueryAdminEventReportsResponse, int64, error)
+	QueryAdminEventReport(ctx context.Context, reportID uint64) (QueryAdminEventReportResponse, error)
+	PerformAdminDeleteEventReport(ctx context.Context, reportID uint64) error
 }
 
 type UserRoomserverAPI interface {

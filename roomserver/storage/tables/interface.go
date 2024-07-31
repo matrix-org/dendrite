@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
@@ -69,6 +70,8 @@ type Events interface {
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
 	SelectRoomNIDsForEventNIDs(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
 	SelectEventRejected(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string) (rejected bool, err error)
+
+	SelectRoomsWithEventTypeNID(ctx context.Context, txn *sql.Tx, eventTypeNID types.EventTypeNID) ([]types.RoomNID, error)
 }
 
 type Rooms interface {
@@ -80,7 +83,6 @@ type Rooms interface {
 	UpdateLatestEventNIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID, stateSnapshotNID types.StateSnapshotNID) error
 	SelectRoomVersionsForRoomNIDs(ctx context.Context, txn *sql.Tx, roomNID []types.RoomNID) (map[types.RoomNID]gomatrixserverlib.RoomVersion, error)
 	SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error)
-	SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error)
 	BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error)
 	BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error)
 }
@@ -124,6 +126,33 @@ type Invites interface {
 	UpdateInviteRetired(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) ([]string, error)
 	// SelectInviteActiveForUserInRoom returns a list of sender state key NIDs and invite event IDs matching those nids.
 	SelectInviteActiveForUserInRoom(ctx context.Context, txn *sql.Tx, targetUserNID types.EventStateKeyNID, roomNID types.RoomNID) ([]types.EventStateKeyNID, []string, []byte, error)
+}
+
+type ReportedEvents interface {
+	InsertReportedEvent(
+		ctx context.Context,
+		txn *sql.Tx,
+		roomNID types.RoomNID,
+		eventNID types.EventNID,
+		reportingUserID types.EventStateKeyNID,
+		eventSenderID types.EventStateKeyNID,
+		reason string,
+		score int64,
+	) (int64, error)
+	SelectReportedEvents(
+		ctx context.Context,
+		txn *sql.Tx,
+		from, limit uint64,
+		backwards bool,
+		reportingUserID types.EventStateKeyNID,
+		roomNID types.RoomNID,
+	) ([]api.QueryAdminEventReportsResponse, int64, error)
+	SelectReportedEvent(
+		ctx context.Context,
+		txn *sql.Tx,
+		reportID uint64,
+	) (api.QueryAdminEventReportResponse, error)
+	DeleteReportedEvent(ctx context.Context, txn *sql.Tx, reportID uint64) error
 }
 
 type MembershipState int64
@@ -235,6 +264,10 @@ func ExtractContentValue(ev *types.HeaderedEvent) string {
 		key = "topic"
 	case "m.room.guest_access":
 		key = "guest_access"
+	case "m.room.server_acl":
+		// We need the entire content and not only one key, so we can use it
+		// on startup to generate the ACLs. This is merely a workaround.
+		return string(content)
 	}
 	result := gjson.GetBytes(content, key)
 	if !result.Exists() {

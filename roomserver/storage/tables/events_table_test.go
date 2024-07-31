@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -145,5 +146,40 @@ func Test_EventsTable(t *testing.T) {
 		maxDepth, err := tab.SelectMaxEventDepth(ctx, nil, nids)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(len(room.Events())+1), maxDepth)
+	})
+}
+
+func TestRoomsWithACL(t *testing.T) {
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		eventStateKeys, closeEventStateKeys := mustCreateEventTypesTable(t, dbType)
+		defer closeEventStateKeys()
+
+		eventsTable, closeEventsTable := mustCreateEventsTable(t, dbType)
+		defer closeEventsTable()
+
+		ctx := context.Background()
+
+		// insert the m.room.server_acl event type
+		eventTypeNID, err := eventStateKeys.InsertEventTypeNID(ctx, nil, "m.room.server_acl")
+		assert.Nil(t, err)
+
+		// Create ACL'd rooms
+		var wantRoomNIDs []types.RoomNID
+		for i := 0; i < 10; i++ {
+			_, _, err = eventsTable.InsertEvent(ctx, nil, types.RoomNID(i), eventTypeNID, types.EmptyStateKeyNID, fmt.Sprintf("$1337+%d", i), nil, 0, false)
+			assert.Nil(t, err)
+			wantRoomNIDs = append(wantRoomNIDs, types.RoomNID(i))
+		}
+
+		// Create non-ACL'd rooms (eventTypeNID+1)
+		for i := 10; i < 20; i++ {
+			_, _, err = eventsTable.InsertEvent(ctx, nil, types.RoomNID(i), eventTypeNID+1, types.EmptyStateKeyNID, fmt.Sprintf("$1337+%d", i), nil, 0, false)
+			assert.Nil(t, err)
+		}
+
+		gotRoomNIDs, err := eventsTable.SelectRoomsWithEventTypeNID(ctx, nil, eventTypeNID)
+		assert.Nil(t, err)
+		assert.Equal(t, wantRoomNIDs, gotRoomNIDs)
 	})
 }

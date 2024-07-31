@@ -30,6 +30,7 @@ import (
 
 type Database interface {
 	UserRoomKeys
+	ReportedEvents
 	// Do we support processing input events for more than one room at a time?
 	SupportsConcurrentRoomInputs() bool
 	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
@@ -170,8 +171,6 @@ type Database interface {
 	GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName spec.ServerName) (bool, error)
 	// GetKnownUsers searches all users that userID knows about.
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
-	// GetKnownRooms returns a list of all rooms we know about.
-	GetKnownRooms(ctx context.Context) ([]string, error)
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
 	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
 
@@ -193,6 +192,12 @@ type Database interface {
 	MaybeRedactEvent(
 		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
+
+	// RoomsWithACLs returns all room IDs for rooms with ACLs
+	RoomsWithACLs(ctx context.Context) ([]string, error)
+	QueryAdminEventReports(ctx context.Context, from uint64, limit uint64, backwards bool, userID string, roomID string) ([]api.QueryAdminEventReportsResponse, int64, error)
+	QueryAdminEventReport(ctx context.Context, reportID uint64) (api.QueryAdminEventReportResponse, error)
+	AdminDeleteEventReport(ctx context.Context, reportID uint64) error
 }
 
 type UserRoomKeys interface {
@@ -255,4 +260,12 @@ type EventDatabase interface {
 		ctx context.Context, roomInfo *types.RoomInfo, eventNID types.EventNID, event gomatrixserverlib.PDU, plResolver state.PowerLevelResolver, querier api.QuerySenderIDAPI,
 	) (gomatrixserverlib.PDU, gomatrixserverlib.PDU, error)
 	StoreEvent(ctx context.Context, event gomatrixserverlib.PDU, roomInfo *types.RoomInfo, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID, authEventNIDs []types.EventNID, isRejected bool) (types.EventNID, types.StateAtEvent, error)
+}
+
+type ReportedEvents interface {
+	InsertReportedEvent(
+		ctx context.Context,
+		roomID, eventID, reportingUserID, reason string,
+		score int64,
+	) (int64, error)
 }

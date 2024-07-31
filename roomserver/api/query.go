@@ -346,6 +346,28 @@ type QueryServerBannedFromRoomResponse struct {
 	Banned bool `json:"banned"`
 }
 
+type QueryAdminEventReportsResponse struct {
+	ID               int64                  `json:"id"`
+	Score            int64                  `json:"score"`
+	EventNID         types.EventNID         `json:"-"` // only used to query the state
+	RoomNID          types.RoomNID          `json:"-"` // only used to query the state
+	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the DB
+	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the DB
+	RoomID           string                 `json:"room_id"`
+	EventID          string                 `json:"event_id"`
+	UserID           string                 `json:"user_id"` // the user reporting the event
+	Reason           string                 `json:"reason"`
+	Sender           string                 `json:"sender"` // the user sending the reported event
+	CanonicalAlias   string                 `json:"canonical_alias"`
+	RoomName         string                 `json:"name"`
+	ReceivedTS       spec.Timestamp         `json:"received_ts"`
+}
+
+type QueryAdminEventReportResponse struct {
+	QueryAdminEventReportsResponse
+	EventJSON json.RawMessage `json:"event_json"`
+}
+
 // MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
 func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
 	se := make(map[string]string)

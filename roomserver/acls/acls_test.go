@@ -15,8 +15,14 @@
 package acls
 
 import (
+	"context"
 	"regexp"
 	"testing"
+
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenACLsWithBlacklist(t *testing.T) {
@@ -38,8 +44,8 @@ func TestOpenACLsWithBlacklist(t *testing.T) {
 		ServerACL: ServerACL{
 			AllowIPLiterals: true,
 		},
-		allowedRegexes: []*regexp.Regexp{allowRegex},
-		deniedRegexes:  []*regexp.Regexp{denyRegex},
+		allowedRegexes: []**regexp.Regexp{&allowRegex},
+		deniedRegexes:  []**regexp.Regexp{&denyRegex},
 	}
 
 	if acls.IsServerBannedFromRoom("1.2.3.4", roomID) {
@@ -77,8 +83,8 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 		ServerACL: ServerACL{
 			AllowIPLiterals: false,
 		},
-		allowedRegexes: []*regexp.Regexp{allowRegex},
-		deniedRegexes:  []*regexp.Regexp{},
+		allowedRegexes: []**regexp.Regexp{&allowRegex},
+		deniedRegexes:  []**regexp.Regexp{},
 	}
 
 	if !acls.IsServerBannedFromRoom("1.2.3.4", roomID) {
@@ -102,4 +108,46 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 	if !acls.IsServerBannedFromRoom("qux.com:4567", roomID) {
 		t.Fatal("Expected qux.com:4567 to be allowed but wasn't")
 	}
+}
+
+var (
+	content1 = `{"allow":["*"],"allow_ip_literals":false,"deny":["hello.world", "*.hello.world"]}`
+)
+
+type dummyACLDB struct{}
+
+func (d dummyACLDB) RoomsWithACLs(ctx context.Context) ([]string, error) {
+	return []string{"1", "2"}, nil
+}
+
+func (d dummyACLDB) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error) {
+	return []tables.StrippedEvent{
+		{
+			RoomID:       "1",
+			ContentValue: content1,
+		},
+		{
+			RoomID:       "2",
+			ContentValue: content1,
+		},
+	}, nil
+}
+
+func TestCachedRegex(t *testing.T) {
+	db := dummyACLDB{}
+	wantBannedServer := spec.ServerName("hello.world")
+
+	acls := NewServerACLs(db)
+
+	// Check that hello.world is banned in room 1
+	banned := acls.IsServerBannedFromRoom(wantBannedServer, "1")
+	assert.True(t, banned)
+
+	// Check that hello.world is banned in room 2
+	banned = acls.IsServerBannedFromRoom(wantBannedServer, "2")
+	assert.True(t, banned)
+
+	// Check that matrix.hello.world is banned in room 2
+	banned = acls.IsServerBannedFromRoom("matrix."+wantBannedServer, "2")
+	assert.True(t, banned)
 }

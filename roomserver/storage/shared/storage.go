@@ -61,6 +61,7 @@ type EventDatabase struct {
 	EventStateKeysTable tables.EventStateKeys
 	PrevEventsTable     tables.PreviousEvents
 	RedactionsTable     tables.Redactions
+	ReportedEventsTable tables.ReportedEvents
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {
@@ -1625,9 +1626,24 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 	return d.MembershipTable.SelectKnownUsers(ctx, nil, stateKeyNID, searchString, limit)
 }
 
-// GetKnownRooms returns a list of all rooms we know about.
-func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
-	return d.RoomsTable.SelectRoomIDsWithEvents(ctx, nil)
+func (d *Database) RoomsWithACLs(ctx context.Context) ([]string, error) {
+
+	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, "m.room.server_acl")
+	if err != nil {
+		return nil, err
+	}
+
+	roomNIDs, err := d.EventsTable.SelectRoomsWithEventTypeNID(ctx, nil, eventTypeNID)
+	if err != nil {
+		return nil, err
+	}
+
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, roomNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return roomIDs, nil
 }
 
 // ForgetRoom sets a users room to forgotten
@@ -1865,6 +1881,252 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys ma
 		result[roomID] = resMap
 	}
 	return result, err
+}
+
+// InsertReportedEvent stores a reported event.
+func (d *Database) InsertReportedEvent(
+	ctx context.Context,
+	roomID, eventID, reportingUserID, reason string,
+	score int64,
+) (int64, error) {
+	roomInfo, err := d.roomInfo(ctx, nil, roomID)
+	if err != nil {
+		return 0, err
+	}
+	if roomInfo == nil {
+		return 0, fmt.Errorf("room does not exist")
+	}
+
+	events, err := d.eventsFromIDs(ctx, nil, roomInfo, []string{eventID}, NoFilter)
+	if err != nil {
+		return 0, err
+	}
+	if len(events) == 0 {
+		return 0, fmt.Errorf("unable to find requested event")
+	}
+
+	stateKeyNIDs, err := d.EventStateKeyNIDs(ctx, []string{reportingUserID, events[0].SenderID().ToUserID().String()})
+	if err != nil {
+		return 0, fmt.Errorf("failed to query eventStateKeyNIDs: %w", err)
+	}
+
+	// We expect exactly 2 stateKeyNIDs
+	if len(stateKeyNIDs) != 2 {
+		return 0, fmt.Errorf("expected 2 stateKeyNIDs, received %d", len(stateKeyNIDs))
+	}
+
+	var reportID int64
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		reportID, err = d.ReportedEventsTable.InsertReportedEvent(
+			ctx,
+			txn,
+			roomInfo.RoomNID,
+			events[0].EventNID,
+			stateKeyNIDs[reportingUserID],
+			stateKeyNIDs[events[0].SenderID().ToUserID().String()],
+			reason,
+			score,
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return reportID, err
+}
+
+// QueryAdminEventReports returns event reports given a filter.
+func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limit uint64, backwards bool, userID string, roomID string) ([]api.QueryAdminEventReportsResponse, int64, error) {
+	// Filter on roomID, if requested
+	var roomNID types.RoomNID
+	if roomID != "" {
+		roomInfo, err := d.RoomInfo(ctx, roomID)
+		if err != nil {
+			return nil, 0, err
+		}
+		roomNID = roomInfo.RoomNID
+	}
+
+	// Same as above, but for userID
+	var userNID types.EventStateKeyNID
+	if userID != "" {
+		stateKeysMap, err := d.EventStateKeyNIDs(ctx, []string{userID})
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(stateKeysMap) != 1 {
+			return nil, 0, fmt.Errorf("failed to get eventStateKeyNID for %s", userID)
+		}
+		userNID = stateKeysMap[userID]
+	}
+
+	// Query all reported events matching the filters
+	reports, count, err := d.ReportedEventsTable.SelectReportedEvents(ctx, nil, from, limit, backwards, userNID, roomNID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to SelectReportedEvents: %w", err)
+	}
+
+	// TODO: The below code may be inefficient due to many DB round trips and needs to be revisited.
+	// 	For the time being, this is "good enough".
+	qryRoomNIDs := make([]types.RoomNID, 0, len(reports))
+	qryEventNIDs := make([]types.EventNID, 0, len(reports))
+	qryStateKeyNIDs := make([]types.EventStateKeyNID, 0, len(reports))
+	for _, report := range reports {
+		qryRoomNIDs = append(qryRoomNIDs, report.RoomNID)
+		qryEventNIDs = append(qryEventNIDs, report.EventNID)
+		qryStateKeyNIDs = append(qryStateKeyNIDs, report.ReportingUserNID, report.SenderNID)
+	}
+
+	// This also de-dupes the roomIDs, otherwise we would query the same
+	// roomIDs in GetBulkStateContent multiple times
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, qryRoomNIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// TODO: replace this with something more efficient, as it loads the entire state snapshot.
+	stateContent, err := d.GetBulkStateContent(ctx, roomIDs, []gomatrixserverlib.StateKeyTuple{
+		{EventType: spec.MRoomName, StateKey: ""},
+		{EventType: spec.MRoomCanonicalAlias, StateKey: ""},
+	}, false)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	eventIDMap, err := d.EventIDs(ctx, qryEventNIDs)
+	if err != nil {
+		logrus.WithError(err).Error("unable to map eventNIDs to eventIDs")
+		return nil, 0, err
+	}
+	if len(eventIDMap) != len(qryEventNIDs) {
+		return nil, 0, fmt.Errorf("expected %d eventIDs, got %d", len(qryEventNIDs), len(eventIDMap))
+	}
+
+	// Get a map from EventStateKeyNID to userID
+	userNIDMap, err := d.EventStateKeys(ctx, qryStateKeyNIDs)
+	if err != nil {
+		logrus.WithError(err).Error("unable to map userNIDs to userIDs")
+		return nil, 0, err
+	}
+
+	// Create a cache from roomNID to roomID to avoid hitting the DB again
+	roomNIDIDCache := make(map[types.RoomNID]string, len(roomIDs))
+	for i := 0; i < len(reports); i++ {
+		cachedRoomID := roomNIDIDCache[reports[i].RoomNID]
+		if cachedRoomID == "" {
+			// We need to query this again, as we otherwise don't have a way to match roomNID -> roomID
+			roomIDs, err = d.RoomsTable.BulkSelectRoomIDs(ctx, nil, []types.RoomNID{reports[i].RoomNID})
+			if err != nil {
+				return nil, 0, err
+			}
+			if len(roomIDs) == 0 || len(roomIDs) > 1 {
+				logrus.Warnf("unable to map roomNID %d to a roomID, was this room deleted?", roomNID)
+				continue
+			}
+			roomNIDIDCache[reports[i].RoomNID] = roomIDs[0]
+			cachedRoomID = roomIDs[0]
+		}
+
+		reports[i].EventID = eventIDMap[reports[i].EventNID]
+		reports[i].RoomID = cachedRoomID
+		roomName, canonicalAlias := findRoomNameAndCanonicalAlias(stateContent, cachedRoomID)
+		reports[i].RoomName = roomName
+		reports[i].CanonicalAlias = canonicalAlias
+		reports[i].Sender = userNIDMap[reports[i].SenderNID]
+		reports[i].UserID = userNIDMap[reports[i].ReportingUserNID]
+	}
+
+	return reports, count, nil
+}
+
+func (d *Database) QueryAdminEventReport(ctx context.Context, reportID uint64) (api.QueryAdminEventReportResponse, error) {
+
+	report, err := d.ReportedEventsTable.SelectReportedEvent(ctx, nil, reportID)
+	if err != nil {
+		return api.QueryAdminEventReportResponse{}, err
+	}
+
+	// Get a map from EventStateKeyNID to userID
+	userNIDMap, err := d.EventStateKeys(ctx, []types.EventStateKeyNID{report.ReportingUserNID, report.SenderNID})
+	if err != nil {
+		logrus.WithError(err).Error("unable to map userNIDs to userIDs")
+		return report, err
+	}
+
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, nil, []types.RoomNID{report.RoomNID})
+	if err != nil {
+		return report, err
+	}
+
+	if len(roomIDs) != 1 {
+		return report, fmt.Errorf("expected one roomID, got %d", len(roomIDs))
+	}
+
+	// TODO: replace this with something more efficient, as it loads the entire state snapshot.
+	stateContent, err := d.GetBulkStateContent(ctx, roomIDs, []gomatrixserverlib.StateKeyTuple{
+		{EventType: spec.MRoomName, StateKey: ""},
+		{EventType: spec.MRoomCanonicalAlias, StateKey: ""},
+	}, false)
+	if err != nil {
+		return report, err
+	}
+
+	eventIDMap, err := d.EventIDs(ctx, []types.EventNID{report.EventNID})
+	if err != nil {
+		logrus.WithError(err).Error("unable to map eventNIDs to eventIDs")
+		return report, err
+	}
+	if len(eventIDMap) != 1 {
+		return report, fmt.Errorf("expected %d eventIDs, got %d", 1, len(eventIDMap))
+	}
+
+	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{report.EventNID})
+	if err != nil {
+		return report, err
+	}
+	if len(eventJSONs) != 1 {
+		return report, fmt.Errorf("expected %d eventJSONs, got %d", 1, len(eventJSONs))
+	}
+
+	roomName, canonicalAlias := findRoomNameAndCanonicalAlias(stateContent, roomIDs[0])
+
+	report.Sender = userNIDMap[report.SenderNID]
+	report.UserID = userNIDMap[report.ReportingUserNID]
+	report.RoomID = roomIDs[0]
+	report.RoomName = roomName
+	report.CanonicalAlias = canonicalAlias
+	report.EventID = eventIDMap[report.EventNID]
+	report.EventJSON = eventJSONs[0].EventJSON
+
+	return report, nil
+}
+
+func (d *Database) AdminDeleteEventReport(ctx context.Context, reportID uint64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.ReportedEventsTable.DeleteReportedEvent(ctx, txn, reportID)
+	})
+}
+
+// findRoomNameAndCanonicalAlias loops over events to find the corresponding room name and canonicalAlias
+// for a given roomID.
+func findRoomNameAndCanonicalAlias(events []tables.StrippedEvent, roomID string) (name, canonicalAlias string) {
+	for _, ev := range events {
+		if ev.RoomID != roomID {
+			continue
+		}
+		if ev.EventType == spec.MRoomName {
+			name = ev.ContentValue
+		}
+		if ev.EventType == spec.MRoomCanonicalAlias {
+			canonicalAlias = ev.ContentValue
+		}
+		// We found both wanted values, break the loop
+		if name != "" && canonicalAlias != "" {
+			break
+		}
+	}
+	return name, canonicalAlias
 }
 
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops

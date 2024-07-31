@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"reflect"
 	"testing"
 
@@ -33,11 +34,27 @@ func TestSyncTokens(t *testing.T) {
 		"s3_1_0_0_0_0_2_0_5": StreamingToken{3, 1, 0, 0, 0, 0, 2, 0, 5}.String(),
 		"s3_1_2_3_5_0_0_0_6": StreamingToken{3, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
 		"t3_1":               TopologyToken{3, 1}.String(),
+		"t9223372036854775807_9223372036854775807": TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}.String(),
+		"s9223372036854775807_1_2_3_5_0_0_0_6":     StreamingToken{math.MaxInt64, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
 	}
 
 	for a, b := range shouldPass {
 		if a != b {
 			t.Errorf("expected %q, got %q", a, b)
+		}
+
+		// parse as topology token
+		if a[0] == 't' {
+			if _, err := NewTopologyTokenFromString(a); err != nil {
+				t.Errorf("expected %q to pass, but got %q", a, err)
+			}
+		}
+
+		// parse as sync token
+		if a[0] == 's' {
+			if _, err := NewStreamTokenFromString(a); err != nil {
+				t.Errorf("expected %q to pass, but got %q", a, err)
+			}
 		}
 	}
 

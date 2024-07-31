@@ -38,9 +38,9 @@ var (
 	ErrPasswordTooLong    = fmt.Errorf("password too long: max %d characters", maxPasswordLength)
 	ErrPasswordWeak       = fmt.Errorf("password too weak: min %d characters", minPasswordLength)
 	ErrUsernameTooLong    = fmt.Errorf("username exceeds the maximum length of %d characters", maxUsernameLength)
-	ErrUsernameInvalid    = errors.New("username can only contain characters a-z, 0-9, or '_-./='")
+	ErrUsernameInvalid    = errors.New("username can only contain characters a-z, 0-9, or '_+-./='")
 	ErrUsernameUnderscore = errors.New("username cannot start with a '_'")
-	validUsernameRegex    = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
+	validUsernameRegex    = regexp.MustCompile(`^[0-9a-z_\-+=./]+$`)
 )
 
 // ValidatePassword returns an error if the password is invalid

@@ -290,6 +290,7 @@ func (u *latestEventsUpdater) latestState(ctx context.Context, roomInfo *types.R
 		}).Warnf("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
+			scope.SetTag("room_id", u.event.RoomID().String())
 			scope.SetContext("State reset", map[string]interface{}{
 				"Event ID":        u.event.EventID(),
 				"Old state NID":   fmt.Sprintf("%d", u.oldStateNID),

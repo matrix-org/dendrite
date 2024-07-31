@@ -61,7 +61,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -92,7 +92,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -122,7 +122,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{shouldFail: true}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -152,7 +152,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -183,7 +183,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,

@@ -1,5 +1,43 @@
 # Changelog
 
+## Dendrite 0.13.7 (2024-04-09)
+
+### Fixes
+
+- Fixed an issue where the displayname/avatar of an invited user was replaced with the inviter's details
+- Improved server startup performance by avoiding unnecessary room ACL queries
+  - This change reduces memory footprint as it caches ACL regex patterns once instead of for each room
+  - Unnecessary Relay related queries have been removed. **Note**: To use relays, you now need to explicitly enable them using the `federation_api.enable_relays` config
+- Fixed space summaries over federation
+- Improved usage of external NATS JetStream by reusing existing connections instead of opening new ones unnecessarily
+
+### Features
+
+- Modernized Appservices (contributed by [tulir](https://github.com/tulir))
+- Added event reporting with Synapse Admin endpoints for querying them
+- Updated dependencies
+
+## Dendrite 0.13.6 (2024-01-26)
+
+Upgrading to this version is **highly** recommended, as it contains several QoL improvements.
+
+### Fixes
+
+- Use `AckExplicitPolicy` for JetStream consumers, so messages don't pile up in NATS
+- A rare panic when assigning a state key NID has been fixed
+- A rare panic when checking powerlevels has been fixed
+- Notary keys requests for all keys now work correctly
+- Spec compliance:
+  - Return `M_INVALID_PARAM` when querying room aliases
+  - Handle empty `from` parameter when requesting `/messages`
+  - Add CORP headers on media endpoints
+  - Remove `aliases` from `/publicRooms` responses
+  - Allow `+` in MXIDs (Contributed by [RosstheRoss](https://github.com/RosstheRoss))
+- Fixes membership transitions from `knock` to `join` in `knock_restricted` rooms
+- Incremental syncs now batch querying events (Contributed by [recht](https://github.com/recht))
+- Move `/joined_members` back to the clientAPI/roomserver, which should make bridges happier again
+- Backfilling from other servers now only uses at max 100 events instead of potentially thousands
+
 ## Dendrite 0.13.5 (2023-12-12)
 
 Upgrading to this version is **highly** recommended, as it fixes several long-standing bugs in

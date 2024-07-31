@@ -138,7 +138,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 		walker = *cachedWalker
 	}
 
-	discoveredRooms, nextWalker, err := rsAPI.QueryNextRoomHierarchyPage(req.Context(), walker, limit)
+	discoveredRooms, _, nextWalker, err := rsAPI.QueryNextRoomHierarchyPage(req.Context(), walker, limit)
 
 	if err != nil {
 		switch err.(type) {
