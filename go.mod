@@ -151,4 +151,6 @@ require (
 	modernc.org/token v1.1.0 // indirect
 )
 
-go 1.20
+go 1.21
+
+toolchain go1.22.5
