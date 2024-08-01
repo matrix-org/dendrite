@@ -410,7 +410,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 	}
 	containerID = body.ID
 
-	err = dockerClient.ContainerStart(ctx, containerID, types.ContainerStartOptions{})
+	err = dockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to ContainerStart: %s", err)
 	}
@@ -442,7 +442,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 		lastErr = nil
 		break
 	}
-	logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	logs, err := dockerClient.ContainerLogs(context.Background(), containerID, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -463,7 +463,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 }
 
 func destroyContainer(dockerClient *client.Client, containerID string) {
-	err := dockerClient.ContainerRemove(context.TODO(), containerID, types.ContainerRemoveOptions{
+	err := dockerClient.ContainerRemove(context.TODO(), containerID, container.RemoveOptions{
 		Force: true,
 	})
 	if err != nil {
@@ -550,7 +550,7 @@ func verifyTests(dockerClient *client.Client, volumeName string, versions []*sem
 // cleanup old containers/volumes from a previous run
 func cleanup(dockerClient *client.Client) {
 	// ignore all errors, we are just cleaning up and don't want to fail just because we fail to cleanup
-	containers, _ := dockerClient.ContainerList(context.Background(), types.ContainerListOptions{
+	containers, _ := dockerClient.ContainerList(context.Background(), container.ListOptions{
 		Filters: label(dendriteUpgradeTestLabel),
 		All:     true,
 	})
@@ -558,7 +558,7 @@ func cleanup(dockerClient *client.Client) {
 		log.Printf("Removing container: %v %v\n", c.ID, c.Names)
 		timeout := 1
 		_ = dockerClient.ContainerStop(context.Background(), c.ID, container.StopOptions{Timeout: &timeout})
-		_ = dockerClient.ContainerRemove(context.Background(), c.ID, types.ContainerRemoveOptions{
+		_ = dockerClient.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{
 			Force: true,
 		})
 	}
