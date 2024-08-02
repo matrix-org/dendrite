@@ -54,7 +54,7 @@ var latest, _ = semver.NewVersion("v6.6.6") // Dummy version, used as "HEAD"
 // due to the error:
 // When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const DockerfilePostgreSQL = `FROM golang:1.20-bookworm as build
+const DockerfilePostgreSQL = `FROM golang:1.22-bookworm as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
@@ -67,13 +67,11 @@ RUN go build ./cmd/${BINARY}
 RUN go build ./cmd/generate-keys
 RUN go build ./cmd/generate-config
 RUN go build ./cmd/create-account
-RUN ./generate-config --ci > dendrite.yaml
+RUN ./generate-config --ci --db "user=postgres database=postgres host=/var/run/postgresql/" > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
-# Replace the connection string with a single postgres DB, using user/db = 'postgres' and no password
-RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml
-# No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            scram-sha-256%127.0.0.1/32            trust%g" /etc/postgresql/15/main/pg_hba.conf
+# No password when connecting to Postgres
+RUN sed -i "s%peer%trust%g" /etc/postgresql/15/main/pg_hba.conf
 # Bump up max conns for moar concurrency
 RUN sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/15/main/postgresql.conf
 RUN sed -i 's/max_open_conns:.*$/max_open_conns: 100/g' dendrite.yaml
@@ -100,7 +98,7 @@ ENV BINARY=dendrite
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh`
 
-const DockerfileSQLite = `FROM golang:1.20-bookworm as build
+const DockerfileSQLite = `FROM golang:1.22-bookworm as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
