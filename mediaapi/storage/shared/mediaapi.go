@@ -17,6 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage/tables"
@@ -33,7 +34,7 @@ type Database struct {
 
 // StoreMediaMetadata inserts the metadata about the uploaded media into the database.
 // Returns an error if the combination of MediaID and Origin are not unique in the table.
-func (d Database) StoreMediaMetadata(ctx context.Context, mediaMetadata *types.MediaMetadata) error {
+func (d *Database) StoreMediaMetadata(ctx context.Context, mediaMetadata *types.MediaMetadata) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.MediaRepository.InsertMedia(ctx, txn, mediaMetadata)
 	})
@@ -42,9 +43,9 @@ func (d Database) StoreMediaMetadata(ctx context.Context, mediaMetadata *types.M
 // GetMediaMetadata returns metadata about media stored on this server.
 // The media could have been uploaded to this server or fetched from another server and cached here.
 // Returns nil metadata if there is no metadata associated with this media.
-func (d Database) GetMediaMetadata(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName) (*types.MediaMetadata, error) {
+func (d *Database) GetMediaMetadata(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName) (*types.MediaMetadata, error) {
 	mediaMetadata, err := d.MediaRepository.SelectMedia(ctx, nil, mediaID, mediaOrigin)
-	if err != nil && err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return mediaMetadata, err
@@ -53,9 +54,9 @@ func (d Database) GetMediaMetadata(ctx context.Context, mediaID types.MediaID, m
 // GetMediaMetadataByHash returns metadata about media stored on this server.
 // The media could have been uploaded to this server or fetched from another server and cached here.
 // Returns nil metadata if there is no metadata associated with this media.
-func (d Database) GetMediaMetadataByHash(ctx context.Context, mediaHash types.Base64Hash, mediaOrigin spec.ServerName) (*types.MediaMetadata, error) {
+func (d *Database) GetMediaMetadataByHash(ctx context.Context, mediaHash types.Base64Hash, mediaOrigin spec.ServerName) (*types.MediaMetadata, error) {
 	mediaMetadata, err := d.MediaRepository.SelectMediaByHash(ctx, nil, mediaHash, mediaOrigin)
-	if err != nil && err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return mediaMetadata, err
@@ -63,7 +64,7 @@ func (d Database) GetMediaMetadataByHash(ctx context.Context, mediaHash types.Ba
 
 // StoreThumbnail inserts the metadata about the thumbnail into the database.
 // Returns an error if the combination of MediaID and Origin are not unique in the table.
-func (d Database) StoreThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error {
+func (d *Database) StoreThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.Thumbnails.InsertThumbnail(ctx, txn, thumbnailMetadata)
 	})
@@ -72,13 +73,10 @@ func (d Database) StoreThumbnail(ctx context.Context, thumbnailMetadata *types.T
 // GetThumbnail returns metadata about a specific thumbnail.
 // The media could have been uploaded to this server or fetched from another server and cached here.
 // Returns nil metadata if there is no metadata associated with this thumbnail.
-func (d Database) GetThumbnail(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName, width, height int, resizeMethod string) (*types.ThumbnailMetadata, error) {
+func (d *Database) GetThumbnail(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName, width, height int, resizeMethod string) (*types.ThumbnailMetadata, error) {
 	metadata, err := d.Thumbnails.SelectThumbnail(ctx, nil, mediaID, mediaOrigin, width, height, resizeMethod)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
 	}
 	return metadata, err
 }
@@ -86,13 +84,10 @@ func (d Database) GetThumbnail(ctx context.Context, mediaID types.MediaID, media
 // GetThumbnails returns metadata about all thumbnails for a specific media stored on this server.
 // The media could have been uploaded to this server or fetched from another server and cached here.
 // Returns nil metadata if there are no thumbnails associated with this media.
-func (d Database) GetThumbnails(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName) ([]*types.ThumbnailMetadata, error) {
+func (d *Database) GetThumbnails(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName) ([]*types.ThumbnailMetadata, error) {
 	metadatas, err := d.Thumbnails.SelectThumbnails(ctx, nil, mediaID, mediaOrigin)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
 	}
 	return metadatas, err
 }
