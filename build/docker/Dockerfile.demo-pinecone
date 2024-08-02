@@ -1,5 +1,4 @@
-# Pinned to alpine3.18 until https://github.com/mattn/go-sqlite3/issues/1164 is solved
-FROM docker.io/golang:1.21-alpine3.18 AS base
+FROM docker.io/golang:1.22 AS base
 
 #
 # Needs to be separate from the main Dockerfile for OpenShift,
