@@ -848,38 +848,37 @@ func (r *downloadRequest) fetchRemoteFile(
 	var reader io.Reader
 	var parseErr error
 	if isMultiPart {
-		r.Logger.Info("Downloaded file using authenticated endpoint")
+		r.Logger.Debug("Downloaded file using authenticated endpoint")
 		var params map[string]string
 		_, params, err = mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			panic(err)
 		}
 		if params["boundary"] == "" {
-			return "", false, fmt.Errorf("no boundary header found on %s", r.MediaMetadata.Origin)
+			return "", false, fmt.Errorf("no boundary header found on media %s from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 		}
 		mr := multipart.NewReader(resp.Body, params["boundary"])
 
-		first := true
-		for {
-			var p *multipart.Part
-			p, err = mr.NextPart()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return "", false, err
-			}
-
-			if !first {
-				readCloser := io.NopCloser(p)
-				contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), readCloser, maxFileSizeBytes)
-				// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
-				r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
-				break
-			}
-
-			first = false
+		// Get the first, JSON, part
+		p, multipartErr := mr.NextPart()
+		if multipartErr != nil {
+			return "", false, multipartErr
 		}
+
+		if p.Header.Get("Content-Type") != "application/json" {
+			return "", false, fmt.Errorf("first part of the response must be application/json")
+		}
+		// TODO: Once something is defined, parse the JSON content
+
+		// Get the actual media content
+		p, multipartErr = mr.NextPart()
+		if multipartErr != nil {
+			return "", false, multipartErr
+		}
+
+		contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
+		// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
+		r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
 	} else {
 		// The reader returned here will be limited either by the Content-Length
 		// and/or the configured maximum media size.
