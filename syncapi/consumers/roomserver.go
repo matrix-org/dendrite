@@ -601,9 +601,11 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 	}
 	e.SetContentType(ev.Type())
 
+	var relatesTo gjson.Result
 	switch ev.Type() {
 	case "m.room.message":
 		e.Content = gjson.GetBytes(ev.Content(), "body").String()
+		relatesTo = gjson.GetBytes(ev.Content(), "m\\.relates_to")
 	case spec.MRoomName:
 		e.Content = gjson.GetBytes(ev.Content(), "name").String()
 	case spec.MRoomTopic:
@@ -621,6 +623,22 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 		log.Tracef("Indexing element: %+v", e)
 		if err := s.fts.Index(e); err != nil {
 			return err
+		}
+		// If the event is an edited message we remove the original event from the index
+		// to avoid duplicates in the search results.
+		if relatesTo.Exists() {
+			relatedData := relatesTo.Map()
+			if _, ok := relatedData["rel_type"]; ok && relatedData["rel_type"].Str == "m.replace" {
+				// We remove the original event from the index
+				if srcEventID, ok := relatedData["event_id"]; ok {
+					if err := s.fts.Delete(srcEventID.Str); err != nil {
+						log.WithFields(log.Fields{
+							"event_id": ev.EventID(),
+							"src_id":   srcEventID.Str,
+						}).WithError(err).Error("Failed to delete edited message from the fulltext index")
+					}
+				}
+			}
 		}
 	}
 	return nil
