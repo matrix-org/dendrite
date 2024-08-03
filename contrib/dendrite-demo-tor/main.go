@@ -15,7 +15,6 @@
 package main
 
 import (
-	"flag"
 	"time"
 
 	"github.com/getsentry/sentry-go"
