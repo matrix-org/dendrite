@@ -291,6 +291,10 @@ func (config *Dendrite) Derive() error {
 		config.Derived.Registration.Flows = []authtypes.Flow{
 			{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
 		}
+	} else if config.ClientAPI.RegistrationRequiresToken {
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeRegistrationToken}},
+		}
 	} else {
 		config.Derived.Registration.Flows = []authtypes.Flow{
 			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
