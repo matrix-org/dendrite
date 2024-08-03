@@ -18,16 +18,15 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
-	"fmt"
 	"net"
 	"regexp"
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/neilalexander/utp"
 	"github.com/sirupsen/logrus"
+	"github.com/yggdrasil-network/yggquic"
 
-	ironwoodtypes "github.com/Arceliar/ironwood/types"
+	"github.com/yggdrasil-network/yggdrasil-go/src/config"
 	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	yggdrasilcore "github.com/yggdrasil-network/yggdrasil-go/src/core"
 	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -40,25 +39,23 @@ type Node struct {
 	core      *yggdrasilcore.Core
 	multicast *yggdrasilmulticast.Multicast
 	log       *gologme.Logger
-	utpSocket *utp.Socket
-	incoming  chan net.Conn
+	*yggquic.YggdrasilTransport
 }
 
 func (n *Node) DialerContext(ctx context.Context, _, address string) (net.Conn, error) {
 	tokens := strings.Split(address, ":")
-	raw, err := hex.DecodeString(tokens[0])
-	if err != nil {
-		return nil, fmt.Errorf("hex.DecodeString: %w", err)
-	}
-	pk := make(ironwoodtypes.Addr, ed25519.PublicKeySize)
-	copy(pk, raw[:])
-	return n.utpSocket.DialAddrContext(ctx, pk)
+	return n.DialContext(ctx, "yggdrasil", tokens[0])
 }
 
 func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, listenURI string) (*Node, error) {
 	n := &Node{
-		log:      gologme.New(logrus.StandardLogger().Writer(), "", 0),
-		incoming: make(chan net.Conn),
+		log: gologme.New(logrus.StandardLogger().Writer(), "", 0),
+	}
+
+	cfg := config.GenerateConfig()
+	cfg.PrivateKey = config.KeyBytes(sk)
+	if err := cfg.GenerateSelfSignedCertificate(); err != nil {
+		panic(err)
 	}
 
 	n.log.EnableLevel("error")
@@ -78,12 +75,12 @@ func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, liste
 				})
 			}
 		}
-		if n.core, err = core.New(sk[:], n.log, options...); err != nil {
+		if n.core, err = core.New(cfg.Certificate, n.log, options...); err != nil {
 			panic(err)
 		}
 		n.core.SetLogger(n.log)
 
-		if n.utpSocket, err = utp.NewSocketFromPacketConnNoClose(n.core); err != nil {
+		if n.YggdrasilTransport, err = yggquic.New(n.core, *cfg.Certificate, nil); err != nil {
 			panic(err)
 		}
 	}
@@ -106,8 +103,6 @@ func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, liste
 	}
 
 	n.log.Printf("Public key: %x", n.core.PublicKey())
-	go n.listenFromYgg()
-
 	return n, nil
 }
 
