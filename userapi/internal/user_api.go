@@ -939,11 +939,12 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 		return nil
 	case bcrypt.ErrHashTooShort: // user exists, but probably a passwordless account
 		return nil
-	default:
+	case nil:
 		res.Exists = true
 		res.Account = acc
 		return nil
 	}
+	return err
 }
 
 func (a *UserInternalAPI) SetDisplayName(ctx context.Context, localpart string, serverName spec.ServerName, displayName string) (*authtypes.Profile, bool, error) {
