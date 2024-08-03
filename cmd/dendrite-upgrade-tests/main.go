@@ -54,7 +54,7 @@ var latest, _ = semver.NewVersion("v6.6.6") // Dummy version, used as "HEAD"
 // due to the error:
 // When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const DockerfilePostgreSQL = `FROM golang:1.20-bookworm as build
+const DockerfilePostgreSQL = `FROM golang:1.22-bookworm as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
@@ -67,13 +67,11 @@ RUN go build ./cmd/${BINARY}
 RUN go build ./cmd/generate-keys
 RUN go build ./cmd/generate-config
 RUN go build ./cmd/create-account
-RUN ./generate-config --ci > dendrite.yaml
+RUN ./generate-config --ci --db "user=postgres database=postgres host=/var/run/postgresql/" > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
-# Replace the connection string with a single postgres DB, using user/db = 'postgres' and no password
-RUN sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml
-# No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            scram-sha-256%127.0.0.1/32            trust%g" /etc/postgresql/15/main/pg_hba.conf
+# No password when connecting to Postgres
+RUN sed -i "s%peer%trust%g" /etc/postgresql/15/main/pg_hba.conf
 # Bump up max conns for moar concurrency
 RUN sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/15/main/postgresql.conf
 RUN sed -i 's/max_open_conns:.*$/max_open_conns: 100/g' dendrite.yaml
@@ -100,7 +98,7 @@ ENV BINARY=dendrite
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh`
 
-const DockerfileSQLite = `FROM golang:1.20-bookworm as build
+const DockerfileSQLite = `FROM golang:1.22-bookworm as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 ARG BINARY
@@ -410,7 +408,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 	}
 	containerID = body.ID
 
-	err = dockerClient.ContainerStart(ctx, containerID, types.ContainerStartOptions{})
+	err = dockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to ContainerStart: %s", err)
 	}
@@ -442,7 +440,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 		lastErr = nil
 		break
 	}
-	logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+	logs, err := dockerClient.ContainerLogs(context.Background(), containerID, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -463,7 +461,7 @@ func runImage(dockerClient *client.Client, volumeName string, branchNameToImageI
 }
 
 func destroyContainer(dockerClient *client.Client, containerID string) {
-	err := dockerClient.ContainerRemove(context.TODO(), containerID, types.ContainerRemoveOptions{
+	err := dockerClient.ContainerRemove(context.TODO(), containerID, container.RemoveOptions{
 		Force: true,
 	})
 	if err != nil {
@@ -550,7 +548,7 @@ func verifyTests(dockerClient *client.Client, volumeName string, versions []*sem
 // cleanup old containers/volumes from a previous run
 func cleanup(dockerClient *client.Client) {
 	// ignore all errors, we are just cleaning up and don't want to fail just because we fail to cleanup
-	containers, _ := dockerClient.ContainerList(context.Background(), types.ContainerListOptions{
+	containers, _ := dockerClient.ContainerList(context.Background(), container.ListOptions{
 		Filters: label(dendriteUpgradeTestLabel),
 		All:     true,
 	})
@@ -558,7 +556,7 @@ func cleanup(dockerClient *client.Client) {
 		log.Printf("Removing container: %v %v\n", c.ID, c.Names)
 		timeout := 1
 		_ = dockerClient.ContainerStop(context.Background(), c.ID, container.StopOptions{Timeout: &timeout})
-		_ = dockerClient.ContainerRemove(context.Background(), c.ID, types.ContainerRemoveOptions{
+		_ = dockerClient.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{
 			Force: true,
 		})
 	}

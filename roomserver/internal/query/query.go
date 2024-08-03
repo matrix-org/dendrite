@@ -1099,3 +1099,18 @@ func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, 
 
 	return nil, nil
 }
+
+// RoomsWithACLs returns all room IDs for rooms with ACLs
+func (r *Queryer) RoomsWithACLs(ctx context.Context) ([]string, error) {
+	return r.DB.RoomsWithACLs(ctx)
+}
+
+// QueryAdminEventReports returns event reports given a filter.
+func (r *Queryer) QueryAdminEventReports(ctx context.Context, from uint64, limit uint64, backwards bool, userID, roomID string) ([]api.QueryAdminEventReportsResponse, int64, error) {
+	return r.DB.QueryAdminEventReports(ctx, from, limit, backwards, userID, roomID)
+}
+
+// QueryAdminEventReport returns a single event report.
+func (r *Queryer) QueryAdminEventReport(ctx context.Context, reportID uint64) (api.QueryAdminEventReportResponse, error) {
+	return r.DB.QueryAdminEventReport(ctx, reportID)
+}

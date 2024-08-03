@@ -28,13 +28,13 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"

@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/matrix-org/gomatrix"
@@ -26,7 +27,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -294,6 +294,10 @@ func (oq *destinationQueue) checkNotificationsOnClose() {
 
 // backgroundSend is the worker goroutine for sending events.
 func (oq *destinationQueue) backgroundSend() {
+	// Don't try to send transactions if we are shutting down.
+	if oq.process.Context().Err() != nil {
+		return
+	}
 	// Check if a worker is already running, and if it isn't, then
 	// mark it as started.
 	if !oq.running.CompareAndSwap(false, true) {

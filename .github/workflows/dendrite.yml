@@ -33,7 +33,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Install Node
@@ -72,7 +72,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
 
@@ -108,7 +108,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - uses: actions/cache@v4
         # manually set up caches, as they otherwise clash with different steps using setup-go with cache=true
         with:
@@ -145,7 +145,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - uses: actions/cache@v4
         with:
           path: |
@@ -178,7 +178,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - uses: actions/cache@v4
         with:
           path: |
@@ -241,7 +241,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
         with:
@@ -279,7 +279,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
           cache: true
       - uses: actions/cache@v4
         with:
@@ -309,7 +309,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
           cache: true
       - uses: actions/cache@v4
         with:

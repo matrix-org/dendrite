@@ -189,7 +189,7 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 			RoomID: roomID,
 		}
 		joinCount := 0
-		var joinRule, guestAccess string
+		var guestAccess string
 		for tuple, contentVal := range data {
 			if tuple.EventType == spec.MRoomMember && contentVal == "join" {
 				joinCount++
@@ -210,12 +210,12 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 				pub.WorldReadable = contentVal == "world_readable"
 			// need both of these to determine whether guests can join
 			case joinRuleTuple:
-				joinRule = contentVal
+				pub.JoinRule = contentVal
 			case guestTuple:
 				guestAccess = contentVal
 			}
 		}
-		if joinRule == spec.Public && guestAccess == "can_join" {
+		if pub.JoinRule == spec.Public && guestAccess == "can_join" {
 			pub.GuestCanJoin = true
 		}
 		pub.JoinedMembersCount = joinCount
