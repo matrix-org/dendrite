@@ -382,9 +382,9 @@ func (r *downloadRequest) respondFromLocalFile(
 		" plugin-types application/pdf;" +
 		" style-src 'unsafe-inline';" +
 		" object-src 'self';"
-	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 	if !r.forFederation {
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 		if _, err = io.Copy(w, responseFile); err != nil {
 			return nil, fmt.Errorf("io.Copy: %w", err)
 		}
@@ -393,8 +393,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		boundary := uuid.NewString()
 		w.Header().Set("Content-Type", "multipart/mixed; boundary="+boundary)
 
-		w.Header().Del("Content-Length")          // let Go handle the content length
-		w.Header().Del("Content-Security-Policy") // S-S request, so does not really matter?
+		w.Header().Del("Content-Length") // let Go handle the content length
 		mw := multipart.NewWriter(w)
 		defer func() {
 			if err = mw.Close(); err != nil {
@@ -814,6 +813,10 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 	return contentLength, reader, nil
 }
 
+// mediaMeta contains information about a multipart media response.
+// TODO: extend once something is defined.
+type mediaMeta struct{}
+
 // nolint: gocyclo
 func (r *downloadRequest) fetchRemoteFile(
 	ctx context.Context,
@@ -852,7 +855,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		var params map[string]string
 		_, params, err = mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
-			panic(err)
+			return "", false, err
 		}
 		if params["boundary"] == "" {
 			return "", false, fmt.Errorf("no boundary header found on media %s from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
@@ -868,7 +871,12 @@ func (r *downloadRequest) fetchRemoteFile(
 		if p.Header.Get("Content-Type") != "application/json" {
 			return "", false, fmt.Errorf("first part of the response must be application/json")
 		}
-		// TODO: Once something is defined, parse the JSON content
+		// Try to parse media meta information
+		meta := mediaMeta{}
+		if err = json.NewDecoder(p).Decode(&meta); err != nil {
+			return "", false, err
+		}
+		defer p.Close() // nolint: errcheck
 
 		// Get the actual media content
 		p, multipartErr = mr.NextPart()
@@ -876,9 +884,30 @@ func (r *downloadRequest) fetchRemoteFile(
 			return "", false, multipartErr
 		}
 
-		contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
-		// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
-		r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
+		redirect := p.Header.Get("Location")
+		if redirect != "" {
+			if !strings.HasPrefix(redirect, "https://") {
+				return "", false, fmt.Errorf("redirect URL must be HTTPS")
+			}
+			req, reqErr := http.NewRequest(http.MethodGet, redirect, nil)
+			if reqErr != nil {
+				return "", false, fmt.Errorf("failed to create request to %s: %w", redirect, err)
+			}
+			redirectResp, reqErr := client.DoHTTPRequest(ctx, req)
+			if reqErr != nil {
+				return "", false, fmt.Errorf("error following redirect: %w", err)
+			}
+			defer redirectResp.Body.Close() // nolint: errcheck
+			if redirectResp.StatusCode != http.StatusOK {
+				return "", false, fmt.Errorf("unexpected status code %d after following redirect", resp.StatusCode)
+			}
+			contentLength, reader, parseErr = r.GetContentLengthAndReader(redirectResp.Header.Get("Content-Length"), redirectResp.Body, maxFileSizeBytes)
+			r.MediaMetadata.ContentType = types.ContentType(redirectResp.Header.Get("Content-Type"))
+		} else {
+			contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
+			// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
+			r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
+		}
 	} else {
 		// The reader returned here will be limited either by the Content-Length
 		// and/or the configured maximum media size.
