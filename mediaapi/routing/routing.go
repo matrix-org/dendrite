@@ -105,7 +105,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	// v1 client endpoints requiring auth
-	downloadHandlerAuthed := httputil.MakeHTMLAPI("download_authed_client", userAPI, cfg.Global.Metrics.Enabled, downloadHandler, httputil.WithAuth())
+	downloadHandlerAuthed := httputil.MakeHTMLAPI("download", userAPI, cfg.Global.Metrics.Enabled, makeDownloadAPI("download_authed_client", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, false), httputil.WithAuth())
 	v1mux.Handle("/config", configHandler).Methods(http.MethodGet, http.MethodOptions)
 	v1mux.Handle("/download/{serverName}/{mediaId}", downloadHandlerAuthed).Methods(http.MethodGet, http.MethodOptions)
 	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandlerAuthed).Methods(http.MethodGet, http.MethodOptions)
