@@ -7,9 +7,12 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/blevesearch/bleve/v2 v2.4.0
 	github.com/codeclysm/extract v2.2.0+incompatible
+	github.com/cretz/bine v0.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/eyedeekay/goSam v0.32.54
+	github.com/eyedeekay/onramp v0.33.7
 	github.com/getsentry/sentry-go v0.14.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.6.0
@@ -34,7 +37,7 @@ require (
 	github.com/prometheus/client_golang v1.19.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	github.com/tidwall/gjson v1.17.1
+	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
@@ -86,6 +89,8 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/eyedeekay/i2pkeys v0.33.7 // indirect
+	github.com/eyedeekay/sam3 v0.33.7 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
