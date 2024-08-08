@@ -15,23 +15,26 @@
 package mediaapi
 
 import (
-	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
-	mediaRouter *mux.Router,
+	routers httputil.Routers,
 	cm *sqlutil.Connections,
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
+	fedClient fclient.FederationClient,
+	keyRing gomatrixserverlib.JSONVerifier,
 ) {
 	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
 	if err != nil {
@@ -39,6 +42,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		mediaRouter, cfg, mediaDB, userAPI, client,
+		routers, cfg, mediaDB, userAPI, client, fedClient, keyRing,
 	)
 }
