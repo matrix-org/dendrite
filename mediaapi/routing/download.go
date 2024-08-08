@@ -886,23 +886,7 @@ func (r *downloadRequest) fetchRemoteFile(
 
 		redirect := p.Header.Get("Location")
 		if redirect != "" {
-			if !strings.HasPrefix(redirect, "https://") {
-				return "", false, fmt.Errorf("redirect URL must be HTTPS")
-			}
-			req, reqErr := http.NewRequest(http.MethodGet, redirect, nil)
-			if reqErr != nil {
-				return "", false, fmt.Errorf("failed to create request to %s: %w", redirect, reqErr)
-			}
-			redirectResp, reqErr := client.DoHTTPRequest(ctx, req)
-			if reqErr != nil {
-				return "", false, fmt.Errorf("error following redirect: %w", reqErr)
-			}
-			defer redirectResp.Body.Close() // nolint: errcheck
-			if redirectResp.StatusCode != http.StatusOK {
-				return "", false, fmt.Errorf("unexpected status code %d after following redirect", redirectResp.StatusCode)
-			}
-			contentLength, reader, parseErr = r.GetContentLengthAndReader(redirectResp.Header.Get("Content-Length"), redirectResp.Body, maxFileSizeBytes)
-			r.MediaMetadata.ContentType = types.ContentType(redirectResp.Header.Get("Content-Type"))
+			return "", false, fmt.Errorf("Location header is not yet supported")
 		} else {
 			contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
 			// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
