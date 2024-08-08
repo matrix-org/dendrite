@@ -115,10 +115,10 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	// same, but for federation
-	v1fedMux.Handle("/download/{mediaId}", routing.MakeFedAPIHTML(cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
+	v1fedMux.Handle("/download/{mediaId}", routing.MakeFedHTMLAPI(cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 		makeDownloadAPI("download_authed_federation", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, true),
 	)).Methods(http.MethodGet, http.MethodOptions)
-	v1fedMux.Handle("/thumbnail/{mediaId}", routing.MakeFedAPIHTML(cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
+	v1fedMux.Handle("/thumbnail/{mediaId}", routing.MakeFedHTMLAPI(cfg.Global.ServerName, cfg.Global.IsLocalServerName, keyRing,
 		makeDownloadAPI("thumbnail_authed_federation", &cfg.MediaAPI, rateLimits, db, client, federationClient, activeRemoteRequests, activeThumbnailGeneration, true),
 	)).Methods(http.MethodGet, http.MethodOptions)
 }

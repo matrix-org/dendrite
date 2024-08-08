@@ -64,7 +64,7 @@ type downloadRequest struct {
 	ThumbnailSize      types.ThumbnailSize
 	Logger             *log.Entry
 	DownloadFilename   string
-	forFederation      bool // whether we need to return a multipart/mixed response
+	multipartResponse  bool // whether we need to return a multipart/mixed response (for requests coming in over federation)
 	fedClient          fclient.FederationClient
 	origin             spec.ServerName
 }
@@ -122,10 +122,10 @@ func Download(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	isThumbnailRequest bool,
 	customFilename string,
-	forFederation bool,
+	federationRequest bool,
 ) {
 	// This happens if we call Download for a federation request
-	if forFederation && origin == "" {
+	if federationRequest && origin == "" {
 		origin = cfg.Matrix.ServerName
 	}
 	dReq := &downloadRequest{
@@ -138,10 +138,10 @@ func Download(
 			"Origin":  origin,
 			"MediaID": mediaID,
 		}),
-		DownloadFilename: customFilename,
-		forFederation:    forFederation,
-		origin:           cfg.Matrix.ServerName,
-		fedClient:        fedClient,
+		DownloadFilename:  customFilename,
+		multipartResponse: federationRequest,
+		origin:            cfg.Matrix.ServerName,
+		fedClient:         fedClient,
 	}
 
 	if dReq.IsThumbnailRequest {
@@ -383,7 +383,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		" style-src 'unsafe-inline';" +
 		" object-src 'self';"
 
-	if !r.forFederation {
+	if !r.multipartResponse {
 		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 		if _, err = io.Copy(w, responseFile); err != nil {
 			return nil, fmt.Errorf("io.Copy: %w", err)
@@ -827,10 +827,10 @@ func (r *downloadRequest) fetchRemoteFile(
 	r.Logger.Debug("Fetching remote file")
 
 	// Attempt to download via authenticated media endpoint
-	isMultiPart := true
+	isAuthed := true
 	resp, err := r.fedClient.DownloadMedia(ctx, r.origin, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
 	if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
-		isMultiPart = false
+		isAuthed = false
 		// try again on the unauthed endpoint
 		// create request for remote file
 		resp, err = client.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
@@ -838,7 +838,7 @@ func (r *downloadRequest) fetchRemoteFile(
 			if resp != nil && resp.StatusCode == http.StatusNotFound {
 				return "", false, fmt.Errorf("File with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 			}
-			return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+			return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s: %w", r.MediaMetadata.MediaID, r.MediaMetadata.Origin, err)
 		}
 	}
 	defer resp.Body.Close() // nolint: errcheck
@@ -850,7 +850,7 @@ func (r *downloadRequest) fetchRemoteFile(
 	var contentLength int64
 	var reader io.Reader
 	var parseErr error
-	if isMultiPart {
+	if isAuthed {
 		r.Logger.Debug("Downloaded file using authenticated endpoint")
 		var params map[string]string
 		_, params, err = mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -891,15 +891,15 @@ func (r *downloadRequest) fetchRemoteFile(
 			}
 			req, reqErr := http.NewRequest(http.MethodGet, redirect, nil)
 			if reqErr != nil {
-				return "", false, fmt.Errorf("failed to create request to %s: %w", redirect, err)
+				return "", false, fmt.Errorf("failed to create request to %s: %w", redirect, reqErr)
 			}
 			redirectResp, reqErr := client.DoHTTPRequest(ctx, req)
 			if reqErr != nil {
-				return "", false, fmt.Errorf("error following redirect: %w", err)
+				return "", false, fmt.Errorf("error following redirect: %w", reqErr)
 			}
 			defer redirectResp.Body.Close() // nolint: errcheck
 			if redirectResp.StatusCode != http.StatusOK {
-				return "", false, fmt.Errorf("unexpected status code %d after following redirect", resp.StatusCode)
+				return "", false, fmt.Errorf("unexpected status code %d after following redirect", redirectResp.StatusCode)
 			}
 			contentLength, reader, parseErr = r.GetContentLengthAndReader(redirectResp.Header.Get("Content-Length"), redirectResp.Body, maxFileSizeBytes)
 			r.MediaMetadata.ContentType = types.ContentType(redirectResp.Header.Get("Content-Type"))
