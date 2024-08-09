@@ -17,10 +17,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	types2 "github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -65,21 +64,21 @@ const selectRelationsInRangeDescSQL = "" +
 	" ORDER BY id DESC LIMIT $7"
 
 const selectThreadsSQL = "" +
-	"SELECT syncapi_relations.id, syncapi_relations.child_event_id, syncapi_output_room_events.sender, syncapi_relations.event_id, syncapi_output_room_events.headered_event_json FROM syncapi_relations" +
+	"SELECT syncapi_relations.id, syncapi_relations.child_event_id, syncapi_output_room_events.sender, syncapi_relations.event_id, syncapi_output_room_events.headered_event_json, syncapi_output_room_events.type FROM syncapi_relations" +
 	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
 	" WHERE syncapi_relations.room_id = $1" +
 	" AND syncapi_relations.rel_type = 'm.thread'" +
-	" AND syncapi_relations.id >= $2 AND syncapi_relations.id < $3" +
-	" ORDER BY syncapi_relations.id LIMIT $4"
+	" AND syncapi_relations.id >= $2 AND" +
+	" ORDER BY syncapi_relations.id LIMIT $3"
 
 const selectThreadsWithSenderSQL = "" +
-	"SELECT syncapi_relations.id, syncapi_relations.child_event_id, syncapi_output_room_events.sender, syncapi_relations.event_id, syncapi_output_room_events.headered_event_json FROM syncapi_relations" +
+	"SELECT syncapi_relations.id, syncapi_relations.child_event_id, syncapi_output_room_events.sender, syncapi_relations.event_id, syncapi_output_room_events.headered_event_json, syncapi_output_room_events.type FROM syncapi_relations" +
 	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
 	" WHERE syncapi_relations.room_id = $1" +
 	" AND syncapi_output_room_events.sender = $2" +
 	" AND syncapi_relations.rel_type = 'm.thread'" +
-	" AND syncapi_relations.id >= $3 AND syncapi_relations.id < $4" +
-	" ORDER BY syncapi_relations.id LIMIT $5"
+	" AND syncapi_relations.id >= $3" +
+	" ORDER BY syncapi_relations.id LIMIT $4"
 
 const selectMaxRelationIDSQL = "" +
 	"SELECT COALESCE(MAX(id), 0) FROM syncapi_relations"
@@ -175,9 +174,9 @@ func (s *relationsStatements) SelectThreads(
 	ctx context.Context,
 	txn *sql.Tx,
 	roomID, userID string,
-	r types.Range,
-	limit int,
-) ([]map[string]any, types.StreamPosition, error) {
+	from types.StreamPosition,
+	limit uint64,
+) ([]string, types.StreamPosition, error) {
 	var lastPos types.StreamPosition
 	var stmt *sql.Stmt
 	var rows *sql.Rows
@@ -185,35 +184,34 @@ func (s *relationsStatements) SelectThreads(
 
 	if userID == "" {
 		stmt = sqlutil.TxStmt(txn, s.selectThreadsStmt)
-		rows, err = stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
+		rows, err = stmt.QueryContext(ctx, roomID, from, limit)
 	} else {
 		stmt = sqlutil.TxStmt(txn, s.selectThreadsWithSenderStmt)
-		rows, err = stmt.QueryContext(ctx, roomID, userID, r.Low(), r.High(), limit)
+		rows, err = stmt.QueryContext(ctx, roomID, userID, from, limit)
 	}
 	if err != nil {
 		return nil, lastPos, err
 	}
 
 	defer internal.CloseAndLogIfError(ctx, rows, "selectThreads: rows.close() failed")
-	var result []map[string]any
+	var result []string
 	var (
 		id                types.StreamPosition
 		childEventID      string
 		sender            string
 		eventId           string
 		headeredEventJson string
+		eventType         string
 	)
 
 	for rows.Next() {
-		if err = rows.Scan(&id, &childEventID, &sender, &eventId, &headeredEventJson); err != nil {
+		if err = rows.Scan(&id, &childEventID, &sender, &eventId, &headeredEventJson, &eventType); err != nil {
 			return nil, lastPos, err
 		}
 		if id > lastPos {
 			lastPos = id
 		}
-		var event types2.HeaderedEvent
-		json.Unmarshal(event)
-		result = append(result)
+		result = append(result, eventId)
 	}
 
 	return result, lastPos, rows.Err()

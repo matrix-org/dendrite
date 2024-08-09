@@ -1,6 +1,10 @@
 package routing
 
 import (
+	rstypes "github.com/matrix-org/dendrite/roomserver/types"
+	"net/http"
+	"strconv"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -10,8 +14,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"strconv"
 )
 
 type ThreadsResponse struct {
@@ -42,7 +44,13 @@ func Threads(
 		limit = 100
 	}
 
-	from := req.URL.Query().Get("from")
+	var from types.StreamPosition
+	if f := req.URL.Query().Get("from"); f != "" {
+		if from, err = types.NewStreamPositionFromString(f); err != nil {
+			return util.ErrorResponse(err)
+		}
+	}
+
 	include := req.URL.Query().Get("include")
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
@@ -60,8 +68,9 @@ func Threads(
 		Chunk: []synctypes.ClientEvent{},
 	}
 
+	var userID string
 	if include == "participated" {
-		userID, err := spec.NewUserID(device.UserID, true)
+		_, err := spec.NewUserID(device.UserID, true)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
 			return util.JSONResponse{
@@ -69,9 +78,26 @@ func Threads(
 				JSON: spec.Unknown("internal server error"),
 			}
 		}
-		var events []types.StreamEvent
-		events, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
-			req.Context(), roomID.String(), "", relType, eventType, from, to, dir == "b", limit,
-		)
+		userID = device.UserID
+	} else {
+		userID = ""
+	}
+	var headeredEvents []*rstypes.HeaderedEvent
+	headeredEvents, _, res.NextBatch, err = snapshot.ThreadsFor(
+		req.Context(), roomID.String(), userID, from, limit,
+	)
+
+	for _, event := range headeredEvents {
+		ce, err := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		})
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		res.Chunk = append(res.Chunk, *ce)
+	}
+
+	return util.JSONResponse{
+		JSON: res,
 	}
 }
