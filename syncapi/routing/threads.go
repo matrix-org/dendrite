@@ -98,6 +98,7 @@ func Threads(
 	}
 
 	return util.JSONResponse{
+		Code: http.StatusOK,
 		JSON: res,
 	}
 }
