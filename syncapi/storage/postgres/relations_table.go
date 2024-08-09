@@ -68,7 +68,7 @@ const selectThreadsSQL = "" +
 	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
 	" WHERE syncapi_relations.room_id = $1" +
 	" AND syncapi_relations.rel_type = 'm.thread'" +
-	" AND syncapi_relations.id >= $2 AND" +
+	" AND syncapi_relations.id >= $2" +
 	" ORDER BY syncapi_relations.id LIMIT $3"
 
 const selectThreadsWithSenderSQL = "" +
