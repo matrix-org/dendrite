@@ -166,7 +166,8 @@ func Setup(
 		return Threads(
 			req, device, syncDB, rsAPI, vars["roomId"],
 		)
-	}))
+	})).Methods(http.MethodGet)
+
 	v3mux.Handle("/search",
 		httputil.MakeAuthAPI("search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if !cfg.Fulltext.Enabled {
