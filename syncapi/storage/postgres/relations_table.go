@@ -64,7 +64,7 @@ const selectRelationsInRangeDescSQL = "" +
 	" ORDER BY id DESC LIMIT $7"
 
 const selectThreadsSQL = "" +
-	"SELECT syncapi_relations.id, syncapi_relations.child_event_id, syncapi_output_room_events.sender, syncapi_relations.event_id, syncapi_output_room_events.headered_event_json, syncapi_output_room_events.type FROM syncapi_relations" +
+	"SELECT syncapi_relations.id, syncapi_relations.event_id FROM syncapi_relations" +
 	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
 	" WHERE syncapi_relations.room_id = $1" +
 	" AND syncapi_relations.rel_type = 'm.thread'" +
@@ -72,7 +72,7 @@ const selectThreadsSQL = "" +
 	" ORDER BY syncapi_relations.id LIMIT $3"
 
 const selectThreadsWithSenderSQL = "" +
-	"SELECT syncapi_relations.id, syncapi_relations.child_event_id, syncapi_output_room_events.sender, syncapi_relations.event_id, syncapi_output_room_events.headered_event_json, syncapi_output_room_events.type FROM syncapi_relations" +
+	"SELECT syncapi_relations.id, syncapi_relations.event_id FROM syncapi_relations" +
 	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
 	" WHERE syncapi_relations.room_id = $1" +
 	" AND syncapi_output_room_events.sender = $2" +
@@ -196,16 +196,12 @@ func (s *relationsStatements) SelectThreads(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectThreads: rows.close() failed")
 	var result []string
 	var (
-		id                types.StreamPosition
-		childEventID      string
-		sender            string
-		eventId           string
-		headeredEventJson string
-		eventType         string
+		id      types.StreamPosition
+		eventId string
 	)
 
 	for rows.Next() {
-		if err = rows.Scan(&id, &childEventID, &sender, &eventId, &headeredEventJson, &eventType); err != nil {
+		if err = rows.Scan(&id, &eventId); err != nil {
 			return nil, lastPos, err
 		}
 		if id > lastPos {
