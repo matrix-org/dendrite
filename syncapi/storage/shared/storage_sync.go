@@ -834,7 +834,7 @@ func (d *DatabaseTransaction) ThreadsFor(ctx context.Context, roomID, userID str
 	// First look up any threads from the database. We add one to the limit here
 	// so that we can tell if we're overflowing, as we will only set the "next_batch"
 	// in the response if we are.
-	eventIDs, _, err := d.Relations.SelectThreads(ctx, d.txn, roomID, userID, from, limit+1)
+	eventIDs, pos, err := d.Relations.SelectThreads(ctx, d.txn, roomID, userID, from, limit+1)
 
 	if err != nil {
 		return nil, "", "", fmt.Errorf("d.Relations.SelectRelationsInRange: %w", err)
@@ -845,5 +845,5 @@ func (d *DatabaseTransaction) ThreadsFor(ctx context.Context, roomID, userID str
 		return nil, "", "", fmt.Errorf("d.OutputEvents.SelectEvents: %w", err)
 	}
 
-	return events, prevBatch, nextBatch, nil
+	return events, prevBatch, fmt.Sprintf("%d", pos), nil
 }

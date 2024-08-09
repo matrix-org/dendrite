@@ -86,6 +86,9 @@ func Threads(
 	headeredEvents, _, res.NextBatch, err = snapshot.ThreadsFor(
 		req.Context(), roomID.String(), userID, from, limit,
 	)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
 
 	for _, event := range headeredEvents {
 		ce, err := synctypes.ToClientEvent(event, synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
