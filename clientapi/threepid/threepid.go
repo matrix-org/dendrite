@@ -83,6 +83,7 @@ func CreateSession(
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close() // nolint: errcheck
 
 	// Error if the status isn't OK
 	if resp.StatusCode != http.StatusOK {
