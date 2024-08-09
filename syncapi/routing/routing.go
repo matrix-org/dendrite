@@ -157,6 +157,16 @@ func Setup(
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	v1unstablemux.Handle("/rooms/{roomId}/threads", httputil.MakeAuthAPI("threads", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+
+		return Threads(
+			req, device, syncDB, rsAPI, vars["roomId"],
+		)
+	}))
 	v3mux.Handle("/search",
 		httputil.MakeAuthAPI("search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if !cfg.Fulltext.Enabled {
@@ -200,4 +210,5 @@ func Setup(
 			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, membership, notMembership, at)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
+
 }

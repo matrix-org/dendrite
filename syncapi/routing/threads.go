@@ -23,7 +23,7 @@ type ThreadsResponse struct {
 
 func Threads(
 	req *http.Request,
-	device userapi.Device,
+	device *userapi.Device,
 	syncDB storage.Database,
 	rsAPI api.SyncRoomserverAPI,
 	rawRoomID string) util.JSONResponse {
