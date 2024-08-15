@@ -28,47 +28,97 @@ import (
 )
 
 const (
-	maxUsernameLength = 254 // https://spec.matrix.org/v1.7/appendices/#user-identifiers TODO account for domain
-
-	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
-	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	minPasswordLength = 8   // Minimum password length
+	maxPasswordLength = 512 // Maximum password length
+	maxUsernameLength = 254 // Maximum username length
+	sessionIDLength   = 24  // Session ID length
 )
 
 var (
-	ErrPasswordTooLong    = fmt.Errorf("password too long: max %d characters", maxPasswordLength)
-	ErrPasswordWeak       = fmt.Errorf("password too weak: min %d characters", minPasswordLength)
+	ErrPasswordTooLong    = errors.New("password is too long")
+	ErrPasswordWeak       = errors.New("password does not meet the strength requirements")
 	ErrUsernameTooLong    = fmt.Errorf("username exceeds the maximum length of %d characters", maxUsernameLength)
 	ErrUsernameInvalid    = errors.New("username can only contain characters a-z, 0-9, or '_+-./='")
 	ErrUsernameUnderscore = errors.New("username cannot start with a '_'")
 	validUsernameRegex    = regexp.MustCompile(`^[0-9a-z_\-+=./]+$`)
 )
 
-// ValidatePassword returns an error if the password is invalid
-func ValidatePassword(password string) error {
-	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(password) > maxPasswordLength {
+// PasswordConfig defines the configurable parameters for password validation
+type PasswordConfig struct {
+	MinLength        int  `yaml:"min_length"`
+	MaxLength        int  `yaml:"max_length"`
+	RequireUppercase bool `yaml:"require_uppercase"`
+	RequireLowercase bool `yaml:"require_lowercase"`
+	RequireDigit     bool `yaml:"require_digit"`
+	RequireSpecial   bool `yaml:"require_special"`
+}
+
+// Default password config
+var defaultPasswordConfig = PasswordConfig{
+	MinLength:        minPasswordLength,
+	MaxLength:        maxPasswordLength,
+	RequireUppercase: true,
+	RequireLowercase: true,
+	RequireDigit:     true,
+	RequireSpecial:   true,
+}
+
+// ValidatePassword returns an error if the password is invalid according to the config
+func ValidatePassword(password string, config PasswordConfig) error {
+	if len(password) > config.MaxLength {
 		return ErrPasswordTooLong
-	} else if len(password) > 0 && len(password) < minPasswordLength {
+	} else if len(password) < config.MinLength {
 		return ErrPasswordWeak
 	}
+
+	var hasUppercase, hasLowercase, hasDigit, hasSpecial bool
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUppercase = true
+		case unicode.IsLower(char):
+			hasLowercase = true
+		case unicode.IsDigit(char):
+			hasDigit = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+
+	if config.RequireUppercase && !hasUppercase {
+		return ErrPasswordWeak
+	}
+	if config.RequireLowercase && !hasLowercase {
+		return ErrPasswordWeak
+	}
+	if config.RequireDigit && !hasDigit {
+		return ErrPasswordWeak
+	}
+	if config.RequireSpecial && !hasSpecial {
+		return ErrPasswordWeak
+	}
+
+	// Sidecar: Log the password validation attempt (placeholder)
+	sidecarLogPasswordValidation(password)
+
 	return nil
 }
 
-// PasswordResponse returns a util.JSONResponse for a given error, if any.
-func PasswordResponse(err error) *util.JSONResponse {
-	switch err {
-	case ErrPasswordWeak:
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.WeakPassword(ErrPasswordWeak.Error()),
-		}
-	case ErrPasswordTooLong:
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON(ErrPasswordTooLong.Error()),
-		}
+// Sidecar function to log password validation attempts
+func sidecarLogPasswordValidation(password string) {
+	// Placeholder for sidecar logging
+	fmt.Println("Sidecar log: Password validation attempted")
+}
+
+func main() {
+	// Example usage
+	password := "P@ssw0rd"
+	err := ValidatePassword(password, defaultPasswordConfig)
+	if err != nil {
+		fmt.Println("Password validation failed:", err)
+	} else {
+		fmt.Println("Password is valid")
 	}
-	return nil
 }
 
 // ValidateUsername returns an error if the username is invalid
