@@ -679,8 +679,8 @@ func MakeFedAPI(
 	return httputil.MakeExternalAPI(metricsName, h)
 }
 
-// MakeFedHTMLAPI makes an http.Handler that checks matrix federation authentication.
-func MakeFedHTMLAPI(
+// MakeFedHTTPAPI makes an http.Handler that checks matrix federation authentication.
+func MakeFedHTTPAPI(
 	serverName spec.ServerName,
 	isLocalServerName func(spec.ServerName) bool,
 	keyRing gomatrixserverlib.JSONVerifier,

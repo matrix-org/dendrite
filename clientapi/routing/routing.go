@@ -733,7 +733,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/auth/{authType}/fallback/web",
-		httputil.MakeHTMLAPI("auth_fallback", userAPI, enableMetrics, func(w http.ResponseWriter, req *http.Request) {
+		httputil.MakeHTTPAPI("auth_fallback", userAPI, enableMetrics, func(w http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 			AuthFallback(w, req, vars["authType"], cfg)
 		}),

@@ -29,11 +29,11 @@ func TestOpenACLsWithBlacklist(t *testing.T) {
 	roomID := "!test:test.com"
 	allowRegex, err := compileACLRegex("*")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	denyRegex, err := compileACLRegex("foo.com")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 
 	acls := ServerACLs{
@@ -72,7 +72,7 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 	roomID := "!test:test.com"
 	allowRegex, err := compileACLRegex("foo.com")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 
 	acls := ServerACLs{

@@ -59,7 +59,7 @@ func WithAllowGuests() AuthAPIOption {
 	}
 }
 
-// WithAuth is an option to MakeHTMLAPI to add authentication.
+// WithAuth is an option to MakeHTTPAPI to add authentication.
 func WithAuth() AuthAPIOption {
 	return func(opts *AuthAPIOpts) {
 		opts.WithAuth = true
@@ -206,9 +206,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	return http.HandlerFunc(withSpan)
 }
 
-// MakeHTMLAPI adds Span metrics to the HTML Handler function
+// MakeHTTPAPI adds Span metrics to the HTML Handler function
 // This is used to serve HTML alongside JSON error messages
-func MakeHTMLAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enableMetrics bool, f func(http.ResponseWriter, *http.Request), checks ...AuthAPIOption) http.Handler {
+func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enableMetrics bool, f func(http.ResponseWriter, *http.Request), checks ...AuthAPIOption) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		trace, ctx := internal.StartTask(req.Context(), metricsName)
 		defer trace.EndTask()
@@ -224,7 +224,6 @@ func MakeHTMLAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 			logger := util.GetLogger(req.Context())
 			_, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
 			if jsonErr != nil {
-				logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, jsonErr.Code)
 				w.WriteHeader(jsonErr.Code)
 				if err := json.NewEncoder(w).Encode(jsonErr.JSON); err != nil {
 					logger.WithError(err).Error("failed to encode JSON response")
