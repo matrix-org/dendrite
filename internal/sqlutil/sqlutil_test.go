@@ -218,5 +218,5 @@ func assertNoError(t *testing.T, err error, msg string) {
 	if err == nil {
 		return
 	}
-	t.Fatalf(msg)
+	t.Fatal(msg)
 }

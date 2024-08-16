@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -676,6 +677,53 @@ func MakeFedAPI(
 		return jsonRes
 	}
 	return httputil.MakeExternalAPI(metricsName, h)
+}
+
+// MakeFedHTTPAPI makes an http.Handler that checks matrix federation authentication.
+func MakeFedHTTPAPI(
+	serverName spec.ServerName,
+	isLocalServerName func(spec.ServerName) bool,
+	keyRing gomatrixserverlib.JSONVerifier,
+	f func(http.ResponseWriter, *http.Request),
+) http.Handler {
+	h := func(w http.ResponseWriter, req *http.Request) {
+		fedReq, errResp := fclient.VerifyHTTPRequest(
+			req, time.Now(), serverName, isLocalServerName, keyRing,
+		)
+
+		enc := json.NewEncoder(w)
+		logger := util.GetLogger(req.Context())
+		if fedReq == nil {
+
+			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, errResp.Code)
+			w.WriteHeader(errResp.Code)
+			if err := enc.Encode(errResp); err != nil {
+				logger.WithError(err).Error("failed to encode JSON response")
+			}
+			return
+		}
+		// add the user to Sentry, if enabled
+		hub := sentry.GetHubFromContext(req.Context())
+		if hub != nil {
+			// clone the hub, so we don't send garbage events with e.g. mismatching rooms/event_ids
+			hub = hub.Clone()
+			hub.Scope().SetTag("origin", string(fedReq.Origin()))
+			hub.Scope().SetTag("uri", fedReq.RequestURI())
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				if hub != nil {
+					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+				}
+				// re-panic to return the 500
+				panic(r)
+			}
+		}()
+
+		f(w, req)
+	}
+
+	return http.HandlerFunc(h)
 }
 
 type FederationWakeups struct {
