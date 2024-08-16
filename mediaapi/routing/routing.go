@@ -138,7 +138,7 @@ var thumbnailSize = promauto.NewHistogramVec(
 		Namespace: "dendrite",
 		Subsystem: "mediaapi",
 		Name:      "thumbnail_size_bytes",
-		Help:      "Total number of media_api requests for thumbnails",
+		Help:      "Total size of media_api requests for thumbnails",
 		Buckets:   []float64{50, 100, 200, 500, 900, 1500, 3000, 6000},
 	},
 	[]string{"code", "type"},
@@ -149,7 +149,7 @@ var downloadCounter = promauto.NewCounterVec(
 		Namespace: "dendrite",
 		Subsystem: "mediaapi",
 		Name:      "download",
-		Help:      "Total number of media_api requests for full downloads",
+		Help:      "Total size of media_api requests for full downloads",
 	},
 	[]string{"code", "type"},
 )
@@ -159,8 +159,8 @@ var downloadSize = promauto.NewHistogramVec(
 		Namespace: "dendrite",
 		Subsystem: "mediaapi",
 		Name:      "download_size_bytes",
-		Help:      "Total number of media_api requests for full downloads",
-		Buckets:   []float64{200, 500, 900, 1500, 3000, 6000, 10_000, 50_000, 100_000},
+		Help:      "Total size of media_api requests for full downloads",
+		Buckets:   []float64{1500, 3000, 6000, 10_000, 50_000, 100_000},
 	},
 	[]string{"code", "type"},
 )
@@ -181,7 +181,10 @@ func makeDownloadAPI(
 	var requestType string
 	if cfg.Matrix.Metrics.Enabled {
 		split := strings.Split(name, "_")
+		// The first part of the split is either "download" or "thumbnail"
 		name = split[0]
+		// The remainder of the split is something like "authed_download" or "unauthed_thumbnail", etc.
+		// This is used to curry the metrics with the given types.
 		requestType = strings.Join(split[1:], "_")
 
 		counterVec = thumbnailCounter

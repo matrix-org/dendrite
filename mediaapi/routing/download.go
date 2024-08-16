@@ -389,45 +389,52 @@ func (r *downloadRequest) respondFromLocalFile(
 			return nil, fmt.Errorf("io.Copy: %w", err)
 		}
 	} else {
-		// Update the header to be multipart/mixed; boundary=$randomBoundary
-		boundary := uuid.NewString()
-		w.Header().Set("Content-Type", "multipart/mixed; boundary="+boundary)
-
-		w.Header().Del("Content-Length") // let Go handle the content length
-		mw := multipart.NewWriter(w)
-		defer func() {
-			if err = mw.Close(); err != nil {
-				r.Logger.WithError(err).Error("Failed to close multipart writer")
-			}
-		}()
-
-		if err = mw.SetBoundary(boundary); err != nil {
-			return nil, fmt.Errorf("failed to set multipart boundary: %w", err)
-		}
-
-		// JSON object part
-		jsonWriter, err := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type": {"application/json"},
-		})
+		var written int64
+		written, err = multipartResponse(w, r, string(responseMetadata.ContentType), responseFile)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create json writer: %w", err)
+			return nil, err
 		}
-		if _, err = jsonWriter.Write([]byte("{}")); err != nil {
-			return nil, fmt.Errorf("failed to write to json writer: %w", err)
-		}
-
-		// media part
-		mediaWriter, err := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type": {string(responseMetadata.ContentType)},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create media writer: %w", err)
-		}
-		if _, err = io.Copy(mediaWriter, responseFile); err != nil {
-			return nil, fmt.Errorf("failed to write to media writer: %w", err)
-		}
+		responseMetadata.FileSizeBytes = types.FileSizeBytes(written)
 	}
 	return responseMetadata, nil
+}
+
+func multipartResponse(w http.ResponseWriter, r *downloadRequest, contentType string, responseFile io.Reader) (int64, error) {
+	// Update the header to be multipart/mixed; boundary=$randomBoundary
+	boundary := uuid.NewString()
+	w.Header().Set("Content-Type", "multipart/mixed; boundary="+boundary)
+
+	w.Header().Del("Content-Length") // let Go handle the content length
+	mw := multipart.NewWriter(w)
+	defer func() {
+		if err := mw.Close(); err != nil {
+			r.Logger.WithError(err).Error("Failed to close multipart writer")
+		}
+	}()
+
+	if err := mw.SetBoundary(boundary); err != nil {
+		return 0, fmt.Errorf("failed to set multipart boundary: %w", err)
+	}
+
+	// JSON object part
+	jsonWriter, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {"application/json"},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create json writer: %w", err)
+	}
+	if _, err = jsonWriter.Write([]byte("{}")); err != nil {
+		return 0, fmt.Errorf("failed to write to json writer: %w", err)
+	}
+
+	// media part
+	mediaWriter, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {contentType},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create media writer: %w", err)
+	}
+	return io.Copy(mediaWriter, responseFile)
 }
 
 func (r *downloadRequest) addDownloadFilenameToHeaders(
@@ -851,47 +858,7 @@ func (r *downloadRequest) fetchRemoteFile(
 	var reader io.Reader
 	var parseErr error
 	if isAuthed {
-		r.Logger.Debug("Downloaded file using authenticated endpoint")
-		var params map[string]string
-		_, params, err = mime.ParseMediaType(resp.Header.Get("Content-Type"))
-		if err != nil {
-			return "", false, err
-		}
-		if params["boundary"] == "" {
-			return "", false, fmt.Errorf("no boundary header found on media %s from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
-		}
-		mr := multipart.NewReader(resp.Body, params["boundary"])
-
-		// Get the first, JSON, part
-		p, multipartErr := mr.NextPart()
-		if multipartErr != nil {
-			return "", false, multipartErr
-		}
-
-		if p.Header.Get("Content-Type") != "application/json" {
-			return "", false, fmt.Errorf("first part of the response must be application/json")
-		}
-		// Try to parse media meta information
-		meta := mediaMeta{}
-		if err = json.NewDecoder(p).Decode(&meta); err != nil {
-			return "", false, err
-		}
-		defer p.Close() // nolint: errcheck
-
-		// Get the actual media content
-		p, multipartErr = mr.NextPart()
-		if multipartErr != nil {
-			return "", false, multipartErr
-		}
-
-		redirect := p.Header.Get("Location")
-		if redirect != "" {
-			return "", false, fmt.Errorf("Location header is not yet supported")
-		} else {
-			contentLength, reader, parseErr = r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
-			// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
-			r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
-		}
+		parseErr, contentLength, reader = parseMultipartResponse(r, resp, maxFileSizeBytes)
 	} else {
 		// The reader returned here will be limited either by the Content-Length
 		// and/or the configured maximum media size.
@@ -959,6 +926,50 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 
 	return types.Path(finalPath), duplicate, nil
+}
+
+func parseMultipartResponse(r *downloadRequest, resp *http.Response, maxFileSizeBytes config.FileSizeBytes) (error, int64, io.Reader) {
+	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		return err, 0, nil
+	}
+	if params["boundary"] == "" {
+		return fmt.Errorf("no boundary header found on media %s from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin), 0, nil
+	}
+	mr := multipart.NewReader(resp.Body, params["boundary"])
+
+	// Get the first, JSON, part
+	p, err := mr.NextPart()
+	if err != nil {
+		return err, 0, nil
+	}
+	defer p.Close() // nolint: errcheck
+
+	if p.Header.Get("Content-Type") != "application/json" {
+		return fmt.Errorf("first part of the response must be application/json"), 0, nil
+	}
+	// Try to parse media meta information
+	meta := mediaMeta{}
+	if err = json.NewDecoder(p).Decode(&meta); err != nil {
+		return err, 0, nil
+	}
+	defer p.Close() // nolint: errcheck
+
+	// Get the actual media content
+	p, err = mr.NextPart()
+	if err != nil {
+		return err, 0, nil
+	}
+
+	redirect := p.Header.Get("Location")
+	if redirect != "" {
+		return fmt.Errorf("Location header is not yet supported"), 0, nil
+	}
+
+	contentLength, reader, err := r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
+	// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
+	r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
+	return err, contentLength, reader
 }
 
 // contentDispositionFor returns the Content-Disposition for a given
