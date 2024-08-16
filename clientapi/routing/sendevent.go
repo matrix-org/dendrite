@@ -158,7 +158,35 @@ func SendEvent(
 		}
 	}
 
-	evTime, err := httputil.ParseTSParam(req)
+
+	// HandleEventTimestamp processes the ts parameter based on whether the request is from an appservice.
+	func HandleEventTimestamp(req *http.Request) (time.Time, error) {
+    	if isAppService(req) {
+        	evTime, err := httputil.ParseTSParam(req)
+        	if err != nil {
+            	return time.Time{}, err // Return error for further handling
+        	}
+        	return evTime, nil
+    	}
+
+    	// If not from an appservice, use the current time or other default handling
+    	return time.Now(), nil
+	}
+
+	// Check if the request is from an appservice
+	func isAppService(req *http.Request) error {
+		evTime, err := HandleEventTimestamp(req)
+		if err != nil {
+			// Handle error, e.g., return a 400 Bad Request
+			return httputil.LogThenError(req, err)
+		}
+	
+		// Use evTime for the event timestamp
+		// Proceed with your original logic...
+	
+		return nil
+	}
+
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -289,6 +317,26 @@ func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID strin
 	}
 	r["users"] = userMap
 	return nil
+}
+
+//If appservices use a specific access token, you can check the request’s authorization header for this token.
+func isAppService(req *http.Request) bool {
+    // Check if the request contains an access token for appservices
+    accessToken := req.Header.Get("Authorization")
+    
+    // This is an example; you need to replace it with your appservice token checking logic
+    if strings.HasPrefix(accessToken, "Bearer") {
+        token := strings.TrimPrefix(accessToken, "Bearer ")
+        return isValidAppServiceToken(token)
+    }
+    
+    return false
+}
+
+func isValidAppServiceToken(token string) bool {
+    // Placeholder function: implement logic to validate if the token belongs to an appservice
+    // For example, you could compare against a list of known appservice tokens
+    return token == "your_appservice_token"
 }
 
 // stateEqual compares the new and the existing state event content. If they are equal, returns a *util.JSONResponse
