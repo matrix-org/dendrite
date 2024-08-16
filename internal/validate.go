@@ -85,6 +85,7 @@ func ValidatePassword(password string, config PasswordConfig) error {
 		}
 	}
 
+	
 	if config.RequireUppercase && !hasUppercase {
 		return ErrPasswordWeak 
 	}
