@@ -44,6 +44,7 @@ import (
 
 var sam, err = goSam.NewClient(*samAddr)
 
+// Dial a network connection to an I2P server or a unix socket. Fail for clearnet addresses.
 func Dial(network, addr string) (net.Conn, error) {
 	if err != nil {
 		return nil, err

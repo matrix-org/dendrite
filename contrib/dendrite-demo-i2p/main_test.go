@@ -14,9 +14,10 @@ import (
 // Generate HTML with coverage: go tool cover -html=/somewhere/where/there/is/integrationcover.out -o cover.html
 // Source: https://dzone.com/articles/measuring-integration-test-coverage-rate-in-pouchc
 func TestMain(t *testing.T) {
-	if os.Getenv("CI") != "" {
+	if _, ex := os.LookupEnv("CI"); ex {
 		t.Skip("skipping test, as no TOR/I2P client is available")
 	} else {
+		t.Log("running locally, continuing with tests")
 		var (
 			args []string
 		)

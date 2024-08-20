@@ -43,6 +43,7 @@ import (
 var t, terr = tor.Start(context.Background(), nil)
 var tdialer, tderr = t.Dialer(context.TODO(), nil)
 
+// Dial either a unix socket address, or connect to a remote address over Tor. Always uses Tor.
 func Dial(network, addr string) (net.Conn, error) {
 	if terr != nil {
 		return nil, terr
