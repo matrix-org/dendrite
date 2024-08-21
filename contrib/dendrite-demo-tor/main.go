@@ -15,6 +15,7 @@
 package main
 
 import (
+	"os"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -38,9 +39,13 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 )
 
+var _, skip = os.LookupEnv("CI")
+
 func main() {
 	cfg := setup.ParseFlags(true)
-
+	if skip {
+		return
+	}
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {

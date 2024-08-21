@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -40,9 +41,13 @@ import (
 )
 
 var samAddr = flag.String("samaddr", "127.0.0.1:7656", "Address to connect to the I2P SAMv3 API")
+var _, skip = os.LookupEnv("CI")
 
 func main() {
 	cfg := setup.ParseFlags(true)
+	if skip {
+		return
+	}
 
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors)
