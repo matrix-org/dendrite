@@ -1,7 +1,10 @@
 package main
 
-/*
 import (
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -50,4 +53,4 @@ func TestMain(t *testing.T) {
 		}
 	}
 }
-*/
+
