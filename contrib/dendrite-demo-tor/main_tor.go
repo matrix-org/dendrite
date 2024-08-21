@@ -40,8 +40,22 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-var t, terr = tor.Start(context.Background(), nil)
-var tdialer, tderr = t.Dialer(context.TODO(), nil)
+func start() (*tor.Tor, error) {
+	if skip {
+		return nil, nil
+	}
+	return tor.Start(context.Background(), nil)
+}
+
+func dialer() (*tor.Dialer, error) {
+	if skip {
+		return nil, nil
+	}
+	return t.Dialer(context.TODO(), nil)
+}
+
+var t, terr = start()
+var tdialer, tderr = dialer()
 
 // Dial either a unix socket address, or connect to a remote address over Tor. Always uses Tor.
 func Dial(network, addr string) (net.Conn, error) {

@@ -42,7 +42,14 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-var sam, err = goSam.NewClient(*samAddr)
+func client() (*goSam.Client, error) {
+	if skip {
+		return nil, nil
+	}
+	return goSam.NewClient(*samAddr)
+}
+
+var sam, err = client()
 
 // Dial a network connection to an I2P server or a unix socket. Fail for clearnet addresses.
 func Dial(network, addr string) (net.Conn, error) {
