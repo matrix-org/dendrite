@@ -196,7 +196,7 @@ func (a *UserInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Quer
 		if m.StreamID > maxStreamID {
 			maxStreamID = m.StreamID
 		}
-		if m.KeyJSON == nil || len(m.KeyJSON) == 0 {
+		if len(m.KeyJSON) == 0 {
 			continue
 		}
 		result = append(result, m)
