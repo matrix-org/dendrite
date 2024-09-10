@@ -21,6 +21,9 @@ type JetStream struct {
 	NoLog bool `yaml:"-"`
 	// Disables TLS validation. This should NOT be used in production
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
+	// A credentials file to be used for authentication, example:
+	// https://docs.nats.io/using-nats/developer/connecting/creds
+	Credentials Path `yaml:"credentials_path"`
 }
 
 func (c *JetStream) Prefixed(name string) string {
@@ -38,6 +41,7 @@ func (c *JetStream) Defaults(opts DefaultOpts) {
 		c.StoragePath = Path("./")
 		c.NoLog = true
 		c.DisableTLSValidation = true
+		c.Credentials = Path("")
 	}
 }
 
