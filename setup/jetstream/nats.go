@@ -102,6 +102,9 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 				InsecureSkipVerify: true,
 			}))
 		}
+		if string(cfg.Credentials) != "" {
+			opts = append(opts, natsclient.UserCredentials(string(cfg.Credentials)))
+		}
 		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","), opts...)
 		if err != nil {
 			logrus.WithError(err).Panic("Unable to connect to NATS")
