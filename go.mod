@@ -25,8 +25,8 @@ require (
 	github.com/matrix-org/pinecone v0.11.1-0.20230810010612-ea4c33717fd7
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.22
-	github.com/nats-io/nats-server/v2 v2.10.7
-	github.com/nats-io/nats.go v1.31.0
+	github.com/nats-io/nats-server/v2 v2.10.20
+	github.com/nats-io/nats.go v1.36.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -41,12 +41,12 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.5.6
 	github.com/yggdrasil-network/yggquic v0.0.0-20240802104827-b4e97a928967
 	go.uber.org/atomic v1.11.0
-	golang.org/x/crypto v0.24.0
+	golang.org/x/crypto v0.26.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
 	golang.org/x/image v0.18.0
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
-	golang.org/x/sync v0.7.0
-	golang.org/x/term v0.21.0
+	golang.org/x/sync v0.8.0
+	golang.org/x/term v0.23.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.4.0
@@ -101,16 +101,16 @@ require (
 	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
-	github.com/minio/highwayhash v1.0.2 // indirect
+	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/moby/term v0.0.0-20220808134915-39b0c02b01ae // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/nats-io/jwt/v2 v2.5.5 // indirect
+	github.com/nats-io/jwt/v2 v2.5.8 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
@@ -136,9 +136,9 @@ require (
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
-	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/sys v0.24.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
@@ -152,4 +152,4 @@ require (
 	modernc.org/token v1.1.0 // indirect
 )
 
-go 1.21
+go 1.21.0

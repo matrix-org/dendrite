@@ -56,6 +56,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			MaxPayload:      16 * 1024 * 1024,
 			NoSigs:          true,
 			NoLog:           cfg.NoLog,
+			SyncAlways:      true,
 		}
 		s.Server, err = natsserver.NewServer(opts)
 		if err != nil {
