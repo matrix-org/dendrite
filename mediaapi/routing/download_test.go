@@ -35,7 +35,7 @@ func Test_Multipart(t *testing.T) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 	// contentLength is always 0, since there's no Content-Length header on the multipart part.
-	err, _, reader := parseMultipartResponse(r, resp, 1000)
+	_, reader, err := parseMultipartResponse(r, resp, 1000)
 	assert.NoError(t, err)
 	gotResponse, err := io.ReadAll(reader)
 	assert.NoError(t, err)
