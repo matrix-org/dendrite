@@ -1,10 +1,28 @@
 # Changelog
 
-## Dendrite 0.xx.x
+## Dendrite 0.13.8
 
-### Other
+### Features
 
-  - Bump required Go version to 1.21
+  - The required Go version to build Dendrite is now 1.21
+  - Support for authenticated media ([MSC3916](https://github.com/matrix-org/matrix-spec-proposals/pull/3916)) has been added
+  - NATS can now connect to servers requiring authentication (contributed by [paigeadelethompson](https://github.com/paigeadelethompson))
+  - Updated dependencies
+    - Internal NATS Server has been updated from v2.10.7 to v2.10.20 (contributed by [neilalexander](https://github.com/neilalexander)) 
+
+### Fixes
+
+  - Fix parsing `?ts` query param (contributed by [tulir](https://github.com/tulir))
+  - Don't query the database if we could fetch all keys from cache
+  - Fix media DB potentially leaking connections
+  - Fixed a bug where we would return that an account exists, if we encountered an error
+  - Edited message could appear twice in search results (contributed by [adnull](https://github.com/adnull))
+  - Outgoing threepid HTTP requests now correctly close the returned body (contributed by [ testwill](https://github.com/testwill))
+  - Presence conflicts are now handled differently, reducing the amount of federation requests (contributed by [jjj333-p](https://github.com/jjj333-p))
+  - Internal NATS now uses `SyncAlways` which should improve resilience against crash (contributed by [neilalexander](https://github.com/neilalexander))
+  - Whitespaces in the `X-Matrix` header are now handled correctly
+  - `/.well-known/matrix/server` lookups now timeout after 30 seconds
+  - Purging rooms has seen a huge speed-up
 
 ## Dendrite 0.13.7 (2024-04-09)
 
