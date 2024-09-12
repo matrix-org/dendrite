@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -27,6 +26,7 @@ import (
 	"sync/atomic"
 	"text/template"
 
+	"github.com/cretz/bine/tor"
 	"github.com/eyedeekay/goSam"
 	"github.com/eyedeekay/onramp"
 	sentryhttp "github.com/getsentry/sentry-go/http"
@@ -49,12 +49,29 @@ func client() (*goSam.Client, error) {
 	return goSam.NewClient(*samAddr)
 }
 
-var sam, err = client()
+var sam, samError = client()
+
+func start() (*tor.Tor, error) {
+	if skip {
+		return nil, nil
+	}
+	return tor.Start(context.Background(), nil)
+}
+
+func dialer() (*tor.Dialer, error) {
+	if skip {
+		return nil, nil
+	}
+	return t.Dialer(context.TODO(), nil)
+}
+
+var t, terr = start()
+var tdialer, tderr = dialer()
 
 // Dial a network connection to an I2P server or a unix socket. Fail for clearnet addresses.
 func Dial(network, addr string) (net.Conn, error) {
-	if err != nil {
-		return nil, err
+	if samError != nil {
+		return nil, samError
 	}
 	if network == "unix" {
 		return net.Dial(network, addr)
@@ -68,7 +85,7 @@ func Dial(network, addr string) (net.Conn, error) {
 	if strings.HasSuffix(url.Host, ".i2p") {
 		return sam.Dial(network, addr)
 	}
-	return nil, fmt.Errorf("unknown network %s or address %s", network, url)
+	return tdialer.Dial(network, addr)
 }
 
 //go:embed static/*.gotmpl
