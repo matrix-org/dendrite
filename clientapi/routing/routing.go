@@ -94,6 +94,7 @@ func Setup(
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
 		"org.matrix.msc2285.stable":    true,
+		"org.matrix.msc3916.stable":    true,
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
@@ -732,7 +733,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/auth/{authType}/fallback/web",
-		httputil.MakeHTMLAPI("auth_fallback", enableMetrics, func(w http.ResponseWriter, req *http.Request) {
+		httputil.MakeHTTPAPI("auth_fallback", userAPI, enableMetrics, func(w http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 			AuthFallback(w, req, vars["authType"], cfg)
 		}),

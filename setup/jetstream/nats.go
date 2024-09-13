@@ -56,6 +56,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			MaxPayload:      16 * 1024 * 1024,
 			NoSigs:          true,
 			NoLog:           cfg.NoLog,
+			SyncAlways:      true,
 		}
 		s.Server, err = natsserver.NewServer(opts)
 		if err != nil {
@@ -101,6 +102,9 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 			opts = append(opts, natsclient.Secure(&tls.Config{
 				InsecureSkipVerify: true,
 			}))
+		}
+		if string(cfg.Credentials) != "" {
+			opts = append(opts, natsclient.UserCredentials(string(cfg.Credentials)))
 		}
 		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","), opts...)
 		if err != nil {
