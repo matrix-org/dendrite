@@ -70,7 +70,7 @@ var (
 	tdialer, tderr = dialer()
 )
 
-// Dial a network connection to an I2P server or a unix socket. Fail for clearnet addresses.
+// Dial a network connection to an I2P server or a unix socket. Use Tor, or Fail for clearnet addresses.
 func Dial(network, addr string) (net.Conn, error) {
 	if samError != nil {
 		return nil, samError
