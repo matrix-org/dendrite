@@ -1,6 +1,6 @@
 # Changelog
 
-## Dendrite 0.13.8
+## Dendrite 0.13.8 (2024-09-13)
 
 ### Features
 
