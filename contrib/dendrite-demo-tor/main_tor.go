@@ -54,8 +54,10 @@ func dialer() (*tor.Dialer, error) {
 	return t.Dialer(context.TODO(), nil)
 }
 
-var t, terr = start()
-var tdialer, tderr = dialer()
+var (
+	t, terr        = start()
+	tdialer, tderr = dialer()
+)
 
 // Dial either a unix socket address, or connect to a remote address over Tor. Always uses Tor.
 func Dial(network, addr string) (net.Conn, error) {
@@ -127,7 +129,7 @@ func SetupAndServeHTTPS(
 		},
 	}
 
-	//Redirect for Landing Page
+	// Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})

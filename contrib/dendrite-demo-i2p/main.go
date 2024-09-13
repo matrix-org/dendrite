@@ -40,8 +40,10 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 )
 
-var samAddr = flag.String("samaddr", "127.0.0.1:7656", "Address to connect to the I2P SAMv3 API")
-var _, skip = os.LookupEnv("CI")
+var (
+	samAddr = flag.String("samaddr", "127.0.0.1:7656", "Address to connect to the I2P SAMv3 API")
+	_, skip = os.LookupEnv("CI")
+)
 
 func main() {
 	cfg := setup.ParseFlags(true)

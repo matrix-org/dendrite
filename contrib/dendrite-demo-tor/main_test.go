@@ -14,9 +14,7 @@ import (
 // Generate HTML with coverage: go tool cover -html=/somewhere/where/there/is/integrationcover.out -o cover.html
 // Source: https://dzone.com/articles/measuring-integration-test-coverage-rate-in-pouchc
 func TestMain(t *testing.T) {
-	var (
-		args []string
-	)
+	var args []string
 
 	for _, arg := range os.Args {
 		switch {

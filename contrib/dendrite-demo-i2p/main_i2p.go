@@ -65,8 +65,10 @@ func dialer() (*tor.Dialer, error) {
 	return t.Dialer(context.TODO(), nil)
 }
 
-var t, terr = start()
-var tdialer, tderr = dialer()
+var (
+	t, terr        = start()
+	tdialer, tderr = dialer()
+)
 
 // Dial a network connection to an I2P server or a unix socket. Fail for clearnet addresses.
 func Dial(network, addr string) (net.Conn, error) {
@@ -84,6 +86,12 @@ func Dial(network, addr string) (net.Conn, error) {
 	}
 	if strings.HasSuffix(url.Host, ".i2p") {
 		return sam.Dial(network, addr)
+	}
+	if terr != nil {
+		return nil, terr
+	}
+	if (tderr != nil) || (tdialer == nil) {
+		return nil, tderr
 	}
 	return tdialer.Dial(network, addr)
 }
@@ -139,7 +147,7 @@ func SetupAndServeHTTPS(
 		},
 	}
 
-	//Redirect for Landing Page
+	// Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
