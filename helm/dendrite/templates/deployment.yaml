@@ -110,3 +110,7 @@ spec:
           httpGet:
             path: /_dendrite/monitor/up
             port: http
+      imagePullSecrets:
+      {{- with .Values.imagePullSecrets }}
+      {{ . | toYaml | nindent 6 }}
+      {{- end }}
