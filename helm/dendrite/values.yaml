@@ -6,6 +6,10 @@ image:
   # -- Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
+# -- Configure image pull secrets to use private container registry 
+# https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-pod-that-uses-your-secret
+imagePullSecrets: []
+# - name: your-pull-secret-name
 
 # signing key to use
 signing_key:
