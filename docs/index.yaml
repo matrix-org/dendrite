@@ -23,7 +23,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.14.2.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.14.2/dendrite-0.14.2.tgz
     version: 0.14.2
   - apiVersion: v2
     appVersion: 0.13.7
@@ -47,7 +47,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.14.1.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.14.1/dendrite-0.14.1.tgz
     version: 0.14.1
   - apiVersion: v2
     appVersion: 0.13.6
@@ -71,7 +71,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.14.0.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.14.0/dendrite-0.14.0.tgz
     version: 0.14.0
   - apiVersion: v2
     appVersion: 0.13.6
@@ -94,7 +94,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.13.8.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.13.8/dendrite-0.13.8.tgz
     version: 0.13.8
   - apiVersion: v2
     appVersion: 0.13.6
@@ -117,7 +117,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.13.7.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.13.7/dendrite-0.13.7.tgz
     version: 0.13.7
   - apiVersion: v2
     appVersion: 0.13.5
@@ -140,7 +140,7 @@ entries:
     - https://github.com/matrix-org/dendrite
     type: application
     urls:
-    - dendrite-0.13.6.tgz
+    - https://github.com/matrix-org/dendrite/releases/download/helm-dendrite-0.13.6/dendrite-0.13.6.tgz
     version: 0.13.6
   - apiVersion: v2
     appVersion: 0.13.4
