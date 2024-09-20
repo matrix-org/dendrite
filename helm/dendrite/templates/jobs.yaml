@@ -54,6 +54,10 @@ metadata:
 spec:
   template:
     spec:
+      imagePullSecrets:
+      {{- with .Values.imagePullSecrets }}
+      {{ . | toYaml | nindent 6 }}
+      {{- end }}
       restartPolicy: "Never"
       serviceAccount: {{ $name }}
       containers:
