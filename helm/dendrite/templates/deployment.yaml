@@ -56,6 +56,9 @@ spec:
         args:
           - '--config'
           - '/etc/dendrite/dendrite.yaml'
+        {{- with .Values.extraArgs }}
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
         ports:
           - name: http
             containerPort: 8008
