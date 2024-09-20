@@ -100,6 +100,15 @@ strategy:
     # -- Maximum number of pods that can be scheduled above the desired number of pods
     maxSurge: 25%
 
+# -- Node selector configuration
+nodeSelector: {}
+
+# -- Tolerations configuration
+tolerations: {}
+
+# -- Affinity configuration
+affinity: {}
+
 dendrite_config:
   version: 2
   global:
