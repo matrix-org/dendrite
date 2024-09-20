@@ -77,6 +77,9 @@ persistence:
     #   GKE, AWS & OpenStack)
     storageClass:
 
+# -- Add additional arguments to the dendrite command
+extraArgs: []
+
 # -- Add additional volumes to the Dendrite Pod
 extraVolumes: []
 # ex.
@@ -99,6 +102,15 @@ strategy:
     maxUnavailable: 25%
     # -- Maximum number of pods that can be scheduled above the desired number of pods
     maxSurge: 25%
+
+# -- Node selector configuration
+nodeSelector: {}
+
+# -- Tolerations configuration
+tolerations: {}
+
+# -- Affinity configuration
+affinity: {}
 
 dendrite_config:
   version: 2
