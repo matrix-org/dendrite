@@ -71,7 +71,7 @@ var (
 )
 
 // Dial a network connection to an I2P server or a unix socket. Use Tor, or Fail for clearnet addresses.
-func Dial(network, addr string) (net.Conn, error) {
+func DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	if samError != nil {
 		return nil, samError
 	}
@@ -85,7 +85,7 @@ func Dial(network, addr string) (net.Conn, error) {
 		return nil, err
 	}
 	if strings.HasSuffix(url.Host, ".i2p") {
-		return sam.Dial(network, addr)
+		return sam.DialContext(ctx, network, addr)
 	}
 	if terr != nil {
 		return nil, terr
@@ -93,7 +93,7 @@ func Dial(network, addr string) (net.Conn, error) {
 	if (tderr != nil) || (tdialer == nil) {
 		return nil, tderr
 	}
-	return tdialer.Dial(network, addr)
+	return tdialer.DialContext(ctx, network, addr)
 }
 
 //go:embed static/*.gotmpl
@@ -109,7 +109,7 @@ func SetupAndServeHTTPS(
 	// create a transport that uses SAM to dial TCP Connections
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			Dial: Dial,
+			DialContext: DialContext,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},

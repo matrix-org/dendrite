@@ -60,7 +60,7 @@ var (
 )
 
 // Dial either a unix socket address, or connect to a remote address over Tor. Always uses Tor.
-func Dial(network, addr string) (net.Conn, error) {
+func DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	if terr != nil {
 		return nil, terr
 	}
@@ -75,7 +75,7 @@ func Dial(network, addr string) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tdialer.Dial(network, url.Host)
+	return tdialer.DialContext(ctx, network, url.Host)
 }
 
 //go:embed static/*.gotmpl
@@ -91,7 +91,7 @@ func SetupAndServeHTTPS(
 	// create a transport that uses SAM to dial TCP Connections
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			Dial: Dial,
+			DialContext: DialContext,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
