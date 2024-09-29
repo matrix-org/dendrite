@@ -100,6 +100,38 @@ type ActiveThumbnailGeneration struct {
 	PathToResult map[string]*ThumbnailGenerationResult
 }
 
+type UrlPreviewCache struct {
+	Lock    sync.Mutex
+	Records map[string]*UrlPreviewCacheRecord
+}
+
+type UrlPreviewCacheRecord struct {
+	Created int64
+	Preview *UrlPreview
+	Error   error
+}
+
+type UrlPreview struct {
+	ImageSize   FileSizeBytes `json:"matrix:image:size"`
+	Description string        `json:"og:description"`
+	ImageUrl    string        `json:"og:image"`
+	ImageType   ContentType   `json:"og:image:type"`
+	ImageHeight int           `json:"og:image:height"`
+	ImageWidth  int           `json:"og:image:width"`
+	Title       string        `json:"og:title"`
+}
+
+type UrlPreviewResult struct {
+	Cond    *sync.Cond
+	Preview *UrlPreview
+	Error   error
+}
+
+type ActiveUrlPreviewRequests struct {
+	sync.Mutex
+	Url map[string]*UrlPreviewResult
+}
+
 // Crop indicates we should crop the thumbnail on resize
 const Crop = "crop"
 

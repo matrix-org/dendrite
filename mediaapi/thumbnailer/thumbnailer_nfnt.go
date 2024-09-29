@@ -19,6 +19,7 @@ package thumbnailer
 
 import (
 	"context"
+	"errors"
 	"image"
 	"image/draw"
 
@@ -41,6 +42,8 @@ import (
 	"github.com/nfnt/resize"
 	log "github.com/sirupsen/logrus"
 )
+
+var ErrThumbnailTooLarge = errors.New("thumbnail is larger than original")
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
 func GenerateThumbnails(
@@ -273,4 +276,37 @@ func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *lo
 	}
 
 	return out.Bounds().Max.X, out.Bounds().Max.Y, nil
+}
+
+func CreateThumbnailFromFile(
+	src types.Path,
+	dst types.Path,
+	config types.ThumbnailSize,
+	logger *log.Entry,
+) (err error) {
+	img, err := readFile(string(src))
+	if err != nil {
+		logger.WithError(err).WithFields(log.Fields{
+			"src": src,
+		}).Error("Failed to read src file")
+		return err
+	}
+
+	// Check if request is larger than original
+	if config.Width >= img.Bounds().Dx() && config.Height >= img.Bounds().Dy() {
+		return ErrThumbnailTooLarge
+	}
+
+	start := time.Now()
+	width, height, err := adjustSize(dst, img, config.Width, config.Height, config.ResizeMethod == types.Crop, logger)
+	if err != nil {
+		return err
+	}
+	logger.WithFields(log.Fields{
+		"ActualWidth":  width,
+		"ActualHeight": height,
+		"processTime":  time.Since(start),
+	}).Info("Generated thumbnail")
+
+	return nil
 }
