@@ -27,9 +27,12 @@ import (
 	"golang.org/x/net/html"
 )
 
-var ErrorMissingUrl = errors.New("missing url")
-var ErrorUnsupportedContentType = errors.New("unsupported content type")
-var ErrorFileTooLarge = errors.New("file too large")
+var (
+	ErrorMissingUrl                = errors.New("missing url")
+	ErrorUnsupportedContentType    = errors.New("unsupported content type")
+	ErrorFileTooLarge              = errors.New("file too large")
+	ErrorTimeoutThumbnailGenerator = errors.New("timeout waiting for thumbnail generator")
+)
 
 func makeUrlPreviewHandler(
 	cfg *config.MediaAPI,
@@ -138,16 +141,23 @@ func makeUrlPreviewHandler(
 			defer resp.Body.Close()
 
 			var result *types.UrlPreview
+			var err error
+			var imgUrl *url.URL
 			var imgReader *http.Response
+			var mediaData *types.MediaMetadata
+
 			if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 				result, err = getPreviewFromHTML(resp, pUrl)
 				if err == nil && result.ImageUrl != "" {
-					if imgUrl, err := url.Parse(result.ImageUrl); err == nil {
+					if imgUrl, err = url.Parse(result.ImageUrl); err == nil {
 						imgReader, err = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second)
 						if err == nil {
-							mediaData, err := downloadAndStoreImage(imgUrl.Path, req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
+							mediaData, err = downloadAndStoreImage(imgUrl.Path, req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
 							if err == nil {
 								result.ImageUrl = fmt.Sprintf("mxc://%s/%s", mediaData.Origin, mediaData.MediaID)
+							} else {
+								// We don't show the orginal URL as it is insecure for the room users
+								result.ImageUrl = ""
 							}
 						}
 					}
@@ -306,16 +316,43 @@ func downloadAndStoreImage(
 
 	// Create a thumbnail from the image
 	thumbnailPath := tmpFileName + ".thumbnail"
-	err = thumbnailer.CreateThumbnailFromFile(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize), logger)
-	if err != nil {
-		if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
-			thumbnailPath = tmpFileName
-		} else {
-			logger.WithError(err).Error("unable to create thumbnail")
-			return nil, err
+
+	// Check if we have too many thumbnail generators running
+	// If so, wait up to 30 seconds for one to finish
+	timeout := time.After(30 * time.Second)
+	for {
+		if len(activeThumbnailGeneration.PathToResult) < cfg.MaxThumbnailGenerators {
+			activeThumbnailGeneration.Lock()
+			activeThumbnailGeneration.PathToResult[string(hash)] = nil
+			activeThumbnailGeneration.Unlock()
+
+			defer func() {
+				activeThumbnailGeneration.Lock()
+				delete(activeThumbnailGeneration.PathToResult, string(hash))
+				activeThumbnailGeneration.Unlock()
+			}()
+
+			err = thumbnailer.CreateThumbnailFromFile(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize), logger)
+			if err != nil {
+				if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
+					thumbnailPath = tmpFileName
+				} else {
+					logger.WithError(err).Error("unable to create thumbnail")
+					return nil, err
+				}
+			}
+			break
+		}
+
+		select {
+		case <-timeout:
+			logger.Error("timed out waiting for thumbnail generator")
+			return nil, ErrorTimeoutThumbnailGenerator
+		default:
+			time.Sleep(time.Second)
 		}
 	}
-	logger.Debug("thumbnail created", thumbnailPath)
+
 	thumbnailFileInfo, err := os.Stat(string(thumbnailPath))
 	if err != nil {
 		logger.WithError(err).Error("unable to get thumbnail file info")
@@ -345,7 +382,7 @@ func downloadAndStoreImage(
 		Base64Hash:        hash,
 		UserID:            userid,
 	}
-	fmt.Println("mediaMetaData", mediaMetaData)
+
 	finalPath, err := fileutils.GetPathFromBase64Hash(mediaMetaData.Base64Hash, cfg.AbsBasePath)
 	if err != nil {
 		logger.WithError(err).Error("unable to get path from base64 hash")
