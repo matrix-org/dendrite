@@ -303,10 +303,7 @@ func downloadAndStoreImage(
 
 	var width, height int
 
-	userid := types.MatrixUserID("user")
-	if dev != nil {
-		userid = types.MatrixUserID(dev.UserID)
-	}
+	userid := types.MatrixUserID(dev.UserID)
 
 	reqReader := req.Body.(io.Reader)
 	if cfg.MaxFileSizeBytes > 0 {
