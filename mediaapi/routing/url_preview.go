@@ -96,7 +96,7 @@ func makeUrlPreviewHandler(
 
 		hash := getHashFromString(pUrl)
 		// Check if we have a previously stored response
-		if urlPreviewCached, err := loadUrlPreviewResponse(req.Context(), cfg, db, hash, logger); err == nil {
+		if urlPreviewCached, err := loadUrlPreviewResponse(req.Context(), cfg, db, hash); err == nil {
 			logger.Debug("Loaded url preview from the cache")
 			// Put in into the cache for further usage
 			defer func() {
@@ -183,8 +183,8 @@ func makeUrlPreviewHandler(
 
 			if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 				// The url is a webpage - get data from the meta tags
-				result, err = getPreviewFromHTML(resp, pUrl)
-				if err == nil && result.ImageUrl != "" {
+				result = getPreviewFromHTML(resp, pUrl)
+				if result.ImageUrl != "" {
 					// The page has an og:image link
 					if imgUrl, err2 = url.Parse(result.ImageUrl); err2 == nil {
 						imgReader, err2 = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second)
@@ -194,7 +194,7 @@ func makeUrlPreviewHandler(
 						}
 					}
 					// In case of any error in image download
-					// we don't show the orginal URL as it is insecure for the room users
+					// we don't show the original URL as it is insecure for the room users
 					if err2 != nil {
 						result.ImageUrl = ""
 					}
@@ -257,7 +257,7 @@ func downloadUrl(url string, t time.Duration) (*http.Response, error) {
 	return resp, nil
 }
 
-func getPreviewFromHTML(resp *http.Response, url string) (*types.UrlPreview, error) {
+func getPreviewFromHTML(resp *http.Response, url string) *types.UrlPreview {
 	fields := getMetaFieldsFromHTML(resp)
 	preview := &types.UrlPreview{
 		Title:       fields["og:title"],
@@ -286,7 +286,7 @@ func getPreviewFromHTML(resp *http.Response, url string) (*types.UrlPreview, err
 		}
 	}
 
-	return preview, nil
+	return preview
 }
 
 func downloadAndStoreImage(
@@ -337,11 +337,11 @@ func downloadAndStoreImage(
 
 		logger.WithField("mediaID", existingMetadata.MediaID).Debug("media already exists")
 		// Here we have to read the image to get it's size
-		filename, err := fileutils.GetPathFromBase64Hash(existingMetadata.Base64Hash, cfg.AbsBasePath)
+		filePath, err := fileutils.GetPathFromBase64Hash(existingMetadata.Base64Hash, cfg.AbsBasePath)
 		if err != nil {
 			return nil, width, height, err
 		}
-		img, err := thumbnailer.ReadFile(string(filename))
+		img, err := thumbnailer.ReadFile(string(filePath))
 		if err != nil {
 			return nil, width, height, err
 		}
@@ -511,7 +511,7 @@ func storeUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db stora
 	return nil
 }
 
-func loadUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db storage.Database, hash types.Base64Hash, logger *log.Entry) (*types.UrlPreview, error) {
+func loadUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db storage.Database, hash types.Base64Hash) (*types.UrlPreview, error) {
 	if mediaMetadata, err := db.GetMediaMetadataByHash(ctx, hash, cfg.Matrix.ServerName); err == nil && mediaMetadata != nil {
 		// Get the response file
 		filePath, err := fileutils.GetPathFromBase64Hash(mediaMetadata.Base64Hash, cfg.AbsBasePath)
