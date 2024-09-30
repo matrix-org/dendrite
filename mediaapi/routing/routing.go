@@ -112,17 +112,7 @@ func Setup(
 	v1mux.Handle("/download/{serverName}/{mediaId}", downloadHandlerAuthed).Methods(http.MethodGet, http.MethodOptions)
 	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandlerAuthed).Methods(http.MethodGet, http.MethodOptions)
 
-	//	urlPreviewHandler := httputil.MakeAuthAPI(
-	//		"preview_url", userAPI,
-	//		makeUrlPreviewHandler(&cfg.MediaAPI, rateLimits, db, client, activeThumbnailGeneration),
-	//	)
-	f := makeUrlPreviewHandler(&cfg.MediaAPI, rateLimits, db, activeThumbnailGeneration)
-	urlPreviewHandler := httputil.MakeExternalAPI(
-		"preview_url",
-		func(req *http.Request) util.JSONResponse {
-			return f(req, nil)
-		},
-	)
+	urlPreviewHandler := httputil.MakeAuthAPI("preview_url", userAPI, makeUrlPreviewHandler(&cfg.MediaAPI, rateLimits, db, activeThumbnailGeneration))
 	v1mux.Handle("/preview_url", urlPreviewHandler).Methods(http.MethodGet, http.MethodOptions)
 	// That method is deprecated according to spec but still in use
 	v3mux.Handle("/preview_url", urlPreviewHandler).Methods(http.MethodGet, http.MethodOptions)

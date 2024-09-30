@@ -283,24 +283,24 @@ func CreateThumbnailFromFile(
 	dst types.Path,
 	config types.ThumbnailSize,
 	logger *log.Entry,
-) (err error) {
+) (width int, height int, err error) {
 	img, err := readFile(string(src))
 	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
 			"src": src,
-		}).Error("Failed to read src file")
-		return err
+		}).Error("Failed to read image")
+		return 0, 0, err
 	}
 
 	// Check if request is larger than original
 	if config.Width >= img.Bounds().Dx() && config.Height >= img.Bounds().Dy() {
-		return ErrThumbnailTooLarge
+		return img.Bounds().Dx(), img.Bounds().Dy(), ErrThumbnailTooLarge
 	}
 
 	start := time.Now()
-	width, height, err := adjustSize(dst, img, config.Width, config.Height, config.ResizeMethod == types.Crop, logger)
+	width, height, err = adjustSize(dst, img, config.Width, config.Height, config.ResizeMethod == types.Crop, logger)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	logger.WithFields(log.Fields{
 		"ActualWidth":  width,
@@ -308,5 +308,9 @@ func CreateThumbnailFromFile(
 		"processTime":  time.Since(start),
 	}).Info("Generated thumbnail")
 
-	return nil
+	return width, height, nil
+}
+
+func ReadFile(src string) (image.Image, error) {
+	return readFile(src)
 }

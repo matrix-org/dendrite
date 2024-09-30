@@ -1,7 +1,11 @@
 package routing
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +36,7 @@ var (
 	ErrorUnsupportedContentType    = errors.New("unsupported content type")
 	ErrorFileTooLarge              = errors.New("file too large")
 	ErrorTimeoutThumbnailGenerator = errors.New("timeout waiting for thumbnail generator")
+	ErrNoMetadataFound             = errors.New("no metadata found")
 )
 
 func makeUrlPreviewHandler(
@@ -89,6 +94,30 @@ func makeUrlPreviewHandler(
 			}
 		}
 
+		hash := getHashFromString(pUrl)
+		// Check if we have a previously stored response
+		if urlPreviewCached, err := loadUrlPreviewResponse(req.Context(), cfg, db, hash, logger); err == nil {
+			logger.Debug("Loaded url preview from the cache")
+			// Put in into the cache for further usage
+			defer func() {
+				if _, ok := urlPreviewCache.Records[pUrl]; !ok {
+
+					urlPreviewCacheItem := &types.UrlPreviewCacheRecord{
+						Created: time.Now().Unix(),
+						Preview: urlPreviewCached,
+					}
+					urlPreviewCache.Lock.Lock()
+					urlPreviewCache.Records[pUrl] = urlPreviewCacheItem
+					defer urlPreviewCache.Lock.Unlock()
+				}
+			}()
+
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: urlPreviewCached,
+			}
+		}
+
 		// Check if there is an active request
 		activeUrlPreviewRequests.Lock()
 		if activeUrlPreviewRequest, ok := activeUrlPreviewRequests.Url[pUrl]; ok {
@@ -122,6 +151,11 @@ func makeUrlPreviewHandler(
 				urlPreviewCacheItem.Error = activeUrlPreviewRequest.Error
 			} else {
 				urlPreviewCacheItem.Preview = activeUrlPreviewRequest.Preview
+				// Store the response file for further usage
+				err := storeUrlPreviewResponse(req.Context(), cfg, db, *device, hash, activeUrlPreviewRequest.Preview, logger)
+				if err != nil {
+					logger.WithError(err).Error("unable to store url preview response")
+				}
 			}
 
 			urlPreviewCache.Lock.Lock()
@@ -141,47 +175,64 @@ func makeUrlPreviewHandler(
 			defer resp.Body.Close()
 
 			var result *types.UrlPreview
-			var err error
+			var err, err2 error
 			var imgUrl *url.URL
 			var imgReader *http.Response
 			var mediaData *types.MediaMetadata
+			var width, height int
 
 			if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+				// The url is a webpage - get data from the meta tags
 				result, err = getPreviewFromHTML(resp, pUrl)
 				if err == nil && result.ImageUrl != "" {
-					if imgUrl, err = url.Parse(result.ImageUrl); err == nil {
-						imgReader, err = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second)
-						if err == nil {
-							mediaData, err = downloadAndStoreImage(imgUrl.Path, req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
-							if err == nil {
-								result.ImageUrl = fmt.Sprintf("mxc://%s/%s", mediaData.Origin, mediaData.MediaID)
-							} else {
-								// We don't show the orginal URL as it is insecure for the room users
-								result.ImageUrl = ""
-							}
+					// The page has an og:image link
+					if imgUrl, err2 = url.Parse(result.ImageUrl); err2 == nil {
+						imgReader, err2 = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second)
+						if err2 == nil {
+							// Download image and store it as a thumbnail
+							mediaData, width, height, err2 = downloadAndStoreImage(imgUrl.Path, req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
 						}
 					}
+					// In case of any error in image download
+					// we don't show the orginal URL as it is insecure for the room users
+					if err2 != nil {
+						result.ImageUrl = ""
+					}
+
 				}
 			} else if strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
-				mediaData, err := downloadAndStoreImage("somefile", req.Context(), resp, cfg, device, db, activeThumbnailGeneration, logger)
+				// The url is an image link
+				mediaData, width, height, err = downloadAndStoreImage("somefile", req.Context(), resp, cfg, device, db, activeThumbnailGeneration, logger)
 				if err == nil {
-					result = &types.UrlPreview{ImageUrl: fmt.Sprintf("mxc://%s/%s", mediaData.Origin, mediaData.MediaID)}
+					result = &types.UrlPreview{}
 				}
 			} else {
 				return util.ErrorResponse(errors.New("Unsupported content type"))
 			}
 
+			// In case of any error happened during the page/image download
+			// we store the error instead of the preview
 			if err != nil {
 				activeUrlPreviewRequest.Error = err
 			} else {
+				// We have a mediadata so we have an image in the preview
+				if mediaData != nil {
+					result.ImageUrl = fmt.Sprintf("mxc://%s/%s", mediaData.Origin, mediaData.MediaID)
+					result.ImageWidth = width
+					result.ImageHeight = height
+					result.ImageType = mediaData.ContentType
+					result.ImageSize = mediaData.FileSizeBytes
+				}
+
 				activeUrlPreviewRequest.Preview = result
 			}
 		}
 
-		// choose the answer based on the result
+		// Return eather the error or the preview
 		if activeUrlPreviewRequest.Error != nil {
 			return util.ErrorResponse(activeUrlPreviewRequest.Error)
 		} else {
+
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: activeUrlPreviewRequest.Preview,
@@ -248,7 +299,9 @@ func downloadAndStoreImage(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	logger *log.Entry,
 
-) (*types.MediaMetadata, error) {
+) (*types.MediaMetadata, int, int, error) {
+
+	var width, height int
 
 	userid := types.MatrixUserID("user")
 	if dev != nil {
@@ -264,13 +317,13 @@ func downloadAndStoreImage(
 		logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
-		return nil, err
+		return nil, width, height, err
 	}
 	defer fileutils.RemoveDir(tmpDir, logger)
 
 	// Check if temp file size exceeds max file size configuration
 	if cfg.MaxFileSizeBytes > 0 && bytesWritten > types.FileSizeBytes(cfg.MaxFileSizeBytes) {
-		return nil, ErrorFileTooLarge
+		return nil, 0, 0, ErrorFileTooLarge
 	}
 
 	// Check if we already have this file
@@ -280,13 +333,22 @@ func downloadAndStoreImage(
 
 	if err != nil {
 		logger.WithError(err).Error("unable to get media metadata by hash")
-		return nil, err
+		return nil, width, height, err
 	}
 
 	if existingMetadata != nil {
 
 		logger.WithField("mediaID", existingMetadata.MediaID).Debug("media already exists")
-		return existingMetadata, nil
+		// Here we have to read the image to get it's size
+		filename, err := fileutils.GetPathFromBase64Hash(existingMetadata.Base64Hash, cfg.AbsBasePath)
+		if err != nil {
+			return nil, width, height, err
+		}
+		img, err := thumbnailer.ReadFile(string(filename))
+		if err != nil {
+			return nil, width, height, err
+		}
+		return existingMetadata, img.Bounds().Dx(), img.Bounds().Dy(), nil
 	}
 
 	tmpFileName := filepath.Join(string(tmpDir), "content")
@@ -295,7 +357,7 @@ func downloadAndStoreImage(
 	file, err := os.Open(string(tmpFileName))
 	if err != nil {
 		logger.WithError(err).Error("unable to open file")
-		return nil, err
+		return nil, 0, 0, err
 	}
 	defer file.Close()
 
@@ -304,13 +366,13 @@ func downloadAndStoreImage(
 	_, err = file.Read(buf)
 	if err != nil {
 		logger.WithError(err).Error("unable to read file")
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	fileType := http.DetectContentType(buf)
 	if !strings.HasPrefix(fileType, "image") {
 		logger.WithField("contentType", fileType).Debugf("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
-		return nil, ErrorUnsupportedContentType
+		return nil, 0, 0, ErrorUnsupportedContentType
 	}
 	logger.WithField("contentType", fileType).Debug("uploaded file is an image")
 
@@ -332,13 +394,13 @@ func downloadAndStoreImage(
 				activeThumbnailGeneration.Unlock()
 			}()
 
-			err = thumbnailer.CreateThumbnailFromFile(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize), logger)
+			width, height, err = thumbnailer.CreateThumbnailFromFile(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize), logger)
 			if err != nil {
 				if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
 					thumbnailPath = tmpFileName
 				} else {
 					logger.WithError(err).Error("unable to create thumbnail")
-					return nil, err
+					return nil, 0, 0, err
 				}
 			}
 			break
@@ -347,7 +409,7 @@ func downloadAndStoreImage(
 		select {
 		case <-timeout:
 			logger.Error("timed out waiting for thumbnail generator")
-			return nil, ErrorTimeoutThumbnailGenerator
+			return nil, 0, 0, ErrorTimeoutThumbnailGenerator
 		default:
 			time.Sleep(time.Second)
 		}
@@ -356,7 +418,7 @@ func downloadAndStoreImage(
 	thumbnailFileInfo, err := os.Stat(string(thumbnailPath))
 	if err != nil {
 		logger.WithError(err).Error("unable to get thumbnail file info")
-		return nil, err
+		return nil, width, height, err
 	}
 
 	r := &uploadRequest{
@@ -370,7 +432,7 @@ func downloadAndStoreImage(
 	mediaID, err := r.generateMediaID(ctx, db)
 	if err != nil {
 		logger.WithError(err).Error("unable to generate media ID")
-		return nil, err
+		return nil, width, height, err
 	}
 	mediaMetaData := &types.MediaMetadata{
 		MediaID:           mediaID,
@@ -386,21 +448,97 @@ func downloadAndStoreImage(
 	finalPath, err := fileutils.GetPathFromBase64Hash(mediaMetaData.Base64Hash, cfg.AbsBasePath)
 	if err != nil {
 		logger.WithError(err).Error("unable to get path from base64 hash")
-		return nil, err
+		return nil, width, height, err
 	}
 	err = fileutils.MoveFile(types.Path(thumbnailPath), types.Path(finalPath))
 	if err != nil {
 		logger.WithError(err).Error("unable to move thumbnail file")
-		return nil, err
+		return nil, width, height, err
 	}
 	// Store the metadata in the database
 	err = db.StoreMediaMetadata(ctx, mediaMetaData)
 	if err != nil {
 		logger.WithError(err).Error("unable to store media metadata")
-		return nil, err
+		return nil, width, height, err
 	}
 
-	return mediaMetaData, nil
+	return mediaMetaData, width, height, nil
+}
+
+func storeUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db storage.Database, user userapi.Device, hash types.Base64Hash, preview *types.UrlPreview, logger *log.Entry) error {
+
+	jsonPreview, err := json.Marshal(preview)
+	if err != nil {
+		return err
+	}
+
+	_, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, bytes.NewReader(jsonPreview), cfg.AbsBasePath)
+	if err != nil {
+		return err
+	}
+	defer fileutils.RemoveDir(tmpDir, logger)
+
+	r := &uploadRequest{
+		MediaMetadata: &types.MediaMetadata{
+			Origin: cfg.Matrix.ServerName,
+		},
+		Logger: logger,
+	}
+
+	mediaID, err := r.generateMediaID(ctx, db)
+	if err != nil {
+		return err
+	}
+
+	mediaMetaData := &types.MediaMetadata{
+		MediaID:           mediaID,
+		Origin:            cfg.Matrix.ServerName,
+		ContentType:       "application/json",
+		FileSizeBytes:     types.FileSizeBytes(bytesWritten),
+		UploadName:        types.Filename("url_preview.json"),
+		CreationTimestamp: spec.Timestamp(time.Now().Unix()),
+		Base64Hash:        hash,
+		UserID:            types.MatrixUserID(user.UserID),
+	}
+
+	_, _, err = fileutils.MoveFileWithHashCheck(tmpDir, mediaMetaData, cfg.AbsBasePath, logger)
+	if err != nil {
+		return err
+	}
+
+	err = db.StoreMediaMetadata(ctx, mediaMetaData)
+	if err != nil {
+		logger.WithError(err).Error("unable to store media metadata")
+		return err
+	}
+	return nil
+}
+
+func loadUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db storage.Database, hash types.Base64Hash, logger *log.Entry) (*types.UrlPreview, error) {
+	if mediaMetadata, err := db.GetMediaMetadataByHash(ctx, hash, cfg.Matrix.ServerName); err == nil && mediaMetadata != nil {
+		// Get the response file
+		filePath, err := fileutils.GetPathFromBase64Hash(mediaMetadata.Base64Hash, cfg.AbsBasePath)
+		if err != nil {
+			return nil, err
+		}
+		data, err := os.ReadFile(string(filePath))
+		if err != nil {
+			return nil, err
+		}
+		var preview types.UrlPreview
+		err = json.Unmarshal(data, &preview)
+		if err != nil {
+			return nil, err
+		}
+		return &preview, nil
+	}
+	return nil, ErrNoMetadataFound
+}
+
+func getHashFromString(s string) types.Base64Hash {
+	hasher := sha256.New()
+	hasher.Write([]byte(s))
+	return types.Base64Hash(base64.RawURLEncoding.EncodeToString(hasher.Sum(nil)))
 }
 
 func getMetaFieldsFromHTML(resp *http.Response) map[string]string {
