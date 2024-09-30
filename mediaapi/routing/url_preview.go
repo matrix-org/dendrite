@@ -172,7 +172,12 @@ func makeUrlPreviewHandler(
 		if err != nil {
 			activeUrlPreviewRequest.Error = err
 		} else {
-			defer resp.Body.Close()
+			defer func() {
+				err := resp.Body.Close()
+				if err != nil {
+					logger.WithError(err).Error("unable to close response body")
+				}
+			}()
 
 			var result *types.UrlPreview
 			var err, err2 error
@@ -349,66 +354,23 @@ func downloadAndStoreImage(
 	}
 
 	tmpFileName := filepath.Join(string(tmpDir), "content")
-	// Check if the file is an image.
-	// Otherwise return an error
-	file, err := os.Open(string(tmpFileName))
+	fileType, err := detectFileType(tmpFileName, logger)
 	if err != nil {
-		logger.WithError(err).Error("unable to open file")
-		return nil, 0, 0, err
-	}
-	defer file.Close()
-
-	buf := make([]byte, 512)
-
-	_, err = file.Read(buf)
-	if err != nil {
-		logger.WithError(err).Error("unable to read file")
-		return nil, 0, 0, err
-	}
-
-	fileType := http.DetectContentType(buf)
-	if !strings.HasPrefix(fileType, "image") {
-		logger.WithField("contentType", fileType).Debugf("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
-		return nil, 0, 0, ErrorUnsupportedContentType
+		logger.WithError(err).Error("unable to detect file type")
+		return nil, width, height, err
 	}
 	logger.WithField("contentType", fileType).Debug("uploaded file is an image")
 
 	// Create a thumbnail from the image
 	thumbnailPath := tmpFileName + ".thumbnail"
 
-	// Check if we have too many thumbnail generators running
-	// If so, wait up to 30 seconds for one to finish
-	timeout := time.After(30 * time.Second)
-	for {
-		if len(activeThumbnailGeneration.PathToResult) < cfg.MaxThumbnailGenerators {
-			activeThumbnailGeneration.Lock()
-			activeThumbnailGeneration.PathToResult[string(hash)] = nil
-			activeThumbnailGeneration.Unlock()
-
-			defer func() {
-				activeThumbnailGeneration.Lock()
-				delete(activeThumbnailGeneration.PathToResult, string(hash))
-				activeThumbnailGeneration.Unlock()
-			}()
-
-			width, height, err = thumbnailer.CreateThumbnailFromFile(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize), logger)
-			if err != nil {
-				if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
-					thumbnailPath = tmpFileName
-				} else {
-					logger.WithError(err).Error("unable to create thumbnail")
-					return nil, 0, 0, err
-				}
-			}
-			break
-		}
-
-		select {
-		case <-timeout:
-			logger.Error("timed out waiting for thumbnail generator")
-			return nil, 0, 0, ErrorTimeoutThumbnailGenerator
-		default:
-			time.Sleep(time.Second)
+	width, height, err = createThumbnail(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize),
+		hash, activeThumbnailGeneration, cfg.MaxThumbnailGenerators, logger)
+	if err != nil {
+		if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
+			thumbnailPath = tmpFileName
+		} else {
+			return nil, width, height, err
 		}
 	}
 
@@ -460,6 +422,41 @@ func downloadAndStoreImage(
 	}
 
 	return mediaMetaData, width, height, nil
+}
+
+func createThumbnail(src types.Path, dst types.Path, size types.ThumbnailSize, hash types.Base64Hash, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *log.Entry) (int, int, error) {
+	// Check if we have too many thumbnail generators running
+	// If so, wait up to 30 seconds for one to finish
+	timeout := time.After(30 * time.Second)
+	for {
+		if len(activeThumbnailGeneration.PathToResult) < maxThumbnailGenerators {
+
+			activeThumbnailGeneration.Lock()
+			activeThumbnailGeneration.PathToResult[string(hash)] = nil
+			activeThumbnailGeneration.Unlock()
+
+			defer func() {
+				activeThumbnailGeneration.Lock()
+				delete(activeThumbnailGeneration.PathToResult, string(hash))
+				activeThumbnailGeneration.Unlock()
+			}()
+
+			width, height, err := thumbnailer.CreateThumbnailFromFile(src, dst, size, logger)
+			if err != nil {
+				logger.WithError(err).Error("unable to create thumbnail")
+				return 0, 0, err
+			}
+			return width, height, nil
+		}
+
+		select {
+		case <-timeout:
+			logger.Error("timed out waiting for thumbnail generator")
+			return 0, 0, ErrorTimeoutThumbnailGenerator
+		default:
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func storeUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db storage.Database, user userapi.Device, hash types.Base64Hash, preview *types.UrlPreview, logger *log.Entry) error {
@@ -530,6 +527,37 @@ func loadUrlPreviewResponse(ctx context.Context, cfg *config.MediaAPI, db storag
 		return &preview, nil
 	}
 	return nil, ErrNoMetadataFound
+}
+
+func detectFileType(filePath string, logger *log.Entry) (string, error) {
+	// Check if the file is an image.
+	// Otherwise return an error
+	file, err := os.Open(string(filePath))
+	if err != nil {
+		logger.WithError(err).Error("unable to open image file")
+		return "", err
+	}
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			logger.WithError(err).Error("unable to close image file")
+		}
+	}()
+
+	buf := make([]byte, 512)
+
+	_, err = file.Read(buf)
+	if err != nil {
+		logger.WithError(err).Error("unable to read file")
+		return "", err
+	}
+
+	fileType := http.DetectContentType(buf)
+	if !strings.HasPrefix(fileType, "image") {
+		logger.WithField("contentType", fileType).Debugf("uploaded file is not an image")
+		return "", ErrorUnsupportedContentType
+	}
+	return fileType, nil
 }
 
 func getHashFromString(s string) types.Base64Hash {
