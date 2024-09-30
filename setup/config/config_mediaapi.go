@@ -31,6 +31,9 @@ type MediaAPI struct {
 	// A list of thumbnail sizes to be pre-generated for downloaded remote / uploaded content
 	ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
 
+	// Black list of urls
+	UrlPreviewBlacklist []string `yaml:"url_preview_blacklist"`
+
 	// The time in seconds to cache URL previews for
 	UrlPreviewCacheTime int `yaml:"url_preview_cache_time"`
 

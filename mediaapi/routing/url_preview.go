@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,6 +38,7 @@ var (
 	ErrorFileTooLarge              = errors.New("file too large")
 	ErrorTimeoutThumbnailGenerator = errors.New("timeout waiting for thumbnail generator")
 	ErrNoMetadataFound             = errors.New("no metadata found")
+	ErrorBlackListed               = errors.New("url is blacklisted")
 )
 
 func makeUrlPreviewHandler(
@@ -48,6 +50,7 @@ func makeUrlPreviewHandler(
 
 	activeUrlPreviewRequests := &types.ActiveUrlPreviewRequests{Url: map[string]*types.UrlPreviewResult{}}
 	urlPreviewCache := &types.UrlPreviewCache{Records: map[string]*types.UrlPreviewCacheRecord{}}
+	urlBlackList := createUrlBlackList(cfg)
 
 	go func() {
 		for {
@@ -81,6 +84,14 @@ func makeUrlPreviewHandler(
 		// Check rate limits
 		if r := rateLimits.Limit(req, device); r != nil {
 			return *r
+		}
+
+		// Check if the url is in the blacklist
+		for _, pattern := range urlBlackList {
+			if pattern.MatchString(pUrl) {
+				logger.WithField("pattern", pattern.String()).Warn("the url is blacklisted")
+				return util.ErrorResponse(ErrorBlackListed)
+			}
 		}
 
 		// Get url preview from cache
@@ -624,4 +635,13 @@ func getMetaFieldsFromHTML(resp *http.Response) map[string]string {
 		}
 	}
 	return ogValues
+}
+
+func createUrlBlackList(cfg *config.MediaAPI) []*regexp.Regexp {
+	blackList := make([]*regexp.Regexp, len(cfg.UrlPreviewBlacklist))
+	for i, pattern := range cfg.UrlPreviewBlacklist {
+		blackList[i] = regexp.MustCompile(pattern)
+	}
+	return blackList
+
 }
