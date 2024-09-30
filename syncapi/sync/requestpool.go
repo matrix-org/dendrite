@@ -456,13 +456,19 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 		} else {
 			// Incremental sync
+			reasonablePositions := findReasonableIncrementalSyncWindow(
+				syncReq.Since, rp.Notifier.CurrentPosition(),
+			)
+			// Also update the currentPos, which is used for the retry logic below.
+			// Otherwise we may skip over some events.
+			currentPos = reasonablePositions
 			syncReq.Response.NextBatch = types.StreamingToken{
 				PDUPosition: withTransaction(
 					syncReq.Since.PDUPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PDUStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.PDUPosition, rp.Notifier.CurrentPosition().PDUPosition,
+							syncReq.Since.PDUPosition, reasonablePositions.PDUPosition,
 						)
 					},
 				),
@@ -471,7 +477,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.TypingStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.TypingPosition, rp.Notifier.CurrentPosition().TypingPosition,
+							syncReq.Since.TypingPosition, reasonablePositions.TypingPosition,
 						)
 					},
 				),
@@ -480,7 +486,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.ReceiptStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.ReceiptPosition, rp.Notifier.CurrentPosition().ReceiptPosition,
+							syncReq.Since.ReceiptPosition, reasonablePositions.ReceiptPosition,
 						)
 					},
 				),
@@ -489,7 +495,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.InviteStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.InvitePosition, rp.Notifier.CurrentPosition().InvitePosition,
+							syncReq.Since.InvitePosition, reasonablePositions.InvitePosition,
 						)
 					},
 				),
@@ -498,7 +504,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.SendToDeviceStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.SendToDevicePosition, rp.Notifier.CurrentPosition().SendToDevicePosition,
+							syncReq.Since.SendToDevicePosition, reasonablePositions.SendToDevicePosition,
 						)
 					},
 				),
@@ -507,7 +513,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.AccountDataStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.AccountDataPosition, rp.Notifier.CurrentPosition().AccountDataPosition,
+							syncReq.Since.AccountDataPosition, reasonablePositions.AccountDataPosition,
 						)
 					},
 				),
@@ -516,7 +522,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.NotificationDataStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.NotificationDataPosition, rp.Notifier.CurrentPosition().NotificationDataPosition,
+							syncReq.Since.NotificationDataPosition, reasonablePositions.NotificationDataPosition,
 						)
 					},
 				),
@@ -525,7 +531,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.DeviceListStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.DeviceListPosition, rp.Notifier.CurrentPosition().DeviceListPosition,
+							syncReq.Since.DeviceListPosition, reasonablePositions.DeviceListPosition,
 						)
 					},
 				),
@@ -534,7 +540,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PresenceStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
-							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
+							syncReq.Since.PresencePosition, reasonablePositions.PresencePosition,
 						)
 					},
 				),
@@ -643,4 +649,24 @@ func (rp *RequestPool) shouldReturnImmediately(syncReq *types.SyncRequest, curre
 		return true
 	}
 	return false
+}
+
+func findReasonableIncrementalSyncWindow(since, limit types.StreamingToken) types.StreamingToken {
+	const windowSize = 100 // TODO: reasonable number?
+	for s, l := range map[*types.StreamPosition]types.StreamPosition{
+		&since.AccountDataPosition:      limit.AccountDataPosition,
+		&since.DeviceListPosition:       limit.DeviceListPosition,
+		&since.InvitePosition:           limit.InvitePosition,
+		&since.NotificationDataPosition: limit.NotificationDataPosition,
+		&since.PDUPosition:              limit.PDUPosition,
+		&since.PresencePosition:         limit.PresencePosition,
+		&since.ReceiptPosition:          limit.ReceiptPosition,
+		&since.SendToDevicePosition:     limit.SendToDevicePosition,
+		&since.TypingPosition:           limit.TypingPosition,
+	} {
+		if *s += windowSize; *s > l {
+			*s = l
+		}
+	}
+	return since
 }
