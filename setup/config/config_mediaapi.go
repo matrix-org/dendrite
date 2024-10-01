@@ -75,12 +75,6 @@ func (c *MediaAPI) Defaults(opts DefaultOpts) {
 		}
 		c.BasePath = "./media_store"
 	}
-
-	c.UrlPreviewThumbnailSize = ThumbnailSize{
-		Width:        200,
-		Height:       200,
-		ResizeMethod: "scale",
-	}
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors) {

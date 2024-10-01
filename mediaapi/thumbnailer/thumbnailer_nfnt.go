@@ -311,6 +311,10 @@ func CreateThumbnailFromFile(
 	return width, height, nil
 }
 
-func ReadFile(src string) (image.Image, error) {
-	return readFile(src)
+func GetImageSize(src string) (width int, height int, err error) {
+	img, err := readFile(src)
+	if err != nil {
+		return 0, 0, err
+	}
+	return img.Bounds().Dx(), img.Bounds().Dy(), nil
 }

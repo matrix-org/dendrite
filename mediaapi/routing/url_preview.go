@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -94,6 +95,11 @@ func makeUrlPreviewHandler(
 			}
 		}
 
+		urlParsed, err := url.Parse(pUrl)
+		if err != nil {
+			return util.ErrorResponse(ErrorMissingUrl)
+		}
+
 		hash := getHashFromString(pUrl)
 
 		// Get for url preview from in-memory cache
@@ -136,6 +142,7 @@ func makeUrlPreviewHandler(
 		// we defer caching the url preview response as well as signalling the waiting goroutines
 		// about the completion of the request
 		defer func() {
+
 			urlPreviewCacheItem := &types.UrlPreviewCacheRecord{
 				Created: time.Now().Unix(),
 			}
@@ -164,38 +171,25 @@ func makeUrlPreviewHandler(
 		if err != nil {
 			activeUrlPreviewRequest.Error = err
 		} else {
-			defer func() {
-				err := resp.Body.Close()
-				if err != nil {
-					logger.WithError(err).Error("unable to close response body")
-				}
-			}()
+			defer resp.Body.Close() // nolint: errcheck
 
 			var result *types.UrlPreview
-			var err, err2 error
-			var imgUrl *url.URL
+			var err error
 			var imgReader *http.Response
 			var mediaData *types.MediaMetadata
 			var width, height int
 
 			if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 				// The url is a webpage - get data from the meta tags
-				result = getPreviewFromHTML(resp, pUrl)
+				result = getPreviewFromHTML(resp, urlParsed)
 				if result.ImageUrl != "" {
-					// The page has an og:image link
-					if imgUrl, err2 = url.Parse(result.ImageUrl); err2 == nil {
-						imgReader, err2 = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second)
-						if err2 == nil {
-							// Download image and store it as a thumbnail
-							mediaData, width, height, err2 = downloadAndStoreImage(imgUrl.Path, req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
-						}
+					// In case of an image in the preview we download it
+					if imgReader, err = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second); err == nil {
+						mediaData, width, height, _ = downloadAndStoreImage("url_preview", req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
 					}
-					// In case of any error in image download
-					// we don't show the original URL as it is insecure for the room users
-					if err2 != nil {
-						result.ImageUrl = ""
-					}
-
+					// We don't show the original image in the preview
+					// as it is insecure for room members
+					result.ImageUrl = ""
 				}
 			} else if strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
 				// The url is an image link
@@ -275,7 +269,10 @@ func checkActivePreviewResponse(activeUrlPreviewRequests *types.ActiveUrlPreview
 }
 
 func downloadUrl(url string, t time.Duration) (*http.Response, error) {
-	client := http.Client{Timeout: t}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := http.Client{Timeout: t, Transport: tr}
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
@@ -287,15 +284,18 @@ func downloadUrl(url string, t time.Duration) (*http.Response, error) {
 	return resp, nil
 }
 
-func getPreviewFromHTML(resp *http.Response, url string) *types.UrlPreview {
+func getPreviewFromHTML(resp *http.Response, urlParsed *url.URL) *types.UrlPreview {
+
 	fields := getMetaFieldsFromHTML(resp)
 	preview := &types.UrlPreview{
 		Title:       fields["og:title"],
 		Description: fields["og:description"],
+		Type:        fields["og:type"],
+		Url:         fields["og:url"],
 	}
 
 	if fields["og:title"] == "" {
-		preview.Title = url
+		preview.Title = urlParsed.String()
 	}
 	if fields["og:image"] != "" {
 		preview.ImageUrl = fields["og:image"]
@@ -305,14 +305,19 @@ func getPreviewFromHTML(resp *http.Response, url string) *types.UrlPreview {
 		preview.ImageUrl = fields["og:image:secure_url"]
 	}
 
-	if fields["og:image:width"] != "" {
-		if width, err := strconv.Atoi(fields["og:image:width"]); err == nil {
-			preview.ImageWidth = width
-		}
-	}
-	if fields["og:image:height"] != "" {
-		if height, err := strconv.Atoi(fields["og:image:height"]); err == nil {
-			preview.ImageHeight = height
+	if preview.ImageUrl != "" {
+		if imgUrl, err := url.Parse(preview.ImageUrl); err == nil {
+			// Use the same scheme and host as the original URL if empty
+			if imgUrl.Scheme == "" {
+				imgUrl.Scheme = urlParsed.Scheme
+			}
+			// Use the same host as the original URL if empty
+			if imgUrl.Host == "" {
+				imgUrl.Host = urlParsed.Host
+			}
+			preview.ImageUrl = imgUrl.String()
+		} else {
+			preview.ImageUrl = ""
 		}
 	}
 
@@ -371,11 +376,11 @@ func downloadAndStoreImage(
 		if err != nil {
 			return nil, width, height, err
 		}
-		img, err := thumbnailer.ReadFile(string(filePath))
+		width, height, err := thumbnailer.GetImageSize(string(filePath))
 		if err != nil {
 			return nil, width, height, err
 		}
-		return existingMetadata, img.Bounds().Dx(), img.Bounds().Dy(), nil
+		return existingMetadata, width, height, nil
 	}
 
 	tmpFileName := filepath.Join(string(tmpDir), "content")
@@ -386,22 +391,34 @@ func downloadAndStoreImage(
 	}
 	logger.WithField("contentType", fileType).Debug("uploaded file is an image")
 
-	// Create a thumbnail from the image
-	thumbnailPath := tmpFileName + ".thumbnail"
+	var thumbnailPath string
 
-	width, height, err = createThumbnail(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize),
-		hash, activeThumbnailGeneration, cfg.MaxThumbnailGenerators, logger)
-	if err != nil {
-		if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
-			// In case the image is smaller than the thumbnail size
-			// we don't create a thumbnail
-			thumbnailPath = tmpFileName
-		} else {
+	if cfg.UrlPreviewThumbnailSize.Width != 0 {
+		// Create a thumbnail from the image
+		thumbnailPath = tmpFileName + ".thumbnail"
+
+		width, height, err = createThumbnail(types.Path(tmpFileName), types.Path(thumbnailPath), types.ThumbnailSize(cfg.UrlPreviewThumbnailSize),
+			hash, activeThumbnailGeneration, cfg.MaxThumbnailGenerators, logger)
+		if err != nil {
+			if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
+				// In case the image is smaller than the thumbnail size
+				// we don't create a thumbnail
+				thumbnailPath = tmpFileName
+			} else {
+				return nil, width, height, err
+			}
+		}
+	} else {
+		// No thumbnail size specified, use the original image
+		thumbnailPath = tmpFileName
+		width, height, err = thumbnailer.GetImageSize(thumbnailPath)
+		if err != nil {
 			return nil, width, height, err
 		}
+
 	}
 
-	thumbnailFileInfo, err := os.Stat(string(thumbnailPath))
+	thumbnailFileInfo, err := os.Stat(thumbnailPath)
 	if err != nil {
 		logger.WithError(err).Error("unable to get thumbnail file info")
 		return nil, width, height, err
@@ -564,12 +581,7 @@ func detectFileType(filePath string, logger *log.Entry) (string, error) {
 		logger.WithError(err).Error("unable to open image file")
 		return "", err
 	}
-	defer func() {
-		err := file.Close()
-		if err != nil {
-			logger.WithError(err).Error("unable to close image file")
-		}
-	}()
+	defer file.Close() // nolint: errcheck
 
 	buf := make([]byte, 512)
 
@@ -605,6 +617,8 @@ func getMetaFieldsFromHTML(resp *http.Response) map[string]string {
 		"og:image:width",
 		"og:image:height",
 		"og:image:type",
+		"og:type",
+		"og:url",
 	}
 	fieldsMap := make(map[string]bool, len(fieldsToGet))
 	for _, field := range fieldsToGet {

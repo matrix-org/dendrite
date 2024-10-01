@@ -119,6 +119,8 @@ type UrlPreview struct {
 	ImageHeight int           `json:"og:image:height"`
 	ImageWidth  int           `json:"og:image:width"`
 	Title       string        `json:"og:title"`
+	Type        string        `json:"og:type"`
+	Url         string        `json:"og:url"`
 }
 
 type UrlPreviewResult struct {
