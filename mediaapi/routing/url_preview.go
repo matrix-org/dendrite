@@ -95,8 +95,8 @@ func makeUrlPreviewHandler(
 			}
 		}
 
-		urlParsed, err := url.Parse(pUrl)
-		if err != nil {
+		urlParsed, perr := url.Parse(pUrl)
+		if perr != nil {
 			return util.ErrorResponse(ErrorMissingUrl)
 		}
 
@@ -175,7 +175,6 @@ func makeUrlPreviewHandler(
 
 			var result *types.UrlPreview
 			var err error
-			var imgReader *http.Response
 			var mediaData *types.MediaMetadata
 			var width, height int
 
@@ -184,7 +183,7 @@ func makeUrlPreviewHandler(
 				result = getPreviewFromHTML(resp, urlParsed)
 				if result.ImageUrl != "" {
 					// In case of an image in the preview we download it
-					if imgReader, err = downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second); err == nil {
+					if imgReader, err := downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second); err == nil {
 						mediaData, width, height, _ = downloadAndStoreImage("url_preview", req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
 					}
 					// We don't show the original image in the preview
@@ -344,12 +343,12 @@ func downloadAndStoreImage(
 	if cfg.MaxFileSizeBytes > 0 {
 		reqReader = io.LimitReader(reqReader, int64(cfg.MaxFileSizeBytes)+1)
 	}
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
-	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
+	hash, bytesWritten, tmpDir, fileErr := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
+	if fileErr != nil {
+		logger.WithError(fileErr).WithFields(log.Fields{
 			"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
-		return nil, width, height, err
+		return nil, width, height, fileErr
 	}
 	defer fileutils.RemoveDir(tmpDir, logger)
 
@@ -362,7 +361,6 @@ func downloadAndStoreImage(
 	existingMetadata, err := db.GetMediaMetadataByHash(
 		ctx, hash, cfg.Matrix.ServerName,
 	)
-
 	if err != nil {
 		logger.WithError(err).Error("unable to get media metadata by hash")
 		return nil, width, height, err
@@ -376,7 +374,7 @@ func downloadAndStoreImage(
 		if err != nil {
 			return nil, width, height, err
 		}
-		width, height, err := thumbnailer.GetImageSize(string(filePath))
+		width, height, err = thumbnailer.GetImageSize(string(filePath))
 		if err != nil {
 			return nil, width, height, err
 		}
@@ -384,10 +382,10 @@ func downloadAndStoreImage(
 	}
 
 	tmpFileName := filepath.Join(string(tmpDir), "content")
-	fileType, err := detectFileType(tmpFileName, logger)
-	if err != nil {
+	fileType, typeErr := detectFileType(tmpFileName, logger)
+	if typeErr != nil {
 		logger.WithError(err).Error("unable to detect file type")
-		return nil, width, height, err
+		return nil, width, height, typeErr
 	}
 	logger.WithField("contentType", fileType).Debug("uploaded file is an image")
 
@@ -418,10 +416,10 @@ func downloadAndStoreImage(
 
 	}
 
-	thumbnailFileInfo, err := os.Stat(thumbnailPath)
-	if err != nil {
-		logger.WithError(err).Error("unable to get thumbnail file info")
-		return nil, width, height, err
+	thumbnailFileInfo, statErr := os.Stat(thumbnailPath)
+	if statErr != nil {
+		logger.WithError(statErr).Error("unable to get thumbnail file info")
+		return nil, width, height, statErr
 	}
 
 	r := &uploadRequest{
@@ -432,10 +430,10 @@ func downloadAndStoreImage(
 	}
 
 	// Move the thumbnail to the media store
-	mediaID, err := r.generateMediaID(ctx, db)
-	if err != nil {
-		logger.WithError(err).Error("unable to generate media ID")
-		return nil, width, height, err
+	mediaID, mediaErr := r.generateMediaID(ctx, db)
+	if mediaErr != nil {
+		logger.WithError(mediaErr).Error("unable to generate media ID")
+		return nil, width, height, mediaErr
 	}
 	mediaMetaData := &types.MediaMetadata{
 		MediaID:           mediaID,
@@ -448,10 +446,10 @@ func downloadAndStoreImage(
 		UserID:            userid,
 	}
 
-	finalPath, err := fileutils.GetPathFromBase64Hash(mediaMetaData.Base64Hash, cfg.AbsBasePath)
-	if err != nil {
-		logger.WithError(err).Error("unable to get path from base64 hash")
-		return nil, width, height, err
+	finalPath, pathErr := fileutils.GetPathFromBase64Hash(mediaMetaData.Base64Hash, cfg.AbsBasePath)
+	if pathErr != nil {
+		logger.WithError(pathErr).Error("unable to get path from base64 hash")
+		return nil, width, height, pathErr
 	}
 	err = fileutils.MoveFile(types.Path(thumbnailPath), types.Path(finalPath))
 	if err != nil {
