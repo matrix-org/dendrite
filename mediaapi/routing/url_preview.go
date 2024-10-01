@@ -94,19 +94,13 @@ func makeUrlPreviewHandler(
 			}
 		}
 
-		// Get url preview from cache
-		if cacheRecord, ok := urlPreviewCache.Records[pUrl]; ok {
-			if cacheRecord.Error != nil {
-				return util.ErrorResponse(cacheRecord.Error)
-			}
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: cacheRecord.Preview,
-			}
+		hash := getHashFromString(pUrl)
+
+		// Get for url preview from in-memory cache
+		if response, ok := checkInternalCacheResponse(urlPreviewCache, pUrl); ok {
+			return response
 		}
 
-		hash := getHashFromString(pUrl)
-		// Check if we have a previously stored response
 		if urlPreviewCached, err := loadUrlPreviewResponse(req.Context(), cfg, db, hash); err == nil {
 			logger.Debug("Loaded url preview from the cache")
 			// Put in into the cache for further usage
@@ -130,21 +124,8 @@ func makeUrlPreviewHandler(
 		}
 
 		// Check if there is an active request
-		activeUrlPreviewRequests.Lock()
-		if activeUrlPreviewRequest, ok := activeUrlPreviewRequests.Url[pUrl]; ok {
-			activeUrlPreviewRequests.Unlock()
-			// Wait for it to complete
-			activeUrlPreviewRequest.Cond.L.Lock()
-			defer activeUrlPreviewRequest.Cond.L.Unlock()
-			activeUrlPreviewRequest.Cond.Wait()
-
-			if activeUrlPreviewRequest.Error != nil {
-				return util.ErrorResponse(activeUrlPreviewRequest.Error)
-			}
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: activeUrlPreviewRequest.Preview,
-			}
+		if response, ok := checkActivePreviewResponse(activeUrlPreviewRequests, pUrl); ok {
+			return response
 		}
 
 		// Start new url preview request
@@ -258,6 +239,39 @@ func makeUrlPreviewHandler(
 
 	return httpHandler
 
+}
+
+func checkInternalCacheResponse(urlPreviewCache *types.UrlPreviewCache, url string) (util.JSONResponse, bool) {
+	if cacheRecord, ok := urlPreviewCache.Records[url]; ok {
+		if cacheRecord.Error != nil {
+			return util.ErrorResponse(cacheRecord.Error), true
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: cacheRecord.Preview,
+		}, true
+	}
+	return util.JSONResponse{}, false
+}
+
+func checkActivePreviewResponse(activeUrlPreviewRequests *types.ActiveUrlPreviewRequests, url string) (util.JSONResponse, bool) {
+	activeUrlPreviewRequests.Lock()
+	if activeUrlPreviewRequest, ok := activeUrlPreviewRequests.Url[url]; ok {
+		activeUrlPreviewRequests.Unlock()
+		// Wait for it to complete
+		activeUrlPreviewRequest.Cond.L.Lock()
+		defer activeUrlPreviewRequest.Cond.L.Unlock()
+		activeUrlPreviewRequest.Cond.Wait()
+
+		if activeUrlPreviewRequest.Error != nil {
+			return util.ErrorResponse(activeUrlPreviewRequest.Error), true
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: activeUrlPreviewRequest.Preview,
+		}, true
+	}
+	return util.JSONResponse{}, false
 }
 
 func downloadUrl(url string, t time.Duration) (*http.Response, error) {
@@ -379,6 +393,8 @@ func downloadAndStoreImage(
 		hash, activeThumbnailGeneration, cfg.MaxThumbnailGenerators, logger)
 	if err != nil {
 		if errors.Is(err, thumbnailer.ErrThumbnailTooLarge) {
+			// In case the image is smaller than the thumbnail size
+			// we don't create a thumbnail
 			thumbnailPath = tmpFileName
 		} else {
 			return nil, width, height, err
@@ -436,10 +452,10 @@ func downloadAndStoreImage(
 }
 
 func createThumbnail(src types.Path, dst types.Path, size types.ThumbnailSize, hash types.Base64Hash, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *log.Entry) (int, int, error) {
-	// Check if we have too many thumbnail generators running
-	// If so, wait up to 30 seconds for one to finish
 	timeout := time.After(30 * time.Second)
 	for {
+		// Check if we have too many thumbnail generators running
+		// If so, wait up to 30 seconds for one to finish
 		if len(activeThumbnailGeneration.PathToResult) < maxThumbnailGenerators {
 
 			activeThumbnailGeneration.Lock()
