@@ -183,7 +183,7 @@ func makeUrlPreviewHandler(
 				result = getPreviewFromHTML(resp, urlParsed)
 				if result.ImageUrl != "" {
 					// In case of an image in the preview we download it
-					if imgReader, err := downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second); err == nil {
+					if imgReader, derr := downloadUrl(result.ImageUrl, time.Duration(cfg.UrlPreviewTimeout)*time.Second); derr == nil {
 						mediaData, width, height, _ = downloadAndStoreImage("url_preview", req.Context(), imgReader, cfg, device, db, activeThumbnailGeneration, logger)
 					}
 					// We don't show the original image in the preview
@@ -370,9 +370,9 @@ func downloadAndStoreImage(
 
 		logger.WithField("mediaID", existingMetadata.MediaID).Debug("media already exists")
 		// Here we have to read the image to get it's size
-		filePath, err := fileutils.GetPathFromBase64Hash(existingMetadata.Base64Hash, cfg.AbsBasePath)
-		if err != nil {
-			return nil, width, height, err
+		filePath, pathErr := fileutils.GetPathFromBase64Hash(existingMetadata.Base64Hash, cfg.AbsBasePath)
+		if pathErr != nil {
+			return nil, width, height, pathErr
 		}
 		width, height, err = thumbnailer.GetImageSize(string(filePath))
 		if err != nil {
