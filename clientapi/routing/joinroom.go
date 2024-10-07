@@ -44,9 +44,16 @@ func JoinRoomByIDOrAlias(
 		Content:       map[string]interface{}{},
 	}
 
-	// Check to see if any ?server_name= query parameters were
-	// given in the request.
-	if serverNames, ok := req.URL.Query()["server_name"]; ok {
+	// Check to see if any ?via= or ?server_name= query parameters
+	// were given in the request.
+	if serverNames, ok := req.URL.Query()["via"]; ok {
+		for _, serverName := range serverNames {
+			joinReq.ServerNames = append(
+				joinReq.ServerNames,
+				spec.ServerName(serverName),
+			)
+		}
+	} else if serverNames, ok := req.URL.Query()["server_name"]; ok {
 		for _, serverName := range serverNames {
 			joinReq.ServerNames = append(
 				joinReq.ServerNames,
