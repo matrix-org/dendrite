@@ -322,3 +322,18 @@ func Test_SigningIdentityFor(t *testing.T) {
 		})
 	}
 }
+
+func Test_MediaAPIConfigVerify(t *testing.T) {
+	config := &MediaAPI{
+		Matrix:           &Global{DatabaseOptions: DatabaseOptions{}},
+		Database:         DatabaseOptions{},
+		MaxFileSizeBytes: FileSizeBytes(9223372036854775807),
+	}
+
+	configErrs := &ConfigErrors{}
+
+	config.Verify(configErrs)
+	if config.MaxFileSizeBytes != DefaultMaxFileSizeBytes {
+		t.Errorf("config.MediaAPI.MaxFileSizeBytes got = %v, want %v", config.MaxFileSizeBytes, DefaultMaxFileSizeBytes)
+	}
+}

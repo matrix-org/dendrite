@@ -612,9 +612,6 @@ func getMetaFieldsFromHTML(resp *http.Response) map[string]string {
 		"og:image",
 		"og:image:url",
 		"og:image:secure_url",
-		"og:image:width",
-		"og:image:height",
-		"og:image:type",
 		"og:type",
 		"og:url",
 	}
