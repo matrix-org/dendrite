@@ -327,7 +327,7 @@ func Test_MediaAPIConfigVerify(t *testing.T) {
 	config := &MediaAPI{
 		Matrix:           &Global{DatabaseOptions: DatabaseOptions{}},
 		Database:         DatabaseOptions{},
-		MaxFileSizeBytes: FileSizeBytes(9223372036854775807),
+		MaxFileSizeBytes: FileSizeBytes(^int64(0)),
 	}
 
 	configErrs := &ConfigErrors{}

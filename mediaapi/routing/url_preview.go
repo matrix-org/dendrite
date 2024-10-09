@@ -88,11 +88,9 @@ func makeUrlPreviewHandler(
 		}
 
 		// Check if the url is in the blacklist
-		for _, pattern := range urlBlackList {
-			if pattern.MatchString(pUrl) {
-				logger.WithField("pattern", pattern.String()).Warn("the url is blacklisted")
-				return util.ErrorResponse(ErrorBlackListed)
-			}
+		if checkURLBlacklisted(urlBlackList, pUrl) {
+			logger.Debug("The url is in the blacklist")
+			return util.ErrorResponse(ErrorBlackListed)
 		}
 
 		urlParsed, perr := url.Parse(pUrl)
@@ -668,5 +666,14 @@ func createUrlBlackList(cfg *config.MediaAPI) []*regexp.Regexp {
 		blackList[i] = regexp.MustCompile(pattern)
 	}
 	return blackList
+}
 
+func checkURLBlacklisted(blacklist []*regexp.Regexp, url string) bool {
+	// Check if the url is in the blacklist
+	for _, pattern := range blacklist {
+		if pattern.MatchString(url) {
+			return true
+		}
+	}
+	return false
 }
