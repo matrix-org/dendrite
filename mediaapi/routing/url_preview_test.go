@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -72,17 +71,6 @@ func Test_getMetaFieldsFromHTML(t *testing.T) {
 }
 
 func Test_LoadStorePreview(t *testing.T) {
-	type fields struct {
-		MediaMetadata *types.MediaMetadata
-		Logger        *log.Entry
-	}
-	type args struct {
-		ctx                       context.Context
-		reqReader                 io.Reader
-		cfg                       *config.MediaAPI
-		db                        storage.Database
-		activeThumbnailGeneration *types.ActiveThumbnailGeneration
-	}
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -242,8 +230,6 @@ func Test_UrlPreviewHandler(t *testing.T) {
 	}
 
 	maxSize := config.FileSizeBytes(1024 * 1024)
-	logger := log.New().WithField("mediaapi", "test")
-	logger.Debug("some")
 	testdataPath := filepath.Join(wd, "./testdata")
 
 	g := &config.Global{}
@@ -281,13 +267,13 @@ func Test_UrlPreviewHandler(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening mediaapi database: %v", err)
 	}
-	db2, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
+	db2, err2 := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
 		ConnectionString:       "file::memory:",
 		MaxOpenConnections:     100,
 		MaxIdleConnections:     2,
 		ConnMaxLifetimeSeconds: -1,
 	})
-	if err != nil {
+	if err2 != nil {
 		t.Errorf("error opening mediaapi database: %v", err)
 	}
 
@@ -306,7 +292,6 @@ func Test_UrlPreviewHandler(t *testing.T) {
 	// this handler is to test image resize
 	handler3 := makeUrlPreviewHandler(cfg2, rateLimits, db2, activeThumbnailGeneration)
 
-	data := bytes.Buffer{}
 	responseBody := `<html>
 	<head>
 	<title>Title</title>
@@ -317,7 +302,6 @@ func Test_UrlPreviewHandler(t *testing.T) {
 	<meta property="og:url" content="/image.jpg" />
 	</head>
 	</html>`
-	data.WriteString(responseBody)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.RequestURI == "/test.png" || r.RequestURI == "/test2.png" {
