@@ -316,10 +316,11 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, fmt.Errorf("fileutils.GetPathFromBase64Hash: %w", err)
 	}
 	file, err := os.Open(filePath)
-	defer file.Close() // nolint: errcheck, staticcheck, megacheck
 	if err != nil {
 		return nil, fmt.Errorf("os.Open: %w", err)
 	}
+	defer file.Close() // nolint: errcheck, staticcheck, megacheck
+
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("file.Stat: %w", err)
