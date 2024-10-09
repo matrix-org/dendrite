@@ -106,9 +106,9 @@ type UserInteractive struct {
 	flows []userInteractiveFlow
 	// Map of login type to implementation
 	types map[string]Type
-	// Map of session ID to completed login types, will need to be extended in future
 
-	mutex    sync.RWMutex
+	mutex sync.RWMutex
+	// Map of session ID to completed login types, will need to be extended in future
 	sessions map[string][]string
 }
 
@@ -160,13 +160,11 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 	completed := u.sessions[sessionID]
 	u.mutex.RUnlock()
 
-	flows := u.flows
-
 	return &util.JSONResponse{
 		Code: 401,
 		JSON: Challenge{
 			Completed: completed,
-			Flows:     flows,
+			Flows:     u.flows,
 			Session:   sessionID,
 			Params:    make(map[string]interface{}),
 		},
