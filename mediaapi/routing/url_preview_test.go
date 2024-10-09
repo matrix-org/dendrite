@@ -190,6 +190,7 @@ func Test_ActiveRequestWaiting(t *testing.T) {
 	}
 
 	successResults := 0
+	successResultsLock := &sync.Mutex{}
 
 	for i := 0; i < 3; i++ {
 		go func() {
@@ -197,6 +198,8 @@ func Test_ActiveRequestWaiting(t *testing.T) {
 				if res.Code != 200 {
 					t.Errorf("Unsuccess result: %v", res)
 				}
+				successResultsLock.Lock()
+				defer successResultsLock.Unlock()
 				successResults++
 				return
 			}
@@ -205,9 +208,11 @@ func Test_ActiveRequestWaiting(t *testing.T) {
 	}
 
 	time.Sleep(time.Duration(1) * time.Second)
+	successResultsLock.Lock()
 	if successResults != 0 {
 		t.Error("Subroutines didn't wait")
 	}
+	successResultsLock.Unlock()
 	activeRequests.Url["someurl"].Cond.Broadcast()
 	to := time.After(1 * time.Second)
 	for {
@@ -217,9 +222,11 @@ func Test_ActiveRequestWaiting(t *testing.T) {
 			return
 		default:
 		}
+		successResultsLock.Lock()
 		if successResults == 3 {
 			break
 		}
+		successResultsLock.Unlock()
 	}
 }
 

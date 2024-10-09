@@ -101,7 +101,7 @@ type ActiveThumbnailGeneration struct {
 }
 
 type UrlPreviewCache struct {
-	Lock    sync.Mutex
+	sync.Mutex
 	Records map[string]*UrlPreviewCacheRecord
 }
 

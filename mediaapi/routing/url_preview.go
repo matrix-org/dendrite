@@ -56,14 +56,14 @@ func makeUrlPreviewHandler(
 	go func() {
 		for {
 			t := time.Now().Unix()
+			urlPreviewCache.Lock()
 			for k, record := range urlPreviewCache.Records {
 				if record.Created < (t - int64(cfg.UrlPreviewCacheTime)) {
-					urlPreviewCache.Lock.Lock()
 					delete(urlPreviewCache.Records, k)
-					urlPreviewCache.Lock.Unlock()
 				}
 			}
-			time.Sleep(time.Duration(16) * time.Second)
+			urlPreviewCache.Unlock()
+			time.Sleep(time.Duration(60) * time.Second)
 		}
 	}()
 
@@ -115,9 +115,9 @@ func makeUrlPreviewHandler(
 						Created: time.Now().Unix(),
 						Preview: urlPreviewCached,
 					}
-					urlPreviewCache.Lock.Lock()
+					urlPreviewCache.Lock()
 					urlPreviewCache.Records[pUrl] = urlPreviewCacheItem
-					defer urlPreviewCache.Lock.Unlock()
+					defer urlPreviewCache.Unlock()
 				}
 			}()
 
@@ -155,9 +155,9 @@ func makeUrlPreviewHandler(
 				}
 			}
 
-			urlPreviewCache.Lock.Lock()
+			urlPreviewCache.Lock()
 			urlPreviewCache.Records[pUrl] = urlPreviewCacheItem
-			defer urlPreviewCache.Lock.Unlock()
+			defer urlPreviewCache.Unlock()
 
 			activeUrlPreviewRequests.Lock()
 			activeUrlPreviewRequests.Url[pUrl].Cond.Broadcast()
