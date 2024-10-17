@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/federationapi/statistics"
+	rsapi "github.com/element-hq/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
@@ -28,9 +28,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/userapi/api"
+	fedsenderapi "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/setup/process"
+	"github.com/element-hq/dendrite/userapi/api"
 )
 
 var (

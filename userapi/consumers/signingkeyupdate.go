@@ -16,10 +16,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
+	"github.com/element-hq/dendrite/userapi/api"
 )
 
 // SigningKeyUpdateConsumer consumes signing key updates that came in over federation.

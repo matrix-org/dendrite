@@ -9,7 +9,7 @@ package eventutil
 import (
 	"strconv"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/syncapi/types"
 )
 
 // AccountData represents account data sent from the client API server to the

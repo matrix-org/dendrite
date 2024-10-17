@@ -9,9 +9,9 @@ package storage
 import (
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/mediaapi/storage/sqlite3"
+	"github.com/element-hq/dendrite/setup/config"
 )
 
 // Open opens a postgres database.

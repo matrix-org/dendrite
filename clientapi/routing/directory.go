@@ -15,11 +15,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/clientapi/httputil"
+	federationAPI "github.com/element-hq/dendrite/federationapi/api"
+	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/setup/config"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 )
 
 type roomDirectoryResponse struct {

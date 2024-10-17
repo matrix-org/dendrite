@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
-	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/cmd/dendrite-demo-pinecone/defaults"
+	"github.com/element-hq/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"

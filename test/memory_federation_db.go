@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/federationapi/types"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/federationapi/storage/shared/receipt"
+	"github.com/element-hq/dendrite/federationapi/types"
+	rstypes "github.com/element-hq/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

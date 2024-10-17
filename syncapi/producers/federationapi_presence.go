@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 )

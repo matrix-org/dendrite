@@ -7,9 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )

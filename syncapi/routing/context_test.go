@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
+	"github.com/element-hq/dendrite/syncapi/synctypes"
 )
 
 func Test_parseContextParams(t *testing.T) {

@@ -9,8 +9,8 @@ package perform
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/storage"
 )
 
 type Forgetter struct {

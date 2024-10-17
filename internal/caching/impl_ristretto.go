@@ -19,8 +19,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/setup/config"
 )
 
 const (

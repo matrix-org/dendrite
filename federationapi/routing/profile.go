@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"net/http"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	appserviceAPI "github.com/element-hq/dendrite/appservice/api"
+	"github.com/element-hq/dendrite/internal/eventutil"
+	"github.com/element-hq/dendrite/setup/config"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )

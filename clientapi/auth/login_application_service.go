@@ -9,10 +9,10 @@ package auth
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
+	"github.com/element-hq/dendrite/clientapi/httputil"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/util"
 )
 

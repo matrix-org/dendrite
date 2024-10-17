@@ -9,26 +9,26 @@ package syncapi
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/fulltext"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/internal/fulltext"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/caching"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 
-	"github.com/matrix-org/dendrite/syncapi/consumers"
-	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
-	"github.com/matrix-org/dendrite/syncapi/routing"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/streams"
-	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/element-hq/dendrite/syncapi/consumers"
+	"github.com/element-hq/dendrite/syncapi/notifier"
+	"github.com/element-hq/dendrite/syncapi/producers"
+	"github.com/element-hq/dendrite/syncapi/routing"
+	"github.com/element-hq/dendrite/syncapi/storage"
+	"github.com/element-hq/dendrite/syncapi/streams"
+	"github.com/element-hq/dendrite/syncapi/sync"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI

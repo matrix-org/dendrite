@@ -13,25 +13,25 @@ import (
 	"errors"
 	"fmt"
 
-	//"github.com/matrix-org/dendrite/roomserver/internal"
-	"github.com/matrix-org/dendrite/setup/config"
+	//"github.com/element-hq/dendrite/roomserver/internal"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
+	"github.com/element-hq/dendrite/roomserver/storage/tables"
+	"github.com/element-hq/dendrite/syncapi/synctypes"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/roomserver/acls"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
+	fsAPI "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/roomserver/acls"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/internal/helpers"
+	"github.com/element-hq/dendrite/roomserver/state"
+	"github.com/element-hq/dendrite/roomserver/storage"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 type Queryer struct {

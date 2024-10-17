@@ -23,13 +23,13 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"golang.org/x/crypto/bcrypt"
 
-	clientapi "github.com/matrix-org/dendrite/clientapi/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal/pushrules"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/dendrite/userapi/types"
+	clientapi "github.com/element-hq/dendrite/clientapi/api"
+	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
+	"github.com/element-hq/dendrite/internal/pushrules"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/userapi/storage/tables"
+	"github.com/element-hq/dendrite/userapi/types"
 )
 
 // Database represents an account database

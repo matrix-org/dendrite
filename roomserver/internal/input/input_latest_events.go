@@ -17,12 +17,12 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/state"
+	"github.com/element-hq/dendrite/roomserver/storage/shared"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the

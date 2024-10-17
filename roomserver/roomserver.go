@@ -7,16 +7,16 @@
 package roomserver
 
 import (
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal"
-	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/internal"
+	"github.com/element-hq/dendrite/roomserver/storage"
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API.

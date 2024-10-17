@@ -9,23 +9,23 @@ package userapi
 import (
 	"time"
 
-	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
+	fedsenderapi "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/federationapi/statistics"
+	"github.com/element-hq/dendrite/internal/pushgateway"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
-	rsapi "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/consumers"
-	"github.com/matrix-org/dendrite/userapi/internal"
-	"github.com/matrix-org/dendrite/userapi/producers"
-	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/dendrite/userapi/util"
+	rsapi "github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/userapi/consumers"
+	"github.com/element-hq/dendrite/userapi/internal"
+	"github.com/element-hq/dendrite/userapi/producers"
+	"github.com/element-hq/dendrite/userapi/storage"
+	"github.com/element-hq/dendrite/userapi/util"
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API. Callers

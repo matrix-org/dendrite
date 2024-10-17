@@ -7,7 +7,7 @@
 package internal
 
 import (
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 )
 

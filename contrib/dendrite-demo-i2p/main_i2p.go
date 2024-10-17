@@ -24,14 +24,14 @@ import (
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
-	basepkg "github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
+	basepkg "github.com/element-hq/dendrite/setup/base"
+	"github.com/element-hq/dendrite/setup/config"
 )
 
 func client() (*goSam.Client, error) {

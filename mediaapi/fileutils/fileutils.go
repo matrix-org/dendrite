@@ -17,8 +17,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/matrix-org/dendrite/mediaapi/types"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/mediaapi/types"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )

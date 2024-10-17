@@ -9,8 +9,8 @@ package routing
 import (
 	"net/http"
 
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/version"
+	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )

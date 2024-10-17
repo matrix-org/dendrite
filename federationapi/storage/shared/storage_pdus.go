@@ -13,8 +13,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/federationapi/storage/shared/receipt"
+	"github.com/element-hq/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

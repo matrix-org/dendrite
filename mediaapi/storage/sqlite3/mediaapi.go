@@ -9,9 +9,9 @@ package sqlite3
 
 import (
 	// Import the postgres database driver.
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/mediaapi/storage/shared"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/mediaapi/storage/shared"
+	"github.com/element-hq/dendrite/setup/config"
 )
 
 // NewDatabase opens a SQLIte database.

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/clientapi/userutil"
+	"github.com/element-hq/dendrite/setup/config"
+	uapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"

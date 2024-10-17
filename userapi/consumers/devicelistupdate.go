@@ -11,15 +11,15 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/matrix-org/dendrite/userapi/internal"
+	"github.com/element-hq/dendrite/userapi/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
 )
 
 // DeviceListUpdateConsumer consumes device list updates that came in over federation.

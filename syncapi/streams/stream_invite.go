@@ -10,10 +10,10 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/syncapi/storage"
+	"github.com/element-hq/dendrite/syncapi/synctypes"
+	"github.com/element-hq/dendrite/syncapi/types"
 )
 
 type InviteStreamProvider struct {

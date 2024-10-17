@@ -9,21 +9,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/dendrite/userapi"
-	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/test"
+	"github.com/element-hq/dendrite/test/testrig"
+	"github.com/element-hq/dendrite/userapi"
+	uapi "github.com/element-hq/dendrite/userapi/api"
 )
 
 func TestLogin(t *testing.T) {

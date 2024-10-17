@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"

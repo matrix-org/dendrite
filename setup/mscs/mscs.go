@@ -10,12 +10,12 @@ package mscs
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/setup"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/mscs/msc2836"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )

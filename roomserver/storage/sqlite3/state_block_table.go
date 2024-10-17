@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
 

@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 )
 

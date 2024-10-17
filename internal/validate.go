@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/clientapi/userutil"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"

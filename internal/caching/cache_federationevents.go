@@ -1,7 +1,7 @@
 package caching
 
 import (
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

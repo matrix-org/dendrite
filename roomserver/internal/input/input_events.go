@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/element-hq/dendrite/roomserver/storage/tables"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -26,19 +26,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/roomserver/acls"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/element-hq/dendrite/roomserver/acls"
+	"github.com/element-hq/dendrite/roomserver/internal/helpers"
 
-	userAPI "github.com/matrix-org/dendrite/userapi/api"
+	userAPI "github.com/element-hq/dendrite/userapi/api"
 
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/internal/hooks"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	fedapi "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/eventutil"
+	"github.com/element-hq/dendrite/internal/hooks"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/state"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 // MaximumMissingProcessingTime is the maximum time we allow "processRoomEvent" to fetch

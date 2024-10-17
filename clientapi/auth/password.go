@@ -11,11 +11,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
+	"github.com/element-hq/dendrite/clientapi/httputil"
+	"github.com/element-hq/dendrite/clientapi/userutil"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )

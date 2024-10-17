@@ -8,7 +8,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/element-hq/dendrite/internal"
 	"github.com/matrix-org/util"
 )
 

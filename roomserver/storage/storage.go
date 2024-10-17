@@ -13,11 +13,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
-	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/storage/postgres"
+	"github.com/element-hq/dendrite/roomserver/storage/sqlite3"
+	"github.com/element-hq/dendrite/setup/config"
 )
 
 // Open opens a database connection.

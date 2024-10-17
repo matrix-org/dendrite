@@ -13,10 +13,10 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/userapi/storage/tables"
 )
 
 var deviceKeysSchema = `

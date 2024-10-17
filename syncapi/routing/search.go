@@ -20,14 +20,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/internal/fulltext"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/clientapi/httputil"
+	"github.com/element-hq/dendrite/internal/fulltext"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/syncapi/storage"
+	"github.com/element-hq/dendrite/syncapi/synctypes"
+	"github.com/element-hq/dendrite/userapi/api"
 )
 
 // nolint:gocyclo

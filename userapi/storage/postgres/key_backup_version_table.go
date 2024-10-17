@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/userapi/storage/tables"
 )
 
 const keyBackupVersionTableSchema = `

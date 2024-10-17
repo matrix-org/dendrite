@@ -13,14 +13,14 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/syncapi/internal"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/api"
+	rstypes "github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/syncapi/internal"
+	"github.com/element-hq/dendrite/syncapi/storage"
+	"github.com/element-hq/dendrite/syncapi/synctypes"
+	"github.com/element-hq/dendrite/syncapi/types"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

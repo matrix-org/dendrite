@@ -11,9 +11,9 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/mediaapi/storage/tables"
-	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/mediaapi/storage/tables"
+	"github.com/element-hq/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

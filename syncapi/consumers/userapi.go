@@ -14,14 +14,14 @@ import (
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/streams"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/internal/eventutil"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
+	"github.com/element-hq/dendrite/syncapi/notifier"
+	"github.com/element-hq/dendrite/syncapi/storage"
+	"github.com/element-hq/dendrite/syncapi/streams"
+	"github.com/element-hq/dendrite/syncapi/types"
 )
 
 // OutputNotificationDataConsumer consumes events that originated in

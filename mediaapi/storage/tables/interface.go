@@ -10,7 +10,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/element-hq/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

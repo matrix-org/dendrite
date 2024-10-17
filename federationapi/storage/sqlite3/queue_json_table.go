@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
 )
 
 const queueJSONSchema = `

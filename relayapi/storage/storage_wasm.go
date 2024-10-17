@@ -9,10 +9,10 @@ package storage
 import (
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/relayapi/storage/sqlite3"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

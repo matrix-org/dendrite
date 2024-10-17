@@ -20,11 +20,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/federationapi/statistics"
+	"github.com/element-hq/dendrite/federationapi/storage"
+	"github.com/element-hq/dendrite/federationapi/storage/shared/receipt"
+	"github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/setup/process"
 )
 
 const (

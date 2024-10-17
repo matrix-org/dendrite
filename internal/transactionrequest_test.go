@@ -21,15 +21,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gotest.tools/v3/poll"
 
-	"github.com/matrix-org/dendrite/federationapi/producers"
-	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/test"
-	keyAPI "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/federationapi/producers"
+	rsAPI "github.com/element-hq/dendrite/roomserver/api"
+	rstypes "github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
+	"github.com/element-hq/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/test"
+	keyAPI "github.com/element-hq/dendrite/userapi/api"
 )
 
 const (

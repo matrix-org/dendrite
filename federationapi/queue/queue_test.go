@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"gotest.tools/v3/poll"
@@ -24,12 +24,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/test"
+	"github.com/element-hq/dendrite/federationapi/statistics"
+	"github.com/element-hq/dendrite/federationapi/storage"
+	"github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/process"
+	"github.com/element-hq/dendrite/test"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {

@@ -15,13 +15,13 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/auth"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	federationAPI "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/auth"
+	"github.com/element-hq/dendrite/roomserver/internal/helpers"
+	"github.com/element-hq/dendrite/roomserver/state"
+	"github.com/element-hq/dendrite/roomserver/storage"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 // the max number of servers to backfill from per request. If this is too low we may fail to backfill when

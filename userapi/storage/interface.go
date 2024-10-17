@@ -15,12 +15,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	clientapi "github.com/matrix-org/dendrite/clientapi/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal/pushrules"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/dendrite/userapi/types"
+	clientapi "github.com/element-hq/dendrite/clientapi/api"
+	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
+	"github.com/element-hq/dendrite/internal/pushrules"
+	"github.com/element-hq/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/userapi/storage/tables"
+	"github.com/element-hq/dendrite/userapi/types"
 )
 
 type RegistrationTokens interface {

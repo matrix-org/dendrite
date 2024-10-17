@@ -8,13 +8,13 @@ package perform
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
-	"github.com/matrix-org/dendrite/roomserver/internal/input"
-	"github.com/matrix-org/dendrite/roomserver/internal/query"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/internal/helpers"
+	"github.com/element-hq/dendrite/roomserver/internal/input"
+	"github.com/element-hq/dendrite/roomserver/internal/query"
+	"github.com/element-hq/dendrite/roomserver/state"
+	"github.com/element-hq/dendrite/roomserver/storage"
+	"github.com/element-hq/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )

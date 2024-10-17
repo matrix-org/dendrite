@@ -9,7 +9,7 @@ package api
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"

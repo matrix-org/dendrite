@@ -20,9 +20,9 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 type StateResolutionStorage interface {

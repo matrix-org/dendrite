@@ -11,8 +11,8 @@ import (
 
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/roomserver/api"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

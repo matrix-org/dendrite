@@ -12,10 +12,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/element-hq/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )

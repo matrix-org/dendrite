@@ -10,17 +10,17 @@ import (
 	"context"
 	"sync"
 
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/appservice/consumers"
-	"github.com/matrix-org/dendrite/appservice/query"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	appserviceAPI "github.com/element-hq/dendrite/appservice/api"
+	"github.com/element-hq/dendrite/appservice/consumers"
+	"github.com/element-hq/dendrite/appservice/query"
+	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/setup/config"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 )
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers

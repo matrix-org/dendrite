@@ -10,10 +10,10 @@ import (
 
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/clientapi/httputil"
+	"github.com/element-hq/dendrite/clientapi/producers"
+	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

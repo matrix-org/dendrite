@@ -20,20 +20,20 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/matrix-org/dendrite/setup/base"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/setup/base"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/api"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/transactions"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
+	appserviceAPI "github.com/element-hq/dendrite/appservice/api"
+	"github.com/element-hq/dendrite/clientapi/api"
+	"github.com/element-hq/dendrite/clientapi/auth"
+	clientutil "github.com/element-hq/dendrite/clientapi/httputil"
+	"github.com/element-hq/dendrite/clientapi/producers"
+	federationAPI "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/internal/transactions"
+	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/jetstream"
 )
 
 type WellKnownClientHomeserver struct {

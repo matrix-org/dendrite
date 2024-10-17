@@ -7,12 +7,12 @@
 package mediaapi
 
 import (
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/mediaapi/routing"
-	"github.com/matrix-org/dendrite/mediaapi/storage"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/mediaapi/routing"
+	"github.com/element-hq/dendrite/mediaapi/storage"
+	"github.com/element-hq/dendrite/setup/config"
+	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"

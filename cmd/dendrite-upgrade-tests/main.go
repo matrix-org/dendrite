@@ -141,7 +141,7 @@ const dendriteUpgradeTestLabel = "dendrite_upgrade_test"
 
 // downloadArchive downloads an arbitrary github archive of the form:
 //
-//	https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//	https://github.com/element-hq/dendrite/archive/v0.3.11.tar.gz
 //
 // and re-tarballs it without the top-level directory which contains branch information. It inserts
 // the contents of `dockerfile` as a root file `Dockerfile` in the re-tarballed directory such that
@@ -210,7 +210,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir 
 		log.Printf("%s: Downloading version %s to %s\n", branchOrTagName, branchOrTagName, tmpDir)
 		// pull an archive, this contains a top-level directory which screws with the build context
 		// which we need to fix up post download
-		u := fmt.Sprintf("https://github.com/matrix-org/dendrite/archive/%s.tar.gz", branchOrTagName)
+		u := fmt.Sprintf("https://github.com/element-hq/dendrite/archive/%s.tar.gz", branchOrTagName)
 		tarball, err = downloadArchive(httpClient, tmpDir, u, dockerfile())
 		if err != nil {
 			return "", fmt.Errorf("failed to download archive %s: %w", u, err)
@@ -255,7 +255,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir 
 }
 
 func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Version, err error) {
-	u := "https://api.github.com/repos/matrix-org/dendrite/tags"
+	u := "https://api.github.com/repos/element-hq/dendrite/tags"
 
 	var res *http.Response
 	for i := 0; i < 3; i++ {

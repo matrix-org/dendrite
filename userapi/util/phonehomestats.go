@@ -18,9 +18,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

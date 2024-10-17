@@ -1,4 +1,4 @@
-module github.com/matrix-org/dendrite
+module github.com/element-hq/dendrite
 
 require (
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d

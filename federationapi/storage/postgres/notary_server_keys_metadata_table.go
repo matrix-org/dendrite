@@ -12,9 +12,9 @@ import (
 	"encoding/json"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/federationapi/storage/tables"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/federationapi/storage/tables"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

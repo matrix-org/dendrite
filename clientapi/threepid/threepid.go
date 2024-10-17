@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

@@ -30,13 +30,13 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/httputil"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/setup/config"
+	"github.com/element-hq/dendrite/setup/process"
 )
 
 //go:embed static/*.gotmpl

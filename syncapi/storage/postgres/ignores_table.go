@@ -11,9 +11,9 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/syncapi/storage/tables"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/syncapi/storage/tables"
+	"github.com/element-hq/dendrite/syncapi/types"
 )
 
 const ignoresSchema = `

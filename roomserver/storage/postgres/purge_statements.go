@@ -10,8 +10,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 const purgeEventJSONSQL = "" +

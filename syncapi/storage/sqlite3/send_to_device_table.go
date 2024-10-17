@@ -11,11 +11,11 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
-	"github.com/matrix-org/dendrite/syncapi/storage/tables"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/syncapi/storage/sqlite3/deltas"
+	"github.com/element-hq/dendrite/syncapi/storage/tables"
+	"github.com/element-hq/dendrite/syncapi/types"
 	"github.com/sirupsen/logrus"
 )
 

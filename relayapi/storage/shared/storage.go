@@ -12,10 +12,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/relayapi/storage/tables"
+	"github.com/element-hq/dendrite/federationapi/storage/shared/receipt"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/relayapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

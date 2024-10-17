@@ -9,7 +9,7 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
+	"github.com/element-hq/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

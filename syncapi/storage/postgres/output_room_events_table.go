@@ -15,14 +15,14 @@ import (
 	"sort"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
-	"github.com/matrix-org/dendrite/syncapi/storage/tables"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/api"
+	rstypes "github.com/element-hq/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/syncapi/storage/postgres/deltas"
+	"github.com/element-hq/dendrite/syncapi/storage/tables"
+	"github.com/element-hq/dendrite/syncapi/synctypes"
+	"github.com/element-hq/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
