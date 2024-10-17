@@ -1,6 +1,6 @@
 image:
   # -- Docker repository/image to use
-  repository: "ghcr.io/matrix-org/dendrite-monolith"
+  repository: "ghcr.io/element-hq/dendrite-monolith"
   # -- Kubernetes pullPolicy
   pullPolicy: IfNotPresent
   # -- Overrides the image tag whose default is the chart appVersion.
@@ -250,7 +250,8 @@ dendrite_config:
 
   # -- Configuration for experimental MSC's. (Valid values are: msc2836)
   mscs:
-    mscs: []
+    mscs:
+      []
       # A list of enabled MSC's
       # Currently valid values are:
       # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
@@ -366,7 +367,7 @@ dendrite_config:
       index_path: "/data/search"
       # -- The language most likely to be used on the server - used when indexing, to
       # ensure the returned results match expectations. A full list of possible languages
-      # can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46)
+      # can be found [here](https://github.com/element-hq/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46)
       language: "en"
 
   user_api:
@@ -382,8 +383,8 @@ dendrite_config:
 
   # -- Default logging configuration
   logging:
-  - type: std
-    level: info
+    - type: std
+      level: info
 
 postgresql:
   # -- Enable and configure postgres as the database for dendrite.

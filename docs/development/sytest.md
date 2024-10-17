@@ -28,7 +28,7 @@ go build -o bin/ ./cmd/...
 ```
 
 If you are fixing an issue marked with
-[Are We Synapse Yet](https://github.com/matrix-org/dendrite/labels/are-we-synapse-yet)
+[Are We Synapse Yet](https://github.com/element-hq/dendrite/labels/are-we-synapse-yet)
 then there will be a list of Sytests that you should add to the whitelist when you
 have fixed that issue. This MUST be included in your PR to ensure that the issue
 is fully resolved.

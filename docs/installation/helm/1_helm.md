@@ -16,8 +16,8 @@ helm repo add dendrite https://matrix-org.github.io/dendrite/
 helm repo update
 ```
 
-Next you'll need to create a `values.yaml` file and configure it to your liking. All possible values can be found 
-[here](https://github.com/matrix-org/dendrite/blob/main/helm/dendrite/values.yaml), but at least you need to configure
+Next you'll need to create a `values.yaml` file and configure it to your liking. All possible values can be found
+[here](https://github.com/element-hq/dendrite/blob/main/helm/dendrite/values.yaml), but at least you need to configure
 a `server_name`, otherwise the chart will complain about it:
 
 ```yaml
