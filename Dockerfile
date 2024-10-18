@@ -31,7 +31,7 @@ RUN apk --update --no-cache add curl
 LABEL org.opencontainers.image.title="Dendrite"
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/element-hq/dendrite"
-LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only OR LicenseRef-Element-Commercial"
 LABEL org.opencontainers.image.documentation="https://element-hq.github.io/dendrite/"
 LABEL org.opencontainers.image.vendor="New Vector Ltd."
 

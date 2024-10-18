@@ -2,8 +2,8 @@
 // Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 // Copyright 2017, 2018 New Vector Ltd
 //
-// SPDX-License-Identifier: AGPL-3.0-only
-// Please see LICENSE in the repository root for full details.
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+// Please see LICENSE files in the repository root for full details.
 
 package sqlite3
 

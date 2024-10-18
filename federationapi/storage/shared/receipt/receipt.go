@@ -1,8 +1,8 @@
 // Copyright 2024 New Vector Ltd.
 // Copyright 2023 The Matrix.org Foundation C.I.C.
 //
-// SPDX-License-Identifier: AGPL-3.0-only
-// Please see LICENSE in the repository root for full details.
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+// Please see LICENSE files in the repository root for full details.
 // A Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
 // We don't actually export the NIDs but we need the caller to be able
 // to pass them back so that we can clean up if the transaction sends
