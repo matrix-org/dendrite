@@ -5,6 +5,8 @@ nav_order: 6
 permalink: /administration/troubleshooting
 ---
 
+{% include deprecation.html %}
+
 # Troubleshooting
 
 If your Dendrite installation is acting strangely, there are a few things you should

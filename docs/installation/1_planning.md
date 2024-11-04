@@ -5,6 +5,8 @@ nav_order: 1
 permalink: /installation/planning
 ---
 
+{% include deprecation.html %}
+
 # Planning your installation
 
 ## Database

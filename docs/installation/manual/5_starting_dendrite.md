@@ -6,6 +6,8 @@ nav_order: 5
 permalink: /installation/manual/start
 ---
 
+{% include deprecation.html %}
+
 # Starting Dendrite
 
 Once you have completed all preparation and installation steps,

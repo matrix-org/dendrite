@@ -5,6 +5,8 @@ nav_order: 3
 permalink: /development/coverage
 ---
 
+{% include deprecation.html %}
+
 ## Running unit tests with coverage enabled
 
 Running unit tests with coverage enabled can be done with the following commands, this will generate a `integrationcover.log`

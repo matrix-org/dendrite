@@ -7,6 +7,8 @@ nav_order: 1
 permalink: /installation/helm/install
 ---
 
+{% include deprecation.html %}
+
 # Installing Dendrite using Helm
 
 To install Dendrite using the Helm chart, you first have to add the repository using the following commands:

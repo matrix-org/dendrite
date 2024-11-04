@@ -4,6 +4,8 @@ nav_order: 1
 permalink: /faq
 ---
 
+{% include deprecation.html %}
+
 # FAQ
 
 ## Why does Dendrite exist?

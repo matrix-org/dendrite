@@ -5,6 +5,8 @@ permalink: /administration/registration
 nav_order: 2
 ---
 
+{% include deprecation.html %}
+
 # Enabling registration
 
 Enabling registration allows users to register their own user accounts on your

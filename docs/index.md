@@ -3,6 +3,8 @@ layout: home
 nav_exclude: true
 ---
 
+{% include deprecation.html %}
+
 # Dendrite
 
 Dendrite is a second-generation Matrix homeserver written in Go! Following the microservice

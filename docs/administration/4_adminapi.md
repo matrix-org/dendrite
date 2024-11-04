@@ -5,6 +5,8 @@ nav_order: 4
 permalink: /administration/adminapi
 ---
 
+{% include deprecation.html %}
+
 # Supported admin APIs
 
 Dendrite supports, at present, a very small number of endpoints that allow
