@@ -39,3 +39,13 @@ jobs:
           config: helm/cr.yaml
           charts_dir: helm/
           mark_as_latest: false
+
+  invoke_pages_build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke gh-pages build and deploy
+        env:
+          WORKFLOW_PATH: .github/workflows/gh-pages.yml
+          WORKFLOW_TARGET_REF: "gh-pages"
+        run: |
+          gh workflow run ${WORKFLOW_PATH} --ref ${WORKFLOW_TARGET_REF}
