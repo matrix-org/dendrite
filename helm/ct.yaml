@@ -5,3 +5,5 @@ chart-repos:
 chart-dirs:
   - helm
 validate-maintainers: false
+# this should ensure the tarballs are in the appropriate location for GH pages, rather than repo root
+package-path: docs/

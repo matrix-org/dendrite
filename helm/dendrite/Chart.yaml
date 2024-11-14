@@ -1,7 +1,7 @@
 apiVersion: v2
 name: dendrite
-version: "0.14.1"
-appVersion: "0.13.7"
+version: "0.14.6"
+appVersion: "0.13.8"
 description: Dendrite Matrix Homeserver
 type: application
 icon: https://avatars.githubusercontent.com/u/8418310?s=48&v=4

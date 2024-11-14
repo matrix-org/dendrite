@@ -52,6 +52,7 @@ var staticContent embed.FS
 
 //go:embed static/client/login
 var loginFallback embed.FS
+var StaticContent = staticContent
 
 const HTTPServerTimeout = time.Minute * 5
 
@@ -235,7 +236,6 @@ func SetupAndServeHTTP(
 							logrus.WithError(err).Fatal("failed to serve unix socket")
 						}
 					}
-
 				} else {
 					if err := externalServ.ListenAndServe(); err != nil {
 						if err != http.ErrServerClosed {

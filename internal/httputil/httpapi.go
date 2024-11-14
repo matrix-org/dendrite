@@ -210,6 +210,12 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 // This is used to serve HTML alongside JSON error messages
 func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enableMetrics bool, f func(http.ResponseWriter, *http.Request), checks ...AuthAPIOption) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == http.MethodOptions {
+			util.SetCORSHeaders(w)
+			w.WriteHeader(http.StatusOK) // Maybe http.StatusNoContent?
+			return
+		}
+
 		trace, ctx := internal.StartTask(req.Context(), metricsName)
 		defer trace.EndTask()
 		req = req.WithContext(ctx)
