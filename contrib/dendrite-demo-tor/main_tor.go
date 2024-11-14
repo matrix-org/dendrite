@@ -18,13 +18,13 @@ import (
 	"text/template"
 
 	"github.com/cretz/bine/tor"
+	"github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/httputil"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/eyedeekay/onramp"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
-	"github.com/element-hq/dendrite/internal"
-	"github.com/element-hq/dendrite/internal/httputil"
-	"github.com/element-hq/dendrite/setup/process"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 

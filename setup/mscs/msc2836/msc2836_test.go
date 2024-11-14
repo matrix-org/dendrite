@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/element-hq/dendrite/setup/process"
 	"github.com/element-hq/dendrite/syncapi/synctypes"
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 

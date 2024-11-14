@@ -10,9 +10,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal"
 	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

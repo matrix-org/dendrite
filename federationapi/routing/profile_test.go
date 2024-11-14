@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"github.com/element-hq/dendrite/clientapi/auth/authtypes"
 	"github.com/element-hq/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	fedAPI "github.com/element-hq/dendrite/federationapi"
@@ -26,6 +25,7 @@ import (
 	"github.com/element-hq/dendrite/test"
 	"github.com/element-hq/dendrite/test/testrig"
 	userAPI "github.com/element-hq/dendrite/userapi/api"
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"

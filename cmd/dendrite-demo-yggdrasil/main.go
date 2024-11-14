@@ -19,15 +19,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/element-hq/dendrite/internal/caching"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/element-hq/dendrite/setup/jetstream"
 	"github.com/element-hq/dendrite/setup/process"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/gorilla/mux"
 	"github.com/element-hq/dendrite/appservice"
 	"github.com/element-hq/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/element-hq/dendrite/cmd/dendrite-demo-yggdrasil/signing"
@@ -44,6 +43,7 @@ import (
 	"github.com/element-hq/dendrite/setup/mscs"
 	"github.com/element-hq/dendrite/test"
 	"github.com/element-hq/dendrite/userapi"
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 

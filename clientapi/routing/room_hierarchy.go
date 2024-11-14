@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/google/uuid"
 	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
 	"github.com/element-hq/dendrite/roomserver/types"
 	userapi "github.com/element-hq/dendrite/userapi/api"
+	"github.com/google/uuid"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"

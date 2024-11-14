@@ -10,7 +10,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/getsentry/sentry-go"
 	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
 	"github.com/element-hq/dendrite/setup/config"
 	"github.com/element-hq/dendrite/setup/jetstream"
@@ -20,6 +19,7 @@ import (
 	"github.com/element-hq/dendrite/syncapi/streams"
 	"github.com/element-hq/dendrite/syncapi/types"
 	"github.com/element-hq/dendrite/userapi/api"
+	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )

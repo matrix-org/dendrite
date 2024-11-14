@@ -12,11 +12,11 @@ import (
 	"database/sql"
 
 	// Import the postgres database driver.
-	_ "github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/element-hq/dendrite/setup/config"
 	"github.com/element-hq/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/element-hq/dendrite/syncapi/storage/shared"
+	_ "github.com/lib/pq"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages

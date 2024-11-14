@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	rstypes "github.com/element-hq/dendrite/roomserver/types"
@@ -21,6 +20,7 @@ import (
 	"github.com/element-hq/dendrite/syncapi/storage/tables"
 	"github.com/element-hq/dendrite/syncapi/synctypes"
 	"github.com/element-hq/dendrite/syncapi/types"
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

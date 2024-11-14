@@ -9,10 +9,10 @@ package postgres
 
 import (
 	// Import the postgres database driver.
-	_ "github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/element-hq/dendrite/mediaapi/storage/shared"
 	"github.com/element-hq/dendrite/setup/config"
+	_ "github.com/lib/pq"
 )
 
 // NewDatabase opens a postgres database.

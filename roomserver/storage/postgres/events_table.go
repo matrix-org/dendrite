@@ -13,12 +13,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/element-hq/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/element-hq/dendrite/roomserver/storage/tables"
 	"github.com/element-hq/dendrite/roomserver/types"
+	"github.com/lib/pq"
 )
 
 const eventsSchema = `

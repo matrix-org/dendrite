@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/element-hq/dendrite/federationapi/queue"
 	"github.com/element-hq/dendrite/federationapi/storage"
 	fedTypes "github.com/element-hq/dendrite/federationapi/types"
@@ -19,6 +18,7 @@ import (
 	"github.com/element-hq/dendrite/setup/jetstream"
 	"github.com/element-hq/dendrite/setup/process"
 	syncTypes "github.com/element-hq/dendrite/syncapi/types"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"

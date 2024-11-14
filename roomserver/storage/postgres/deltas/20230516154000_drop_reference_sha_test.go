@@ -3,10 +3,10 @@ package deltas
 import (
 	"testing"
 
-	"github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/element-hq/dendrite/test"
 	"github.com/element-hq/dendrite/test/testrig"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )
 

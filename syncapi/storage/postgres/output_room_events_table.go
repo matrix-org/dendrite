@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal"
 	"github.com/element-hq/dendrite/internal/sqlutil"
 	"github.com/element-hq/dendrite/roomserver/api"
@@ -23,6 +22,7 @@ import (
 	"github.com/element-hq/dendrite/syncapi/storage/tables"
 	"github.com/element-hq/dendrite/syncapi/synctypes"
 	"github.com/element-hq/dendrite/syncapi/types"
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

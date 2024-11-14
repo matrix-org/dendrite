@@ -11,8 +11,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/lib/pq"
 	"github.com/element-hq/dendrite/internal"
+	"github.com/lib/pq"
 	"github.com/matrix-org/util"
 )
 

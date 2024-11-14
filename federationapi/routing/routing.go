@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getsentry/sentry-go"
-	"github.com/gorilla/mux"
 	fedInternal "github.com/element-hq/dendrite/federationapi/internal"
 	"github.com/element-hq/dendrite/federationapi/producers"
 	"github.com/element-hq/dendrite/internal"
@@ -24,6 +22,8 @@ import (
 	roomserverAPI "github.com/element-hq/dendrite/roomserver/api"
 	"github.com/element-hq/dendrite/setup/config"
 	userapi "github.com/element-hq/dendrite/userapi/api"
+	"github.com/getsentry/sentry-go"
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
