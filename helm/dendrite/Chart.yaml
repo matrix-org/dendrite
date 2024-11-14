@@ -10,9 +10,9 @@ keywords:
   - chat
   - homeserver
   - dendrite
-home: https://github.com/matrix-org/dendrite
+home: https://github.com/element-hq/dendrite
 sources:
-  - https://github.com/matrix-org/dendrite
+  - https://github.com/element-hq/dendrite
 dependencies:
   - name: postgresql
     version: 14.2.3

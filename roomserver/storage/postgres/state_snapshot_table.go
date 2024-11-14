@@ -1,17 +1,9 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2024 New Vector Ltd.
+// Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2017, 2018 New Vector Ltd
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+// Please see LICENSE files in the repository root for full details.
 
 package postgres
 
@@ -24,8 +16,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/roomserver/types"
 )
 
 const stateSnapshotSchema = `
@@ -79,8 +71,8 @@ const bulkSelectStateBlockNIDsSQL = "" +
 // TODO: There's a sequence scan here because of the hash join strategy, which is
 // probably O(n) on state key entries, so there must be a way to avoid that somehow.
 // Event type NIDs are:
-// - 5: m.room.member as per https://github.com/matrix-org/dendrite/blob/c7f7aec4d07d59120d37d5b16a900f6d608a75c4/roomserver/storage/postgres/event_types_table.go#L40
-// - 7: m.room.history_visibility as per https://github.com/matrix-org/dendrite/blob/c7f7aec4d07d59120d37d5b16a900f6d608a75c4/roomserver/storage/postgres/event_types_table.go#L42
+// - 5: m.room.member as per https://github.com/element-hq/dendrite/blob/c7f7aec4d07d59120d37d5b16a900f6d608a75c4/roomserver/storage/postgres/event_types_table.go#L40
+// - 7: m.room.history_visibility as per https://github.com/element-hq/dendrite/blob/c7f7aec4d07d59120d37d5b16a900f6d608a75c4/roomserver/storage/postgres/event_types_table.go#L42
 const bulkSelectStateForHistoryVisibilitySQL = `
 	SELECT event_nid FROM (
 	  SELECT event_nid, event_type_nid, event_state_key_nid FROM roomserver_events

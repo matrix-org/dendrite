@@ -10,7 +10,7 @@ plugins:
   - jekyll-feed
 aux_links:
   "GitHub":
-    - "//github.com/matrix-org/dendrite"
+    - "//github.com/element-hq/dendrite"
 aux_links_new_tab: true
 sass:
   sass_dir: _sass

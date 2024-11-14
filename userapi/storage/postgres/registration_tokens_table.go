@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/api"
-	internal "github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/element-hq/dendrite/clientapi/api"
+	internal "github.com/element-hq/dendrite/internal"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/userapi/storage/tables"
 	"golang.org/x/exp/constraints"
 )
 

@@ -1,16 +1,8 @@
+// Copyright 2024 New Vector Ltd.
 // Copyright 2020 The Matrix.org Foundation C.I.C.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+// Please see LICENSE files in the repository root for full details.
 
 //go:build wasm
 // +build wasm
@@ -34,13 +26,16 @@ type JSServer struct {
 
 // OnRequestFromJS is the function that JS will invoke when there is a new request.
 // The JS function signature is:
-//   function(reqString: string): Promise<{result: string, error: string}>
+//
+//	function(reqString: string): Promise<{result: string, error: string}>
+//
 // Usage is like:
-//   const res = await global._go_js_server.fetch(reqString);
-//   if (res.error) {
-//     // handle error: this is a 'network' error, not a non-2xx error.
-//   }
-//   const rawHttpResponse = res.result;
+//
+//	const res = await global._go_js_server.fetch(reqString);
+//	if (res.error) {
+//	  // handle error: this is a 'network' error, not a non-2xx error.
+//	}
+//	const rawHttpResponse = res.result;
 func (h *JSServer) OnRequestFromJS(this js.Value, args []js.Value) interface{} {
 	// we HAVE to spawn a new goroutine and return immediately or else Go will deadlock
 	// if this request blocks at all e.g for /sync calls

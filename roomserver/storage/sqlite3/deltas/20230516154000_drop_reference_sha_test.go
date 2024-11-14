@@ -3,9 +3,9 @@ package deltas
 import (
 	"testing"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/test"
+	"github.com/element-hq/dendrite/test/testrig"
 	"github.com/stretchr/testify/assert"
 )
 

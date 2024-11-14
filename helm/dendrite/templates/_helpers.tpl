@@ -1,6 +1,6 @@
 {{- define "validate.config" }}
 {{- if and (not .Values.signing_key.create) (eq .Values.signing_key.existingSecret "") -}}
-{{-  fail "You must create a signing key for configuration.signing_key OR specify an existing secret name in .Values.signing_key.existingSecret to mount it. (see https://github.com/matrix-org/dendrite/blob/master/docs/INSTALL.md#server-key-generation)" -}}
+{{-  fail "You must create a signing key for configuration.signing_key OR specify an existing secret name in .Values.signing_key.existingSecret to mount it. (see https://github.com/element-hq/dendrite/blob/master/docs/INSTALL.md#server-key-generation)" -}}
 {{- end -}}
 {{- if and (not .Values.postgresql.enabled) (eq .Values.dendrite_config.global.database.connection_string "") -}}
 {{-  fail "Database connection string must be set." -}}

@@ -11,7 +11,7 @@ permalink: /installation/manual/configuration
 A YAML configuration file is used to configure Dendrite. A sample configuration file is
 present in the top level of the Dendrite repository:
 
-* [`dendrite-sample.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.yaml)
+* [`dendrite-sample.yaml`](https://github.com/element-hq/dendrite/blob/main/dendrite-sample.yaml)
 
 You will need to duplicate the sample, calling it `dendrite.yaml` for example, and then
 tailor it to your installation. At a minimum, you will need to populate the following
@@ -81,7 +81,7 @@ one address in the `addresses` field.
 
 ## Database connection using a global connection pool
 
-If you want to use a single connection pool to a single PostgreSQL database, 
+If you want to use a single connection pool to a single PostgreSQL database,
 then you must uncomment and configure the `database` section within the `global` section:
 
 ```yaml
@@ -103,9 +103,9 @@ these will override the `global` database configuration.
 
 Dendrite supports full-text indexing using [Bleve](https://github.com/blevesearch/bleve). It is configured in the `sync_api` section as follows.
 
-Depending on the language most likely to be used on the server, it might make sense to change the `language` used when indexing, 
-to ensure the returned results match the expectations. A full list of possible languages 
-can be found [here](https://github.com/matrix-org/dendrite/blob/5b73592f5a4dddf64184fcbe33f4c1835c656480/internal/fulltext/bleve.go#L25-L46).
+Depending on the language most likely to be used on the server, it might make sense to change the `language` used when indexing,
+to ensure the returned results match the expectations. A full list of possible languages
+can be found [here](https://github.com/element-hq/dendrite/blob/5b73592f5a4dddf64184fcbe33f4c1835c656480/internal/fulltext/bleve.go#L25-L46).
 
 ```yaml
 sync_api:

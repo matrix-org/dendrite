@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

@@ -14,7 +14,7 @@ on:
 env:
   DOCKER_NAMESPACE: matrixdotorg
   DOCKER_HUB_USER: dendritegithub
-  GHCR_NAMESPACE: matrix-org
+  GHCR_NAMESPACE: element-hq
   PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7
 
 jobs:

@@ -32,7 +32,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 ## Source Code
 
-* <https://github.com/matrix-org/dendrite>
+* <https://github.com/element-hq/dendrite>
 ## Requirements
 
 | Repository | Name | Version |
@@ -42,7 +42,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| image.repository | string | `"ghcr.io/matrix-org/dendrite-monolith"` | Docker repository/image to use |
+| image.repository | string | `"ghcr.io/element-hq/dendrite-monolith"` | Docker repository/image to use |
 | image.pullPolicy | string | `"IfNotPresent"` | Kubernetes pullPolicy |
 | image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | imagePullSecrets | list | `[]` | Configure image pull secrets to use private container registry https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-pod-that-uses-your-secret |
@@ -135,7 +135,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | dendrite_config.sync_api.search | object | `{"enabled":true,"index_path":"/data/search","language":"en"}` | Configuration for the full-text search engine. |
 | dendrite_config.sync_api.search.enabled | bool | `true` | Whether fulltext search is enabled. |
 | dendrite_config.sync_api.search.index_path | string | `"/data/search"` | The path to store the search index in. |
-| dendrite_config.sync_api.search.language | string | `"en"` | The language most likely to be used on the server - used when indexing, to ensure the returned results match expectations. A full list of possible languages can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46) |
+| dendrite_config.sync_api.search.language | string | `"en"` | The language most likely to be used on the server - used when indexing, to ensure the returned results match expectations. A full list of possible languages can be found [here](https://github.com/element-hq/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46) |
 | dendrite_config.user_api.bcrypt_cost | int | `10` | bcrypt cost to use when hashing passwords. (ranges from 4-31; 4 being least secure, 31 being most secure; _NOTE: Using a too high value can cause clients to timeout and uses more CPU._) |
 | dendrite_config.user_api.openid_token_lifetime_ms | int | `3600000` | OpenID Token lifetime in milliseconds. |
 | dendrite_config.user_api.push_gateway_disable_tls_validation | bool | `false` |  |

@@ -1,4 +1,4 @@
-This component roughly corresponds to "Client Room Send" and "Client Sync" on [the WIRING diagram](https://github.com/matrix-org/dendrite/blob/master/WIRING.md).
+This component roughly corresponds to "Client Room Send" and "Client Sync" on [the WIRING diagram](https://github.com/element-hq/dendrite/blob/master/WIRING.md).
 This component produces multiple binaries.
 
 ## Internals
