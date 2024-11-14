@@ -161,6 +161,10 @@ func moveFile(src types.Path, dst types.Path) error {
 	return nil
 }
 
+func MoveFile(src types.Path, dst types.Path) error {
+	return moveFile(src, dst)
+}
+
 func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, types.Path, error) {
 	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {

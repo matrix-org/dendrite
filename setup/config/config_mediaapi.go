@@ -30,6 +30,17 @@ type MediaAPI struct {
 
 	// A list of thumbnail sizes to be pre-generated for downloaded remote / uploaded content
 	ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
+
+	// Black list of urls
+	UrlPreviewBlacklist []string `yaml:"url_preview_blacklist"`
+
+	// The time in seconds to cache URL previews for
+	UrlPreviewCacheTime int `yaml:"url_preview_cache_time"`
+
+	// The timeout in milliseconds for fetching URL previews
+	UrlPreviewTimeout int `yaml:"url_preview_timeout"`
+
+	UrlPreviewThumbnailSize ThumbnailSize `yaml:"url_preview_thumbnail_size"`
 }
 
 // DefaultMaxFileSizeBytes defines the default file size allowed in transfers
@@ -38,6 +49,9 @@ var DefaultMaxFileSizeBytes = FileSizeBytes(10485760)
 func (c *MediaAPI) Defaults(opts DefaultOpts) {
 	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
+	c.UrlPreviewCacheTime = 10
+	c.UrlPreviewTimeout = 10000
+
 	if opts.Generate {
 		c.ThumbnailSizes = []ThumbnailSize{
 			{
@@ -76,4 +90,11 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors) {
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 	}
+
+	// If MaxFileSizeBytes overflows int64, default to DefaultMaxFileSizeBytes
+	if c.MaxFileSizeBytes+1 <= 0 {
+		c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
+		fmt.Printf("Configured MediaApi.MaxFileSizeBytes overflows int64, defaulting to %d bytes", DefaultMaxFileSizeBytes)
+	}
+
 }
