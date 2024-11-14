@@ -101,7 +101,7 @@ We also have unit tests which we run via:
 DENDRITE_TEST_SKIP_NODB=1 go test --race ./...
 ```
 
-This only runs SQLite database tests. If you wish to execute Postgres tests as well, you'll either need to 
+This only runs SQLite database tests. If you wish to execute Postgres tests as well, you'll either need to
 have Postgres installed locally (`createdb` will be used) or have a remote/containerized Postgres instance
 available.
 
@@ -119,7 +119,7 @@ code is functioning as intended is great, and to ensure that we will find out qu
 in the future if any regressions happen.
 
 We use the standard [Go testing package](https://gobyexample.com/testing) for this,
-alongside some helper functions in our own [`test` package](https://pkg.go.dev/github.com/matrix-org/dendrite/test).
+alongside some helper functions in our own [`test` package](https://pkg.go.dev/github.com/element-hq/dendrite/test).
 
 ## Continuous integration
 
@@ -131,7 +131,7 @@ test suites ([Complement](https://github.com/matrix-org/complement) and
 [SyTest](https://github.com/matrix-org/sytest)).
 
 You can see the progress of any CI jobs at the bottom of the Pull Request page, or by
-looking at the [Actions](https://github.com/matrix-org/dendrite/actions) tab of the Dendrite
+looking at the [Actions](https://github.com/element-hq/dendrite/actions) tab of the Dendrite
 repository.
 
 We generally won't accept a submission unless all of the CI jobs are passing. We
@@ -152,7 +152,7 @@ significant amount of CPU and RAM.
 
 Once the code builds, run [Sytest](https://github.com/matrix-org/sytest)
 according to the guide in
-[docs/development/sytest.md](https://github.com/matrix-org/dendrite/blob/main/docs/development/sytest.md#using-a-sytest-docker-image)
+[docs/development/sytest.md](https://github.com/element-hq/dendrite/blob/main/docs/development/sytest.md#using-a-sytest-docker-image)
 so you can see whether something is being broken and whether there are newly
 passing tests.
 
@@ -162,17 +162,17 @@ tests.
 ## Picking things to do
 
 If you're new then feel free to pick up an issue labelled [good first
-issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue).
+issue](https://github.com/element-hq/dendrite/labels/good%20first%20issue).
 These should be well-contained, small pieces of work that can be picked up to
 help you get familiar with the code base.
 
 Once you're comfortable with hacking on Dendrite there are issues labelled as
-[help wanted](https://github.com/matrix-org/dendrite/labels/help-wanted),
+[help wanted](https://github.com/element-hq/dendrite/labels/help-wanted),
 these are often slightly larger or more complicated pieces of work but are
 hopefully nonetheless fairly well-contained.
 
 We ask people who are familiar with Dendrite to leave the [good first
-issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue)
+issue](https://github.com/element-hq/dendrite/labels/good%20first%20issue)
 issues so that there is always a way for new people to come and get involved.
 
 ## Getting help

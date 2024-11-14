@@ -9,10 +9,10 @@ import (
 // the final version string
 var version string
 
-// -ldflags "-X github.com/matrix-org/dendrite/internal.branch=master"
+// -ldflags "-X github.com/element-hq/dendrite/internal.branch=master"
 var branch string
 
-// -ldflags "-X github.com/matrix-org/dendrite/internal.build=alpha"
+// -ldflags "-X github.com/element-hq/dendrite/internal.build=alpha"
 var build string
 
 const (

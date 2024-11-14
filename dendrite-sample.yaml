@@ -188,13 +188,12 @@ client_api:
   recaptcha_public_key: ""
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
-  
+
   # To use hcaptcha.com instead of ReCAPTCHA, set the following parameters, otherwise just keep them empty.
   # recaptcha_siteverify_api: "https://hcaptcha.com/siteverify"
   # recaptcha_api_js_url: "https://js.hcaptcha.com/1/api.js"
   # recaptcha_form_field: "h-captcha-response"
   # recaptcha_sitekey_class: "h-captcha"
-
 
   # TURN server information that this homeserver should send to clients.
   turn:
@@ -337,7 +336,7 @@ user_api:
   # worker_count: 8
 
 # Configuration for Opentracing.
-# See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on
+# See https://github.com/element-hq/dendrite/tree/master/docs/tracing for information on
 # how this works and how to set it up.
 tracing:
   enabled: false

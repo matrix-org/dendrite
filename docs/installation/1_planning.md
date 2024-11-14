@@ -77,8 +77,8 @@ therefore does not need this to be manually installed.
 
 A reverse proxy such as [Caddy](https://caddyserver.com), [NGINX](https://www.nginx.com) or
 [HAProxy](http://www.haproxy.org) is useful for deployments. Configuring this is not covered in this documentation, although sample configurations
-for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy) and
-[NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx) are provided.
+for [Caddy](https://github.com/element-hq/dendrite/blob/main/docs/caddy) and
+[NGINX](https://github.com/element-hq/dendrite/blob/main/docs/nginx) are provided.
 
 ### Windows
 

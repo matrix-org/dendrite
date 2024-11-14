@@ -18,13 +18,13 @@ Mostly, although there are still bugs and missing features. If you are a confide
 
 ## Is Dendrite feature-complete?
 
-No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](https://github.com/matrix-org/dendrite/blob/main/README.md) at the root of the repository for more information.
+No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](https://github.com/element-hq/dendrite/blob/main/README.md) at the root of the repository for more information.
 
 ## Why doesn't Dendrite have "x" yet?
 
-Dendrite development is currently supported by a small team of developers and due to those limited resources, the majority of the effort is focused on getting Dendrite to be 
-specification complete. If there are major features you're requesting (e.g. new administration endpoints), we'd like to strongly encourage you to join the community in supporting 
-the development efforts through [contributing](./development/CONTRIBUTING.md). 
+Dendrite development is currently supported by a small team of developers and due to those limited resources, the majority of the effort is focused on getting Dendrite to be
+specification complete. If there are major features you're requesting (e.g. new administration endpoints), we'd like to strongly encourage you to join the community in supporting
+the development efforts through [contributing](./development/CONTRIBUTING.md).
 
 ## Is there a migration path from Synapse to Dendrite?
 
@@ -37,7 +37,7 @@ No, Dendrite has a very different database schema to Synapse and the two are not
 
 ## Can I configure which port Dendrite listens on?
 
-Yes, use the cli flag `-http-bind-address`. 
+Yes, use the cli flag `-http-bind-address`.
 
 ## I've installed Dendrite but federation isn't working
 
@@ -130,9 +130,9 @@ We don't officially support this or any other dedicated media storage solutions.
 
 ## Is there an upgrade guide for Dendrite?
 
-Run a newer docker image. We don't officially support deployments other than Docker. 
-Most of the time you should be able to just 
-- stop 
+Run a newer docker image. We don't officially support deployments other than Docker.
+Most of the time you should be able to just
+- stop
 - replace binary
 - start
 

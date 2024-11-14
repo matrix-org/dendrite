@@ -21,7 +21,7 @@
       }
     ]
   },
-  "description": "Dendrite dashboard from https://github.com/matrix-org/dendrite/",
+  "description": "Dendrite dashboard from https://github.com/element-hq/dendrite/",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": 13916,
@@ -95,9 +95,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -191,10 +189,7 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
+          "calcs": ["mean", "lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -326,10 +321,7 @@
       "id": 10,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
+          "calcs": ["mean", "lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -384,10 +376,7 @@
   "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
-  "tags": [
-    "matrix",
-    "dendrite"
-  ],
+  "tags": ["matrix", "dendrite"],
   "templating": {
     "list": [
       {
@@ -411,12 +400,8 @@
       {
         "current": {
           "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",

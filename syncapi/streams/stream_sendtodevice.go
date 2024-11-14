@@ -3,8 +3,8 @@ package streams
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/element-hq/dendrite/syncapi/storage"
+	"github.com/element-hq/dendrite/syncapi/types"
 )
 
 type SendToDeviceStreamProvider struct {

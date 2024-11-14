@@ -12,17 +12,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/element-hq/dendrite/internal/sqlutil"
+	"github.com/element-hq/dendrite/setup/jetstream"
+	"github.com/element-hq/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/federationapi/routing"
+	"github.com/element-hq/dendrite/internal/caching"
+	"github.com/element-hq/dendrite/setup/config"
 )
 
 type server struct {
