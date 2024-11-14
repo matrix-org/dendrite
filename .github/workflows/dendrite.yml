@@ -28,12 +28,12 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ false }} # disable for now
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Install Node
@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 14
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -66,13 +66,13 @@ jobs:
     name: Linting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install libolm
         run: sudo apt-get install libolm-dev libolm3
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
 
@@ -102,14 +102,14 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install libolm
         run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
-      - uses: actions/cache@v3
+          go-version-file: 'go.mod'
+      - uses: actions/cache@v4
         # manually set up caches, as they otherwise clash with different steps using setup-go with cache=true
         with:
           path: |
@@ -141,12 +141,12 @@ jobs:
         goos: ["linux"]
         goarch: ["amd64", "386"]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
-      - uses: actions/cache@v3
+          go-version-file: 'go.mod'
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -174,12 +174,12 @@ jobs:
         goos: ["windows"]
         goarch: ["amd64"]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
-      - uses: actions/cache@v3
+          go-version-file: 'go.mod'
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -235,19 +235,19 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install libolm
         run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -262,10 +262,11 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: dendrite
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           flags: unittests
           fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # run database upgrade tests
   upgrade_test:
@@ -274,12 +275,20 @@ jobs:
     needs: initial-tests-done
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
           cache: true
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-upgrade-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-upgrade-test-
       - name: Docker version
         run: docker version
       - name: Build upgrade-tests
@@ -296,12 +305,20 @@ jobs:
     needs: initial-tests-done
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version-file: 'go.mod'
           cache: true
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-upgrade-direct-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-upgrade-direct-test-
       - name: Docker version
         run: docker version
       - name: Build upgrade-tests
@@ -340,8 +357,8 @@ jobs:
         SYTEST_BRANCH: ${{ github.head_ref }}
         CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -364,7 +381,7 @@ jobs:
         run: /src/are-we-synapse-yet.py /logs/results.tap -v
         continue-on-error: true # not fatal
       - name: Upload Sytest logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
@@ -404,8 +421,8 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
           go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
-      - name: Run actions/checkout@v3 for dendrite
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for dendrite
+        uses: actions/checkout@v4
         with:
           path: dendrite
 

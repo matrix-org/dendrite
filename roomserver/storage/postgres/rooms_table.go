@@ -76,9 +76,6 @@ const selectRoomVersionsForRoomNIDsSQL = "" +
 const selectRoomInfoSQL = "" +
 	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
 
-const selectRoomIDsSQL = "" +
-	"SELECT room_id FROM roomserver_rooms WHERE array_length(latest_event_nids, 1) > 0"
-
 const bulkSelectRoomIDsSQL = "" +
 	"SELECT room_id FROM roomserver_rooms WHERE room_nid = ANY($1)"
 
@@ -94,7 +91,6 @@ type roomStatements struct {
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionsForRoomNIDsStmt  *sql.Stmt
 	selectRoomInfoStmt                 *sql.Stmt
-	selectRoomIDsStmt                  *sql.Stmt
 	bulkSelectRoomIDsStmt              *sql.Stmt
 	bulkSelectRoomNIDsStmt             *sql.Stmt
 }
@@ -116,29 +112,11 @@ func PrepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionsForRoomNIDsStmt, selectRoomVersionsForRoomNIDsSQL},
 		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
-		{&s.selectRoomIDsStmt, selectRoomIDsSQL},
 		{&s.bulkSelectRoomIDsStmt, bulkSelectRoomIDsSQL},
 		{&s.bulkSelectRoomNIDsStmt, bulkSelectRoomNIDsSQL},
 	}.Prepare(db)
 }
 
-func (s *roomStatements) SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsStmt)
-	rows, err := stmt.QueryContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsStmt: rows.close() failed")
-	var roomIDs []string
-	var roomID string
-	for rows.Next() {
-		if err = rows.Scan(&roomID); err != nil {
-			return nil, err
-		}
-		roomIDs = append(roomIDs, roomID)
-	}
-	return roomIDs, nil
-}
 func (s *roomStatements) InsertRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
@@ -255,7 +233,7 @@ func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
 		}
 		result[roomNID] = roomVersion
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error) {
@@ -277,7 +255,7 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roo
 		}
 		roomIDs = append(roomIDs, roomID)
 	}
-	return roomIDs, nil
+	return roomIDs, rows.Err()
 }
 
 func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error) {
@@ -299,7 +277,7 @@ func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, ro
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
-	return roomNIDs, nil
+	return roomNIDs, rows.Err()
 }
 
 func roomNIDsAsArray(roomNIDs []types.RoomNID) pq.Int64Array {

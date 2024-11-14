@@ -41,6 +41,11 @@ const purgePreviousEventsSQL = "" +
 	"	SELECT ARRAY_AGG(event_nid) FROM roomserver_events WHERE room_nid = $1" +
 	")"
 
+// This removes the majority of prev events and is way faster than the above.
+// The above query is still needed to delete the remaining prev events.
+const purgePreviousEvents2SQL = "" +
+	"DELETE FROM roomserver_previous_events rpe WHERE EXISTS(SELECT event_id FROM roomserver_events re WHERE room_nid = $1 AND re.event_id = rpe.previous_event_id)"
+
 const purgePublishedSQL = "" +
 	"DELETE FROM roomserver_published WHERE room_id = $1"
 
@@ -69,6 +74,7 @@ type purgeStatements struct {
 	purgeInvitesStmt              *sql.Stmt
 	purgeMembershipsStmt          *sql.Stmt
 	purgePreviousEventsStmt       *sql.Stmt
+	purgePreviousEvents2Stmt      *sql.Stmt
 	purgePublishedStmt            *sql.Stmt
 	purgeRedactionStmt            *sql.Stmt
 	purgeRoomAliasesStmt          *sql.Stmt
@@ -87,6 +93,7 @@ func PreparePurgeStatements(db *sql.DB) (*purgeStatements, error) {
 		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
 		{&s.purgePublishedStmt, purgePublishedSQL},
 		{&s.purgePreviousEventsStmt, purgePreviousEventsSQL},
+		{&s.purgePreviousEvents2Stmt, purgePreviousEvents2SQL},
 		{&s.purgeRedactionStmt, purgeRedactionsSQL},
 		{&s.purgeRoomAliasesStmt, purgeRoomAliasesSQL},
 		{&s.purgeRoomStmt, purgeRoomSQL},
@@ -117,7 +124,8 @@ func (s *purgeStatements) PurgeRoom(
 		s.purgeStateSnapshotEntriesStmt,
 		s.purgeInvitesStmt,
 		s.purgeMembershipsStmt,
-		s.purgePreviousEventsStmt,
+		s.purgePreviousEvents2Stmt, // Fast purge the majority of events
+		s.purgePreviousEventsStmt,  // Slow purge the remaining events
 		s.purgeEventJSONStmt,
 		s.purgeRedactionStmt,
 		s.purgeEventsStmt,

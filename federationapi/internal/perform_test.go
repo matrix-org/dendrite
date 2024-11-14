@@ -66,11 +66,11 @@ func TestPerformWakeupServers(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, true)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -112,11 +112,11 @@ func TestQueryRelayServers(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -153,11 +153,11 @@ func TestRemoveRelayServers(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -193,11 +193,11 @@ func TestPerformDirectoryLookup(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -232,11 +232,11 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, true)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(

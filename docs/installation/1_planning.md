@@ -5,6 +5,8 @@ nav_order: 1
 permalink: /installation/planning
 ---
 
+{% include deprecation.html %}
+
 # Planning your installation
 
 ## Database
@@ -59,7 +61,7 @@ In order to install Dendrite, you will need to satisfy the following dependencie
 
 ### Go
 
-At this time, Dendrite supports being built with Go 1.20 or later. We do not support building
+At this time, Dendrite supports being built with Go 1.21 or later. We do not support building
 Dendrite with older versions of Go than this. If you are installing Go using a package manager,
 you should check (by running `go version`) that you are using a suitable version before you start.
 

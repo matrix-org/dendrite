@@ -5,6 +5,8 @@ nav_order: 1
 permalink: /development/contributing
 ---
 
+{% include deprecation.html %}
+
 # Contributing to Dendrite
 
 Everyone is welcome to contribute to Dendrite! We aim to make it as easy as

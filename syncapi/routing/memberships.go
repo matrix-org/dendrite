@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"math"
 	"net/http"
 
@@ -33,31 +32,13 @@ type getMembershipResponse struct {
 	Chunk []synctypes.ClientEvent `json:"chunk"`
 }
 
-// https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-rooms-roomid-joined-members
-type getJoinedMembersResponse struct {
-	Joined map[string]joinedMember `json:"joined"`
-}
-
-type joinedMember struct {
-	DisplayName string `json:"display_name"`
-	AvatarURL   string `json:"avatar_url"`
-}
-
-// The database stores 'displayname' without an underscore.
-// Deserialize into this and then change to the actual API response
-type databaseJoinedMember struct {
-	DisplayName string `json:"displayname"`
-	AvatarURL   string `json:"avatar_url"`
-}
-
 // GetMemberships implements
 //
 //	GET /rooms/{roomId}/members
-//	GET /rooms/{roomId}/joined_members
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string,
 	syncDB storage.Database, rsAPI api.SyncRoomserverAPI,
-	joinedOnly bool, membership, notMembership *string, at string,
+	membership, notMembership *string, at string,
 ) util.JSONResponse {
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
@@ -81,13 +62,6 @@ func GetMemberships(
 	}
 
 	if !queryRes.HasBeenInRoom {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
-		}
-	}
-
-	if joinedOnly && !queryRes.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
@@ -139,40 +113,6 @@ func GetMemberships(
 
 	result := qryRes.Events
 
-	if joinedOnly {
-		var res getJoinedMembersResponse
-		res.Joined = make(map[string]joinedMember)
-		for _, ev := range result {
-			var content databaseJoinedMember
-			if err := json.Unmarshal(ev.Content(), &content); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
-				return util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-
-			userID, err := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
-			if err != nil || userID == nil {
-				util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
-				return util.JSONResponse{
-					Code: http.StatusInternalServerError,
-					JSON: spec.InternalServerError{},
-				}
-			}
-			if err != nil {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: spec.Forbidden("You don't have permission to kick this user, unknown senderID"),
-				}
-			}
-			res.Joined[userID.String()] = joinedMember(content)
-		}
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: res,
-		}
-	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {

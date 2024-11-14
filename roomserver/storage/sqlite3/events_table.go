@@ -44,6 +44,14 @@ const eventsSchema = `
 	auth_event_nids TEXT NOT NULL DEFAULT '[]',
 	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
   );
+
+-- Create an index which helps in resolving membership events (event_type_nid = 5) - (used for history visibility)
+CREATE INDEX IF NOT EXISTS roomserver_events_memberships_idx ON roomserver_events (room_nid, event_state_key_nid) WHERE (event_type_nid = 5);
+
+-- The following indexes are used by bulkSelectStateEventByNIDSQL 
+CREATE INDEX IF NOT EXISTS roomserver_event_event_type_nid_idx ON roomserver_events (event_type_nid);
+CREATE INDEX IF NOT EXISTS roomserver_event_state_key_nid_idx ON roomserver_events (event_state_key_nid);
+
 `
 
 const insertEventSQL = `
@@ -120,6 +128,8 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
+const selectRoomsWithEventTypeNIDSQL = `SELECT DISTINCT room_nid FROM roomserver_events WHERE event_type_nid = $1`
+
 type eventStatements struct {
 	db                                            *sql.DB
 	insertEventStmt                               *sql.Stmt
@@ -135,6 +145,7 @@ type eventStatements struct {
 	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
 	bulkSelectEventIDStmt                         *sql.Stmt
 	selectEventRejectedStmt                       *sql.Stmt
+	selectRoomsWithEventTypeNIDStmt               *sql.Stmt
 	//bulkSelectEventNIDStmt               *sql.Stmt
 	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
 	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
@@ -192,6 +203,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
 		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
+		{&s.selectRoomsWithEventTypeNIDStmt, selectRoomsWithEventTypeNIDSQL},
 	}.Prepare(db)
 }
 
@@ -310,6 +322,9 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		}
 		results = append(results, result)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if !excludeRejected && i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
@@ -377,7 +392,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 			return nil, err
 		}
 	}
-	return results[:i], err
+	return results[:i], rows.Err()
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
@@ -424,6 +439,9 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(eventIDs) {
 		return nil, types.MissingEventError(
@@ -507,6 +525,9 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
 		result.EventID = eventID
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
@@ -543,6 +564,9 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 			return nil, err
 		}
 		results[types.EventNID(eventNID)] = eventID
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
@@ -602,7 +626,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 			RoomNID:  types.RoomNID(roomNID),
 		}
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error) {
@@ -652,7 +676,7 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 		}
 		result[eventNID] = roomNID
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) string {
@@ -669,4 +693,26 @@ func (s *eventStatements) SelectEventRejected(
 	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
 	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
+}
+
+func (s *eventStatements) SelectRoomsWithEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventTypeNID types.EventTypeNID,
+) ([]types.RoomNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithEventTypeNIDStmt)
+	rows, err := stmt.QueryContext(ctx, eventTypeNID)
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithEventTypeNID: rows.close() failed")
+	if err != nil {
+		return nil, err
+	}
+
+	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
+	for rows.Next() {
+		if err := rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+
+	return roomNIDs, rows.Err()
 }

@@ -392,7 +392,7 @@ func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, er
 		})
 	}
 
-	return events, nil
+	return events, rows.Err()
 }
 
 func rowsToEvents(rows *sql.Rows) ([]*rstypes.HeaderedEvent, error) {

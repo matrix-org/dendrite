@@ -121,7 +121,7 @@ func (s *roomAliasesStatements) SelectAliasesFromRoomID(
 
 		aliases = append(aliases, alias)
 	}
-
+	err = rows.Err()
 	return
 }
 

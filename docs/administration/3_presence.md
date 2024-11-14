@@ -5,6 +5,8 @@ permalink: /administration/presence
 nav_order: 3
 ---
 
+{% include deprecation.html %}
+
 # Enabling presence
 
 Dendrite supports presence, which allows you to send your online/offline status

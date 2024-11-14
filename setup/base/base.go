@@ -28,13 +28,13 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
@@ -49,6 +49,10 @@ import (
 
 //go:embed static/*.gotmpl
 var staticContent embed.FS
+
+//go:embed static/client/login
+var loginFallback embed.FS
+var StaticContent = staticContent
 
 const HTTPServerTimeout = time.Minute * 5
 
@@ -158,6 +162,14 @@ func SetupAndServeHTTP(
 		_, _ = w.Write(landingPage.Bytes())
 	})
 
+	// We only need the files beneath the static/client/login folder.
+	sub, err := fs.Sub(loginFallback, "static/client/login")
+	if err != nil {
+		logrus.Panicf("unable to read embedded files, this should never happen: %s", err)
+	}
+	// Serve a static page for login fallback
+	routers.Static.PathPrefix("/client/login/").Handler(http.StripPrefix("/_matrix/static/client/login/", http.FileServer(http.FS(sub))))
+
 	var clientHandler http.Handler
 	clientHandler = routers.Client
 	if cfg.Global.Sentry.Enabled {
@@ -224,7 +236,6 @@ func SetupAndServeHTTP(
 							logrus.WithError(err).Fatal("failed to serve unix socket")
 						}
 					}
-
 				} else {
 					if err := externalServ.ListenAndServe(); err != nil {
 						if err != http.ErrServerClosed {

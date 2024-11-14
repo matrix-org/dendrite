@@ -78,7 +78,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	federationapi.AddPublicRoutes(
 		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
-	mediaapi.AddPublicRoutes(routers.Media, cm, cfg, m.UserAPI, m.Client)
+	mediaapi.AddPublicRoutes(routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
 	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 	if m.RelayAPI != nil {

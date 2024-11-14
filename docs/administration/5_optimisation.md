@@ -6,6 +6,8 @@ nav_order: 5
 permalink: /administration/optimisation
 ---
 
+{% include deprecation.html %}
+
 # Optimise your installation
 
 Now that you have Dendrite running, the following tweaks will improve the reliability

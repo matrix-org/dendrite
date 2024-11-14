@@ -100,9 +100,16 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
+	var asProducer *producers.AppserviceEventProducer
+	if len(dendriteCfg.AppServiceAPI.Derived.ApplicationServices) > 0 {
+		asProducer = &producers.AppserviceEventProducer{
+			JetStream: js, Topic: dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
+		}
+	}
+
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		processContext, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, fts,
+		streams.InviteStreamProvider, rsAPI, fts, asProducer,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")

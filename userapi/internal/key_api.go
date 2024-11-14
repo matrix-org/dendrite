@@ -196,7 +196,7 @@ func (a *UserInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Quer
 		if m.StreamID > maxStreamID {
 			maxStreamID = m.StreamID
 		}
-		if m.KeyJSON == nil || len(m.KeyJSON) == 0 {
+		if len(m.KeyJSON) == 0 {
 			continue
 		}
 		result = append(result, m)
@@ -711,9 +711,15 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 		}
 		return
 	}
-	err = emitDeviceKeyChanges(a.KeyChangeProducer, existingKeys, keysToStore, req.OnlyDisplayNameUpdates)
-	if err != nil {
-		util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
+
+	// If the request does _not_ come right after registering an account
+	// inform downstream components. However, we're fine with just creating the
+	// database entries above in other cases.
+	if !req.FromRegistration {
+		err = emitDeviceKeyChanges(a.KeyChangeProducer, existingKeys, keysToStore, req.OnlyDisplayNameUpdates)
+		if err != nil {
+			util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
+		}
 	}
 }
 

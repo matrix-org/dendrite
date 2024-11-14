@@ -6,6 +6,8 @@ nav_order: 3
 permalink: /installation/manual/signingkeys
 ---
 
+{% include deprecation.html %}
+
 # Generating signing keys
 
 All Matrix homeservers require a signing private key, which will be used to authenticate

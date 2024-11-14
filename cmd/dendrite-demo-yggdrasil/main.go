@@ -59,7 +59,7 @@ var (
 	instanceName   = flag.String("name", "dendrite-p2p-ygg", "the name of this P2P demo instance")
 	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
 	instancePeer   = flag.String("peer", "", "the static Yggdrasil peers to connect to, comma separated-list")
-	instanceListen = flag.String("listen", "tcp://:0", "the port Yggdrasil peers can connect to")
+	instanceListen = flag.String("listen", "tls://:0", "the port Yggdrasil peers can connect to")
 	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
 )
 
@@ -134,6 +134,7 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.RelayAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-relayapi.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.MSCs.MSCs = []string{"msc2836"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
@@ -213,15 +214,15 @@ func main() {
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation)
-
-	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
-	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
 		processCtx, cfg, cm, &natsInstance, federation, rsAPI, caches, keyRing, true,
 	)
-
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
+
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federation, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+
+	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
+	rsAPI.SetAppserviceAPI(asAPI)
 
 	monolith := setup.Monolith{
 		Config:    cfg,

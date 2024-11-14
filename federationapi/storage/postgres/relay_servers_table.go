@@ -110,7 +110,7 @@ func (s *relayServersStatements) SelectRelayServers(
 		}
 		result = append(result, spec.ServerName(relayServer))
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *relayServersStatements) DeleteRelayServers(

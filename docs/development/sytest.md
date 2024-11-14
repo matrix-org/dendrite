@@ -5,6 +5,8 @@ nav_order: 2
 permalink: /development/sytest
 ---
 
+{% include deprecation.html %}
+
 # SyTest
 
 Dendrite uses [SyTest](https://github.com/matrix-org/sytest) for its

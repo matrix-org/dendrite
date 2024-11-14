@@ -5,10 +5,10 @@ import (
 	"math"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/gomatrixserverlib/spec"
@@ -34,12 +34,15 @@ type Statistics struct {
 	// mark the destination as offline. At this point we should attempt
 	// to send messages to the user's async relay servers if we know them.
 	FailuresUntilAssumedOffline uint32
+
+	enableRelays bool
 }
 
 func NewStatistics(
 	db storage.Database,
 	failuresUntilBlacklist uint32,
 	failuresUntilAssumedOffline uint32,
+	enableRelays bool,
 ) Statistics {
 	return Statistics{
 		DB:                          db,
@@ -47,6 +50,7 @@ func NewStatistics(
 		FailuresUntilAssumedOffline: failuresUntilAssumedOffline,
 		backoffTimers:               make(map[spec.ServerName]*time.Timer),
 		servers:                     make(map[spec.ServerName]*ServerStatistics),
+		enableRelays:                enableRelays,
 	}
 }
 
@@ -73,6 +77,13 @@ func (s *Statistics) ForServer(serverName spec.ServerName) *ServerStatistics {
 		} else {
 			server.blacklisted.Store(blacklisted)
 		}
+
+		// Don't bother hitting the database 2 additional times
+		// if we don't want to use relays.
+		if !s.enableRelays {
+			return server
+		}
+
 		assumedOffline, err := s.DB.IsServerAssumedOffline(context.Background(), serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get assumed offline entry %q", serverName)
@@ -158,7 +169,7 @@ func (s *ServerStatistics) Success(method SendMethod) {
 	// NOTE : Sending to the final destination vs. a relay server has
 	// slightly different semantics.
 	if method == SendDirect {
-		s.successCounter.Inc()
+		s.successCounter.Add(1)
 		if s.blacklisted.Load() && s.statistics.DB != nil {
 			if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
 				logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
@@ -184,7 +195,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	// start a goroutine which will wait out the backoff and
 	// unset the backoffStarted flag when done.
 	if s.backoffStarted.CompareAndSwap(false, true) {
-		backoffCount := s.backoffCount.Inc()
+		backoffCount := s.backoffCount.Add(1)
 
 		if backoffCount >= s.statistics.FailuresUntilAssumedOffline {
 			s.assumedOffline.CompareAndSwap(false, true)

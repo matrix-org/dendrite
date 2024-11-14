@@ -1,5 +1,91 @@
 # Changelog
 
+## Dendrite 0.13.8 (2024-09-13)
+
+### Features
+
+  - The required Go version to build Dendrite is now 1.21
+  - Support for authenticated media ([MSC3916](https://github.com/matrix-org/matrix-spec-proposals/pull/3916)) has been added
+  - NATS can now connect to servers requiring authentication (contributed by [paigeadelethompson](https://github.com/paigeadelethompson))
+  - Updated dependencies
+    - Internal NATS Server has been updated from v2.10.7 to v2.10.20 (contributed by [neilalexander](https://github.com/neilalexander)) 
+
+### Fixes
+
+  - Fix parsing `?ts` query param (contributed by [tulir](https://github.com/tulir))
+  - Don't query the database if we could fetch all keys from cache
+  - Fix media DB potentially leaking connections
+  - Fixed a bug where we would return that an account exists if we encountered an unhandled error case
+  - Fixed an issues where edited message could appear twice in search results (contributed by [adnull](https://github.com/adnull))
+  - Outgoing threepid HTTP requests now correctly close the returned body (contributed by [ testwill](https://github.com/testwill))
+  - Presence conflicts are handled better, reducing the amount of outgoing federation requests (contributed by [jjj333-p](https://github.com/jjj333-p))
+  - Internal NATS now uses `SyncAlways` which should improve resilience against crashes (contributed by [neilalexander](https://github.com/neilalexander))
+  - Whitespaces in the `X-Matrix` header are now handled correctly
+  - `/.well-known/matrix/server` lookups now timeout after 30 seconds
+  - Purging rooms has seen a huge speed-up
+
+## Dendrite 0.13.7 (2024-04-09)
+
+### Fixes
+
+- Fixed an issue where the displayname/avatar of an invited user was replaced with the inviter's details
+- Improved server startup performance by avoiding unnecessary room ACL queries
+  - This change reduces memory footprint as it caches ACL regex patterns once instead of for each room
+  - Unnecessary Relay related queries have been removed. **Note**: To use relays, you now need to explicitly enable them using the `federation_api.enable_relays` config
+- Fixed space summaries over federation
+- Improved usage of external NATS JetStream by reusing existing connections instead of opening new ones unnecessarily
+
+### Features
+
+- Modernized Appservices (contributed by [tulir](https://github.com/tulir))
+- Added event reporting with Synapse Admin endpoints for querying them
+- Updated dependencies
+
+## Dendrite 0.13.6 (2024-01-26)
+
+Upgrading to this version is **highly** recommended, as it contains several QoL improvements.
+
+### Fixes
+
+- Use `AckExplicitPolicy` for JetStream consumers, so messages don't pile up in NATS
+- A rare panic when assigning a state key NID has been fixed
+- A rare panic when checking powerlevels has been fixed
+- Notary keys requests for all keys now work correctly
+- Spec compliance:
+  - Return `M_INVALID_PARAM` when querying room aliases
+  - Handle empty `from` parameter when requesting `/messages`
+  - Add CORP headers on media endpoints
+  - Remove `aliases` from `/publicRooms` responses
+  - Allow `+` in MXIDs (Contributed by [RosstheRoss](https://github.com/RosstheRoss))
+- Fixes membership transitions from `knock` to `join` in `knock_restricted` rooms
+- Incremental syncs now batch querying events (Contributed by [recht](https://github.com/recht))
+- Move `/joined_members` back to the clientAPI/roomserver, which should make bridges happier again
+- Backfilling from other servers now only uses at max 100 events instead of potentially thousands
+
+## Dendrite 0.13.5 (2023-12-12)
+
+Upgrading to this version is **highly** recommended, as it fixes several long-standing bugs in
+our CanonicalJSON implementation.
+
+### Fixes
+
+- Convert unicode escapes to lowercase (gomatrixserverlib)
+- Fix canonical json utf-16 surrogate pair detection logic (gomatrixserverlib)
+- Handle negative zero and exponential numbers in Canonical JSON verification (gomatrixserverlib)
+- Avoid logging unnecessary messages when unable to fetch server keys if multiple fetchers are used (gomatrixserverlib)
+- Issues around the device list updater have been fixed, which should ensure that there are always
+  workers available to process incoming device list updates.
+- A panic in the `/hierarchy` endpoints used for spaces has been fixed (client-server and server-server API)
+- Fixes around the way we handle database transactions (including a potential connection leak)
+- ACLs are now updated when received as outliers
+- A race condition, which could lead to bridges instantly leaving a room after joining it, between the SyncAPI and
+  Appservices has been fixed
+
+### Features
+
+- **Appservice login is now supported!**
+- Users can now kick themselves (used by some bridges)
+
 ## Dendrite 0.13.4 (2023-10-25)
 
 Upgrading to this version is **highly** recommended, as it fixes a long-standing bug in the state resolution

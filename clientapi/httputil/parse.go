@@ -35,5 +35,5 @@ func ParseTSParam(req *http.Request) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("param 'ts' is no valid int (%s)", err.Error())
 	}
 
-	return time.Unix(ts/1000, 0), nil
+	return time.UnixMilli(ts), nil
 }

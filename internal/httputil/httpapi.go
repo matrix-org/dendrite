@@ -15,6 +15,7 @@
 package httputil
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,6 +45,7 @@ type BasicAuth struct {
 
 type AuthAPIOpts struct {
 	GuestAccessAllowed bool
+	WithAuth           bool
 }
 
 // AuthAPIOption is an option to MakeAuthAPI to add additional checks (e.g. guest access) to verify
@@ -54,6 +56,13 @@ type AuthAPIOption func(opts *AuthAPIOpts)
 func WithAllowGuests() AuthAPIOption {
 	return func(opts *AuthAPIOpts) {
 		opts.GuestAccessAllowed = true
+	}
+}
+
+// WithAuth is an option to MakeHTTPAPI to add authentication.
+func WithAuth() AuthAPIOption {
+	return func(opts *AuthAPIOpts) {
+		opts.WithAuth = true
 	}
 }
 
@@ -76,6 +85,8 @@ func MakeAuthAPI(
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
+			// clone the hub, so we don't send garbage events with e.g. mismatching rooms/event_ids
+			hub = hub.Clone()
 			hub.Scope().SetUser(sentry.User{
 				Username: device.UserID,
 			})
@@ -195,13 +206,38 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	return http.HandlerFunc(withSpan)
 }
 
-// MakeHTMLAPI adds Span metrics to the HTML Handler function
+// MakeHTTPAPI adds Span metrics to the HTML Handler function
 // This is used to serve HTML alongside JSON error messages
-func MakeHTMLAPI(metricsName string, enableMetrics bool, f func(http.ResponseWriter, *http.Request)) http.Handler {
+func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enableMetrics bool, f func(http.ResponseWriter, *http.Request), checks ...AuthAPIOption) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == http.MethodOptions {
+			util.SetCORSHeaders(w)
+			w.WriteHeader(http.StatusOK) // Maybe http.StatusNoContent?
+			return
+		}
+
 		trace, ctx := internal.StartTask(req.Context(), metricsName)
 		defer trace.EndTask()
 		req = req.WithContext(ctx)
+
+		// apply additional checks, if any
+		opts := AuthAPIOpts{}
+		for _, opt := range checks {
+			opt(&opts)
+		}
+
+		if opts.WithAuth {
+			logger := util.GetLogger(req.Context())
+			_, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
+			if jsonErr != nil {
+				w.WriteHeader(jsonErr.Code)
+				if err := json.NewEncoder(w).Encode(jsonErr.JSON); err != nil {
+					logger.WithError(err).Error("failed to encode JSON response")
+				}
+				return
+			}
+		}
+
 		f(w, req)
 	}
 

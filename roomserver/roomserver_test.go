@@ -7,14 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/userapi"
@@ -33,6 +37,10 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 )
+
+var testIsBlacklistedOrBackingOff = func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+	return &statistics.ServerStatistics{}, nil
+}
 
 type FakeQuerier struct {
 	api.QuerySenderIDAPI
@@ -58,7 +66,7 @@ func TestUsers(t *testing.T) {
 		})
 
 		t.Run("kick users", func(t *testing.T) {
-			usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+			usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 			rsAPI.SetUserAPI(usrAPI)
 			testKickUsers(t, rsAPI, usrAPI)
 		})
@@ -258,7 +266,7 @@ func TestPurgeRoom(t *testing.T) {
 		fsAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, rsAPI, caches, nil, true)
 		rsAPI.SetFederationAPI(fsAPI, nil)
 
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, userAPI, rsAPI, caches, caching.DisableMetrics)
 
 		// Create the room
@@ -1050,7 +1058,7 @@ func TestUpgrade(t *testing.T) {
 
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil)
+		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 		rsAPI.SetUserAPI(userAPI)
 
 		for _, tc := range testCases {
@@ -1183,5 +1191,131 @@ func TestStateReset(t *testing.T) {
 				t.Fatalf("Expected displayname to be %q, got %q", expectedDisplayname, dn)
 			}
 		}
+	})
+}
+
+func TestNewServerACLs(t *testing.T) {
+	alice := test.NewUser(t)
+	roomWithACL := test.NewRoom(t, alice)
+
+	roomWithACL.CreateAndInsert(t, alice, acls.MRoomServerACL, acls.ServerACL{
+		Allowed:         []string{"*"},
+		Denied:          []string{"localhost"},
+		AllowIPLiterals: false,
+	}, test.WithStateKey(""))
+
+	roomWithoutACL := test.NewRoom(t, alice)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		// start JetStream listeners
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		// let the RS create the events
+		err := api.SendEvents(context.Background(), rsAPI, api.KindNew, roomWithACL.Events(), "test", "test", "test", nil, false)
+		assert.NoError(t, err)
+		err = api.SendEvents(context.Background(), rsAPI, api.KindNew, roomWithoutACL.Events(), "test", "test", "test", nil, false)
+		assert.NoError(t, err)
+
+		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
+		assert.NoError(t, err)
+		// create new server ACLs and verify server is banned/not banned
+		serverACLs := acls.NewServerACLs(db)
+		banned := serverACLs.IsServerBannedFromRoom("localhost", roomWithACL.ID)
+		assert.Equal(t, true, banned)
+		banned = serverACLs.IsServerBannedFromRoom("localhost", roomWithoutACL.ID)
+		assert.Equal(t, false, banned)
+	})
+}
+
+// Validate that changing the AckPolicy/AckWait of room consumers
+// results in their recreation
+func TestRoomConsumerRecreation(t *testing.T) {
+
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	// As this is DB unrelated, just use SQLite
+	cfg, processCtx, closeDB := testrig.CreateConfig(t, test.DBTypeSQLite)
+	defer closeDB()
+	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	natsInstance := &jetstream.NATSInstance{}
+
+	// Prepare a stream and consumer using the old configuration
+	jsCtx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+
+	streamName := cfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent)
+	consumer := cfg.Global.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(room.ID))
+	subject := cfg.Global.JetStream.Prefixed(jetstream.InputRoomEventSubj(room.ID))
+
+	consumerConfig := &nats.ConsumerConfig{
+		Durable:           consumer,
+		AckPolicy:         nats.AckAllPolicy,
+		DeliverPolicy:     nats.DeliverAllPolicy,
+		FilterSubject:     subject,
+		AckWait:           (time.Minute * 2) + (time.Second * 10),
+		InactiveThreshold: time.Hour * 24,
+	}
+
+	// Create the consumer with the old config
+	_, err := jsCtx.AddConsumer(streamName, consumerConfig)
+	assert.NoError(t, err)
+
+	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	// start JetStream listeners
+	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+	rsAPI.SetFederationAPI(nil, nil)
+
+	// let the RS create the events, this also recreates the Consumers
+	err = api.SendEvents(context.Background(), rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+	assert.NoError(t, err)
+
+	// Validate that AckPolicy and AckWait has changed
+	info, err := jsCtx.ConsumerInfo(streamName, consumer)
+	assert.NoError(t, err)
+	assert.Equal(t, nats.AckExplicitPolicy, info.Config.AckPolicy)
+
+	wantAckWait := input.MaximumMissingProcessingTime + (time.Second * 10)
+	assert.Equal(t, wantAckWait, info.Config.AckWait)
+}
+
+func TestRoomsWithACLs(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser(t)
+	noACLRoom := test.NewRoom(t, alice)
+	aclRoom := test.NewRoom(t, alice)
+
+	aclRoom.CreateAndInsert(t, alice, "m.room.server_acl", map[string]any{
+		"deny":  []string{"evilhost.test"},
+		"allow": []string{"*"},
+	}, test.WithStateKey(""))
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		defer closeDB()
+
+		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		natsInstance := &jetstream.NATSInstance{}
+		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		// start JetStream listeners
+		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		for _, room := range []*test.Room{noACLRoom, aclRoom} {
+			// Create the rooms
+			err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+			assert.NoError(t, err)
+		}
+
+		// Validate that we only have one ACLd room.
+		roomsWithACLs, err := rsAPI.RoomsWithACLs(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{aclRoom.ID}, roomsWithACLs)
 	})
 }

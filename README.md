@@ -1,5 +1,13 @@
 # Dendrite
 
+## Dendrite is now maintained at [element-hq/dendrite](https://github.com/element-hq/dendrite)
+
+Dendrite is an open-source [Matrix](https://matrix.org/) homeserver developed from 2019 through 2023 as part of the Matrix.org Foundation. 
+The Matrix.org Foundation is not able to resource maintenance of Dendrite and it [continues to be developed by Element](https://github.com/element-hq/dendrite)
+additionally you have the choice of [other Matrix homeservers](https://matrix.org/ecosystem/servers/>)
+
+See [The future of Synapse and Dendrite](https://matrix.org/blog/2023/11/06/future-of-synapse-dendrite/) blog post for more information.
+
 [![Build status](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml/badge.svg?event=push)](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
 Dendrite is a second-generation Matrix homeserver written in Go.
@@ -36,7 +44,7 @@ If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or j
 See the [Planning your Installation](https://matrix-org.github.io/dendrite/installation/planning) page for
 more information on requirements.
 
-To build Dendrite, you will need Go 1.20 or later.
+To build Dendrite, you will need Go 1.21 or later.
 
 For a usable federating Dendrite deployment, you will also need:
 

@@ -173,5 +173,5 @@ func (s *profilesStatements) SelectProfilesBySearch(
 			profiles = append(profiles, profile)
 		}
 	}
-	return profiles, nil
+	return profiles, rows.Err()
 }

@@ -54,6 +54,10 @@ metadata:
 spec:
   template:
     spec:
+      imagePullSecrets:
+      {{- with .Values.imagePullSecrets }}
+      {{ . | toYaml | nindent 6 }}
+      {{- end }}
       restartPolicy: "Never"
       serviceAccount: {{ $name }}
       containers:
@@ -94,6 +98,18 @@ spec:
       volumes:
       - name: signing-key
         emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   parallelism: 1
   completions: 1
   backoffLimit: 1

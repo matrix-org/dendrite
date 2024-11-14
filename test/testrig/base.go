@@ -71,6 +71,7 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 			SingleDatabase: false,
 		})
 		cfg.Global.ServerName = "test"
+		cfg.SyncAPI.Fulltext.Enabled = true
 		cfg.SyncAPI.Fulltext.InMemory = true
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(

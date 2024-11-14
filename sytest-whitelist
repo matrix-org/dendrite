@@ -540,7 +540,6 @@ Will not back up to an old backup version
 Can create more than 10 backup versions
 Can delete backup
 Deleted & recreated backups are empty
-Can upload self-signing keys
 Fails to upload self-signing keys with no auth
 Fails to upload self-signing key without master key
 can fetch self-signing keys over federation
@@ -633,7 +632,6 @@ Trying to add push rule with no scope fails with 400
 Trying to add push rule with invalid scope fails with 400
 Forward extremities remain so even after the next events are populated as outliers
 uploading self-signing key notifies over federation
-uploading signed devices gets propagated over federation
 Device list doesn't change if remote server is down
 /context/ on joined room works
 /context/ on non world readable room does not work

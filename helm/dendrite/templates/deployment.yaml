@@ -56,6 +56,9 @@ spec:
         args:
           - '--config'
           - '/etc/dendrite/dendrite.yaml'
+        {{- with .Values.extraArgs }}
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
         ports:
           - name: http
             containerPort: 8008
@@ -110,3 +113,19 @@ spec:
           httpGet:
             path: /_dendrite/monitor/up
             port: http
+      imagePullSecrets:
+      {{- with .Values.imagePullSecrets }}
+      {{ . | toYaml | nindent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

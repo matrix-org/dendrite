@@ -21,7 +21,9 @@ import (
 	"io"
 	"io/fs"
 	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -61,6 +63,43 @@ type downloadRequest struct {
 	ThumbnailSize      types.ThumbnailSize
 	Logger             *log.Entry
 	DownloadFilename   string
+	multipartResponse  bool // whether we need to return a multipart/mixed response (for requests coming in over federation)
+	fedClient          fclient.FederationClient
+	origin             spec.ServerName
+}
+
+// Taken from: https://github.com/matrix-org/synapse/blob/c3627d0f99ed5a23479305dc2bd0e71ca25ce2b1/synapse/media/_base.py#L53C1-L84
+// A list of all content types that are "safe" to be rendered inline in a browser.
+var allowInlineTypes = map[types.ContentType]struct{}{
+	"text/css":            {},
+	"text/plain":          {},
+	"text/csv":            {},
+	"application/json":    {},
+	"application/ld+json": {},
+	// We allow some media files deemed as safe, which comes from the matrix-react-sdk.
+	// https://github.com/matrix-org/matrix-react-sdk/blob/a70fcfd0bcf7f8c85986da18001ea11597989a7c/src/utils/blobs.ts#L51
+	// SVGs are *intentionally* omitted.
+	"image/jpeg":      {},
+	"image/gif":       {},
+	"image/png":       {},
+	"image/apng":      {},
+	"image/webp":      {},
+	"image/avif":      {},
+	"video/mp4":       {},
+	"video/webm":      {},
+	"video/ogg":       {},
+	"video/quicktime": {},
+	"audio/mp4":       {},
+	"audio/webm":      {},
+	"audio/aac":       {},
+	"audio/mpeg":      {},
+	"audio/ogg":       {},
+	"audio/wave":      {},
+	"audio/wav":       {},
+	"audio/x-wav":     {},
+	"audio/x-pn-wav":  {},
+	"audio/flac":      {},
+	"audio/x-flac":    {},
 }
 
 // Download implements GET /download and GET /thumbnail
@@ -77,11 +116,17 @@ func Download(
 	cfg *config.MediaAPI,
 	db storage.Database,
 	client *fclient.Client,
+	fedClient fclient.FederationClient,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	isThumbnailRequest bool,
 	customFilename string,
+	federationRequest bool,
 ) {
+	// This happens if we call Download for a federation request
+	if federationRequest && origin == "" {
+		origin = cfg.Matrix.ServerName
+	}
 	dReq := &downloadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaID,
@@ -92,7 +137,10 @@ func Download(
 			"Origin":  origin,
 			"MediaID": mediaID,
 		}),
-		DownloadFilename: customFilename,
+		DownloadFilename:  customFilename,
+		multipartResponse: federationRequest,
+		origin:            cfg.Matrix.ServerName,
+		fedClient:         fedClient,
 	}
 
 	if dReq.IsThumbnailRequest {
@@ -321,7 +369,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		}).Trace("Responding with file")
 		responseFile = file
 		responseMetadata = r.MediaMetadata
-		if err := r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
+		if err = r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
 			return nil, err
 		}
 	}
@@ -333,12 +381,53 @@ func (r *downloadRequest) respondFromLocalFile(
 		" plugin-types application/pdf;" +
 		" style-src 'unsafe-inline';" +
 		" object-src 'self';"
-	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
-	if _, err := io.Copy(w, responseFile); err != nil {
-		return nil, fmt.Errorf("io.Copy: %w", err)
+	if !r.multipartResponse {
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		if _, err = io.Copy(w, responseFile); err != nil {
+			return nil, fmt.Errorf("io.Copy: %w", err)
+		}
+	} else {
+		var written int64
+		written, err = multipartResponse(w, r, string(responseMetadata.ContentType), responseFile)
+		if err != nil {
+			return nil, err
+		}
+		responseMetadata.FileSizeBytes = types.FileSizeBytes(written)
 	}
 	return responseMetadata, nil
+}
+
+func multipartResponse(w http.ResponseWriter, r *downloadRequest, contentType string, responseFile io.Reader) (int64, error) {
+	mw := multipart.NewWriter(w)
+	// Update the header to be multipart/mixed; boundary=$randomBoundary
+	w.Header().Set("Content-Type", "multipart/mixed; boundary="+mw.Boundary())
+	w.Header().Del("Content-Length") // let Go handle the content length
+	defer func() {
+		if err := mw.Close(); err != nil {
+			r.Logger.WithError(err).Error("Failed to close multipart writer")
+		}
+	}()
+
+	// JSON object part
+	jsonWriter, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {"application/json"},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create json writer: %w", err)
+	}
+	if _, err = jsonWriter.Write([]byte("{}")); err != nil {
+		return 0, fmt.Errorf("failed to write to json writer: %w", err)
+	}
+
+	// media part
+	mediaWriter, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {contentType},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create media writer: %w", err)
+	}
+	return io.Copy(mediaWriter, responseFile)
 }
 
 func (r *downloadRequest) addDownloadFilenameToHeaders(
@@ -353,7 +442,7 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	}
 
 	if len(filename) == 0 {
-		w.Header().Set("Content-Disposition", "attachment")
+		w.Header().Set("Content-Disposition", contentDispositionFor(""))
 		return nil
 	}
 
@@ -383,20 +472,21 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
 	unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
 
+	disposition := contentDispositionFor(responseMetadata.ContentType)
 	if isASCII {
 		// For ASCII filenames, we should only quote the filename if
 		// it needs to be done, e.g. it contains a space or a character
 		// that would otherwise be parsed as a control character in the
 		// Content-Disposition header
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`attachment; filename=%s%s%s`,
-			quote, unescaped, quote,
+			`%s; filename=%s%s%s`,
+			disposition, quote, unescaped, quote,
 		))
 	} else {
 		// For UTF-8 filenames, we quote always, as that's the standard
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`attachment; filename*=utf-8''%s`,
-			url.QueryEscape(unescaped),
+			`%s; filename*=utf-8''%s`,
+			disposition, url.QueryEscape(unescaped),
 		))
 	}
 
@@ -687,8 +777,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	return nil
 }
 
-func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, body *io.ReadCloser, maxFileSizeBytes config.FileSizeBytes) (int64, io.Reader, error) {
-	reader := *body
+func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, reader io.ReadCloser, maxFileSizeBytes config.FileSizeBytes) (int64, io.Reader, error) {
 	var contentLength int64
 
 	if contentLengthHeader != "" {
@@ -707,7 +796,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 
 		// We successfully parsed the Content-Length, so we'll return a limited
 		// reader that restricts us to reading only up to this size.
-		reader = io.NopCloser(io.LimitReader(*body, parsedLength))
+		reader = io.NopCloser(io.LimitReader(reader, parsedLength))
 		contentLength = parsedLength
 	} else {
 		// Content-Length header is missing. If we have a maximum file size
@@ -716,7 +805,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 		// ultimately it will get rewritten later when the temp file is written
 		// to disk.
 		if maxFileSizeBytes > 0 {
-			reader = io.NopCloser(io.LimitReader(*body, int64(maxFileSizeBytes)))
+			reader = io.NopCloser(io.LimitReader(reader, int64(maxFileSizeBytes)))
 		}
 		contentLength = 0
 	}
@@ -724,6 +813,11 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 	return contentLength, reader, nil
 }
 
+// mediaMeta contains information about a multipart media response.
+// TODO: extend once something is defined.
+type mediaMeta struct{}
+
+// nolint: gocyclo
 func (r *downloadRequest) fetchRemoteFile(
 	ctx context.Context,
 	client *fclient.Client,
@@ -732,19 +826,38 @@ func (r *downloadRequest) fetchRemoteFile(
 ) (types.Path, bool, error) {
 	r.Logger.Debug("Fetching remote file")
 
-	// create request for remote file
-	resp, err := client.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
+	// Attempt to download via authenticated media endpoint
+	isAuthed := true
+	resp, err := r.fedClient.DownloadMedia(ctx, r.origin, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
 	if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			return "", false, fmt.Errorf("File with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		isAuthed = false
+		// try again on the unauthed endpoint
+		// create request for remote file
+		resp, err = client.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
+		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				return "", false, fmt.Errorf("File with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+			}
+			return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s: %w", r.MediaMetadata.MediaID, r.MediaMetadata.Origin, err)
 		}
-		return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
-	// The reader returned here will be limited either by the Content-Length
-	// and/or the configured maximum media size.
-	contentLength, reader, parseErr := r.GetContentLengthAndReader(resp.Header.Get("Content-Length"), &resp.Body, maxFileSizeBytes)
+	// If this wasn't a multipart response, set the Content-Type now. Will be overwritten
+	// by the multipart Content-Type below.
+	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
+
+	var contentLength int64
+	var reader io.Reader
+	var parseErr error
+	if isAuthed {
+		contentLength, reader, parseErr = parseMultipartResponse(r, resp, maxFileSizeBytes)
+	} else {
+		// The reader returned here will be limited either by the Content-Length
+		// and/or the configured maximum media size.
+		contentLength, reader, parseErr = r.GetContentLengthAndReader(resp.Header.Get("Content-Length"), resp.Body, maxFileSizeBytes)
+	}
+
 	if parseErr != nil {
 		return "", false, parseErr
 	}
@@ -755,7 +868,6 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
-	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
 
 	dispositionHeader := resp.Header.Get("Content-Disposition")
 	if _, params, e := mime.ParseMediaType(dispositionHeader); e == nil {
@@ -807,4 +919,57 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 
 	return types.Path(finalPath), duplicate, nil
+}
+
+func parseMultipartResponse(r *downloadRequest, resp *http.Response, maxFileSizeBytes config.FileSizeBytes) (int64, io.Reader, error) {
+	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		return 0, nil, err
+	}
+	if params["boundary"] == "" {
+		return 0, nil, fmt.Errorf("no boundary header found on media %s from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+	}
+	mr := multipart.NewReader(resp.Body, params["boundary"])
+
+	// Get the first, JSON, part
+	p, err := mr.NextPart()
+	if err != nil {
+		return 0, nil, err
+	}
+	defer p.Close() // nolint: errcheck
+
+	if p.Header.Get("Content-Type") != "application/json" {
+		return 0, nil, fmt.Errorf("first part of the response must be application/json")
+	}
+	// Try to parse media meta information
+	meta := mediaMeta{}
+	if err = json.NewDecoder(p).Decode(&meta); err != nil {
+		return 0, nil, err
+	}
+	defer p.Close() // nolint: errcheck
+
+	// Get the actual media content
+	p, err = mr.NextPart()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	redirect := p.Header.Get("Location")
+	if redirect != "" {
+		return 0, nil, fmt.Errorf("Location header is not yet supported")
+	}
+
+	contentLength, reader, err := r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)
+	// For multipart requests, we need to get the Content-Type of the second part, which is the actual media
+	r.MediaMetadata.ContentType = types.ContentType(p.Header.Get("Content-Type"))
+	return contentLength, reader, err
+}
+
+// contentDispositionFor returns the Content-Disposition for a given
+// content type.
+func contentDispositionFor(contentType types.ContentType) string {
+	if _, ok := allowInlineTypes[contentType]; ok {
+		return "inline"
+	}
+	return "attachment"
 }

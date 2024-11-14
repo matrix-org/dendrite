@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/matrix-org/gomatrix"
@@ -26,12 +27,10 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -53,7 +52,6 @@ type destinationQueue struct {
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            map[spec.ServerName]*fclient.SigningIdentity
-	rsAPI              api.FederationRoomserverAPI
 	client             fclient.FederationClient        // federation client
 	origin             spec.ServerName                 // origin of requests
 	destination        spec.ServerName                 // destination of requests
@@ -296,6 +294,10 @@ func (oq *destinationQueue) checkNotificationsOnClose() {
 
 // backgroundSend is the worker goroutine for sending events.
 func (oq *destinationQueue) backgroundSend() {
+	// Don't try to send transactions if we are shutting down.
+	if oq.process.Context().Err() != nil {
+		return
+	}
 	// Check if a worker is already running, and if it isn't, then
 	// mark it as started.
 	if !oq.running.CompareAndSwap(false, true) {

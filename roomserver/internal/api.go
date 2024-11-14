@@ -340,3 +340,11 @@ func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID s
 func (r *RoomserverInternalAPI) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error) {
 	return r.DB.AssignRoomNID(ctx, roomID, roomVersion)
 }
+
+func (r *RoomserverInternalAPI) InsertReportedEvent(
+	ctx context.Context,
+	roomID, eventID, reportingUserID, reason string,
+	score int64,
+) (int64, error) {
+	return r.DB.InsertReportedEvent(ctx, roomID, eventID, reportingUserID, reason, score)
+}

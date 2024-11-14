@@ -61,11 +61,11 @@ func TestFederationClientQueryKeys(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -92,11 +92,11 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -122,11 +122,11 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{shouldFail: true}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -152,11 +152,11 @@ func TestFederationClientClaimKeys(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -183,11 +183,11 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
-		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{

@@ -162,7 +162,7 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 
 	rsAPI.SetAppserviceAPI(asAPI)

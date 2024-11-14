@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,6 +34,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
@@ -47,8 +49,10 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
-// TODO: Does this value make sense?
-const MaximumMissingProcessingTime = time.Minute * 2
+// MaximumMissingProcessingTime is the maximum time we allow "processRoomEvent" to fetch
+// e.g. missing auth/prev events. This duration is used for AckWait, and if it is exceeded
+// NATS queues the event for redelivery.
+const MaximumMissingProcessingTime = time.Minute * 5
 
 var processRoomEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
@@ -488,6 +492,33 @@ func (r *Inputer) processRoomEvent(
 		})
 		if err != nil {
 			return fmt.Errorf("r.WriteOutputEvents (old): %w", err)
+		}
+	}
+
+	// If this is a membership event, it is possible we newly joined a federated room and eventually
+	// missed to update our m.room.server_acl - the following ensures we set the ACLs
+	// TODO: This probably performs badly in benchmarks
+	if event.Type() == spec.MRoomMember {
+		membership, _ := event.Membership()
+		if membership == spec.Join {
+			_, serverName, _ := gomatrixserverlib.SplitID('@', *event.StateKey())
+			// only handle local membership events
+			if r.Cfg.Matrix.IsLocalServerName(serverName) {
+				var aclEvent *types.HeaderedEvent
+				aclEvent, err = r.DB.GetStateEvent(ctx, event.RoomID().String(), acls.MRoomServerACL, "")
+				if err != nil {
+					logrus.WithError(err).Error("failed to get server ACLs")
+				}
+				if aclEvent != nil {
+					strippedEvent := tables.StrippedEvent{
+						RoomID:       aclEvent.RoomID().String(),
+						EventType:    aclEvent.Type(),
+						StateKey:     *aclEvent.StateKey(),
+						ContentValue: string(aclEvent.Content()),
+					}
+					r.ACLs.OnServerACLUpdate(strippedEvent)
+				}
+			}
 		}
 	}
 

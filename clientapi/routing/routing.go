@@ -94,6 +94,7 @@ func Setup(
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
 		"org.matrix.msc2285.stable":    true,
+		"org.matrix.msc3916.stable":    true,
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
@@ -255,7 +256,7 @@ func Setup(
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+			logrus.WithError(err).Fatal("unable to get account for sending server notices")
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
@@ -732,7 +733,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/auth/{authType}/fallback/web",
-		httputil.MakeHTMLAPI("auth_fallback", enableMetrics, func(w http.ResponseWriter, req *http.Request) {
+		httputil.MakeHTTPAPI("auth_fallback", userAPI, enableMetrics, func(w http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 			AuthFallback(w, req, vars["authType"], cfg)
 		}),
@@ -1513,4 +1514,58 @@ func Setup(
 			return GetPresence(req, device, natsClient, cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/joined_members",
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetJoinedMembers(req, device, vars["roomID"], rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/report/{eventID}",
+		httputil.MakeAuthAPI("report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return ReportEvent(req, device, vars["roomID"], vars["eventID"], rsAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports",
+		httputil.MakeAdminAPI("admin_report_events", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			from := parseUint64OrDefault(req.URL.Query().Get("from"), 0)
+			limit := parseUint64OrDefault(req.URL.Query().Get("limit"), 100)
+			dir := req.URL.Query().Get("dir")
+			userID := req.URL.Query().Get("user_id")
+			roomID := req.URL.Query().Get("room_id")
+
+			// Go backwards if direction is empty or "b"
+			backwards := dir == "" || dir == "b"
+			return GetEventReports(req, rsAPI, from, limit, backwards, userID, roomID)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports/{reportID}",
+		httputil.MakeAdminAPI("admin_report_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetEventReport(req, rsAPI, vars["reportID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	synapseAdminRouter.Handle("/admin/v1/event_reports/{reportID}",
+		httputil.MakeAdminAPI("admin_report_event_delete", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return DeleteEventReport(req, rsAPI, vars["reportID"])
+		}),
+	).Methods(http.MethodDelete, http.MethodOptions)
 }

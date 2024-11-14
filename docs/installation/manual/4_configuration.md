@@ -6,6 +6,8 @@ nav_order: 4
 permalink: /installation/manual/configuration
 ---
 
+{% include deprecation.html %}
+
 # Configuring Dendrite
 
 A YAML configuration file is used to configure Dendrite. A sample configuration file is

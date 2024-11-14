@@ -71,13 +71,14 @@ func NewOutputRoomEventConsumer(
 		ctx:       process.Context(),
 		cfg:       cfg,
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
 		rsAPI:     rsAPI,
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
+	durableNames := make([]string, 0, len(s.cfg.Derived.ApplicationServices))
 	for _, as := range s.cfg.Derived.ApplicationServices {
 		appsvc := as
 		state := &appserviceState{
@@ -94,6 +95,15 @@ func (s *OutputRoomEventConsumer) Start() error {
 			nats.DeliverNew(), nats.ManualAck(),
 		); err != nil {
 			return fmt.Errorf("failed to create %q consumer: %w", token, err)
+		}
+		durableNames = append(durableNames, s.cfg.Matrix.JetStream.Durable("Appservice_"+token))
+	}
+	// Cleanup any consumers still existing on the OutputRoomEvent stream
+	// to avoid messages not being deleted
+	for _, consumerName := range durableNames {
+		err := s.jetstream.DeleteConsumer(s.cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent), consumerName+"Pull")
+		if err != nil && err != nats.ErrConsumerNotFound {
+			return err
 		}
 	}
 	return nil
@@ -196,13 +206,21 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	}
 
 	// Send the transaction to the appservice.
-	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
-	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.RequestUrl(), txnID, url.QueryEscape(state.HSToken))
+	// https://spec.matrix.org/v1.9/application-service-api/#pushing-events
+	path := "_matrix/app/v1/transactions"
+	if s.cfg.LegacyPaths {
+		path = "transactions"
+	}
+	address := fmt.Sprintf("%s/%s/%s", state.RequestUrl(), path, txnID)
+	if s.cfg.LegacyAuth {
+		address += "?access_token=" + url.QueryEscape(state.HSToken)
+	}
 	req, err := http.NewRequestWithContext(ctx, "PUT", address, bytes.NewBuffer(transaction))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.HSToken))
 	resp, err := state.HTTPClient.Do(req)
 	if err != nil {
 		return state.backoffAndPause(err)

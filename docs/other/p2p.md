@@ -3,6 +3,8 @@ title: P2P Matrix
 nav_exclude: true
 ---
 
+{% include deprecation.html %}
+
 # P2P Matrix
 
 These are the instructions for setting up P2P Dendrite, current as of May 2020. There's both Go stuff and JS stuff to do to set this up.

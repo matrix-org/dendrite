@@ -316,7 +316,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		return nil
 	}
 	// create empty device keys and upload them to trigger device list changes
-	return a.deviceListUpdate(dev.UserID, []string{dev.ID})
+	return a.deviceListUpdate(dev.UserID, []string{dev.ID}, req.FromRegistration)
 }
 
 func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.PerformDeviceDeletionRequest, res *api.PerformDeviceDeletionResponse) error {
@@ -356,10 +356,10 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 		return fmt.Errorf("a.KeyAPI.PerformDeleteKeys: %w", err)
 	}
 	// create empty device keys and upload them to delete what was once there and trigger device list changes
-	return a.deviceListUpdate(req.UserID, deletedDeviceIDs)
+	return a.deviceListUpdate(req.UserID, deletedDeviceIDs, false)
 }
 
-func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) error {
+func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string, fromRegistration bool) error {
 	deviceKeys := make([]api.DeviceKeys, len(deviceIDs))
 	for i, did := range deviceIDs {
 		deviceKeys[i] = api.DeviceKeys{
@@ -371,8 +371,9 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 
 	var uploadRes api.PerformUploadKeysResponse
 	if err := a.PerformUploadKeys(context.Background(), &api.PerformUploadKeysRequest{
-		UserID:     userID,
-		DeviceKeys: deviceKeys,
+		UserID:           userID,
+		DeviceKeys:       deviceKeys,
+		FromRegistration: fromRegistration,
 	}, &uploadRes); err != nil {
 		return err
 	}
@@ -938,11 +939,12 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 		return nil
 	case bcrypt.ErrHashTooShort: // user exists, but probably a passwordless account
 		return nil
-	default:
+	case nil:
 		res.Exists = true
 		res.Account = acc
 		return nil
 	}
+	return err
 }
 
 func (a *UserInternalAPI) SetDisplayName(ctx context.Context, localpart string, serverName spec.ServerName, displayName string) (*authtypes.Profile, bool, error) {

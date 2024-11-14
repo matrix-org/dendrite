@@ -5,6 +5,8 @@ nav_order: 4
 permalink: /development/profiling
 ---
 
+{% include deprecation.html %}
+
 # Profiling Dendrite
 
 If you are running into problems with Dendrite using excessive resources (e.g. CPU or RAM) then you can use the profiler to work out what is happening.

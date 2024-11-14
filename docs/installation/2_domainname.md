@@ -5,6 +5,8 @@ nav_order: 2
 permalink: /installation/domainname
 ---
 
+{% include deprecation.html %}
+
 # Setting up the domain
 
 Every Matrix server deployment requires a server name which uniquely identifies it. For

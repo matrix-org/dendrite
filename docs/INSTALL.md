@@ -1,3 +1,6 @@
+
+{% include deprecation.html %}
+
 # Installation
 
 Please note that new installation instructions can be found

@@ -630,6 +630,7 @@ func handleGuestRegistration(
 		AccessToken:       token,
 		IPAddr:            req.RemoteAddr,
 		UserAgent:         req.UserAgent(),
+		FromRegistration:  true,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
@@ -645,6 +646,16 @@ func handleGuestRegistration(
 			DeviceID:    devRes.Device.ID,
 		},
 	}
+}
+
+// localpartMatchesExclusiveNamespaces will check if a given username matches any
+// application service's exclusive users namespace
+func localpartMatchesExclusiveNamespaces(
+	cfg *config.ClientAPI,
+	localpart string,
+) bool {
+	userID := userutil.MakeUserID(localpart, cfg.Matrix.ServerName)
+	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
 }
 
 // handleRegistrationFlow will direct and complete registration flow stages
@@ -695,7 +706,7 @@ func handleRegistrationFlow(
 	// If an access token is provided, ignore this check this is an appservice
 	// request and we will validate in validateApplicationService
 	if len(cfg.Derived.ApplicationServices) != 0 &&
-		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
+		localpartMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.ASExclusive("This username is reserved by an application service."),
@@ -772,7 +783,7 @@ func handleApplicationServiceRegistration(
 
 	// Check application service register user request is valid.
 	// The application service's ID is returned if so.
-	appserviceID, err := validateApplicationService(
+	appserviceID, err := internal.ValidateApplicationServiceRequest(
 		cfg, r.Username, accessToken,
 	)
 	if err != nil {
@@ -909,6 +920,7 @@ func completeRegistration(
 		DeviceID:          deviceID,
 		IPAddr:            ipAddr,
 		UserAgent:         userAgent,
+		FromRegistration:  true,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{

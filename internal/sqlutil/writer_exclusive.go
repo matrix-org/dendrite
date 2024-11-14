@@ -3,8 +3,7 @@ package sqlutil
 import (
 	"database/sql"
 	"errors"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 )
 
 // ExclusiveWriter implements sqlutil.Writer.

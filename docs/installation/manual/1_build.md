@@ -7,6 +7,8 @@ nav_order: 1
 permalink: /installation/manual/build
 ---
 
+{% include deprecation.html %}
+
 # Build all Dendrite commands
 
 Dendrite has numerous utility commands in addition to the actual server binaries.
