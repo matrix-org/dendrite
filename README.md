@@ -4,7 +4,7 @@
 
 Dendrite is an open-source [Matrix](https://matrix.org/) homeserver developed from 2019 through 2023 as part of the Matrix.org Foundation. 
 The Matrix.org Foundation is not able to resource maintenance of Dendrite and it [continues to be developed by Element](https://github.com/element-hq/dendrite)
-additionally you have the choice of [other Matrix homeservers](https://matrix.org/ecosystem/servers/>)
+additionally you have the choice of [other Matrix homeservers](https://matrix.org/ecosystem/servers/)
 
 See [The future of Synapse and Dendrite](https://matrix.org/blog/2023/11/06/future-of-synapse-dendrite/) blog post for more information.
 
