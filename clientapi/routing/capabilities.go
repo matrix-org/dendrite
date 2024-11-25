@@ -44,6 +44,15 @@ func GetCapabilities(rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse 
 				"default":   rsAPI.DefaultRoomVersion(),
 				"available": versionsMap,
 			},
+			"m.set_displayname": map[string]bool{
+				"enabled": true,
+			},
+			"m.set_avatar_url": map[string]bool{
+				"enabled": true,
+			},
+			"m.3pid_changes": map[string]bool{
+				"enabled": true,
+			},
 		},
 	}
 
