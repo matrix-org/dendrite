@@ -24,7 +24,22 @@ func newRelationsTable(t *testing.T, dbType test.DBType) (tables.Relations, *sql
 		t.Fatalf("failed to open db: %s", err)
 	}
 
+	switch dbType {
+	case test.DBTypePostgres:
+		_, err = postgres.NewPostgresEventsTable(db)
+	case test.DBTypeSQLite:
+		var stream sqlite3.StreamIDStatements
+		if err = stream.Prepare(db); err != nil {
+			t.Fatalf("failed to prepare stream stmts: %s", err)
+		}
+		_, err = sqlite3.NewSqliteEventsTable(db, &stream)
+	}
+	if err != nil {
+		t.Fatalf("failed to make new table: %s", err)
+	}
+
 	var tab tables.Relations
+
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresRelationsTable(db)
@@ -181,6 +196,56 @@ func TestRelationsTable(t *testing.T) {
 			},
 		} {
 			compareRelationsToExpected(t, tab, r, expected)
+		}
+	})
+}
+
+const threadRelType = "m.thread"
+
+func TestThreads(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	alice := test.NewUser(t)
+	room := test.NewRoom(t, alice)
+
+	firstEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{
+		"body": "first message",
+	})
+	threadReplyEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{
+		"body": "thread reply",
+		"m.relates_to": map[string]interface{}{
+			"event_id": firstEvent.EventID(),
+			"rel_type": threadRelType,
+		},
+	})
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		tab, _, close := newRelationsTable(t, dbType)
+		defer close()
+
+		err = tab.InsertRelation(ctx, nil, room.ID, firstEvent.EventID(), threadReplyEvent.EventID(), "m.room.message", threadReplyEvent.EventID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var eventIds []string
+		eventIds, _, err = tab.SelectThreads(ctx, nil, room.ID, "", 0, 100)
+
+		for i, expected := range []string{
+			firstEvent.EventID(),
+		} {
+			eventID := eventIds[i]
+			if eventID != expected {
+				t.Fatalf("eventID mismatch: got %s, want %s", eventID, expected)
+			}
+		}
+		eventIds, _, err = tab.SelectThreads(ctx, nil, room.ID, alice.ID, 0, 100)
+		for i, expected := range []string{
+			firstEvent.EventID(),
+		} {
+			eventID := eventIds[i]
+			if eventID != expected {
+				t.Fatalf("eventID mismatch: got %s, want %s", eventID, expected)
+			}
 		}
 	})
 }

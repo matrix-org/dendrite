@@ -811,3 +811,39 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	return events, prevBatch, nextBatch, nil
 }
+
+func (d *DatabaseTransaction) ThreadsFor(ctx context.Context, roomID, userID string, from types.StreamPosition, limit uint64) (
+	events []*rstypes.HeaderedEvent, prevBatch, nextBatch string, err error,
+) {
+	r := types.Range{
+		From: from,
+	}
+
+	if r.From == 0 {
+		// If we're working backwards (dir=b) and there's no ?from= specified then
+		// we will automatically want to work backwards from the current position,
+		// so find out what that is.
+		if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+		}
+		// The result normally isn't inclusive of the event *at* the ?from=
+		// position, so add 1 here so that we include the most recent relation.
+		r.From++
+	}
+
+	// First look up any threads from the database. We add one to the limit here
+	// so that we can tell if we're overflowing, as we will only set the "next_batch"
+	// in the response if we are.
+	eventIDs, pos, err := d.Relations.SelectThreads(ctx, d.txn, roomID, userID, from, limit+1)
+
+	if err != nil {
+		return nil, "", "", fmt.Errorf("d.Relations.SelectRelationsInRange: %w", err)
+	}
+
+	events, err = d.Events(ctx, eventIDs)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("d.OutputEvents.SelectEvents: %w", err)
+	}
+
+	return events, prevBatch, fmt.Sprintf("%d", pos), nil
+}

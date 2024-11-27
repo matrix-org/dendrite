@@ -63,6 +63,23 @@ const selectRelationsInRangeDescSQL = "" +
 	" AND id >= $5 AND id < $6" +
 	" ORDER BY id DESC LIMIT $7"
 
+const selectThreadsSQL = "" +
+	"SELECT syncapi_relations.id, syncapi_relations.event_id FROM syncapi_relations" +
+	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
+	" WHERE syncapi_relations.room_id = $1" +
+	" AND syncapi_relations.rel_type = 'm.thread'" +
+	" AND syncapi_relations.id >= $2" +
+	" ORDER BY syncapi_relations.id LIMIT $3"
+
+const selectThreadsWithSenderSQL = "" +
+	"SELECT syncapi_relations.id, syncapi_relations.event_id FROM syncapi_relations" +
+	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_relations.event_id" +
+	" WHERE syncapi_relations.room_id = $1" +
+	" AND syncapi_output_room_events.sender = $2" +
+	" AND syncapi_relations.rel_type = 'm.thread'" +
+	" AND syncapi_relations.id >= $3" +
+	" ORDER BY syncapi_relations.id LIMIT $4"
+
 const selectMaxRelationIDSQL = "" +
 	"SELECT COALESCE(MAX(id), 0) FROM syncapi_relations"
 
@@ -70,6 +87,8 @@ type relationsStatements struct {
 	insertRelationStmt             *sql.Stmt
 	selectRelationsInRangeAscStmt  *sql.Stmt
 	selectRelationsInRangeDescStmt *sql.Stmt
+	selectThreadsStmt              *sql.Stmt
+	selectThreadsWithSenderStmt    *sql.Stmt
 	deleteRelationStmt             *sql.Stmt
 	selectMaxRelationIDStmt        *sql.Stmt
 }
@@ -84,6 +103,8 @@ func NewPostgresRelationsTable(db *sql.DB) (tables.Relations, error) {
 		{&s.insertRelationStmt, insertRelationSQL},
 		{&s.selectRelationsInRangeAscStmt, selectRelationsInRangeAscSQL},
 		{&s.selectRelationsInRangeDescStmt, selectRelationsInRangeDescSQL},
+		{&s.selectThreadsStmt, selectThreadsSQL},
+		{&s.selectThreadsWithSenderStmt, selectThreadsWithSenderSQL},
 		{&s.deleteRelationStmt, deleteRelationSQL},
 		{&s.selectMaxRelationIDStmt, selectMaxRelationIDSQL},
 	}.Prepare(db)
@@ -146,6 +167,49 @@ func (s *relationsStatements) SelectRelationsInRange(
 	if lastPos == 0 {
 		lastPos = r.To
 	}
+	return result, lastPos, rows.Err()
+}
+
+func (s *relationsStatements) SelectThreads(
+	ctx context.Context,
+	txn *sql.Tx,
+	roomID, userID string,
+	from types.StreamPosition,
+	limit uint64,
+) ([]string, types.StreamPosition, error) {
+	var lastPos types.StreamPosition
+	var stmt *sql.Stmt
+	var rows *sql.Rows
+	var err error
+
+	if userID == "" {
+		stmt = sqlutil.TxStmt(txn, s.selectThreadsStmt)
+		rows, err = stmt.QueryContext(ctx, roomID, from, limit)
+	} else {
+		stmt = sqlutil.TxStmt(txn, s.selectThreadsWithSenderStmt)
+		rows, err = stmt.QueryContext(ctx, roomID, userID, from, limit)
+	}
+	if err != nil {
+		return nil, lastPos, err
+	}
+
+	defer internal.CloseAndLogIfError(ctx, rows, "selectThreads: rows.close() failed")
+	var result []string
+	var (
+		id      types.StreamPosition
+		eventId string
+	)
+
+	for rows.Next() {
+		if err = rows.Scan(&id, &eventId); err != nil {
+			return nil, lastPos, err
+		}
+		if id > lastPos {
+			lastPos = id
+		}
+		result = append(result, eventId)
+	}
+
 	return result, lastPos, rows.Err()
 }
 
