@@ -76,7 +76,7 @@ func (d *Database) AssociateEDUWithDestinations(
 	})
 }
 
-// GetNextTransactionEDUs retrieves events from the database for
+// GetPendingEDUs retrieves events from the database for
 // the next pending transaction, up to the limit specified.
 func (d *Database) GetPendingEDUs(
 	ctx context.Context,
@@ -166,7 +166,7 @@ func (d *Database) CleanEDUs(
 	})
 }
 
-// GetPendingServerNames returns the server names that have EDUs
+// GetPendingEDUServerNames returns the server names that have EDUs
 // waiting to be sent.
 func (d *Database) GetPendingEDUServerNames(
 	ctx context.Context,
